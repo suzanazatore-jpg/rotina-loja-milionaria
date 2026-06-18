@@ -34,7 +34,7 @@ function mesAtual() {
   return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`
 }
 
-export default function AdminCalendario() {
+export default function AdminCampanhas() {
   const [carregando, setCarregando] = useState(true)
   const [autorizado, setAutorizado] = useState(false)
   const [itens, setItens] = useState([])
@@ -67,7 +67,7 @@ export default function AdminCalendario() {
   }, [router])
 
   async function carregar() {
-    const { data } = await supabase.from('calendario').select('*').order('mes_ano', { ascending: false })
+    const { data } = await supabase.from('campanhas').select('*').order('mes_ano', { ascending: false })
     if (data) setItens(data)
   }
 
@@ -82,8 +82,8 @@ export default function AdminCalendario() {
   }
 
   async function enviar() {
-    if (!titulo.trim()) { setMsg('⚠ Dê um nome ao material (ex: Calendário de Julho).'); return }
-    if (!mesAno) { setMsg('⚠ Selecione o mês deste calendário.'); return }
+    if (!titulo.trim()) { setMsg('⚠ Dê um nome ao material (ex: Campanha de Julho).'); return }
+    if (!mesAno) { setMsg('⚠ Selecione o mês desta campanha.'); return }
     if (!arquivo) { setMsg('⚠ Selecione um arquivo PDF.'); return }
     setEnviando(true); setMsg('')
 
@@ -94,7 +94,7 @@ export default function AdminCalendario() {
         if (existente.arquivo_nome) {
           await supabase.storage.from(BUCKET).remove([existente.arquivo_nome])
         }
-        await supabase.from('calendario').delete().eq('id', existente.id)
+        await supabase.from('campanhas').delete().eq('id', existente.id)
       }
 
       // Nome único pro arquivo (evita sobrescrever no Storage)
@@ -108,7 +108,7 @@ export default function AdminCalendario() {
       const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(nomeArquivo)
 
       // 3. Salva o registro na tabela
-      const { error: dbError } = await supabase.from('calendario').insert({
+      const { error: dbError } = await supabase.from('campanhas').insert({
         ordem: 1,
         mes_ano: mesAno,
         titulo: titulo.trim(),
@@ -135,7 +135,7 @@ export default function AdminCalendario() {
       await supabase.storage.from(BUCKET).remove([item.arquivo_nome])
     }
     // Apaga o registro
-    await supabase.from('calendario').delete().eq('id', item.id)
+    await supabase.from('campanhas').delete().eq('id', item.id)
     await carregar()
   }
 
@@ -166,7 +166,7 @@ export default function AdminCalendario() {
           <button onClick={() => router.push('/admin')} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '7px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>← Escritório</button>
           <div>
             <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: ouro, textTransform: 'uppercase', margin: 0 }}>Administração</p>
-            <p style={{ fontSize: '15px', fontWeight: 800, margin: '1px 0 0' }}>📅 Calendário (PDFs)</p>
+            <p style={{ fontSize: '15px', fontWeight: 800, margin: '1px 0 0' }}>🎯 Campanhas (PDFs)</p>
           </div>
         </div>
         {!mostrarForm && (
@@ -184,7 +184,7 @@ export default function AdminCalendario() {
             <h2 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 16px' }}>Novo material em PDF</h2>
 
             <div style={{ marginBottom: '14px' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '6px' }}>Mês deste calendário *</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '6px' }}>Mês desta campanha *</label>
               <select value={mesAno} onChange={e => setMesAno(e.target.value)}
                 style={{ width: '100%', padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '14px', color: '#FFF', outline: 'none', boxSizing: 'border-box' }}>
                 {meses.map(m => <option key={m.valor} value={m.valor}>{m.rotulo}</option>)}
@@ -196,7 +196,7 @@ export default function AdminCalendario() {
 
             <div style={{ marginBottom: '14px' }}>
               <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '6px' }}>Nome do material *</label>
-              <input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Ex: Calendário de Julho"
+              <input value={titulo} onChange={e => setTitulo(e.target.value)} placeholder="Ex: Campanha de Julho"
                 style={{ width: '100%', padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '14px', color: '#FFF', outline: 'none', boxSizing: 'border-box' }} />
             </div>
 
