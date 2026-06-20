@@ -36,6 +36,29 @@ function rotuloMesCompleto(mesAno) {
   return `${NOMES_MESES[parseInt(mes, 10) - 1]} de ${ano}`
 }
 
+// ════════ HELPER: verifica se o acesso está liberado ════════
+// Retorna { liberado: bool, motivo: 'expirado' | 'atrasado' | 'cancelado' | null }
+function verificarAcesso(perfil) {
+  if (!perfil) return { liberado: true, motivo: null } // sem dados ainda, não bloqueia
+
+  const tipo = perfil.tipo_acesso
+
+  if (tipo === 'assinatura') {
+    if (perfil.status_assinatura === 'atrasado') return { liberado: false, motivo: 'atrasado' }
+    if (perfil.status_assinatura === 'cancelado') return { liberado: false, motivo: 'cancelado' }
+    return { liberado: true, motivo: null } // 'ativo' ou nulo (não bloqueia por padrão)
+  }
+
+  if (tipo === 'teste' || tipo === 'avista') {
+    if (perfil.acesso_expira_em && new Date(perfil.acesso_expira_em) < new Date()) {
+      return { liberado: false, motivo: 'expirado' }
+    }
+    return { liberado: true, motivo: null }
+  }
+
+  return { liberado: true, motivo: null }
+}
+
 export default function Painel() {
   const [usuario, setUsuario] = useState(null)
   const [carregando, setCarregando] = useState(true)
@@ -50,6 +73,9 @@ export default function Painel() {
   const [whatsapp, setWhatsapp] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [msgSalvo, setMsgSalvo] = useState('')
+
+  // Controle de acesso (novo)
+  const [acesso, setAcesso] = useState({ liberado: true, motivo: null })
 
   // Aulas (vindas do banco)
   const [aulas, setAulas] = useState([])
@@ -76,8 +102,15 @@ export default function Painel() {
       setUsuario(session.user)
       // Tenta carregar perfil salvo na tabela 'perfis'
       try {
-        const { data } = await supabase.from('perfis').select('nome, whatsapp').eq('id', session.user.id).single()
-        if (data) { setNome(data.nome || ''); setWhatsapp(data.whatsapp || '') }
+        const { data } = await supabase.from('perfis').select('nome, whatsapp, tipo_acesso, acesso_expira_em, status_assinatura').eq('id', session.user.id).single()
+        if (data) {
+          setNome(data.nome || '')
+          setWhatsapp(data.whatsapp || '')
+          // Admin nunca é bloqueado, mesmo que o perfil tenha algum status estranho
+          if (session.user.email !== ADMIN_EMAIL) {
+            setAcesso(verificarAcesso(data))
+          }
+        }
       } catch (e) { /* tabela pode não existir ainda */ }
       // Carrega as aulas cadastradas no admin
       try {
@@ -182,6 +215,33 @@ export default function Painel() {
     return (
       <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <p style={{ color: '#888', fontSize: '15px' }}>Carregando...</p>
+      </div>
+    )
+  }
+
+  // ── Bloqueio de acesso (teste expirado / à vista expirado / assinatura atrasada ou cancelada) ──
+  if (!acesso.liberado) {
+    const ouroGradLocal = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
+    const textos = {
+      expirado: { titulo: 'Seu acesso expirou', texto: 'O período do seu plano chegou ao fim. Fale com o suporte para renovar e continuar aproveitando a Rotina da Loja Milionária.' },
+      atrasado: { titulo: 'Pagamento pendente', texto: 'Identificamos um atraso no pagamento da sua assinatura. Regularize para voltar a ter acesso completo.' },
+      cancelado: { titulo: 'Assinatura cancelada', texto: 'Sua assinatura foi cancelada. Para reativar o acesso, fale com o suporte ou assine novamente.' },
+    }
+    const info = textos[acesso.motivo] || textos.expirado
+    return (
+      <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center' }}>
+        <div style={{ fontSize: '48px', marginBottom: '14px' }}>🔒</div>
+        <h1 style={{ color: '#FFF', fontSize: '20px', margin: '0 0 8px' }}>{info.titulo}</h1>
+        <p style={{ color: '#888', fontSize: '14px', margin: '0 0 22px', maxWidth: '320px', lineHeight: 1.5 }}>{info.texto}</p>
+        <a
+          href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Quero%20renovar%20meu%20acesso`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ background: ouroGradLocal, color: '#0A0A0A', borderRadius: '8px', padding: '12px 22px', fontSize: '14px', fontWeight: 800, textDecoration: 'none', marginBottom: '12px' }}
+        >
+          💬 Falar com o suporte no WhatsApp
+        </a>
+        <button onClick={sair} style={{ background: 'transparent', color: '#888', border: '1px solid #2A2A2A', borderRadius: '8px', padding: '10px 20px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Sair</button>
       </div>
     )
   }
@@ -300,16 +360,17 @@ export default function Painel() {
           {secao !== 'inicio' && (
             <div style={{ padding: '20px 18px' }}>
 
-              {/* MEUS DADOS */}
+              {/* MEUS DADOS (somente leitura — só o admin pode editar) */}
               {secao === 'dados' && (
                 <div style={{ maxWidth: '500px', margin: '0 auto' }}>
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '20px' }}>
                     <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 16px', color: cores.tx }}>👤 Meus Dados</h2>
-                    <Campo label="Nome" valor={nome} onChange={setNome} placeholder="Seu nome completo" cores={cores} ouro={ouro} />
+                    <Campo label="Nome" valor={nome || '—'} onChange={() => {}} placeholder="" cores={cores} ouro={ouro} disabled />
                     <Campo label="E-mail" valor={usuario?.email || ''} onChange={() => {}} placeholder="" cores={cores} ouro={ouro} disabled />
-                    <Campo label="WhatsApp" valor={whatsapp} onChange={setWhatsapp} placeholder="(00) 00000-0000" cores={cores} ouro={ouro} />
-                    <button onClick={salvarDados} disabled={salvando} style={{ width: '100%', marginTop: '8px', padding: '12px', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar dados'}</button>
-                    {msgSalvo && <p style={{ fontSize: '12px', color: msgSalvo.startsWith('✓') ? '#5dca8a' : '#e88', margin: '10px 0 0', textAlign: 'center' }}>{msgSalvo}</p>}
+                    <Campo label="WhatsApp" valor={whatsapp || '—'} onChange={() => {}} placeholder="" cores={cores} ouro={ouro} disabled />
+                    <p style={{ fontSize: '12px', color: cores.tx3, margin: '10px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
+                      Esses dados são gerenciados pela administração. Para alterar, fale com o suporte. 💬
+                    </p>
                   </div>
                 </div>
               )}
@@ -580,7 +641,7 @@ export default function Painel() {
               <p style={{ fontSize: '16px', fontWeight: 800, margin: '10px 0 1px' }}>{nome || nomeExibe}</p>
               <p style={{ fontSize: '12px', margin: 0, opacity: 0.75 }}>{usuario?.email}</p>
               {whatsapp && <p style={{ fontSize: '12px', margin: '1px 0 0', opacity: 0.75 }}>{whatsapp}</p>}
-              <button onClick={() => { setSecao('dados'); setMenuMobile(false) }} style={{ marginTop: '12px', padding: '7px 12px', background: '#0A0A0A', color: ouro, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>Editar meus dados</button>
+              <button onClick={() => { setSecao('dados'); setMenuMobile(false) }} style={{ marginTop: '12px', padding: '7px 12px', background: '#0A0A0A', color: ouro, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>Ver meus dados</button>
             </div>
             {/* Itens do menu */}
             <div style={{ padding: '8px 14px 14px' }}>
