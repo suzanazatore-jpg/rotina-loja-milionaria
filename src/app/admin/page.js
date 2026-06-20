@@ -16,8 +16,7 @@ export default function Admin() {
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser()
-      const session = user ? { user } : null
+      const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
       if (session.user.email !== ADMIN_EMAIL) {
         setAutorizado(false); setCarregando(false); return
