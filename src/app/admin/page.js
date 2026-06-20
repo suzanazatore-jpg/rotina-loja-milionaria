@@ -28,6 +28,7 @@ export default function Admin() {
   }, [router])
 
   const cards = [
+    { id: 'alunas', icone: '👥', titulo: 'Alunas', sub: 'Dados e contato', rota: '/admin/alunas' },
     { id: 'aulas', icone: '🎓', titulo: 'Aulas', sub: 'Mentoria gravada', rota: '/admin/aulas' },
     { id: 'calendario', icone: '📅', titulo: 'Calendário', sub: 'Conteúdo do mês', rota: '/admin/calendario' },
     { id: 'campanhas', icone: '🎯', titulo: 'Campanhas', sub: 'Vendas prontas', rota: '/admin/campanhas' },
