@@ -429,7 +429,7 @@ export default function Painel() {
                       <p style={{ fontSize: '12px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>{item.d}</p>
                     </div>
                   ))}
-                  <a href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Tenho%20uma%20d%C3%BAvida`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: 800, textDecoration: 'none', marginTop: '14px' }}>💬 Falar com o suporte no WhatsApp</a>
+                  <a href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Suh%2C%20sou%20aluna%20e%20tenho%20uma%20d%C3%BAvida`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: 800, textDecoration: 'none', marginTop: '14px' }}>💬 Falar com o suporte no WhatsApp</a>
                 </div>
               )}
 
