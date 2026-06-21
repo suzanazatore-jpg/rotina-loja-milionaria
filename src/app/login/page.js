@@ -3,6 +3,10 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
+// ════════ SUPORTE (WhatsApp) ════════
+// Suporte de acesso/login (esqueci senha, e-mail errado, não consigo entrar)
+const WHATSAPP_SUPORTE_LOGIN = 'https://api.whatsapp.com/send?phone=558499814124&text=Tenho%20uma%20d%C3%BAvida'
+
 export default function Login() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
@@ -43,7 +47,7 @@ export default function Login() {
           </div>
           <button type="submit" disabled={carregando} style={{ width:'100%', padding:'14px', background: carregando ? '#2A2A2A' : 'linear-gradient(135deg, #D4AF37, #F5D76E)', color: carregando ? '#666666' : '#0A0A0A', border:'none', borderRadius:'10px', fontSize:'15px', fontWeight:'700', cursor: carregando ? 'not-allowed' : 'pointer' }}>{carregando ? 'Entrando...' : 'Entrar'}</button>
         </form>
-        <p style={{ textAlign:'center', fontSize:'12px', color:'#444444', marginTop:'24px', marginBottom:0 }}>Problemas? <a href="https://wa.me/SEU_NUMERO" style={{ color:'#D4AF37', textDecoration:'none' }}>WhatsApp</a></p>
+        <p style={{ textAlign:'center', fontSize:'12px', color:'#444444', marginTop:'24px', marginBottom:0 }}>Problemas? <a href={WHATSAPP_SUPORTE_LOGIN} target="_blank" rel="noopener noreferrer" style={{ color:'#D4AF37', textDecoration:'none' }}>WhatsApp</a></p>
       </div>
     </div>
   )
