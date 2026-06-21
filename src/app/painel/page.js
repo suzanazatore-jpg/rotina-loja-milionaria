@@ -36,6 +36,29 @@ function rotuloMesCompleto(mesAno) {
   return `${NOMES_MESES[parseInt(mes, 10) - 1]} de ${ano}`
 }
 
+// ════════ HELPERS DE SEMANA (usados na seção Rotina) ════════
+function segundaFeiraAtual() {
+  const hoje = new Date()
+  const diaSemana = hoje.getDay() // 0 = domingo, 1 = segunda, ...
+  const diff = diaSemana === 0 ? -6 : 1 - diaSemana
+  const segunda = new Date(hoje)
+  segunda.setDate(hoje.getDate() + diff)
+  const ano = segunda.getFullYear()
+  const mes = String(segunda.getMonth() + 1).padStart(2, '0')
+  const dia = String(segunda.getDate()).padStart(2, '0')
+  return `${ano}-${mes}-${dia}`
+}
+
+function rotuloSemana(semanaInicio) {
+  if (!semanaInicio) return ''
+  const [ano, mes, dia] = semanaInicio.split('-').map(Number)
+  const inicio = new Date(ano, mes - 1, dia)
+  const fim = new Date(inicio)
+  fim.setDate(inicio.getDate() + 4)
+  const fmt = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
+  return `Semana de ${fmt(inicio)} a ${fmt(fim)}`
+}
+
 // ════════ HELPER: verifica se o acesso está liberado ════════
 // Retorna { liberado: bool, motivo: 'expirado' | 'atrasado' | 'cancelado' | null }
 function verificarAcesso(perfil) {
@@ -85,6 +108,8 @@ export default function Painel() {
   // Campanhas (vindo do banco)
   const [campanhas, setCampanhas] = useState([])
   const [mesSelecionadoCamp, setMesSelecionadoCamp] = useState(mesAtualValor())
+  // Rotina semanal (vinda do banco) — mostra só a rotina da semana atual
+  const [rotinaSemanal, setRotinaSemanal] = useState(null)
 
   const router = useRouter()
 
@@ -140,6 +165,11 @@ export default function Painel() {
           }
         }
       } catch (e) { /* sem campanhas ainda */ }
+      // Carrega a rotina da semana atual (mostra só a semana corrente, sem histórico)
+      try {
+        const { data: rotinaData } = await supabase.from('rotinas').select('*').eq('semana_inicio', segundaFeiraAtual()).limit(1)
+        if (rotinaData && rotinaData.length > 0) setRotinaSemanal(rotinaData[0])
+      } catch (e) { /* sem rotina ainda */ }
       setCarregando(false)
     }
     init()
@@ -613,12 +643,58 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* SEÇÃO "EM BREVE" (rotina) */}
+              {/* ROTINA SEMANAL (PDF da semana atual, sem abas) */}
               {secao === 'rotina' && (
-                <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'center', padding: '60px 20px' }}>
-                  <div style={{ fontSize: '44px', marginBottom: '12px' }}>{menu.find(m => m.id === secao)?.icone}</div>
-                  <h2 style={{ fontSize: '20px', fontWeight: 800, color: cores.tx, margin: '0 0 6px' }}>{tituloSecao}</h2>
-                  <p style={{ fontSize: '14px', color: cores.tx2, margin: 0 }}>Este conteúdo estará disponível em breve. 👑</p>
+                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                  <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>🔄 Rotina da Semana</h2>
+                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Sua rotina de segunda a sexta, em PDF. Atualizada toda segunda-feira.</p>
+                  </div>
+
+                  {!rotinaSemanal ? (
+                    <div style={{ textAlign: 'center', padding: '50px 20px', color: cores.tx3 }}>
+                      <div style={{ fontSize: '40px', marginBottom: '10px' }}>🔄</div>
+                      <p style={{ fontSize: '14px', margin: 0 }}>A rotina desta semana ainda não foi publicada. Em breve! 👑</p>
+                    </div>
+                  ) : (
+                    <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
+                        <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: ouroGrad, color: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 }}>🔄</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: '11px', fontWeight: 700, color: ouro, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{rotuloSemana(rotinaSemanal.semana_inicio)}</p>
+                          <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: cores.tx }}>{rotinaSemanal.titulo}</h3>
+                          {rotinaSemanal.descricao && <p style={{ fontSize: '13px', color: cores.tx2, margin: '4px 0 0', lineHeight: 1.5 }}>{rotinaSemanal.descricao}</p>}
+                        </div>
+                      </div>
+
+                      {rotinaSemanal.arquivo_url && (
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
+                          <a
+                            href={rotinaSemanal.arquivo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              flex: 1, textAlign: 'center', padding: '10px', borderRadius: '9px',
+                              background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx,
+                              fontSize: '13px', fontWeight: 700, textDecoration: 'none', cursor: 'pointer',
+                            }}
+                          >
+                            👁️ Ver na tela
+                          </a>
+                          <button
+                            onClick={() => baixarPdf(rotinaSemanal)}
+                            style={{
+                              flex: 1, textAlign: 'center', padding: '10px', borderRadius: '9px',
+                              background: ouroGrad, border: 'none', color: '#0A0A0A',
+                              fontSize: '13px', fontWeight: 800, cursor: 'pointer',
+                            }}
+                          >
+                            ⬇️ Baixar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
