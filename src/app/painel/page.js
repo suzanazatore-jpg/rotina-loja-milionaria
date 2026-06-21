@@ -39,8 +39,9 @@ function rotuloMesCompleto(mesAno) {
 // ════════ HELPERS DE SEMANA (usados na seção Rotina) ════════
 function segundaFeiraAtual() {
   const hoje = new Date()
-  const diaSemana = hoje.getDay() // 0 = domingo, 1 = segunda, ...
-  const diff = diaSemana === 0 ? -6 : 1 - diaSemana
+  const diaSemana = hoje.getDay() // 0=dom, 1=seg, ..., 6=sab
+  // No domingo, já mostra a rotina da semana que está começando (a próxima segunda)
+  const diff = diaSemana === 0 ? 1 : 1 - diaSemana
   const segunda = new Date(hoje)
   segunda.setDate(hoje.getDate() + diff)
   const ano = segunda.getFullYear()

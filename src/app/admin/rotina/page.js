@@ -7,11 +7,12 @@ import { useRouter } from 'next/navigation'
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const BUCKET = 'materiais'
 
-// Retorna a data (YYYY-MM-DD) da segunda-feira da semana de "hoje"
+// Retorna a data (YYYY-MM-DD) da segunda-feira da semana de "hoje".
+// No domingo, já aponta para a próxima segunda (a semana que está começando).
 function segundaFeiraAtual() {
   const hoje = new Date()
   const diaSemana = hoje.getDay() // 0 = domingo, 1 = segunda, ...
-  const diff = diaSemana === 0 ? -6 : 1 - diaSemana // volta até a segunda
+  const diff = diaSemana === 0 ? 1 : 1 - diaSemana
   const segunda = new Date(hoje)
   segunda.setDate(hoje.getDate() + diff)
   return formatarData(segunda)
@@ -246,5 +247,3 @@ export default function AdminRotina() {
     </div>
   )
 }
-
-
