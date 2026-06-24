@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { enviarEmailBoasVindas } from '@/lib/enviarEmailBoasVindas'
 
 // ⚠️ Esta rota roda SOMENTE no servidor.
 // A service_role key NUNCA deve ser exposta ao navegador.
@@ -77,6 +78,21 @@ export async function POST(request) {
         { error: `Erro ao criar perfil: ${erroPerfil.message}. Login revertido.` },
         { status: 400 }
       )
+    }
+
+    // 5.5. Enviar e-mail de boas-vindas com os dados de acesso
+    // Importante: se o e-mail falhar, NÃO desfazemos o cadastro da aluna —
+    // ela já foi criada com sucesso, e o admin pode reenviar o e-mail
+    // manualmente depois pelo botão em /admin/alunas.
+    try {
+      await enviarEmailBoasVindas({
+        nome: nome.trim(),
+        email: email.trim().toLowerCase(),
+        senha,
+      })
+    } catch (erroEmail) {
+      console.error('Aluna criada, mas falhou o envio do e-mail de boas-vindas:', erroEmail)
+      // Segue o fluxo normalmente — não bloqueia o cadastro por causa do e-mail
     }
 
     // 6. Sucesso

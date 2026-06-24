@@ -15,6 +15,12 @@ export default function AdminAlunas() {
   const [whatsapp, setWhatsapp] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [reenviando, setReenviando] = useState(null) // id da aluna recebendo reenvio
+  const [mostrarForm, setMostrarForm] = useState(false)
+  const [novoNome, setNovoNome] = useState('')
+  const [novoEmail, setNovoEmail] = useState('')
+  const [novaSenha, setNovaSenha] = useState('')
+  const [novoWhatsapp, setNovoWhatsapp] = useState('')
+  const [cadastrando, setCadastrando] = useState(false)
   const [msg, setMsg] = useState('')
   const router = useRouter()
 
@@ -96,6 +102,53 @@ export default function AdminAlunas() {
     setTimeout(() => setMsg(''), 5000)
   }
 
+  function abrirNovaAluna() {
+    setNovoNome(""); setNovoEmail(""); setNovaSenha(""); setNovoWhatsapp("")
+    setMsg("")
+    setMostrarForm(true)
+  }
+
+  function cancelarNovaAluna() {
+    setMostrarForm(false)
+    setNovoNome(""); setNovoEmail(""); setNovaSenha(""); setNovoWhatsapp("")
+  }
+
+  async function cadastrarAluna() {
+    if (!novoNome.trim() || !novoEmail.trim() || !novaSenha) {
+      setMsg("Nome, e-mail e senha sao obrigatorios.")
+      return
+    }
+    if (novaSenha.length < 6) {
+      setMsg("A senha precisa ter no minimo 6 caracteres.")
+      return
+    }
+    setCadastrando(true); setMsg("")
+    try {
+      const sessionResult = await supabase.auth.getSession()
+      const token = sessionResult.data.session ? sessionResult.data.session.access_token : null
+      if (!token) throw new Error("Sessao expirada. Faca login novamente.")
+      const response = await fetch("/api/criar-aluna", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+        body: JSON.stringify({
+          nome: novoNome.trim(),
+          email: novoEmail.trim().toLowerCase(),
+          senha: novaSenha,
+          whatsapp: novoWhatsapp.trim(),
+        }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Falha ao cadastrar aluna")
+      setMsg("Aluna " + data.aluna.nome + " cadastrada com sucesso! E-mail de boas-vindas enviado.")
+      await carregar()
+      cancelarNovaAluna()
+    } catch (e) {
+      setMsg("Erro: " + e.message)
+    }
+    setCadastrando(false)
+    setTimeout(function() { setMsg("") }, 6000)
+  }
+
   if (carregando) {
     return (
       <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -124,7 +177,40 @@ export default function AdminAlunas() {
           <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: ouro, textTransform: 'uppercase', margin: 0 }}>Administração</p>
           <p style={{ fontSize: '15px', fontWeight: 800, margin: '1px 0 0' }}>👥 Gerenciar Alunas</p>
         </div>
+        {!mostrarForm && (
+          <button onClick={abrirNovaAluna} style={{ background: ouroGrad, color: "#0A0A0A", border: "none", borderRadius: "9px", padding: "10px 16px", fontSize: "13px", fontWeight: 800, cursor: "pointer", marginLeft: "auto" }}>+ Nova Aluna</button>
+        )}
       </header>
+
+      <div style={{ maxWidth: "680px", margin: "0 auto", padding: "24px 18px 0" }}>
+        {msg && <p style={{ fontSize: "13px", color: msg.indexOf("Erro") === 0 || msg.indexOf("rro") > 0 ? "#e88" : "#5dca8a", margin: "0 0 16px", textAlign: "center" }}>{msg}</p>}
+
+        {mostrarForm && (
+          <div style={{ background: "#111111", border: "1px solid #D4AF37", borderRadius: "16px", padding: "20px", marginBottom: "20px" }}>
+            <h2 style={{ fontSize: "16px", fontWeight: 800, margin: "0 0 16px" }}>Cadastrar nova aluna</h2>
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>Nome *</label>
+              <input value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Nome completo" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>E-mail *</label>
+              <input type="email" value={novoEmail} onChange={e => setNovoEmail(e.target.value)} placeholder="email@exemplo.com" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginBottom: "14px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>Senha * (minimo 6 caracteres)</label>
+              <input type="text" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Senha inicial" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>WhatsApp (opcional)</label>
+              <input value={novoWhatsapp} onChange={e => setNovoWhatsapp(e.target.value)} placeholder="(00) 00000-0000" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button onClick={cadastrarAluna} disabled={cadastrando} style={{ flex: 1, padding: "12px", background: ouroGrad, color: "#0A0A0A", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{cadastrando ? "Cadastrando..." : "Cadastrar aluna"}</button>
+              <button onClick={cancelarNovaAluna} style={{ padding: "12px 20px", background: "transparent", color: "#888", border: "1px solid #2A2A2A", borderRadius: "10px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <main style={{ maxWidth: '680px', margin: '0 auto', padding: '24px 18px 60px' }}>
 
