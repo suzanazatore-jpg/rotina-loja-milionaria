@@ -14,6 +14,7 @@ export default function AdminAlunas() {
   const [nome, setNome] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [reenviando, setReenviando] = useState(null) // id da aluna recebendo reenvio
   const [msg, setMsg] = useState('')
   const router = useRouter()
 
@@ -70,6 +71,29 @@ export default function AdminAlunas() {
     }
     setSalvando(false)
     setTimeout(() => setMsg(''), 4000)
+  }
+
+  async function reenviarBoasVindas(aluna) {
+    const confirmar = confirm(
+      `Reenviar e-mail de boas-vindas para ${aluna.nome || aluna.email}?\n\nUma nova senha será gerada e enviada para ${aluna.email}. A senha antiga deixará de funcionar.`
+    )
+    if (!confirmar) return
+
+    setReenviando(aluna.id); setMsg('')
+    try {
+      const response = await fetch('/api/reenviar-boas-vindas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alunaId: aluna.id }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.erro || 'Falha ao reenviar e-mail')
+      setMsg(`✓ E-mail reenviado para ${aluna.email}!`)
+    } catch (e) {
+      setMsg('⚠ Erro ao reenviar: ' + e.message)
+    }
+    setReenviando(null)
+    setTimeout(() => setMsg(''), 5000)
   }
 
   if (carregando) {
@@ -143,7 +167,17 @@ export default function AdminAlunas() {
                     <p style={{ fontSize: '12px', color: '#888', margin: '2px 0 0' }}>{aluna.email}</p>
                     {aluna.whatsapp && <p style={{ fontSize: '12px', color: '#888', margin: '1px 0 0' }}>📱 {aluna.whatsapp}</p>}
                   </div>
-                  <button onClick={() => abrirEdicao(aluna)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>Editar</button>
+                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                    <button
+                      onClick={() => reenviarBoasVindas(aluna)}
+                      disabled={reenviando === aluna.id}
+                      title="Gera uma nova senha e reenvia o e-mail de boas-vindas"
+                      style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: '#5dca8a', padding: '8px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      {reenviando === aluna.id ? 'Enviando...' : '✉️ Reenviar e-mail'}
+                    </button>
+                    <button onClick={() => abrirEdicao(aluna)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>Editar</button>
+                  </div>
                 </div>
               )}
             </div>
