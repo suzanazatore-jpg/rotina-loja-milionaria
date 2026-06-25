@@ -14,6 +14,7 @@ export default function AdminAlunas() {
   const [nome, setNome] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [desativando, setDesativando] = useState(null) // id da aluna sendo desativada/reativada
   const [reenviando, setReenviando] = useState(null) // id da aluna recebendo reenvio
   const [mostrarForm, setMostrarForm] = useState(false)
   const [novoNome, setNovoNome] = useState('')
@@ -78,6 +79,63 @@ export default function AdminAlunas() {
     }
     setSalvando(false)
     setTimeout(() => setMsg(''), 4000)
+  }
+
+  // ════════ Desativar / Reativar aluna ════════
+  // "Desativar" NÃO apaga nenhum dado — apenas expira o acesso (acesso_expira_em = ontem),
+  // o que faz o bloqueio em /app/painel (função verificarAcesso) impedir o login.
+  // "Reativar" simplesmente limpa essa data, voltando o acesso ao normal.
+  function estaDesativada(aluna) {
+    if (!aluna.acesso_expira_em) return false
+    return new Date(aluna.acesso_expira_em) < new Date()
+  }
+
+  async function desativarAluna(aluna) {
+    const confirmar = confirm(
+      `Desativar o acesso de ${aluna.nome || aluna.email}?\n\nEla não vai conseguir mais entrar na plataforma, mas todos os dados dela continuam salvos. Você pode reativar quando quiser.`
+    )
+    if (!confirmar) return
+
+    setDesativando(aluna.id); setMsg('')
+    try {
+      const ontem = new Date()
+      ontem.setDate(ontem.getDate() - 1)
+      const { error } = await supabase.from('perfis').update({
+        acesso_expira_em: ontem.toISOString(),
+      }).eq('id', aluna.id)
+      if (error) throw error
+      setMsg(`✓ Acesso de ${aluna.nome || aluna.email} foi desativado.`)
+      await carregar()
+      cancelarEdicao()
+    } catch (e) {
+      setMsg('⚠ Erro ao desativar: ' + e.message)
+    }
+    setDesativando(null)
+    setTimeout(() => setMsg(''), 5000)
+  }
+
+  async function reativarAluna(aluna) {
+    const confirmar = confirm(
+      `Reativar o acesso de ${aluna.nome || aluna.email}?\n\nEla poderá entrar na plataforma novamente.`
+    )
+    if (!confirmar) return
+
+    setDesativando(aluna.id); setMsg('')
+    try {
+      const novaData = new Date()
+      novaData.setDate(novaData.getDate() + 30) // padrão: reativa com +30 dias de acesso
+      const { error } = await supabase.from('perfis').update({
+        acesso_expira_em: novaData.toISOString(),
+      }).eq('id', aluna.id)
+      if (error) throw error
+      setMsg(`✓ Acesso de ${aluna.nome || aluna.email} foi reativado por mais 30 dias.`)
+      await carregar()
+      cancelarEdicao()
+    } catch (e) {
+      setMsg('⚠ Erro ao reativar: ' + e.message)
+    }
+    setDesativando(null)
+    setTimeout(() => setMsg(''), 5000)
   }
 
   async function reenviarBoasVindas(aluna) {
@@ -232,7 +290,9 @@ export default function AdminAlunas() {
             <p style={{ fontSize: '14px', margin: 0 }}>Nenhuma aluna cadastrada ainda.</p>
           </div>
         ) : (
-          alunas.map(aluna => (
+          alunas.map(aluna => {
+            const desativada = estaDesativada(aluna)
+            return (
             <div key={aluna.id} style={{ background: '#111111', border: `1px solid ${editando === aluna.id ? ouro : '#2A2A2A'}`, borderRadius: '14px', padding: '16px', marginBottom: '12px' }}>
 
               {editando === aluna.id ? (
@@ -248,18 +308,43 @@ export default function AdminAlunas() {
                       style={{ width: '100%', padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '14px', color: '#FFF', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                   <p style={{ fontSize: '12px', color: '#666', margin: '0 0 14px' }}>{aluna.email}</p>
-                  <div style={{ display: 'flex', gap: '10px' }}>
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                     <button onClick={salvar} disabled={salvando} style={{ flex: 1, padding: '11px', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar'}</button>
                     <button onClick={cancelarEdicao} style={{ padding: '11px 18px', background: 'transparent', color: '#888', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+                  </div>
+                  <div style={{ borderTop: '1px solid #2A2A2A', paddingTop: '10px' }}>
+                    {desativada ? (
+                      <button
+                        onClick={() => reativarAluna(aluna)}
+                        disabled={desativando === aluna.id}
+                        style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {desativando === aluna.id ? 'Reativando...' : '✓ Reativar acesso'}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => desativarAluna(aluna)}
+                        disabled={desativando === aluna.id}
+                        title="O acesso é bloqueado, mas nenhum dado é apagado"
+                        style={{ width: '100%', padding: '11px', background: 'transparent', color: '#e88', border: '1px solid #5A1A1A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                      >
+                        {desativando === aluna.id ? 'Desativando...' : '🚫 Desativar acesso'}
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: ouroGrad, color: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, flexShrink: 0 }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: desativada ? '#3A3A3A' : ouroGrad, color: desativada ? '#888' : '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, flexShrink: 0 }}>
                     {(aluna.nome || aluna.email || '?').charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '14px', fontWeight: 700, margin: 0 }}>{aluna.nome || '(sem nome cadastrado)'}</p>
+                    <p style={{ fontSize: '14px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {aluna.nome || '(sem nome cadastrado)'}
+                      {desativada && (
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#e88', border: '1px solid #5A1A1A', borderRadius: '5px', padding: '2px 6px' }}>DESATIVADA</span>
+                      )}
+                    </p>
                     <p style={{ fontSize: '12px', color: '#888', margin: '2px 0 0' }}>{aluna.email}</p>
                     {aluna.whatsapp && <p style={{ fontSize: '12px', color: '#888', margin: '1px 0 0' }}>📱 {aluna.whatsapp}</p>}
                   </div>
@@ -277,7 +362,8 @@ export default function AdminAlunas() {
                 </div>
               )}
             </div>
-          ))
+            )
+          })
         )}
       </main>
     </div>
