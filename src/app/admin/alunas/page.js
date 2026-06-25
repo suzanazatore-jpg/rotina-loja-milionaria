@@ -21,6 +21,7 @@ export default function AdminAlunas() {
   const [novaSenha, setNovaSenha] = useState('')
   const [novoWhatsapp, setNovoWhatsapp] = useState('')
   const [cadastrando, setCadastrando] = useState(false)
+  const [prazo, setPrazo] = useState("teste7")
   const [msg, setMsg] = useState('')
   const router = useRouter()
 
@@ -135,6 +136,7 @@ export default function AdminAlunas() {
           email: novoEmail.trim().toLowerCase(),
           senha: novaSenha,
           whatsapp: novoWhatsapp.trim(),
+          prazo,
         }),
       })
       const data = await response.json()
@@ -203,6 +205,14 @@ export default function AdminAlunas() {
             <div style={{ marginBottom: "16px" }}>
               <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>WhatsApp (opcional)</label>
               <input value={novoWhatsapp} onChange={e => setNovoWhatsapp(e.target.value)} placeholder="(00) 00000-0000" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
+            </div>
+            <div style={{ marginBottom: "16px" }}>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>Prazo de acesso *</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button type="button" onClick={() => setPrazo("teste7")} style={{ flex: 1, padding: "10px", background: prazo === "teste7" ? ouroGrad : "transparent", color: prazo === "teste7" ? "#0A0A0A" : "#888", border: "1px solid " + (prazo === "teste7" ? "transparent" : "#2A2A2A"), borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>7 dias</button>
+                <button type="button" onClick={() => setPrazo("mensal")} style={{ flex: 1, padding: "10px", background: prazo === "mensal" ? ouroGrad : "transparent", color: prazo === "mensal" ? "#0A0A0A" : "#888", border: "1px solid " + (prazo === "mensal" ? "transparent" : "#2A2A2A"), borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>Mensal</button>
+                <button type="button" onClick={() => setPrazo("anual")} style={{ flex: 1, padding: "10px", background: prazo === "anual" ? ouroGrad : "transparent", color: prazo === "anual" ? "#0A0A0A" : "#888", border: "1px solid " + (prazo === "anual" ? "transparent" : "#2A2A2A"), borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>Anual</button>
+              </div>
             </div>
             <div style={{ display: "flex", gap: "10px" }}>
               <button onClick={cadastrarAluna} disabled={cadastrando} style={{ flex: 1, padding: "12px", background: ouroGrad, color: "#0A0A0A", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{cadastrando ? "Cadastrando..." : "Cadastrar aluna"}</button>
