@@ -1,3 +1,4 @@
+cat > src/app/api/criar-aluna/route.js << 'ARQUIVO_FIM'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { enviarEmailBoasVindas } from '@/lib/enviarEmailBoasVindas'
@@ -17,6 +18,35 @@ const supabaseAdmin = createClient(
 
 // ════════ E-MAIL DO ADMIN ════════
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
+
+// ════════ Calcula tipo_acesso e acesso_expira_em a partir do prazo escolhido ════════
+// prazo esperado: 'teste7' | 'mensal' | 'anual'
+function calcularAcesso(prazo) {
+  const agora = new Date()
+
+  if (prazo === 'teste7') {
+    const expira = new Date(agora)
+    expira.setDate(expira.getDate() + 7)
+    return { tipo_acesso: 'teste', acesso_expira_em: expira.toISOString() }
+  }
+
+  if (prazo === 'mensal') {
+    const expira = new Date(agora)
+    expira.setDate(expira.getDate() + 30)
+    return { tipo_acesso: 'avista', acesso_expira_em: expira.toISOString() }
+  }
+
+  if (prazo === 'anual') {
+    const expira = new Date(agora)
+    expira.setDate(expira.getDate() + 365)
+    return { tipo_acesso: 'avista', acesso_expira_em: expira.toISOString() }
+  }
+
+  // padrão de segurança: teste de 7 dias, caso algo inesperado chegue aqui
+  const expira = new Date(agora)
+  expira.setDate(expira.getDate() + 7)
+  return { tipo_acesso: 'teste', acesso_expira_em: expira.toISOString() }
+}
 
 export async function POST(request) {
   try {
@@ -40,7 +70,7 @@ export async function POST(request) {
 
     // 2. Validar dados recebidos
     const body = await request.json()
-    const { nome, email, senha, whatsapp } = body
+    const { nome, email, senha, whatsapp, prazo } = body
 
     if (!nome?.trim() || !email?.trim() || !senha) {
       return NextResponse.json({ error: 'Nome, e-mail e senha são obrigatórios.' }, { status: 400 })
@@ -49,6 +79,9 @@ export async function POST(request) {
     if (senha.length < 6) {
       return NextResponse.json({ error: 'A senha precisa ter no mínimo 6 caracteres.' }, { status: 400 })
     }
+
+    // 2.5. Calcular tipo de acesso e data de expiração com base no prazo escolhido
+    const { tipo_acesso, acesso_expira_em } = calcularAcesso(prazo)
 
     // 3. Criar o login no Supabase Auth
     const { data: novoUsuario, error: erroCriarAuth } = await supabaseAdmin.auth.admin.createUser({
@@ -69,6 +102,8 @@ export async function POST(request) {
       nome: nome.trim(),
       email: email.trim().toLowerCase(),
       whatsapp: whatsapp?.trim() || null,
+      tipo_acesso,
+      acesso_expira_em,
     })
 
     // 5. Rollback: se o perfil falhar, deleta o login criado no Auth
@@ -104,6 +139,8 @@ export async function POST(request) {
           nome: nome.trim(),
           email: email.trim().toLowerCase(),
           whatsapp: whatsapp?.trim() || null,
+          tipo_acesso,
+          acesso_expira_em,
         },
       },
       { status: 201 }
