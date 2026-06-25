@@ -1,4 +1,3 @@
-cat > src/app/api/criar-aluna/route.js << 'ARQUIVO_FIM'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { enviarEmailBoasVindas } from '@/lib/enviarEmailBoasVindas'
