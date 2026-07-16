@@ -236,7 +236,7 @@ export default function Painel() {
     { id: 'campanhas', icone: '🎯', label: 'Campanhas' },
     { id: 'calendario', icone: '📅', label: 'Calendário' },
     { id: 'rotina', icone: '🔄', label: 'Rotina' },
-    { id: 'calculadora', icone: '🧮', label: 'Calculadora' },
+    { id: 'precificacao', icone: '📊', label: 'Precificação' },
     { id: 'markup', icone: '📊', label: 'Markup' },
     { id: 'mentoria', icone: '🎓', label: 'Mentoria' },
     { id: 'premium', icone: '🔒', label: 'Conteudo Premium' },
