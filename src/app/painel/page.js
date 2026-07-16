@@ -239,6 +239,7 @@ export default function Painel() {
     { id: 'calculadora', icone: '🧮', label: 'Calculadora' },
     { id: 'markup', icone: '📊', label: 'Markup' },
     { id: 'mentoria', icone: '🎓', label: 'Mentoria' },
+    { id: 'premium', icone: '🔒', label: 'Conteudo Premium' },
     { id: 'suporte', icone: '💬', label: 'Suporte' },
   ]
 
