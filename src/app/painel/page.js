@@ -99,6 +99,7 @@ export default function Painel() {
   const [msgSalvo, setMsgSalvo] = useState('')
 
   // Controle de acesso (novo)
+  const [tipoAcesso, setTipoAcesso] = useState('rotina')
   const [acesso, setAcesso] = useState({ liberado: true, motivo: null })
 
   // Aulas (vindas do banco)
@@ -117,6 +118,7 @@ export default function Painel() {
   const cores = tema === 'escuro'
     ? { bg: '#0A0A0A', card: '#111111', card2: '#1A1A1A', borda: '#2A2A2A', tx: '#FFFFFF', tx2: '#888888', tx3: '#555555' }
     : { bg: '#F7F6F2', card: '#FFFFFF', card2: '#F0EFEA', borda: '#E2E0D8', tx: '#1A1A18', tx2: '#6A6A62', tx3: '#A0A098' }
+  const temAcessoPremium = ['implementacao', 'mentoria'].includes(tipoAcesso)
   const ouro = '#D4AF37'
   const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
 
@@ -132,6 +134,7 @@ export default function Painel() {
         if (data) {
           setNome(data.nome || '')
           setWhatsapp(data.whatsapp || '')
+          setTipoAcesso(data.tipo_acesso || 'rotina')
           // Admin nunca é bloqueado, mesmo que o perfil tenha algum status estranho
           if (session.user.email !== ADMIN_EMAIL) {
             setAcesso(verificarAcesso(data))
@@ -237,7 +240,6 @@ export default function Painel() {
     { id: 'calendario', icone: '📅', label: 'Calendário' },
     { id: 'rotina', icone: '🔄', label: 'Rotina' },
     { id: 'precificacao', icone: '📊', label: 'Precificação' },
-    { id: 'markup', icone: '📊', label: 'Markup' },
     { id: 'mentoria', icone: '🎓', label: 'Mentoria' },
     { id: 'premium', icone: '🔒', label: 'Conteudo Premium' },
     { id: 'suporte', icone: '💬', label: 'Suporte' },
@@ -380,9 +382,9 @@ export default function Painel() {
                   <CardAcesso cores={cores} icone="🎯" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
                   <CardAcesso cores={cores} icone="📅" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
                   <CardAcesso cores={cores} icone="🔄" titulo="Rotina" sub="15 min por dia" onClick={() => irPara('rotina')} />
-                  <CardAcesso cores={cores} icone="📊" titulo="Precificacao" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
-                  <CardAcesso cores={cores} icone="📊" titulo="Markup" sub="Preço ideal" onClick={() => irPara('markup')} />
+                  <CardAcesso cores={cores} icone="📊" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
                   <CardAcesso cores={cores} icone="🎓" titulo="Mentoria" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />
+                  <CardAcesso cores={cores} icone={temAcessoPremium ? '⭐' : '🔒'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Plano Implementação'} onClick={() => irPara('premium')} />
                   <CardAcesso cores={cores} icone="💬" titulo="Suporte" sub="24h com IA" onClick={() => irPara('suporte')} />
                 </div>
               </div>
@@ -441,6 +443,57 @@ export default function Painel() {
                         )}
                       </div>
                     ))
+                  )}
+                </div>
+              )}
+
+              {secao === 'precificacao' && (
+                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                  <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
+                    <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>📊 Precificação</h2>
+                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Ferramentas para precificar com lucro real.</p>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
+                    <div onClick={() => router.push('/calculadora')} style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '24px 20px', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>🧮</div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 4px', color: cores.tx }}>Calculadora</h3>
+                      <p style={{ fontSize: '12px', color: cores.tx2, margin: 0 }}>Calcule descontos</p>
+                    </div>
+                    <div onClick={() => router.push('/markup')} style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '24px 20px', cursor: 'pointer', textAlign: 'center' }}>
+                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>📊</div>
+                      <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 4px', color: cores.tx }}>Markup</h3>
+                      <p style={{ fontSize: '12px', color: cores.tx2, margin: 0 }}>Preço ideal de venda</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {secao === 'premium' && (
+                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                  {!temAcessoPremium ? (
+                    <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '40px 20px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+                      <h2 style={{ fontSize: '20px', fontWeight: 800, color: cores.tx, margin: '0 0 10px' }}>Conteúdo Premium</h2>
+                      <p style={{ fontSize: '14px', color: cores.tx2, margin: '0 0 20px', lineHeight: 1.6 }}>
+                        Este conteúdo está disponível nos planos<br />
+                        <strong style={{ color: ouro }}>Implementação</strong> e <strong style={{ color: ouro }}>Mentoria Impulso</strong>.
+                      </p>
+                      <a href={'https://api.whatsapp.com/send?phone=' + WHATSAPP + '&text=Quero%20saber%20mais%20sobre%20o%20plano%20de%20Implementacao'} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: 800, textDecoration: 'none' }}>
+                        💬 Quero fazer upgrade
+                      </a>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
+                        <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>⭐ Conteúdo Premium</h2>
+                        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Aulas e materiais exclusivos do seu plano.</p>
+                      </div>
+                      <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '40px 20px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '44px', marginBottom: '12px' }}>🎬</div>
+                        <h3 style={{ fontSize: '16px', fontWeight: 700, color: cores.tx, margin: '0 0 6px' }}>Em breve!</h3>
+                        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Os conteúdos exclusivos serão liberados em breve. 👑</p>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
