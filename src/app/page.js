@@ -3,17 +3,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
-// ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
 const WHATSAPP = '558499814124'
 
-// ════════ BANNERS DO CARROSSEL (edite à vontade) ════════
 const BANNERS = [
   { tag: '📣 Aviso', titulo: 'Bem-vinda à sua área exclusiva!', texto: 'Use este espaço para avisos e novidades.' },
   { tag: '🎁 Bônus', titulo: 'Novos materiais liberados', texto: 'Confira os conteúdos do mês na área de conteúdos.' },
   { tag: '🔥 Oferta', titulo: 'Mentoria mensal ao vivo', texto: 'Não perca a próxima mentoria gravada.' },
 ]
 
-// ════════ MENTORIA / AULAS (edite títulos e links dos vídeos) ════════
 const AULAS = [
   { num: '▶', titulo: 'Abertura — Bem-vinda à Rotina', desc: 'Conheça o método e como usar o app.', video: '' },
   { num: '1', titulo: 'Mentoria 01 — Organizando sua loja', desc: 'Os primeiros passos da rotina milionária.', video: '' },
@@ -30,8 +27,6 @@ export default function Painel() {
   const [menuMobile, setMenuMobile] = useState(false)
   const [bannerAtual, setBannerAtual] = useState(0)
   const [tipoAcesso, setTipoAcesso] = useState('rotina')
-
-  // Meus Dados
   const [nome, setNome] = useState('')
   const [whatsapp, setWhatsapp] = useState('')
   const [salvando, setSalvando] = useState(false)
@@ -44,7 +39,6 @@ export default function Painel() {
     : { bg: '#F7F6F2', card: '#FFFFFF', card2: '#F0EFEA', borda: '#E2E0D8', tx: '#1A1A18', tx2: '#6A6A62', tx3: '#A0A098' }
   const ouro = '#D4AF37'
   const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
-
   const temAcessoPremium = ['implementacao', 'mentoria'].includes(tipoAcesso)
 
   useEffect(() => {
@@ -59,7 +53,7 @@ export default function Painel() {
           setWhatsapp(data.whatsapp || '')
           setTipoAcesso(data.tipo_acesso || 'rotina')
         }
-      } catch (e) { /* tabela pode não existir ainda */ }
+      } catch (e) {}
       setCarregando(false)
     }
     init()
@@ -79,13 +73,11 @@ export default function Painel() {
     if (!usuario) return
     setSalvando(true); setMsgSalvo('')
     try {
-      const { error } = await supabase.from('perfis').upsert({
-        id: usuario.id, nome, whatsapp, email: usuario.email
-      })
+      const { error } = await supabase.from('perfis').upsert({ id: usuario.id, nome, whatsapp, email: usuario.email })
       if (error) throw error
       setMsgSalvo('✓ Dados salvos com sucesso!')
     } catch (e) {
-      setMsgSalvo('⚠ Erro ao salvar. Confira se a tabela "perfis" existe no Supabase.')
+      setMsgSalvo('⚠ Erro ao salvar.')
     }
     setSalvando(false)
     setTimeout(() => setMsgSalvo(''), 4000)
@@ -127,7 +119,6 @@ export default function Painel() {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background .2s, color .2s' }}>
 
-      {/* ═══════ SIDEBAR (desktop) ═══════ */}
       <aside className="sidebar-desktop" style={{ width: '230px', minWidth: '230px', background: cores.card, borderRight: `1px solid ${cores.borda}`, display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>
         <div style={{ padding: '20px 18px', borderBottom: `1px solid ${cores.borda}` }}>
           <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: ouro, textTransform: 'uppercase', margin: 0 }}>Rotina da Loja</p>
@@ -151,7 +142,6 @@ export default function Painel() {
         </div>
       </aside>
 
-      {/* ═══════ COLUNA PRINCIPAL ═══════ */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
         <header className={secao === 'inicio' ? 'topbar-hide-mobile' : ''} style={{ background: cores.card, borderBottom: `1px solid ${cores.borda}`, padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
@@ -170,7 +160,6 @@ export default function Painel() {
 
         <main style={{ flex: 1, overflowY: 'auto', paddingBottom: '80px' }}>
 
-          {/* ─── INÍCIO ─── */}
           {secao === 'inicio' && (
             <div>
               <div className="hero-dourado" style={{ background: ouroGrad, padding: '20px 22px 26px', color: '#0A0A0A', borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px' }}>
@@ -181,7 +170,6 @@ export default function Painel() {
                 </div>
                 <p style={{ fontSize: '14px', margin: 0, opacity: 0.75 }}>{saudacao},</p>
                 <h1 style={{ fontSize: '26px', fontWeight: 900, margin: '2px 0 0' }}>{nomeExibe} 👑</h1>
-
                 <div style={{ marginTop: '18px', overflow: 'hidden', borderRadius: '14px' }}>
                   <div style={{ display: 'flex', transform: `translateX(-${bannerAtual * 100}%)`, transition: 'transform 0.5s ease' }}>
                     {BANNERS.map((banner, i) => (
@@ -218,7 +206,6 @@ export default function Painel() {
           {secao !== 'inicio' && (
             <div style={{ padding: '20px 18px' }}>
 
-              {/* MEUS DADOS */}
               {secao === 'dados' && (
                 <div style={{ maxWidth: '500px', margin: '0 auto' }}>
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '20px' }}>
@@ -232,7 +219,6 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* MENTORIA / AULAS */}
               {secao === 'mentoria' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
@@ -262,7 +248,6 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* CONTEÚDO PREMIUM */}
               {secao === 'premium' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                   {!temAcessoPremium ? (
@@ -273,11 +258,7 @@ export default function Painel() {
                         Este conteúdo está disponível nos planos<br />
                         <strong style={{ color: ouro }}>Implementação</strong> e <strong style={{ color: ouro }}>Mentoria Impulso</strong>.
                       </p>
-                      
-                        href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Quero%20saber%20mais%20sobre%20o%20plano%20de%20Implementa%C3%A7%C3%E3o`}
-                        target="_blank" rel="noopener noreferrer"
-                        style={{ display: 'inline-block', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: 800, textDecoration: 'none' }}
-                      >
+                      <a href={'https://api.whatsapp.com/send?phone=' + WHATSAPP + '&text=Quero%20saber%20mais%20sobre%20o%20plano%20de%20Implementacao'} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: 800, textDecoration: 'none' }}>
                         💬 Quero fazer upgrade
                       </a>
                     </div>
@@ -297,7 +278,6 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* SUPORTE */}
               {secao === 'suporte' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
@@ -314,11 +294,10 @@ export default function Painel() {
                       <p style={{ fontSize: '12px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>{item.d}</p>
                     </div>
                   ))}
-                  <a href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Tenho%20uma%20d%C3%BAvida`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: 800, textDecoration: 'none', marginTop: '14px' }}>💬 Falar com o suporte no WhatsApp</a>
+                  <a href={'https://api.whatsapp.com/send?phone=' + WHATSAPP + '&text=Tenho%20uma%20duvida'} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: 800, textDecoration: 'none', marginTop: '14px' }}>💬 Falar com o suporte no WhatsApp</a>
                 </div>
               )}
 
-              {/* SEÇÕES "EM BREVE" */}
               {['campanhas', 'calendario', 'rotina'].includes(secao) && (
                 <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'center', padding: '60px 20px' }}>
                   <div style={{ fontSize: '44px', marginBottom: '12px' }}>{menu.find(m => m.id === secao)?.icone}</div>
@@ -333,7 +312,6 @@ export default function Painel() {
         </main>
       </div>
 
-      {/* ═══════ MENU MOBILE ═══════ */}
       {menuMobile && (
         <div onClick={() => setMenuMobile(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '280px', height: '100%', background: cores.card, padding: '0', overflowY: 'auto' }}>
@@ -359,7 +337,6 @@ export default function Painel() {
         </div>
       )}
 
-      {/* ═══════ BOTTOM NAV (mobile) ═══════ */}
       {secao !== 'inicio' && (
         <nav className="bottom-nav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, height: '62px', background: cores.card, borderTop: `1px solid ${cores.borda}`, zIndex: 90 }}>
           <div style={{ display: 'flex', height: '100%' }}>
