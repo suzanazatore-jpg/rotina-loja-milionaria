@@ -380,7 +380,7 @@ export default function Painel() {
                   <CardAcesso cores={cores} icone="🎯" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
                   <CardAcesso cores={cores} icone="📅" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
                   <CardAcesso cores={cores} icone="🔄" titulo="Rotina" sub="15 min por dia" onClick={() => irPara('rotina')} />
-                  <CardAcesso cores={cores} icone="🧮" titulo="Calculadora" sub="Descontos" onClick={() => irPara('calculadora')} />
+                  <CardAcesso cores={cores} icone="📊" titulo="Precificacao" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
                   <CardAcesso cores={cores} icone="📊" titulo="Markup" sub="Preço ideal" onClick={() => irPara('markup')} />
                   <CardAcesso cores={cores} icone="🎓" titulo="Mentoria" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />
                   <CardAcesso cores={cores} icone="💬" titulo="Suporte" sub="24h com IA" onClick={() => irPara('suporte')} />
