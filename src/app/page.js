@@ -29,6 +29,7 @@ export default function Painel() {
   const [aulaAberta, setAulaAberta] = useState(0)
   const [menuMobile, setMenuMobile] = useState(false)
   const [bannerAtual, setBannerAtual] = useState(0)
+  const [tipoAcesso, setTipoAcesso] = useState('rotina')
 
   // Meus Dados
   const [nome, setNome] = useState('')
@@ -44,23 +45,26 @@ export default function Painel() {
   const ouro = '#D4AF37'
   const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
 
-  // Verifica sessão e carrega dados do perfil
+  const temAcessoPremium = ['implementacao', 'mentoria'].includes(tipoAcesso)
+
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
       setUsuario(session.user)
-      // Tenta carregar perfil salvo na tabela 'perfis'
       try {
-        const { data } = await supabase.from('perfis').select('nome, whatsapp').eq('id', session.user.id).single()
-        if (data) { setNome(data.nome || ''); setWhatsapp(data.whatsapp || '') }
+        const { data } = await supabase.from('perfis').select('nome, whatsapp, tipo_acesso').eq('id', session.user.id).single()
+        if (data) {
+          setNome(data.nome || '')
+          setWhatsapp(data.whatsapp || '')
+          setTipoAcesso(data.tipo_acesso || 'rotina')
+        }
       } catch (e) { /* tabela pode não existir ainda */ }
       setCarregando(false)
     }
     init()
   }, [router])
 
-  // Carrossel automático
   useEffect(() => {
     const t = setInterval(() => setBannerAtual(b => (b + 1) % BANNERS.length), 4000)
     return () => clearInterval(t)
@@ -100,6 +104,7 @@ export default function Painel() {
     { id: 'rotina', icone: '🔄', label: 'Rotina' },
     { id: 'calculadora', icone: '🧮', label: 'Calculadora' },
     { id: 'mentoria', icone: '🎓', label: 'Mentoria' },
+    { id: 'premium', icone: temAcessoPremium ? '⭐' : '🔒', label: 'Conteúdo Premium' },
     { id: 'suporte', icone: '💬', label: 'Suporte' },
   ]
 
@@ -149,7 +154,6 @@ export default function Painel() {
       {/* ═══════ COLUNA PRINCIPAL ═══════ */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
 
-        {/* Topbar (desktop sempre; mobile só fora do início) */}
         <header className={secao === 'inicio' ? 'topbar-hide-mobile' : ''} style={{ background: cores.card, borderBottom: `1px solid ${cores.borda}`, padding: '13px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <button onClick={() => setMenuMobile(true)} className="menu-mobile-btn" style={{ display: 'none', background: 'transparent', border: 'none', color: cores.tx, fontSize: '22px', cursor: 'pointer' }}>☰</button>
@@ -169,19 +173,15 @@ export default function Painel() {
           {/* ─── INÍCIO ─── */}
           {secao === 'inicio' && (
             <div>
-              {/* HERO DOURADO (cobre topo até "Acesse") — destaque no mobile */}
               <div className="hero-dourado" style={{ background: ouroGrad, padding: '20px 22px 26px', color: '#0A0A0A', borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px' }}>
-                {/* Linha do topo: menu + nome do app + tema (mobile) */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
                   <button onClick={() => setMenuMobile(true)} style={{ width: '40px', height: '40px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(0,0,0,0.08)', color: '#0A0A0A', fontSize: '20px', cursor: 'pointer' }}>☰</button>
                   <p style={{ fontSize: '18px', fontWeight: 900, margin: 0, textAlign: 'center' }}>Rotina da Loja Milionária 👑</p>
                   <button onClick={() => setTema(tema === 'escuro' ? 'claro' : 'escuro')} style={{ width: '40px', height: '40px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(0,0,0,0.08)', color: '#0A0A0A', fontSize: '17px', cursor: 'pointer' }}>{tema === 'escuro' ? '☀️' : '🌙'}</button>
                 </div>
-                {/* Saudação */}
                 <p style={{ fontSize: '14px', margin: 0, opacity: 0.75 }}>{saudacao},</p>
                 <h1 style={{ fontSize: '26px', fontWeight: 900, margin: '2px 0 0' }}>{nomeExibe} 👑</h1>
 
-                {/* CARROSSEL DESLIZANTE (abaixo da saudação) */}
                 <div style={{ marginTop: '18px', overflow: 'hidden', borderRadius: '14px' }}>
                   <div style={{ display: 'flex', transform: `translateX(-${bannerAtual * 100}%)`, transition: 'transform 0.5s ease' }}>
                     {BANNERS.map((banner, i) => (
@@ -193,7 +193,6 @@ export default function Painel() {
                     ))}
                   </div>
                 </div>
-                {/* bolinhas */}
                 <div style={{ display: 'flex', gap: '5px', marginTop: '10px', justifyContent: 'center' }}>
                   {BANNERS.map((_, i) => (
                     <span key={i} onClick={() => setBannerAtual(i)} style={{ width: i === bannerAtual ? '18px' : '7px', height: '7px', borderRadius: '99px', background: i === bannerAtual ? '#0A0A0A' : 'rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'width .2s' }} />
@@ -201,7 +200,6 @@ export default function Painel() {
                 </div>
               </div>
 
-              {/* CONTEÚDO ABAIXO DO HERO */}
               <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px 18px' }}>
                 <p style={{ fontSize: '14px', fontWeight: 700, color: cores.tx, margin: '0 0 12px' }}>Acesse seu conteúdo</p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '11px' }}>
@@ -210,13 +208,13 @@ export default function Painel() {
                   <CardAcesso cores={cores} icone="🔄" titulo="Rotina" sub="15 min por dia" onClick={() => irPara('rotina')} />
                   <CardAcesso cores={cores} icone="🧮" titulo="Calculadora" sub="Descontos" onClick={() => irPara('calculadora')} />
                   <CardAcesso cores={cores} icone="🎓" titulo="Mentoria" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />
+                  <CardAcesso cores={cores} icone={temAcessoPremium ? '⭐' : '🔒'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Plano Implementação'} onClick={() => irPara('premium')} />
                   <CardAcesso cores={cores} icone="💬" titulo="Suporte" sub="24h com IA" onClick={() => irPara('suporte')} />
                 </div>
               </div>
             </div>
           )}
 
-          {/* ─── conteúdo interno (com padding) ─── */}
           {secao !== 'inicio' && (
             <div style={{ padding: '20px 18px' }}>
 
@@ -264,12 +262,47 @@ export default function Painel() {
                 </div>
               )}
 
+              {/* CONTEÚDO PREMIUM */}
+              {secao === 'premium' && (
+                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                  {!temAcessoPremium ? (
+                    <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '40px 20px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
+                      <h2 style={{ fontSize: '20px', fontWeight: 800, color: cores.tx, margin: '0 0 10px' }}>Conteúdo Premium</h2>
+                      <p style={{ fontSize: '14px', color: cores.tx2, margin: '0 0 20px', lineHeight: 1.6 }}>
+                        Este conteúdo está disponível nos planos<br />
+                        <strong style={{ color: ouro }}>Implementação</strong> e <strong style={{ color: ouro }}>Mentoria Impulso</strong>.
+                      </p>
+                      
+                        href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Quero%20saber%20mais%20sobre%20o%20plano%20de%20Implementa%C3%A7%C3%E3o`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{ display: 'inline-block', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: 800, textDecoration: 'none' }}
+                      >
+                        💬 Quero fazer upgrade
+                      </a>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
+                        <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>⭐ Conteúdo Premium</h2>
+                        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Aulas e materiais exclusivos do seu plano.</p>
+                      </div>
+                      <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '40px 20px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '44px', marginBottom: '12px' }}>🎬</div>
+                        <h3 style={{ fontSize: '16px', fontWeight: 700, color: cores.tx, margin: '0 0 6px' }}>Em breve!</h3>
+                        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Os conteúdos exclusivos serão liberados em breve. 👑</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* SUPORTE */}
               {secao === 'suporte' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
                     <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>💬 Suporte 24h WhatsApp com IA</h2>
-                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Atendimento 24 horas por dia, 7 dias por semana. Confira o passo a passo ou fale direto com o suporte.</p>
+                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Atendimento 24 horas por dia, 7 dias por semana.</p>
                   </div>
                   {[
                     { t: '1. Assista à Mentoria', d: 'Comece pela aula de abertura para entender o método.' },
@@ -285,7 +318,7 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* SEÇÕES "EM BREVE" (campanhas, calendario, rotina) */}
+              {/* SEÇÕES "EM BREVE" */}
               {['campanhas', 'calendario', 'rotina'].includes(secao) && (
                 <div style={{ maxWidth: '720px', margin: '0 auto', textAlign: 'center', padding: '60px 20px' }}>
                   <div style={{ fontSize: '44px', marginBottom: '12px' }}>{menu.find(m => m.id === secao)?.icone}</div>
@@ -300,11 +333,10 @@ export default function Painel() {
         </main>
       </div>
 
-      {/* ═══════ MENU MOBILE (drawer) com MEUS DADOS ═══════ */}
+      {/* ═══════ MENU MOBILE ═══════ */}
       {menuMobile && (
         <div onClick={() => setMenuMobile(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '280px', height: '100%', background: cores.card, padding: '0', overflowY: 'auto' }}>
-            {/* Cabeçalho do menu com dados */}
             <div style={{ background: ouroGrad, padding: '20px 18px', color: '#0A0A0A' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <div style={{ width: '46px', height: '46px', borderRadius: '50%', background: 'rgba(0,0,0,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>👤</div>
@@ -315,7 +347,6 @@ export default function Painel() {
               {whatsapp && <p style={{ fontSize: '12px', margin: '1px 0 0', opacity: 0.75 }}>{whatsapp}</p>}
               <button onClick={() => { setSecao('dados'); setMenuMobile(false) }} style={{ marginTop: '12px', padding: '7px 12px', background: '#0A0A0A', color: ouro, border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>Editar meus dados</button>
             </div>
-            {/* Itens do menu */}
             <div style={{ padding: '8px 14px 14px' }}>
               {menu.map(item => (
                 <div key={item.id} onClick={() => irPara(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '13px 6px', cursor: 'pointer', fontSize: '15px', color: cores.tx, borderBottom: `1px solid ${cores.borda}`, fontWeight: 600 }}>
@@ -328,7 +359,7 @@ export default function Painel() {
         </div>
       )}
 
-      {/* ═══════ BOTTOM NAV (mobile) — só aparece FORA do início ═══════ */}
+      {/* ═══════ BOTTOM NAV (mobile) ═══════ */}
       {secao !== 'inicio' && (
         <nav className="bottom-nav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, height: '62px', background: cores.card, borderTop: `1px solid ${cores.borda}`, zIndex: 90 }}>
           <div style={{ display: 'flex', height: '100%' }}>
