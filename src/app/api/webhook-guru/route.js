@@ -51,7 +51,7 @@ function normalizarTelefone(telefone) {
   return num
 }
 
-async function dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso }) {
+async function dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso, nome_produto }) {
   const url = process.env.PABBLY_WEBHOOK_ACESSO_URL
   if (!url) { console.error('PABBLY_WEBHOOK_ACESSO_URL nao configurada'); return }
   const telefone = normalizarTelefone(whatsapp)
@@ -65,6 +65,7 @@ async function dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acess
         nome,
         primeiro_nome: (nome || '').split(' ')[0],
         email, senha, telefone, tipo_acesso,
+        nome_produto: nome_produto || '',
         link_app: 'https://rotina.suzanazatorre.com.br/login',
       }),
     })
@@ -98,6 +99,7 @@ export async function POST(request) {
       const valorEmCentavos = payload?.current_invoice?.value
       const proximaCobrancaISO = payload?.dates?.next_cycle_at
       const whatsapp = payload?.subscriber?.phone_number || null
+      const nomeProduto = payload?.product?.name || payload?.products?.[0]?.name || ''
 
       if (!nome || !email) {
         return NextResponse.json({ error: 'Payload sem nome ou e-mail.' }, { status: 400 })
@@ -148,7 +150,7 @@ export async function POST(request) {
       try { await enviarEmailBoasVindas({ nome, email, senha }) }
       catch (e) { console.error('Erro e-mail boas-vindas:', e) }
 
-      await dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso: 'rotina' })
+      await dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso: 'rotina', nome_produto: nomeProduto })
 
       return NextResponse.json({ success: true, tipo: 'nova_aluna_assinatura', email }, { status: 201 })
     }
@@ -202,7 +204,7 @@ export async function POST(request) {
       try { await enviarEmailBoasVindas({ nome, email, senha }) }
       catch (e) { console.error('Erro e-mail boas-vindas:', e) }
 
-      await dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso })
+      await dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso, nome_produto: nomeProduto })
 
       return NextResponse.json({ success: true, tipo: 'nova_aluna_venda', email, tipo_acesso }, { status: 201 })
     }
