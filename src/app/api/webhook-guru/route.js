@@ -18,26 +18,16 @@ const supabaseAdmin = createClient(
 
 // ════════════════════════════════════════════════════
 // MAPEAMENTO DE PRODUTOS → NÍVEL DE ACESSO E PRAZO
-// Atualize aqui quando adicionar novos produtos no Guru.
-// O texto é comparado em minúsculas, sem acentos exatos —
-// use parte do nome que seja única o suficiente.
 // ════════════════════════════════════════════════════
 const MAPEAMENTO_PRODUTOS = [
-  // Nível 3 — Mentoria (180 dias)
   { contem: 'mentoria impulso',     tipo_acesso: 'mentoria',       dias: 180 },
   { contem: 'mentoria impulso [6m]',tipo_acesso: 'mentoria',       dias: 180 },
-
-  // Nível 2 — Implementação (90 dias)
   { contem: 'tráfego pago [3m]',    tipo_acesso: 'implementacao',  dias: 90  },
   { contem: 'trafego pago [3m]',    tipo_acesso: 'implementacao',  dias: 90  },
-
-  // Nível 1 — Rotina (prazos variados)
   { contem: '[anual]',              tipo_acesso: 'rotina',         dias: 365 },
   { contem: '[6m]',                 tipo_acesso: 'rotina',         dias: 180 },
   { contem: 'tráfego pago 1x',      tipo_acesso: 'rotina',         dias: 30  },
   { contem: 'trafego pago 1x',      tipo_acesso: 'rotina',         dias: 30  },
-
-  // Fallback genérico para qualquer produto de venda não mapeado acima
   { contem: '',                     tipo_acesso: 'rotina',         dias: 30  },
 ]
 
@@ -56,24 +46,59 @@ function identificarAcessoPorProduto(nomeProduto) {
   }
 }
 
-// Formata valor em centavos para "R$ XX,XX"
 function formatarValorEmReais(valorEmCentavos) {
   const valorEmReais = (valorEmCentavos || 0) / 100
   return valorEmReais.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
 
-// Formata "YYYY-MM-DD" para "DD/MM/AAAA"
 function formatarDataBR(dataISO) {
   if (!dataISO) return ''
   const [ano, mes, dia] = dataISO.split('-')
   return `${dia}/${mes}/${ano}`
 }
 
+// ════════════════════════════════════════════════════
+// Dispara os dados de acesso pro WhatsApp via Pabbly → BotConversa
+// ════════════════════════════════════════════════════
+function normalizarTelefone(telefone) {
+  if (!telefone) return null
+  let num = String(telefone).replace(/\D/g, '')
+  if (num.length <= 11) num = '55' + num
+  return num
+}
+
+async function dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso }) {
+  const url = process.env.PABBLY_WEBHOOK_ACESSO_URL
+  if (!url) { console.error('PABBLY_WEBHOOK_ACESSO_URL nao configurada'); return }
+
+  const telefone = normalizarTelefone(whatsapp)
+  if (!telefone) { console.error('Aluna sem telefone, WhatsApp nao enviado:', email); return }
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        evento: 'boas_vindas',
+        nome,
+        primeiro_nome: (nome || '').split(' ')[0],
+        email,
+        senha,
+        telefone,
+        tipo_acesso,
+        link_app: 'https://rotina.suzanazatorre.com.br/login',
+      }),
+    })
+    console.log('WhatsApp Pabbly disparado:', email, 'status', resp.status)
+  } catch (e) {
+    console.error('Erro ao disparar WhatsApp (Pabbly):', e)
+  }
+}
+
 export async function POST(request) {
   try {
     const payload = await request.json()
 
-    // 1. Verificar token de autenticidade
     const tokenEsperado = process.env.GURU_ACCOUNT_TOKEN
     const tokenRecebido = payload?.api_token
     if (!tokenEsperado || tokenRecebido !== tokenEsperado) {
@@ -83,7 +108,7 @@ export async function POST(request) {
     const webhookType = payload?.webhook_type
 
     // ════════════════════════════════════════════════════
-    // FLUXO 1: ASSINATURA (webhook_type === "subscription")
+    // FLUXO 1: ASSINATURA
     // ════════════════════════════════════════════════════
     if (webhookType === 'subscription') {
       const statusAssinatura = payload?.last_status
@@ -159,11 +184,13 @@ export async function POST(request) {
       try { await enviarEmailBoasVindas({ nome, email, senha }) }
       catch (e) { console.error('Erro e-mail boas-vindas:', e) }
 
+      await dispararWhatsappAcesso({ nome, email, senha, whatsapp, tipo_acesso: 'rotina' })
+
       return NextResponse.json({ success: true, tipo: 'nova_aluna_assinatura', email }, { status: 201 })
     }
 
     // ════════════════════════════════════════════════════
-    // FLUXO 2: VENDA ÚNICA (webhook_type === "transaction")
+    // FLUXO 2: VENDA ÚNICA
     // ════════════════════════════════════════════════════
     if (webhookType === 'transaction') {
       if (payload?.status !== 'approved') {
@@ -174,69 +201,3 @@ export async function POST(request) {
       }
 
       const nome = payload?.contact?.name?.trim()
-      const email = payload?.contact?.email?.trim().toLowerCase()
-      const whatsapp = payload?.contact?.phone_number || null
-      const nomeProduto = payload?.product?.name || ''
-
-      if (!nome || !email) {
-        return NextResponse.json({ error: 'Payload sem nome ou e-mail.' }, { status: 400 })
-      }
-
-      const { tipo_acesso, acesso_expira_em } = identificarAcessoPorProduto(nomeProduto)
-
-      const { data: perfilExistente, error: erroBusca } = await supabaseAdmin
-        .from('perfis').select('id, tipo_acesso').eq('email', email).maybeSingle()
-
-      if (erroBusca) {
-        return NextResponse.json({ error: erroBusca.message }, { status: 500 })
-      }
-
-      // Aluna já existe → atualiza acesso se o novo for maior
-      if (perfilExistente) {
-        await supabaseAdmin.from('perfis').update({
-          tipo_acesso,
-          acesso_expira_em,
-          status_assinatura: 'ativo',
-        }).eq('id', perfilExistente.id)
-
-        return NextResponse.json({ success: true, tipo: 'acesso_atualizado', email, tipo_acesso }, { status: 200 })
-      }
-
-      // Aluna nova via venda única
-      const senha = gerarSenhaNumerica()
-      const { data: novoUsuario, error: erroCriarAuth } = await supabaseAdmin.auth.admin.createUser({
-        email, password: senha, email_confirm: true,
-      })
-      if (erroCriarAuth) {
-        return NextResponse.json({ error: erroCriarAuth.message }, { status: 400 })
-      }
-
-      const novoUserId = novoUsuario.user.id
-      const { error: erroPerfil } = await supabaseAdmin.from('perfis').insert({
-        id: novoUserId, nome, email, whatsapp,
-        tipo_acesso,
-        acesso_expira_em,
-        status_assinatura: 'ativo',
-      })
-
-      if (erroPerfil) {
-        await supabaseAdmin.auth.admin.deleteUser(novoUserId)
-        return NextResponse.json({ error: erroPerfil.message }, { status: 400 })
-      }
-
-      try { await enviarEmailBoasVindas({ nome, email, senha }) }
-      catch (e) { console.error('Erro e-mail boas-vindas:', e) }
-
-      return NextResponse.json({ success: true, tipo: 'nova_aluna_venda', email, tipo_acesso }, { status: 201 })
-    }
-
-    // Tipo de webhook desconhecido
-    return NextResponse.json(
-      { success: true, ignorado: true, motivo: `webhook_type desconhecido: ${webhookType}` },
-      { status: 200 }
-    )
-
-  } catch (err) {
-    return NextResponse.json({ error: `Erro inesperado: ${err.message}` }, { status: 500 })
-  }
-}
