@@ -1,42 +1,109 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 
 // ════════ E-MAIL DO ADMIN ════════
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 
+const ouro = '#D4AF37'
+const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
+
+// ──────── Helpers de formatação ────────
+function iniciais(nome, email) {
+  const base = (nome || email || '?').trim()
+  const partes = base.split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return 'AL'
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase()
+  return `${partes[0][0]}${partes[partes.length - 1][0]}`.toUpperCase()
+}
+
+function formatarData(iso) {
+  if (!iso) return '—'
+  try {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Fortaleza' }).format(new Date(iso))
+  } catch {
+    return '—'
+  }
+}
+
+function formatarWhatsapp(num) {
+  const d = String(num || '').replace(/\D/g, '')
+  if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
+  if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
+  return num || ''
+}
+
+// "Desativada" = acesso com data no passado (mesmo mecanismo que o botão de desativar usa).
+function estaDesativada(aluna) {
+  if (!aluna.acesso_expira_em) return false
+  return new Date(aluna.acesso_expira_em) < new Date()
+}
+
+// Regra de status exibida: ativa a menos que o acesso tenha vencido
+// ou a assinatura esteja cancelada/inativa.
+function estaAtiva(aluna) {
+  if (estaDesativada(aluna)) return false
+  const s = String(aluna.status_assinatura || '').toLowerCase()
+  if (s === 'cancelado' || s === 'cancelada' || s === 'inativo' || s === 'inativa') return false
+  return true
+}
+
+// Monta o rótulo de vencimento: prazo fixo (acesso_expira_em) vira "acesso até"/"venceu em";
+// assinatura (proxima_cobranca_em) vira "renova em".
+function vencimentoInfo(aluna) {
+  const agora = Date.now()
+  if (aluna.acesso_expira_em) {
+    const t = new Date(aluna.acesso_expira_em).getTime()
+    if (t < agora) return { label: 'venceu em', data: formatarData(aluna.acesso_expira_em), tom: 'exp' }
+    const trintaDias = 30 * 24 * 60 * 60 * 1000
+    return { label: 'acesso até', data: formatarData(aluna.acesso_expira_em), tom: t - agora <= trintaDias ? 'warn' : '' }
+  }
+  if (aluna.proxima_cobranca_em) {
+    const t = new Date(aluna.proxima_cobranca_em).getTime()
+    return { label: t < agora ? 'renovar em' : 'renova em', data: formatarData(aluna.proxima_cobranca_em), tom: t < agora ? 'warn' : '' }
+  }
+  return { label: '—', data: '', tom: '' }
+}
+
+const CORES_TOM = { '': '#dddddd', warn: '#e0b84a', exp: '#e88' }
+
 export default function AdminAlunas() {
+  const router = useRouter()
+
   const [carregando, setCarregando] = useState(true)
   const [autorizado, setAutorizado] = useState(false)
   const [alunas, setAlunas] = useState([])
-  const [editando, setEditando] = useState(null) // id da aluna sendo editada
-  const [nome, setNome] = useState('')
-  const [whatsapp, setWhatsapp] = useState('')
+  const [acessos, setAcessos] = useState({}) // id -> last_sign_in_at
+  const [msg, setMsg] = useState('')
+
+  // Filtros
+  const [busca, setBusca] = useState('')
+  const [tipoFiltro, setTipoFiltro] = useState('todos')
+  const [statusFiltro, setStatusFiltro] = useState('todas')
+
+  // Modal Gerenciar (editar/desativar/reenviar)
+  const [gerenciando, setGerenciando] = useState(null) // objeto aluna
+  const [edNome, setEdNome] = useState('')
+  const [edWhatsapp, setEdWhatsapp] = useState('')
   const [salvando, setSalvando] = useState(false)
-  const [desativando, setDesativando] = useState(null) // id da aluna sendo desativada/reativada
-  const [reenviando, setReenviando] = useState(null) // id da aluna recebendo reenvio
-  const [mostrarForm, setMostrarForm] = useState(false)
+  const [desativando, setDesativando] = useState(false)
+  const [reenviando, setReenviando] = useState(false)
+
+  // Modal Nova aluna
+  const [novaAberto, setNovaAberto] = useState(false)
   const [novoNome, setNovoNome] = useState('')
   const [novoEmail, setNovoEmail] = useState('')
   const [novaSenha, setNovaSenha] = useState('')
   const [novoWhatsapp, setNovoWhatsapp] = useState('')
+  const [prazo, setPrazo] = useState('teste7')
   const [cadastrando, setCadastrando] = useState(false)
-  const [prazo, setPrazo] = useState("teste7")
-  const [msg, setMsg] = useState('')
-  const router = useRouter()
-
-  const ouro = '#D4AF37'
-  const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
 
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
-      const session = user ? { user } : null
-      if (!session) { router.push('/login'); return }
-      if (session.user.email !== ADMIN_EMAIL) {
-        setAutorizado(false); setCarregando(false); return
-      }
+      if (!user) { router.push('/login'); return }
+      if (user.email !== ADMIN_EMAIL) { setAutorizado(false); setCarregando(false); return }
       setAutorizado(true)
       await carregar()
       setCarregando(false)
@@ -47,148 +114,133 @@ export default function AdminAlunas() {
   async function carregar() {
     const { data } = await supabase.from('perfis').select('*').order('nome', { ascending: true })
     if (data) setAlunas(data)
+    carregarAcessos() // não bloqueia a lista; preenche o "último acesso" quando chegar
   }
 
-  function abrirEdicao(aluna) {
-    setEditando(aluna.id)
-    setNome(aluna.nome || '')
-    setWhatsapp(aluna.whatsapp || '')
+  async function carregarAcessos() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) return
+      const resp = await fetch('/api/admin/ultimo-acesso', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      })
+      const json = await resp.json()
+      if (resp.ok && json.acessos) setAcessos(json.acessos)
+    } catch {
+      // silencioso: sem último acesso, a tela continua funcionando
+    }
+  }
+
+  function aviso(texto, tempo = 4000) {
+    setMsg(texto)
+    if (tempo) setTimeout(() => setMsg(''), tempo)
+  }
+
+  // ──────── Gerenciar aluna ────────
+  function abrirGerenciar(aluna) {
+    setGerenciando(aluna)
+    setEdNome(aluna.nome || '')
+    setEdWhatsapp(aluna.whatsapp || '')
     setMsg('')
   }
-
-  function cancelarEdicao() {
-    setEditando(null)
-    setNome('')
-    setWhatsapp('')
+  function fecharGerenciar() {
+    setGerenciando(null)
+    setEdNome(''); setEdWhatsapp('')
   }
 
-  async function salvar() {
-    if (!nome.trim()) { setMsg('⚠ O nome não pode ficar vazio.'); return }
-    setSalvando(true); setMsg('')
+  async function salvarEdicao() {
+    if (!edNome.trim()) { aviso('⚠ O nome não pode ficar vazio.'); return }
+    setSalvando(true)
     try {
-      const { error } = await supabase.from('perfis').update({
-        nome: nome.trim(),
-        whatsapp: whatsapp.trim(),
-      }).eq('id', editando)
+      const { error } = await supabase.from('perfis')
+        .update({ nome: edNome.trim(), whatsapp: edWhatsapp.trim() || null })
+        .eq('id', gerenciando.id)
       if (error) throw error
-      setMsg('✓ Dados atualizados com sucesso!')
       await carregar()
-      cancelarEdicao()
+      aviso('✓ Dados atualizados com sucesso!')
+      fecharGerenciar()
     } catch (e) {
-      setMsg('⚠ Erro: ' + e.message)
+      aviso('⚠ Erro: ' + e.message, 5000)
     }
     setSalvando(false)
-    setTimeout(() => setMsg(''), 4000)
   }
 
-  // ════════ Desativar / Reativar aluna ════════
-  // "Desativar" NÃO apaga nenhum dado — apenas expira o acesso (acesso_expira_em = ontem),
-  // o que faz o bloqueio em /app/painel (função verificarAcesso) impedir o login.
-  // "Reativar" simplesmente limpa essa data, voltando o acesso ao normal.
-  function estaDesativada(aluna) {
-    if (!aluna.acesso_expira_em) return false
-    return new Date(aluna.acesso_expira_em) < new Date()
-  }
-
-  async function desativarAluna(aluna) {
-    const confirmar = confirm(
-      `Desativar o acesso de ${aluna.nome || aluna.email}?\n\nEla não vai conseguir mais entrar na plataforma, mas todos os dados dela continuam salvos. Você pode reativar quando quiser.`
-    )
-    if (!confirmar) return
-
-    setDesativando(aluna.id); setMsg('')
+  async function desativarAluna() {
+    setDesativando(true)
     try {
-      const ontem = new Date()
-      ontem.setDate(ontem.getDate() - 1)
-      const { error } = await supabase.from('perfis').update({
-        acesso_expira_em: ontem.toISOString(),
-      }).eq('id', aluna.id)
+      const ontem = new Date(); ontem.setDate(ontem.getDate() - 1)
+      const { error } = await supabase.from('perfis')
+        .update({ acesso_expira_em: ontem.toISOString() })
+        .eq('id', gerenciando.id)
       if (error) throw error
-      setMsg(`✓ Acesso de ${aluna.nome || aluna.email} foi desativado.`)
       await carregar()
-      cancelarEdicao()
+      aviso(`✓ Acesso de ${gerenciando.nome || gerenciando.email} desativado.`, 5000)
+      fecharGerenciar()
     } catch (e) {
-      setMsg('⚠ Erro ao desativar: ' + e.message)
+      aviso('⚠ Erro ao desativar: ' + e.message, 5000)
     }
-    setDesativando(null)
-    setTimeout(() => setMsg(''), 5000)
+    setDesativando(false)
   }
 
-  async function reativarAluna(aluna) {
-    const confirmar = confirm(
-      `Reativar o acesso de ${aluna.nome || aluna.email}?\n\nEla poderá entrar na plataforma novamente.`
-    )
-    if (!confirmar) return
-
-    setDesativando(aluna.id); setMsg('')
+  async function reativarAluna() {
+    setDesativando(true)
     try {
-      const novaData = new Date()
-      novaData.setDate(novaData.getDate() + 30) // padrão: reativa com +30 dias de acesso
-      const { error } = await supabase.from('perfis').update({
-        acesso_expira_em: novaData.toISOString(),
-      }).eq('id', aluna.id)
+      const nova = new Date(); nova.setDate(nova.getDate() + 30)
+      const { error } = await supabase.from('perfis')
+        .update({ acesso_expira_em: nova.toISOString() })
+        .eq('id', gerenciando.id)
       if (error) throw error
-      setMsg(`✓ Acesso de ${aluna.nome || aluna.email} foi reativado por mais 30 dias.`)
       await carregar()
-      cancelarEdicao()
+      aviso(`✓ Acesso reativado por mais 30 dias.`, 5000)
+      fecharGerenciar()
     } catch (e) {
-      setMsg('⚠ Erro ao reativar: ' + e.message)
+      aviso('⚠ Erro ao reativar: ' + e.message, 5000)
     }
-    setDesativando(null)
-    setTimeout(() => setMsg(''), 5000)
+    setDesativando(false)
   }
 
-  async function reenviarBoasVindas(aluna) {
-    const confirmar = confirm(
-      `Reenviar e-mail de boas-vindas para ${aluna.nome || aluna.email}?\n\nUma nova senha será gerada e enviada para ${aluna.email}. A senha antiga deixará de funcionar.`
-    )
-    if (!confirmar) return
-
-    setReenviando(aluna.id); setMsg('')
+  async function reenviarBoasVindas() {
+    const ok = confirm(`Reenviar e-mail de boas-vindas para ${gerenciando.email}?\n\nUma nova senha será gerada e enviada. A senha antiga deixa de funcionar.`)
+    if (!ok) return
+    setReenviando(true)
     try {
-      const response = await fetch('/api/reenviar-boas-vindas', {
+      const resp = await fetch('/api/reenviar-boas-vindas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ alunaId: aluna.id }),
+        body: JSON.stringify({ alunaId: gerenciando.id }),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.erro || 'Falha ao reenviar e-mail')
-      setMsg(`✓ E-mail reenviado para ${aluna.email}!`)
+      const json = await resp.json()
+      if (!resp.ok) throw new Error(json.erro || json.error || 'Falha ao reenviar')
+      aviso(`✓ E-mail reenviado para ${gerenciando.email}!`, 5000)
     } catch (e) {
-      setMsg('⚠ Erro ao reenviar: ' + e.message)
+      aviso('⚠ Erro ao reenviar: ' + e.message, 5000)
     }
-    setReenviando(null)
-    setTimeout(() => setMsg(''), 5000)
+    setReenviando(false)
   }
 
-  function abrirNovaAluna() {
-    setNovoNome(""); setNovoEmail(""); setNovaSenha(""); setNovoWhatsapp("")
-    setMsg("")
-    setMostrarForm(true)
+  // ──────── Nova aluna (reusa /api/criar-aluna) ────────
+  function abrirNova() {
+    setNovoNome(''); setNovoEmail(''); setNovaSenha(''); setNovoWhatsapp(''); setPrazo('teste7')
+    setMsg(''); setNovaAberto(true)
   }
-
-  function cancelarNovaAluna() {
-    setMostrarForm(false)
-    setNovoNome(""); setNovoEmail(""); setNovaSenha(""); setNovoWhatsapp("")
+  function fecharNova() {
+    setNovaAberto(false)
+    setNovoNome(''); setNovoEmail(''); setNovaSenha(''); setNovoWhatsapp('')
   }
 
   async function cadastrarAluna() {
-    if (!novoNome.trim() || !novoEmail.trim() || !novaSenha) {
-      setMsg("Nome, e-mail e senha sao obrigatorios.")
-      return
-    }
-    if (novaSenha.length < 6) {
-      setMsg("A senha precisa ter no minimo 6 caracteres.")
-      return
-    }
-    setCadastrando(true); setMsg("")
+    if (!novoNome.trim() || !novoEmail.trim() || !novaSenha) { aviso('⚠ Nome, e-mail e senha são obrigatórios.'); return }
+    if (novaSenha.length < 6) { aviso('⚠ A senha precisa ter no mínimo 6 caracteres.'); return }
+    setCadastrando(true)
     try {
-      const sessionResult = await supabase.auth.getSession()
-      const token = sessionResult.data.session ? sessionResult.data.session.access_token : null
-      if (!token) throw new Error("Sessao expirada. Faca login novamente.")
-      const response = await fetch("/api/criar-aluna", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) throw new Error('Sessão expirada. Faça login novamente.')
+      const resp = await fetch('/api/criar-aluna', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({
           nome: novoNome.trim(),
           email: novoEmail.trim().toLowerCase(),
@@ -197,18 +249,39 @@ export default function AdminAlunas() {
           prazo,
         }),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || "Falha ao cadastrar aluna")
-      setMsg("Aluna " + data.aluna.nome + " cadastrada com sucesso! E-mail de boas-vindas enviado.")
+      const json = await resp.json()
+      if (!resp.ok) throw new Error(json.error || 'Falha ao cadastrar')
       await carregar()
-      cancelarNovaAluna()
+      aviso(`✓ ${json.aluna?.nome || 'Aluna'} cadastrada! E-mail de boas-vindas enviado.`, 6000)
+      fecharNova()
     } catch (e) {
-      setMsg("Erro: " + e.message)
+      aviso('⚠ Erro: ' + e.message, 6000)
     }
     setCadastrando(false)
-    setTimeout(function() { setMsg("") }, 6000)
   }
 
+  // ──────── Lista filtrada ────────
+  const tiposDisponiveis = useMemo(() => {
+    const set = new Set()
+    alunas.forEach(a => { if (a.tipo_acesso) set.add(a.tipo_acesso) })
+    return Array.from(set).sort()
+  }, [alunas])
+
+  const alunasFiltradas = useMemo(() => {
+    const q = busca.trim().toLowerCase()
+    return alunas.filter(a => {
+      if (q) {
+        const alvo = `${a.nome || ''} ${a.email || ''}`.toLowerCase()
+        if (!alvo.includes(q)) return false
+      }
+      if (tipoFiltro !== 'todos' && a.tipo_acesso !== tipoFiltro) return false
+      if (statusFiltro === 'ativas' && !estaAtiva(a)) return false
+      if (statusFiltro === 'vencidas' && !estaDesativada(a)) return false
+      return true
+    })
+  }, [alunas, busca, tipoFiltro, statusFiltro])
+
+  // ──────── Telas de bloqueio ────────
   if (carregando) {
     return (
       <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -228,144 +301,193 @@ export default function AdminAlunas() {
     )
   }
 
+  const inputEstilo = { width: '100%', padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '14px', color: '#FFF', outline: 'none', boxSizing: 'border-box' }
+  const labelEstilo = { display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '6px' }
+  const gerAluna = gerenciando ? alunas.find(a => a.id === gerenciando.id) || gerenciando : null
+  const gerDesativada = gerAluna ? estaDesativada(gerAluna) : false
+
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FFFFFF', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
 
+      {/* Cabeçalho */}
       <header style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px 20px', borderBottom: '1px solid #2A2A2A', background: '#111111', position: 'sticky', top: 0, zIndex: 10 }}>
         <button onClick={() => router.push('/admin')} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '7px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>← Escritório</button>
         <div>
           <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: ouro, textTransform: 'uppercase', margin: 0 }}>Administração</p>
           <p style={{ fontSize: '15px', fontWeight: 800, margin: '1px 0 0' }}>👥 Gerenciar Alunas</p>
         </div>
-        {!mostrarForm && (
-          <button onClick={abrirNovaAluna} style={{ background: ouroGrad, color: "#0A0A0A", border: "none", borderRadius: "9px", padding: "10px 16px", fontSize: "13px", fontWeight: 800, cursor: "pointer", marginLeft: "auto" }}>+ Nova Aluna</button>
-        )}
+        <button onClick={abrirNova} style={{ background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '9px', padding: '10px 16px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', marginLeft: 'auto' }}>+ Nova Aluna</button>
       </header>
 
-      <div style={{ maxWidth: "680px", margin: "0 auto", padding: "24px 18px 0" }}>
-        {msg && <p style={{ fontSize: "13px", color: msg.indexOf("Erro") === 0 || msg.indexOf("rro") > 0 ? "#e88" : "#5dca8a", margin: "0 0 16px", textAlign: "center" }}>{msg}</p>}
-
-        {mostrarForm && (
-          <div style={{ background: "#111111", border: "1px solid #D4AF37", borderRadius: "16px", padding: "20px", marginBottom: "20px" }}>
-            <h2 style={{ fontSize: "16px", fontWeight: 800, margin: "0 0 16px" }}>Cadastrar nova aluna</h2>
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>Nome *</label>
-              <input value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Nome completo" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>E-mail *</label>
-              <input type="email" value={novoEmail} onChange={e => setNovoEmail(e.target.value)} placeholder="email@exemplo.com" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>Senha * (minimo 6 caracteres)</label>
-              <input type="text" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Senha inicial" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>WhatsApp (opcional)</label>
-              <input value={novoWhatsapp} onChange={e => setNovoWhatsapp(e.target.value)} placeholder="(00) 00000-0000" style={{ width: "100%", padding: "11px 13px", background: "#0A0A0A", border: "1px solid #2A2A2A", borderRadius: "9px", fontSize: "14px", color: "#FFF", outline: "none", boxSizing: "border-box" }} />
-            </div>
-            <div style={{ marginBottom: "16px" }}>
-              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "#888", marginBottom: "6px" }}>Prazo de acesso *</label>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button type="button" onClick={() => setPrazo("teste7")} style={{ flex: 1, padding: "10px", background: prazo === "teste7" ? ouroGrad : "transparent", color: prazo === "teste7" ? "#0A0A0A" : "#888", border: "1px solid " + (prazo === "teste7" ? "transparent" : "#2A2A2A"), borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>7 dias</button>
-                <button type="button" onClick={() => setPrazo("mensal")} style={{ flex: 1, padding: "10px", background: prazo === "mensal" ? ouroGrad : "transparent", color: prazo === "mensal" ? "#0A0A0A" : "#888", border: "1px solid " + (prazo === "mensal" ? "transparent" : "#2A2A2A"), borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>Mensal</button>
-                <button type="button" onClick={() => setPrazo("anual")} style={{ flex: 1, padding: "10px", background: prazo === "anual" ? ouroGrad : "transparent", color: prazo === "anual" ? "#0A0A0A" : "#888", border: "1px solid " + (prazo === "anual" ? "transparent" : "#2A2A2A"), borderRadius: "8px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>Anual</button>
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button onClick={cadastrarAluna} disabled={cadastrando} style={{ flex: 1, padding: "12px", background: ouroGrad, color: "#0A0A0A", border: "none", borderRadius: "10px", fontSize: "14px", fontWeight: 800, cursor: "pointer" }}>{cadastrando ? "Cadastrando..." : "Cadastrar aluna"}</button>
-              <button onClick={cancelarNovaAluna} style={{ padding: "12px 20px", background: "transparent", color: "#888", border: "1px solid #2A2A2A", borderRadius: "10px", fontSize: "14px", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <main style={{ maxWidth: '680px', margin: '0 auto', padding: '24px 18px 60px' }}>
+      <main style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 18px 60px' }}>
 
         {msg && <p style={{ fontSize: '13px', color: msg.startsWith('✓') ? '#5dca8a' : '#e88', margin: '0 0 16px', textAlign: 'center' }}>{msg}</p>}
 
-        {alunas.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 20px', color: '#555' }}>
-            <div style={{ fontSize: '40px', marginBottom: '10px' }}>👥</div>
-            <p style={{ fontSize: '14px', margin: 0 }}>Nenhuma aluna cadastrada ainda.</p>
+        {/* Resumo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(212,175,55,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: ouro, fontSize: '22px' }}>👥</div>
+          <div>
+            <div style={{ fontSize: '11px', color: '#888' }}>Alunas {busca || tipoFiltro !== 'todos' || statusFiltro !== 'todas' ? 'encontradas' : 'cadastradas'}</div>
+            <div style={{ fontSize: '20px', fontWeight: 800 }}>{alunasFiltradas.length} {alunasFiltradas.length === 1 ? 'aluna' : 'alunas'}</div>
           </div>
-        ) : (
-          alunas.map(aluna => {
-            const desativada = estaDesativada(aluna)
-            return (
-            <div key={aluna.id} style={{ background: '#111111', border: `1px solid ${editando === aluna.id ? ouro : '#2A2A2A'}`, borderRadius: '14px', padding: '16px', marginBottom: '12px' }}>
+        </div>
 
-              {editando === aluna.id ? (
-                <>
-                  <div style={{ marginBottom: '12px' }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '6px' }}>Nome</label>
-                    <input value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome completo"
-                      style={{ width: '100%', padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '14px', color: '#FFF', outline: 'none', boxSizing: 'border-box' }} />
-                  </div>
-                  <div style={{ marginBottom: '14px' }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '6px' }}>WhatsApp</label>
-                    <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="(00) 00000-0000"
-                      style={{ width: '100%', padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '14px', color: '#FFF', outline: 'none', boxSizing: 'border-box' }} />
-                  </div>
-                  <p style={{ fontSize: '12px', color: '#666', margin: '0 0 14px' }}>{aluna.email}</p>
-                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                    <button onClick={salvar} disabled={salvando} style={{ flex: 1, padding: '11px', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar'}</button>
-                    <button onClick={cancelarEdicao} style={{ padding: '11px 18px', background: 'transparent', color: '#888', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
-                  </div>
-                  <div style={{ borderTop: '1px solid #2A2A2A', paddingTop: '10px' }}>
-                    {desativada ? (
-                      <button
-                        onClick={() => reativarAluna(aluna)}
-                        disabled={desativando === aluna.id}
-                        style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        {desativando === aluna.id ? 'Reativando...' : '✓ Reativar acesso'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => desativarAluna(aluna)}
-                        disabled={desativando === aluna.id}
-                        title="O acesso é bloqueado, mas nenhum dado é apagado"
-                        style={{ width: '100%', padding: '11px', background: 'transparent', color: '#e88', border: '1px solid #5A1A1A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        {desativando === aluna.id ? 'Desativando...' : '🚫 Desativar acesso'}
-                      </button>
-                    )}
-                  </div>
-                </>
+        {/* Filtros */}
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <input
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="🔍  Buscar por nome ou e-mail…"
+            style={{ flex: 1, minWidth: '200px', padding: '9px 12px', background: '#111', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '13px', color: '#FFF', outline: 'none' }}
+          />
+          <select value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value)} style={{ padding: '9px 12px', background: '#111', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '13px', color: '#ddd', outline: 'none', cursor: 'pointer' }}>
+            <option value="todos">Tipo: todos</option>
+            {tiposDisponiveis.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <select value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)} style={{ padding: '9px 12px', background: '#111', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '13px', color: '#ddd', outline: 'none', cursor: 'pointer' }}>
+            <option value="todas">Status: todas</option>
+            <option value="ativas">Ativas</option>
+            <option value="vencidas">Vencidas</option>
+          </select>
+        </div>
+
+        {/* Tabela */}
+        <div style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '720px' }}>
+              <thead>
+                <tr style={{ background: '#161616', color: '#888', textAlign: 'left' }}>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Aluna</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Tipo</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Último acesso</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Vencimento</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Status</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600, textAlign: 'right' }}>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alunasFiltradas.length === 0 ? (
+                  <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#666' }}>Nenhuma aluna encontrada.</td></tr>
+                ) : alunasFiltradas.map(a => {
+                  const venc = vencimentoInfo(a)
+                  const ativa = estaAtiva(a)
+                  const acesso = acessos[a.id]
+                  const mentoria = a.tipo_acesso === 'mentoria'
+                  return (
+                    <tr key={a.id} style={{ borderTop: '1px solid #222' }}>
+                      <td style={{ padding: '11px 14px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ width: '34px', height: '34px', borderRadius: '50%', background: 'rgba(212,175,55,.14)', color: ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '12px', flexShrink: 0 }}>{iniciais(a.nome, a.email)}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{a.nome || '(sem nome)'}</div>
+                            <div style={{ color: '#777', fontSize: '11px' }}>{a.email}{a.whatsapp ? ` · ${formatarWhatsapp(a.whatsapp)}` : ''}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <span style={mentoria
+                          ? { background: ouroGrad, color: '#0A0A0A', borderRadius: '20px', padding: '2px 9px', fontSize: '11px', fontWeight: 700 }
+                          : { background: 'rgba(212,175,55,.1)', border: '1px solid rgba(212,175,55,.25)', color: ouro, borderRadius: '20px', padding: '2px 9px', fontSize: '11px', fontWeight: 600 }}>
+                          {a.tipo_acesso || '—'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '11px 14px', color: '#aaa', whiteSpace: 'nowrap' }}>{acesso ? formatarData(acesso) : <span style={{ color: '#666' }}>nunca acessou</span>}</td>
+                      <td style={{ padding: '11px 14px', color: CORES_TOM[venc.tom], whiteSpace: 'nowrap' }}>
+                        {venc.data ? <>{venc.label}<br /><span style={{ color: venc.tom === '' ? '#ddd' : CORES_TOM[venc.tom] }}>{venc.data}</span></> : '—'}
+                      </td>
+                      <td style={{ padding: '11px 14px' }}>
+                        <span style={{ display: 'inline-block', width: '30px', height: '17px', borderRadius: '20px', background: ativa ? ouro : '#3A3A3A', position: 'relative', verticalAlign: 'middle' }}>
+                          <span style={{ position: 'absolute', top: '2px', [ativa ? 'right' : 'left']: '2px', width: '13px', height: '13px', borderRadius: '50%', background: ativa ? '#0A0A0A' : '#888' }} />
+                        </span>
+                      </td>
+                      <td style={{ padding: '11px 14px', textAlign: 'right' }}>
+                        <button onClick={() => abrirGerenciar(a)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '7px 13px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Gerenciar</button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <p style={{ marginTop: '10px', fontSize: '11px', color: '#666' }}>Mostrando {alunasFiltradas.length} de {alunas.length} · dados da tabela perfis</p>
+      </main>
+
+      {/* ──────── Modal: Gerenciar aluna ──────── */}
+      {gerenciando && (
+        <div onClick={fecharGerenciar} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '16px', padding: '22px', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+              <span style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(212,175,55,.14)', color: ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '14px' }}>{iniciais(gerAluna.nome, gerAluna.email)}</span>
+              <div style={{ minWidth: 0 }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>Gerenciar aluna</h2>
+                <p style={{ fontSize: '12px', color: '#888', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis' }}>{gerAluna.email}</p>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={labelEstilo}>Nome</label>
+              <input value={edNome} onChange={e => setEdNome(e.target.value)} placeholder="Nome completo" style={inputEstilo} />
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={labelEstilo}>WhatsApp</label>
+              <input value={edWhatsapp} onChange={e => setEdWhatsapp(e.target.value)} placeholder="(00) 00000-0000" style={inputEstilo} />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+              <button onClick={salvarEdicao} disabled={salvando} style={{ flex: 1, padding: '11px', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar dados'}</button>
+              <button onClick={fecharGerenciar} style={{ padding: '11px 18px', background: 'transparent', color: '#888', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Fechar</button>
+            </div>
+
+            <div style={{ borderTop: '1px solid #2A2A2A', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button onClick={reenviarBoasVindas} disabled={reenviando} style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{reenviando ? 'Enviando...' : '✉️ Reenviar e-mail de boas-vindas'}</button>
+              {gerDesativada ? (
+                <button onClick={reativarAluna} disabled={desativando} style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{desativando ? 'Reativando...' : '✓ Reativar acesso (+30 dias)'}</button>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: desativada ? '#3A3A3A' : ouroGrad, color: desativada ? '#888' : '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', fontWeight: 800, flexShrink: 0 }}>
-                    {(aluna.nome || aluna.email || '?').charAt(0).toUpperCase()}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: '14px', fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      {aluna.nome || '(sem nome cadastrado)'}
-                      {desativada && (
-                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#e88', border: '1px solid #5A1A1A', borderRadius: '5px', padding: '2px 6px' }}>DESATIVADA</span>
-                      )}
-                    </p>
-                    <p style={{ fontSize: '12px', color: '#888', margin: '2px 0 0' }}>{aluna.email}</p>
-                    {aluna.whatsapp && <p style={{ fontSize: '12px', color: '#888', margin: '1px 0 0' }}>📱 {aluna.whatsapp}</p>}
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                    <button
-                      onClick={() => reenviarBoasVindas(aluna)}
-                      disabled={reenviando === aluna.id}
-                      title="Gera uma nova senha e reenvia o e-mail de boas-vindas"
-                      style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: '#5dca8a', padding: '8px 12px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}
-                    >
-                      {reenviando === aluna.id ? 'Enviando...' : '✉️ Reenviar e-mail'}
-                    </button>
-                    <button onClick={() => abrirEdicao(aluna)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>Editar</button>
-                  </div>
-                </div>
+                <button onClick={desativarAluna} disabled={desativando} title="O acesso é bloqueado, mas nenhum dado é apagado" style={{ width: '100%', padding: '11px', background: 'transparent', color: '#e88', border: '1px solid #5A1A1A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{desativando ? 'Desativando...' : '🚫 Desativar acesso'}</button>
               )}
             </div>
-            )
-          })
-        )}
-      </main>
+          </div>
+        </div>
+      )}
+
+      {/* ──────── Modal: Nova aluna ──────── */}
+      {novaAberto && (
+        <div onClick={fecharNova} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#111', border: '1px solid #D4AF37', borderRadius: '16px', padding: '22px', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h2 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 16px' }}>Cadastrar nova aluna</h2>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={labelEstilo}>Nome *</label>
+              <input value={novoNome} onChange={e => setNovoNome(e.target.value)} placeholder="Nome completo" style={inputEstilo} />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={labelEstilo}>E-mail *</label>
+              <input type="email" value={novoEmail} onChange={e => setNovoEmail(e.target.value)} placeholder="email@exemplo.com" style={inputEstilo} />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={labelEstilo}>Senha * (mínimo 6 caracteres)</label>
+              <input type="text" value={novaSenha} onChange={e => setNovaSenha(e.target.value)} placeholder="Senha inicial" style={inputEstilo} />
+            </div>
+            <div style={{ marginBottom: '14px' }}>
+              <label style={labelEstilo}>WhatsApp (opcional)</label>
+              <input value={novoWhatsapp} onChange={e => setNovoWhatsapp(e.target.value)} placeholder="(00) 00000-0000" style={inputEstilo} />
+            </div>
+            <div style={{ marginBottom: '18px' }}>
+              <label style={labelEstilo}>Prazo de acesso *</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                {[['teste7', '7 dias'], ['mensal', 'Mensal'], ['anual', 'Anual']].map(([val, txt]) => (
+                  <button key={val} type="button" onClick={() => setPrazo(val)} style={{ flex: 1, padding: '10px', background: prazo === val ? ouroGrad : 'transparent', color: prazo === val ? '#0A0A0A' : '#888', border: '1px solid ' + (prazo === val ? 'transparent' : '#2A2A2A'), borderRadius: '8px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{txt}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={cadastrarAluna} disabled={cadastrando} style={{ flex: 1, padding: '12px', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: 800, cursor: 'pointer' }}>{cadastrando ? 'Cadastrando...' : 'Cadastrar aluna'}</button>
+              <button onClick={fecharNova} style={{ padding: '12px 20px', background: 'transparent', color: '#888', border: '1px solid #2A2A2A', borderRadius: '10px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
