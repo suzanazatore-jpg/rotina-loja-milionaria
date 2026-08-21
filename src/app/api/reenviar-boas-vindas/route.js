@@ -7,12 +7,17 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
+
 function gerarSenhaTemporaria() {
   return Math.random().toString(36).slice(-8)
 }
 
 export async function POST(request) {
   try {
+    const token = request.headers.get('authorization')?.replace('Bearer ', '')
+    const { data: { user } } = token ? await supabaseAdmin.auth.getUser(token) : { data: { user: null } }
+    if (user?.email !== ADMIN_EMAIL) return Response.json({ erro: 'Não autorizado' }, { status: 403 })
     const { alunaId } = await request.json()
 
     if (!alunaId) {

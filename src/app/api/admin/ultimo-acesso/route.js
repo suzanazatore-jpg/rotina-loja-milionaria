@@ -41,6 +41,7 @@ export async function POST(request) {
     //    um mapa { id_da_aluna: data_do_ultimo_login }. O id do Auth é o
     //    mesmo id da tabela "perfis", então dá pra casar direto na tela.
     const acessos = {}
+    const cadastros = {}
     let pagina = 1
     const porPagina = 1000
 
@@ -52,13 +53,14 @@ export async function POST(request) {
       const usuarios = data?.users || []
       for (const u of usuarios) {
         acessos[u.id] = u.last_sign_in_at || null
+        cadastros[u.id] = u.created_at || null
       }
       if (usuarios.length < porPagina) break
       pagina += 1
       if (pagina > 20) break // rede de segurança contra loop infinito
     }
 
-    return NextResponse.json({ acessos })
+    return NextResponse.json({ acessos, cadastros })
   } catch (err) {
     return NextResponse.json({ error: `Erro inesperado: ${err.message}` }, { status: 500 })
   }
