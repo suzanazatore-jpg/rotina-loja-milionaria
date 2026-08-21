@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import CursosArea from './CursosArea'
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
 const WHATSAPP = '558499814124'
@@ -241,6 +242,7 @@ export default function Painel() {
     { id: 'rotina', icone: '🔄', label: 'Rotina' },
     { id: 'precificacao', icone: '📊', label: 'Precificação' },
     { id: 'mentoria', icone: '🎓', label: 'Mentoria' },
+    { id: 'cursos', icone: '📚', label: 'Meus Cursos' },
     { id: 'premium', icone: '🔒', label: 'Conteudo Premium' },
     { id: 'suporte', icone: '💬', label: 'Suporte' },
   ]
@@ -384,6 +386,7 @@ export default function Painel() {
                   <CardAcesso cores={cores} icone="🔄" titulo="Rotina" sub="15 min por dia" onClick={() => irPara('rotina')} />
                   <CardAcesso cores={cores} icone="📊" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
                   <CardAcesso cores={cores} icone="🎓" titulo="Mentoria" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />
+                  <CardAcesso cores={cores} icone="📚" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
                   <CardAcesso cores={cores} icone={temAcessoPremium ? '⭐' : '🔒'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Plano Implementação'} onClick={() => irPara('premium')} />
                   <CardAcesso cores={cores} icone="💬" titulo="Suporte" sub="24h com IA" onClick={() => irPara('suporte')} />
                 </div>
@@ -411,6 +414,8 @@ export default function Painel() {
               )}
 
               {/* MENTORIA / AULAS */}
+              {secao === 'cursos' && <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} />}
+
               {secao === 'mentoria' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
