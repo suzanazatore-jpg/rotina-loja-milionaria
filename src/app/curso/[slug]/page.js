@@ -36,6 +36,11 @@ export default function Curso({ params }) {
   const [abertos, setAbertos] = useState(new Set())
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+  const [aba, setAba] = useState('informacoes')
+  const [comentarios, setComentarios] = useState([])
+  const [novoComentario, setNovoComentario] = useState('')
+  const [enviandoComentario, setEnviandoComentario] = useState(false)
+  const [erroComentario, setErroComentario] = useState('')
 
   useEffect(() => {
     async function carregar() {
@@ -96,6 +101,28 @@ export default function Curso({ params }) {
     if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer')
   }
 
+  async function carregarComentarios(lessonId) {
+    if (!lessonId || !curso?.comments_enabled) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const resposta = await fetch(`/api/comentarios?lesson_id=${lessonId}`, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+    const data = await resposta.json()
+    if (resposta.ok) setComentarios(data.comentarios || [])
+  }
+
+  useEffect(() => { setComentarios([]); setAba('informacoes'); if (aulaAtual?.id) carregarComentarios(aulaAtual.id) }, [aulaAtual?.id, curso?.comments_enabled])
+
+  async function publicarComentario(event) {
+    event.preventDefault()
+    const texto = novoComentario.trim()
+    if (!texto || !aulaAtual) return
+    setEnviandoComentario(true); setErroComentario('')
+    const { data: { session } } = await supabase.auth.getSession()
+    const resposta = await fetch('/api/comentarios', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ lesson_id: aulaAtual.id, body: texto }) })
+    const data = await resposta.json()
+    if (resposta.ok) { setComentarios(atual => [data.comentario, ...atual]); setNovoComentario('') } else setErroComentario(data.error || 'Não foi possível publicar.')
+    setEnviandoComentario(false)
+  }
+
   if (carregando) return <Estado texto="Carregando curso..." />
   if (erro) return <Estado texto={erro} botao={() => router.push('/painel')} />
 
@@ -113,12 +140,29 @@ export default function Curso({ params }) {
             <div style={{ width: '100%', aspectRatio: '16/9', background: '#111', border: '1px solid #292929', borderRadius: '16px', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
               {aulaAtual.video_url ? <iframe src={urlVideo(aulaAtual.video_url)} title={aulaAtual.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} /> : <span style={{ color: '#777' }}>🎬 Vídeo em breve</span>}
             </div>
-            <div style={{ padding: '22px 2px' }}>
+            <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid #292929', marginTop: 20 }}>
+              <button onClick={() => setAba('informacoes')} style={abaStyle(aba === 'informacoes')}>Informações</button>
+              {curso.comments_enabled !== false && <button onClick={() => setAba('comentarios')} style={abaStyle(aba === 'comentarios')}>Comentários</button>}
+            </div>
+            {aba === 'informacoes' ? <div style={{ padding: '22px 2px' }}>
               <p style={{ color: OURO, fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', margin: '0 0 7px' }}>{aulaAtual.duration_label || 'Aula do curso'}</p>
               <h2 style={{ margin: '0 0 8px', fontSize: '24px' }}>{aulaAtual.title}</h2>
               {aulaAtual.description && <p style={{ color: '#AAA', fontSize: '14px', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{aulaAtual.description}</p>}
               <button onClick={alternarConclusao} style={{ ...botaoPrincipal, background: concluidas.has(aulaAtual.id) ? '#17351F' : GRADIENTE, color: concluidas.has(aulaAtual.id) ? '#4ADE80' : '#0A0A0A' }}>{concluidas.has(aulaAtual.id) ? '✓ Aula concluída' : 'Marcar como concluída'}</button>
-            </div>
+            </div> : <section style={{ padding: '22px 2px' }}>
+              <h3 style={{ margin: '0 0 5px', fontSize: 18 }}>Comentários e dúvidas</h3>
+              <p style={{ color: '#888', fontSize: 13, margin: '0 0 18px' }}>Envie sua pergunta. A resposta da Suzana aparecerá aqui.</p>
+              <form onSubmit={publicarComentario} style={{ background: '#111', border: '1px solid #303030', borderRadius: 14, padding: 14, marginBottom: 18 }}>
+                <textarea value={novoComentario} onChange={event => setNovoComentario(event.target.value)} maxLength={1000} required placeholder="Escreva seu comentário ou sua dúvida..." style={{ width: '100%', minHeight: 92, resize: 'vertical', boxSizing: 'border-box', background: '#191919', color: '#FFF', border: '1px solid #333', borderRadius: 10, padding: 12, font: 'inherit', outlineColor: OURO }} />
+                {erroComentario && <p style={{ color: '#F87171', fontSize: 12, margin: '8px 0 0' }}>{erroComentario}</p>}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}><button disabled={enviandoComentario} style={{ ...botaoPrincipal, opacity: enviandoComentario ? .6 : 1 }}>{enviandoComentario ? 'Publicando...' : 'Publicar comentário'}</button></div>
+              </form>
+              {comentarios.length ? <div style={{ display: 'grid', gap: 12 }}>{comentarios.map(comentario => <article key={comentario.id} style={{ background: '#121212', border: '1px solid #2C2C2C', borderRadius: 12, padding: 15 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}><strong style={{ fontSize: 13 }}>Sua pergunta</strong><time style={{ color: '#777', fontSize: 11 }}>{new Date(comentario.created_at).toLocaleDateString('pt-BR')}</time></div>
+                <p style={{ color: '#CCC', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: '9px 0 0' }}>{comentario.body}</p>
+                {(comentario.respostas || []).map(resposta => <div key={resposta.id} style={{ borderLeft: `2px solid ${OURO}`, paddingLeft: 12, marginTop: 14 }}><strong style={{ color: OURO, fontSize: 12 }}>Resposta da Suzana</strong><p style={{ color: '#D7D7D7', fontSize: 14, lineHeight: 1.6, whiteSpace: 'pre-wrap', margin: '5px 0 0' }}>{resposta.body}</p></div>)}
+              </article>)}</div> : <div style={{ border: '1px dashed #333', borderRadius: 12, padding: 26, color: '#777', textAlign: 'center', fontSize: 13 }}>Você ainda não enviou comentários nesta aula.</div>}
+            </section>}
             {materiaisAula.length > 0 && <section style={{ borderTop: '1px solid #292929', padding: '20px 2px' }}><h3 style={{ fontSize: '16px', margin: '0 0 12px' }}>Materiais desta aula</h3>{materiaisAula.map(material => <button key={material.id} onClick={() => abrirMaterial(material)} style={{ ...botaoSecundario, display: 'block', width: '100%', textAlign: 'left', marginBottom: '8px', padding: '13px' }}>↗ {material.title}</button>)}</section>}
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '18px' }}>
               <button disabled={indiceAtual <= 0} onClick={() => escolherAula(aulas[indiceAtual - 1].id)} style={{ ...botaoSecundario, opacity: indiceAtual <= 0 ? .35 : 1 }}>← Aula anterior</button>
@@ -146,6 +190,7 @@ export default function Curso({ params }) {
 
 const botaoSecundario = { background: '#171717', color: '#DDD', border: '1px solid #333', borderRadius: '9px', padding: '9px 12px', fontWeight: 700, cursor: 'pointer' }
 const botaoPrincipal = { background: GRADIENTE, color: '#0A0A0A', border: 0, borderRadius: '9px', padding: '10px 14px', fontWeight: 900, cursor: 'pointer' }
+const abaStyle = ativa => ({ background: 'transparent', color: ativa ? OURO : '#777', border: 0, borderBottom: ativa ? `2px solid ${OURO}` : '2px solid transparent', padding: '0 0 10px', fontWeight: 800, cursor: 'pointer' })
 
 function Estado({ texto, botao }) {
   return <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#AAA', display: 'grid', placeItems: 'center', textAlign: 'center', padding: 24 }}><div><p>{texto}</p>{botao && <button onClick={botao} style={botaoPrincipal}>Voltar ao painel</button>}</div></div>

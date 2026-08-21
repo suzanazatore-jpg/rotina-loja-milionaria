@@ -55,7 +55,7 @@ export default function Admin() {
       titulo: 'Marketing e Comunicação',
       descricao: 'Ações para comunicar e acompanhar suas alunas.',
       cards: [
-        { icone: '💬', titulo: 'Comentários', sub: 'Veja e modere comentários feitos nas aulas.', status: 'Em breve' },
+        { icone: '💬', titulo: 'Comentários', sub: 'Veja, responda e modere comentários feitos nas aulas.', rota: '/admin/comentarios' },
         { icone: '✉️', titulo: 'Suporte', sub: 'Centralize as solicitações de suporte recebidas.', status: 'Em breve' },
         { icone: '📣', titulo: 'Campanhas e Mensagens', sub: 'Envie comunicados e e-mails para suas alunas.', status: 'Em breve' },
       ],
