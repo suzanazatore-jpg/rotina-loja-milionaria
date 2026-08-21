@@ -93,6 +93,10 @@ export default function Painel() {
   const [menuMobile, setMenuMobile] = useState(false)
   const [bannerAtual, setBannerAtual] = useState(0)
   const [banners, setBanners] = useState(BANNERS_PADRAO)
+  const [termosPendentes, setTermosPendentes] = useState(null)
+  const [confirmouTermos, setConfirmouTermos] = useState(false)
+  const [aceitandoTermos, setAceitandoTermos] = useState(false)
+  const [erroTermos, setErroTermos] = useState('')
 
   // Meus Dados
   const [nome, setNome] = useState('')
@@ -130,6 +134,14 @@ export default function Painel() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
       setUsuario(session.user)
+      // Confere se existe uma versão dos Termos de Uso aguardando aceite.
+      if (session.user.email !== ADMIN_EMAIL) {
+        try {
+          const resposta = await fetch('/api/termos', { headers: { Authorization: `Bearer ${session.access_token}` } })
+          const termosData = await resposta.json()
+          if (resposta.ok && termosData.termos?.is_required && !termosData.aceito) setTermosPendentes(termosData.termos)
+        } catch (e) { /* não bloqueia por falha de conexão */ }
+      }
       // Tenta carregar perfil salvo na tabela 'perfis'
       try {
         const { data } = await supabase.from('perfis').select('nome, whatsapp, tipo_acesso, acesso_expira_em, status_assinatura').eq('id', session.user.id).single()
@@ -211,6 +223,22 @@ export default function Painel() {
     router.push('/login')
   }
 
+  async function aceitarTermos() {
+    if (!termosPendentes || !confirmouTermos) return
+    setAceitandoTermos(true); setErroTermos('')
+    const { data: { session } } = await supabase.auth.getSession()
+    try {
+      const resposta = await fetch('/api/termos', {
+        method: 'POST', headers: { Authorization: `Bearer ${session?.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ terms_id: termosPendentes.id }),
+      })
+      const dados = await resposta.json()
+      if (!resposta.ok) throw new Error(dados.error || 'Não foi possível registrar o aceite.')
+      setTermosPendentes(null)
+    } catch (error) { setErroTermos(error.message) }
+    setAceitandoTermos(false)
+  }
+
   async function salvarDados() {
     if (!usuario) return
     setSalvando(true); setMsgSalvo('')
@@ -273,6 +301,20 @@ export default function Painel() {
         <p style={{ color: '#888', fontSize: '15px' }}>Carregando...</p>
       </div>
     )
+  }
+
+  if (termosPendentes) {
+    return <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FFF', display: 'grid', placeItems: 'center', padding: '20px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <section style={{ width: '100%', maxWidth: '680px', background: '#111', border: '1px solid #34302A', borderRadius: '18px', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.5)' }}>
+        <header style={{ padding: '20px 22px 15px', borderBottom: '1px solid #2A2A2A' }}><p style={{ color: ouro, fontSize: '10px', fontWeight: 800, letterSpacing: '.12em', margin: '0 0 5px' }}>ROTINA DA LOJA MILIONÁRIA</p><h1 style={{ fontSize: '21px', margin: 0 }}>Termos de Uso</h1><p style={{ color: '#888', fontSize: '13px', margin: '5px 0 0' }}>Leia para continuar. Versão {termosPendentes.version}.</p></header>
+        <div style={{ margin: '18px 22px', maxHeight: '48vh', overflowY: 'auto', whiteSpace: 'pre-wrap', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '10px', padding: '17px', color: '#CCC', fontSize: '13px', lineHeight: 1.65 }}>{termosPendentes.content}</div>
+        <footer style={{ padding: '0 22px 20px' }}>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', color: '#DDD', fontSize: '13px', cursor: 'pointer', marginBottom: '15px' }}><input type="checkbox" checked={confirmouTermos} onChange={e => setConfirmouTermos(e.target.checked)} style={{ marginTop: '2px' }} /> Li e aceito os Termos de Uso da plataforma.</label>
+          {erroTermos && <p style={{ color: '#FF7777', fontSize: '12px' }}>{erroTermos}</p>}
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px' }}><button onClick={sair} style={{ background: 'transparent', color: '#888', border: '1px solid #333', borderRadius: '8px', padding: '10px 16px', cursor: 'pointer' }}>Sair</button><button onClick={aceitarTermos} disabled={!confirmouTermos || aceitandoTermos} style={{ background: confirmouTermos ? ouroGrad : '#292929', color: confirmouTermos ? '#090909' : '#666', border: 0, borderRadius: '8px', padding: '11px 18px', fontWeight: 900, cursor: confirmouTermos ? 'pointer' : 'not-allowed' }}>{aceitandoTermos ? 'Registrando...' : 'Aceitar e continuar'}</button></div>
+        </footer>
+      </section>
+    </div>
   }
 
   // ── Bloqueio de acesso (teste expirado / à vista expirado / assinatura atrasada ou cancelada) ──
