@@ -56,8 +56,8 @@ export default function Admin() {
       descricao: 'Ações para comunicar e acompanhar suas alunas.',
       cards: [
         { icone: '💬', titulo: 'Comentários', sub: 'Veja, responda e modere comentários feitos nas aulas.', rota: '/admin/comentarios' },
-        { icone: '✉️', titulo: 'Suporte', sub: 'Centralize as solicitações de suporte recebidas.', status: 'Em breve' },
-        { icone: '📣', titulo: 'Campanhas e Mensagens', sub: 'Envie comunicados e e-mails para suas alunas.', status: 'Em breve' },
+        { icone: '✉️', titulo: 'Suporte', sub: 'Centralize e responda as solicitações das alunas.', rota: '/admin/suporte' },
+        { icone: '📣', titulo: 'Campanhas em Massa', sub: 'Envie mensagens por e-mail e WhatsApp.', rota: '/admin/comunicacao' },
       ],
     },
     {

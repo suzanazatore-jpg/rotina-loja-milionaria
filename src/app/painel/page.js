@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import CursosArea from './CursosArea'
+import SupportCenter from './SupportCenter'
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
 const WHATSAPP = '558499814124'
@@ -578,21 +579,7 @@ export default function Painel() {
               {/* SUPORTE */}
               {secao === 'suporte' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-                  <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
-                    <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>💬 Suporte 24h WhatsApp com IA</h2>
-                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Atendimento 24 horas por dia, 7 dias por semana. Confira o passo a passo ou fale direto com o suporte.</p>
-                  </div>
-                  {[
-                    { t: '1. Assista à Mentoria', d: 'Comece pela aula de abertura para entender o método.' },
-                    { t: '2. Use a Calculadora', d: 'Calcule seus descontos e margens com segurança.' },
-                    { t: '3. Siga sua Rotina', d: 'Dedique 15 minutos por dia para a rotina da loja.' },
-                  ].map((item, i) => (
-                    <div key={i} style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '12px', padding: '14px', marginBottom: '10px' }}>
-                      <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 4px', color: cores.tx }}>{item.t}</h3>
-                      <p style={{ fontSize: '12px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>{item.d}</p>
-                    </div>
-                  ))}
-                  <a href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Suh%2C%20sou%20aluna%20e%20tenho%20uma%20d%C3%BAvida`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '14px', fontSize: '14px', fontWeight: 800, textDecoration: 'none', marginTop: '14px' }}>💬 Falar com o suporte no WhatsApp</a>
+                  <SupportCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} whatsapp={WHATSAPP} />
                 </div>
               )}
 
