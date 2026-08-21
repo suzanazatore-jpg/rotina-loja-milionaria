@@ -176,7 +176,9 @@ export default function Painel() {
       } catch (e) { /* sem calendário ainda */ }
       // Carrega as campanhas (PDFs, um por mês)
       try {
-        const { data: campData } = await supabase.from('campanhas').select('*').order('mes_ano', { ascending: false })
+        const resposta = await fetch('/api/campanhas', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        const resultado = await resposta.json()
+        const campData = resposta.ok ? resultado.campanhas : []
         if (campData) {
           setCampanhas(campData)
           const temMesAtual = campData.some(c => c.mes_ano === mesAtualValor())
@@ -595,91 +597,32 @@ export default function Painel() {
 
               {/* CAMPANHAS DE VENDA (PDFs por mês) */}
               {secao === 'campanhas' && (
-                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-                  <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
-                    <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>🎯 Campanhas de Venda</h2>
-                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Campanhas prontas em PDF para você usar nas suas vendas.</p>
+                <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+                  <div style={{ position: 'relative', overflow: 'hidden', background: tema === 'escuro' ? 'linear-gradient(135deg,#1b1608,#111 65%)' : 'linear-gradient(135deg,#fff4c7,#fff 70%)', border: `1px solid ${tema === 'escuro' ? '#554717' : '#ddc779'}`, borderRadius: '18px', padding: '23px', marginBottom: '18px' }}>
+                    <div style={{ position: 'absolute', right: '-18px', top: '-22px', fontSize: '100px', opacity: .055 }}>🎯</div>
+                    <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>AÇÃO DO MÊS</p>
+                    <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 6px', color: cores.tx }}>Campanhas de Venda</h2>
+                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55, maxWidth: '520px' }}>Estratégias prontas para movimentar sua loja, ativar clientes e vender mais.</p>
                   </div>
 
-                  {campanhas.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '50px 20px', color: cores.tx3 }}>
-                      <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎯</div>
-                      <p style={{ fontSize: '14px', margin: 0 }}>Nenhuma campanha disponível ainda. Em breve! 👑</p>
-                    </div>
-                  ) : (
-                    <>
-                      {/* ABAS POR MÊS */}
-                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '16px' }}>
-                        {campanhas.map(item => (
-                          <button
-                            key={item.mes_ano}
-                            onClick={() => setMesSelecionadoCamp(item.mes_ano)}
-                            style={{
-                              flexShrink: 0, padding: '9px 16px', borderRadius: '99px', whiteSpace: 'nowrap',
-                              fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                              border: mesSelecionadoCamp === item.mes_ano ? 'none' : `1px solid ${cores.borda}`,
-                              background: mesSelecionadoCamp === item.mes_ano ? ouroGrad : cores.card,
-                              color: mesSelecionadoCamp === item.mes_ano ? '#0A0A0A' : cores.tx2,
-                            }}
-                          >
-                            {rotuloMesCurto(item.mes_ano)}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* MATERIAL DO MÊS SELECIONADO */}
-                      {(() => {
-                        const item = campanhas.find(c => c.mes_ano === mesSelecionadoCamp)
-                        if (!item) {
-                          return (
-                            <div style={{ textAlign: 'center', padding: '50px 20px', color: cores.tx3 }}>
-                              <div style={{ fontSize: '40px', marginBottom: '10px' }}>🎯</div>
-                              <p style={{ fontSize: '14px', margin: 0 }}>Nenhuma campanha para este mês ainda.</p>
-                            </div>
-                          )
-                        }
-                        return (
-                          <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                              <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: ouroGrad, color: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 }}>🎯</div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: '11px', fontWeight: 700, color: ouro, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{rotuloMesCompleto(item.mes_ano)}</p>
-                                <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: cores.tx }}>{item.titulo}</h3>
-                                {item.descricao && <p style={{ fontSize: '13px', color: cores.tx2, margin: '4px 0 0', lineHeight: 1.5 }}>{item.descricao}</p>}
-                              </div>
-                            </div>
-
-                            {item.arquivo_url && (
-                              <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-                                <a
-                                  href={item.arquivo_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '9px',
-                                    background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx,
-                                    fontSize: '13px', fontWeight: 700, textDecoration: 'none', cursor: 'pointer',
-                                  }}
-                                >
-                                  👁️ Ver na tela
-                                </a>
-                                <button
-                                  onClick={() => baixarPdf(item)}
-                                  style={{
-                                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '9px',
-                                    background: ouroGrad, border: 'none', color: '#0A0A0A',
-                                    fontSize: '13px', fontWeight: 800, cursor: 'pointer',
-                                  }}
-                                >
-                                  ⬇️ Baixar
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </>
-                  )}
+                  {!campanhas.length ? <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>🎯</div><strong style={{ color: cores.tx2 }}>A próxima campanha aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há material disponível.</p></div> : <>
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{campanhas.map(item => <button key={item.mes_ano} onClick={() => setMesSelecionadoCamp(item.mes_ano)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesSelecionadoCamp === item.mes_ano ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesSelecionadoCamp === item.mes_ano ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesSelecionadoCamp === item.mes_ano ? ouro : cores.tx2 }}>{rotuloMesCurto(item.mes_ano)}</button>)}</div>
+                    {(() => {
+                      const item = campanhas.find(c => c.mes_ano === mesSelecionadoCamp) || campanhas[0]
+                      if (!item) return null
+                      return <article style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '18px', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '17px', padding: '22px', borderBottom: `1px solid ${cores.borda}` }}>
+                          <div style={{ width: '74px', height: '74px', borderRadius: '18px', background: ouroGrad, color: '#0A0A0A', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '30px', boxShadow: '0 10px 28px rgba(212,175,55,.18)' }}>🎯</div>
+                          <div style={{ minWidth: 0 }}><p style={{ fontSize: '11px', fontWeight: 800, color: ouro, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '.06em' }}>{rotuloMesCompleto(item.mes_ano)}</p><h3 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: cores.tx }}>{item.titulo}</h3><p style={{ fontSize: '13px', color: cores.tx2, margin: '6px 0 0', lineHeight: 1.5 }}>{item.descricao || 'Sua campanha mensal está pronta para colocar em prática.'}</p></div>
+                        </div>
+                        <div style={{ padding: '14px 16px 0', color: cores.tx2, fontSize: '12px' }}><span style={{ color: ouro }}>●</span> Material estratégico em PDF</div>
+                        <div style={{ display: 'flex', gap: '10px', padding: '14px 16px 16px', flexWrap: 'wrap' }}>
+                          <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx, fontSize: '13px', fontWeight: 800, textDecoration: 'none' }}>👁 Visualizar campanha</a>
+                          <button onClick={() => baixarPdf(item)} style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: ouroGrad, border: 'none', color: '#0A0A0A', fontSize: '13px', fontWeight: 900, cursor: 'pointer' }}>⬇ Baixar campanha</button>
+                        </div>
+                      </article>
+                    })()}
+                  </>}
                 </div>
               )}
 
