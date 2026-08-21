@@ -441,6 +441,7 @@ export default function AdminAlunas() {
             </div>
 
             <div style={{ borderTop: '1px solid #2A2A2A', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <button onClick={() => router.push(`/admin/alunas/acesso?id=${gerAluna.id}`)} style={{ width: '100%', padding: '11px', background: 'rgba(212,175,55,.08)', color: ouro, border: '1px solid #5b4c17', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>🎓 Gerenciar cursos e planos</button>
               <button onClick={reenviarBoasVindas} disabled={reenviando} style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{reenviando ? 'Enviando...' : '✉️ Reenviar e-mail de boas-vindas'}</button>
               {gerDesativada ? (
                 <button onClick={reativarAluna} disabled={desativando} style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{desativando ? 'Reativando...' : '✓ Reativar acesso (+30 dias)'}</button>
