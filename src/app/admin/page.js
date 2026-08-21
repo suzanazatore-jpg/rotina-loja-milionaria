@@ -32,6 +32,7 @@ export default function Admin() {
     { id: 'aulas', icone: '🎓', titulo: 'Aulas', sub: 'Mentoria gravada', rota: '/admin/aulas' },
     { id: 'calendario', icone: '📅', titulo: 'Calendário', sub: 'Conteúdo do mês', rota: '/admin/calendario' },
     { id: 'campanhas', icone: '🎯', titulo: 'Campanhas', sub: 'Vendas prontas', rota: '/admin/campanhas' },
+    { id: 'cursos', icone: '🎬', titulo: 'Cursos', sub: 'Cursos e aulas', rota: '/admin/cursos' },
     { id: 'rotina', icone: '🔄', titulo: 'Rotina', sub: 'Em breve', rota: '/admin/rotina' },
   ]
 
