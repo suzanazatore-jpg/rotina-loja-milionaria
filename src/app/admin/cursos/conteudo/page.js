@@ -38,6 +38,12 @@ export default function ConteudoCurso() {
   const [matForm, setMatForm] = useState({ lesson_id: '', title: '', mode: 'pdf', link: '', file: null })
   const [courseForm, setCourseForm] = useState({ title: '', subtitle: '', description: '', sort_order: 0, is_published: false, cover_image_url: '' })
   const [coverFile, setCoverFile] = useState(null)
+  const [lessonTab, setLessonTab] = useState('dados')
+  const [lessonCoverFile, setLessonCoverFile] = useState(null)
+  const [lessonCoverPreview, setLessonCoverPreview] = useState('')
+  const [pendingMaterials, setPendingMaterials] = useState([])
+  const [materialEditor, setMaterialEditor] = useState(false)
+  const [pendingForm, setPendingForm] = useState({ title: '', mode: 'pdf', link: '', file: null })
 
   useEffect(() => {
     async function init() {
@@ -87,17 +93,75 @@ export default function ConteudoCurso() {
   }
 
   // ---------- Aulas ----------
-  function novaAula(moduleId) { setSlugEditado(false); setLForm({ id: null, module_id: moduleId || '', title: '', slug: '', video_url: '', duration_label: '', description: '', sort_order: lessons.filter(x => (x.module_id || '') === (moduleId || '')).length, is_published: false, thumbnail_url: '' }); setModal('lesson') }
-  function editarAula(l) { setSlugEditado(true); setLForm({ id: l.id, module_id: l.module_id || '', title: l.title || '', slug: l.slug || '', video_url: l.video_url || '', duration_label: l.duration_label || '', description: l.description || '', sort_order: l.sort_order || 0, is_published: !!l.is_published, thumbnail_url: l.thumbnail_url || '' }); setModal('lesson') }
+  function novaAula(moduleId) {
+    setSlugEditado(false); setLessonTab('dados'); setLessonCoverFile(null); setLessonCoverPreview(''); setPendingMaterials([]); setMaterialEditor(false)
+    setLForm({ id: null, module_id: moduleId || '', title: '', slug: '', video_url: '', duration_label: '', description: '', sort_order: lessons.filter(x => (x.module_id || '') === (moduleId || '')).length, is_published: false, thumbnail_url: '' }); setModal('lesson')
+  }
+  function editarAula(l) {
+    setSlugEditado(true); setLessonTab('dados'); setLessonCoverFile(null); setLessonCoverPreview(l.thumbnail_url || ''); setPendingMaterials([]); setMaterialEditor(false)
+    setLForm({ id: l.id, module_id: l.module_id || '', title: l.title || '', slug: l.slug || '', video_url: l.video_url || '', duration_label: l.duration_label || '', description: l.description || '', sort_order: l.sort_order || 0, is_published: !!l.is_published, thumbnail_url: l.thumbnail_url || '' }); setModal('lesson')
+  }
   function onLTitle(v) { setLForm(f => ({ ...f, title: v, slug: slugEditado ? f.slug : slugify(v) })) }
   async function salvarAula() {
-    if (!lForm.title.trim() || !lForm.slug.trim()) { setErro('Aula precisa de título e slug.'); return }
+    if (!lForm.title.trim() || !lForm.slug.trim()) { setErro('Aula precisa de título.'); setLessonTab('dados'); return }
     setSalvando(true); setErro('')
-    const payload = { course_id: courseId, module_id: lForm.module_id || null, title: lForm.title.trim(), slug: lForm.slug.trim(), video_url: lForm.video_url.trim() || null, duration_label: lForm.duration_label.trim() || null, description: lForm.description.trim() || null, sort_order: Number(lForm.sort_order) || 0, is_published: !!lForm.is_published, thumbnail_url: lForm.thumbnail_url.trim() || null }
-    const res = lForm.id ? await supabase.from('lessons').update(payload).eq('id', lForm.id) : await supabase.from('lessons').insert(payload)
-    setSalvando(false)
-    if (res.error) { setErro(res.error.message); return }
-    setModal(null); await carregar(courseId)
+    try {
+      let thumbnailUrl = lForm.thumbnail_url.trim() || null
+      if (lessonCoverFile) {
+        if (!['image/jpeg', 'image/png'].includes(lessonCoverFile.type)) throw new Error('A capa precisa ser JPG ou PNG.')
+        if (lessonCoverFile.size > 5 * 1024 * 1024) throw new Error('A capa deve ter no máximo 5 MB.')
+        const ext = lessonCoverFile.type === 'image/png' ? 'png' : 'jpg'
+        const path = `${courseId}/thumbnails/${Date.now()}.${ext}`
+        const up = await supabase.storage.from('course-covers').upload(path, lessonCoverFile, { contentType: lessonCoverFile.type, upsert: false })
+        if (up.error) throw up.error
+        thumbnailUrl = supabase.storage.from('course-covers').getPublicUrl(path).data.publicUrl
+      }
+      const payload = { course_id: courseId, module_id: lForm.module_id || null, title: lForm.title.trim(), slug: lForm.slug.trim(), video_url: lForm.video_url.trim() || null, duration_label: lForm.duration_label.trim() || null, description: lForm.description.trim() || null, sort_order: Number(lForm.sort_order) || 0, is_published: !!lForm.is_published, thumbnail_url: thumbnailUrl }
+      let lessonId = lForm.id
+      if (lForm.id) {
+        const res = await supabase.from('lessons').update(payload).eq('id', lForm.id)
+        if (res.error) throw res.error
+      } else {
+        const res = await supabase.from('lessons').insert(payload).select('id').single()
+        if (res.error) throw res.error
+        lessonId = res.data.id
+      }
+      const falhas = []
+      for (const material of pendingMaterials) {
+        try { await gravarMaterialDaAula(material, lessonId) } catch { falhas.push(material.title) }
+      }
+      setModal(null); await carregar(courseId)
+      if (falhas.length) setErro(`A aula foi salva, mas não foi possível adicionar: ${falhas.join(', ')}.`)
+    } catch (e) { setErro(e?.message || 'Não foi possível salvar a aula.') }
+    finally { setSalvando(false) }
+  }
+
+  async function gravarMaterialDaAula(material, lessonId) {
+    let fileUrl = material.link?.trim() || ''
+    if (material.mode === 'pdf') {
+      if (!material.file || material.file.type !== 'application/pdf') throw new Error('PDF inválido')
+      if (material.file.size > 20 * 1024 * 1024) throw new Error('PDF maior que 20 MB')
+      const safe = material.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase()
+      const path = `${courseId}/${lessonId}/${Date.now()}-${safe}`
+      const up = await supabase.storage.from('course-materials').upload(path, material.file, { contentType: 'application/pdf', upsert: false })
+      if (up.error) throw up.error
+      fileUrl = `storage://course-materials/${path}`
+    }
+    const { error } = await supabase.from('materials').insert({ course_id: courseId, lesson_id: lessonId, title: material.title.trim(), file_url: fileUrl, sort_order: materiaisDaAula(lessonId).length, is_published: true })
+    if (error) throw error
+  }
+
+  function abrirMaterialDaAula() {
+    setPendingForm({ title: '', mode: 'pdf', link: '', file: null })
+    setMaterialEditor(true)
+  }
+  function adicionarMaterialPendente() {
+    if (!pendingForm.title.trim()) { setErro('Dê um nome ao material.'); return }
+    if (pendingForm.mode === 'pdf' && !pendingForm.file) { setErro('Escolha um PDF.'); return }
+    if (pendingForm.mode === 'link' && !/^https?:\/\//i.test(pendingForm.link.trim())) { setErro('Informe um link completo.'); return }
+    setErro('')
+    setPendingMaterials(p => [...p, { ...pendingForm, id: `${Date.now()}-${p.length}` }])
+    setMaterialEditor(false)
   }
   async function excluirAula(l) {
     if (!window.confirm(`Excluir a aula "${l.title}"?`)) return
@@ -107,7 +171,7 @@ export default function ConteudoCurso() {
   }
 
   function aulasDo(moduleId) { return lessons.filter(l => (l.module_id || '') === (moduleId || '')) }
-  function materiaisDaAula(lessonId) { return materials.filter(m => m.lesson_id === lessonId) }
+  function materiaisDaAula(lessonId) { return lessonId ? materials.filter(m => m.lesson_id === lessonId) : [] }
 
   async function moverAula(aula, direcao) {
     const lista = aulasDo(aula.module_id || '')
@@ -316,25 +380,45 @@ export default function ConteudoCurso() {
 
             {modal === 'lesson' && (
               <>
-                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: '0 0 16px' }}>{lForm.id ? 'Editar aula' : 'Nova aula'}</h2>
-                <div style={grupo}><label style={label}>Título *</label><input style={campo} value={lForm.title} onChange={e => onLTitle(e.target.value)} /></div>
-                <div style={grupo}><label style={label}>Slug *</label><input style={campo} value={lForm.slug} onChange={e => { setSlugEditado(true); setLForm(f => ({ ...f, slug: slugify(e.target.value) })) }} /></div>
-                <div style={grupo}><label style={label}>Módulo</label>
-                  <select style={campo} value={lForm.module_id} onChange={e => setLForm(f => ({ ...f, module_id: e.target.value }))}>
-                    <option value="">— Sem módulo —</option>
-                    {modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
-                  </select>
+                <h2>{lForm.id ? 'Editar aula' : 'Nova aula'}</h2>
+                <p className="conteudo-sub">Preencha os dados e o vídeo da aula.</p>
+                <div className="lesson-tabs">
+                  {[['dados', '1', 'Dados'], ['video', '2', 'Vídeo'], ['materiais', '3', 'Materiais']].map(t => <button key={t[0]} className={lessonTab === t[0] ? 'on' : ''} onClick={() => setLessonTab(t[0])}><i>{t[1]}</i>{t[2]}</button>)}
                 </div>
-                <div style={grupo}><label style={label}>Link do vídeo</label><input style={campo} value={lForm.video_url} onChange={e => setLForm(f => ({ ...f, video_url: e.target.value }))} placeholder="URL do vídeo (YouTube, Vimeo, etc.)" /></div>
-                <div style={grupo}><label style={label}>Duração</label><input style={{ ...campo, maxWidth: '160px' }} value={lForm.duration_label} onChange={e => setLForm(f => ({ ...f, duration_label: e.target.value }))} placeholder="ex.: 12 min" /></div>
-                <div style={grupo}><label style={label}>Descrição</label><textarea style={{ ...campo, minHeight: '70px', resize: 'vertical' }} value={lForm.description} onChange={e => setLForm(f => ({ ...f, description: e.target.value }))} /></div>
-                <div style={grupo}><label style={label}>Thumbnail (link)</label><input style={campo} value={lForm.thumbnail_url} onChange={e => setLForm(f => ({ ...f, thumbnail_url: e.target.value }))} placeholder="URL de uma imagem (opcional)" /></div>
-                <div style={grupo}><label style={label}>Ordem</label><input type="number" style={{ ...campo, maxWidth: '120px' }} value={lForm.sort_order} onChange={e => setLForm(f => ({ ...f, sort_order: e.target.value }))} /></div>
-                <div onClick={() => setLForm(f => ({ ...f, is_published: !f.is_published }))} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: '4px 0 20px' }}>
-                  <div style={{ width: '44px', height: '26px', borderRadius: '999px', background: lForm.is_published ? ouroGrad : '#333', position: 'relative', flexShrink: 0 }}><div style={{ position: 'absolute', top: '3px', left: lForm.is_published ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff' }} /></div>
-                  <span style={{ fontSize: '14px', fontWeight: 600 }}>Publicada</span>
-                </div>
-                <button onClick={salvarAula} disabled={salvando} style={{ width: '100%', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', opacity: salvando ? .6 : 1 }}>{salvando ? 'Salvando...' : 'Salvar aula'}</button>
+
+                {lessonTab === 'dados' && <div className="lesson-tab-body">
+                  <div style={grupo}><label style={label}>Nome da aula *</label><input autoFocus style={campo} value={lForm.title} onChange={e => onLTitle(e.target.value)} placeholder="Ex.: Aula 01 — Preparando o estoque" /></div>
+                  <div className="lesson-two">
+                    <div style={grupo}><label style={label}>Duração <small>opcional</small></label><input style={campo} value={lForm.duration_label} onChange={e => setLForm(f => ({ ...f, duration_label: e.target.value }))} placeholder="Ex.: 15 min" /></div>
+                    <div style={grupo}><label style={label}>Capa da aula <small>opcional</small></label><div className="lesson-cover">{lessonCoverPreview ? <img src={lessonCoverPreview} alt="" /> : <span>🖼️</span>}<label>Escolher<input hidden type="file" accept="image/jpeg,image/png" onChange={e => { const file = e.target.files?.[0] || null; setLessonCoverFile(file); if (file) setLessonCoverPreview(URL.createObjectURL(file)) }} /></label></div></div>
+                  </div>
+                  <div style={grupo}><label style={label}>Descrição <small>opcional</small></label><textarea style={{ ...campo, minHeight: 78, resize: 'vertical' }} value={lForm.description} onChange={e => setLForm(f => ({ ...f, description: e.target.value }))} placeholder="Escreva um resumo do que a aluna vai aprender..." /></div>
+                  <button className="lesson-publish" onClick={() => setLForm(f => ({ ...f, is_published: !f.is_published }))}><span><b>Publicar aula</b><small>Se desligado, fica como rascunho e a aluna não vê.</small></span><i className={lForm.is_published ? 'on' : ''}><u /></i></button>
+                </div>}
+
+                {lessonTab === 'video' && <div className="lesson-tab-body">
+                  <div style={grupo}><label style={label}>Link do vídeo <small>opcional — dá pra adicionar depois</small></label><input style={campo} value={lForm.video_url} onChange={e => setLForm(f => ({ ...f, video_url: e.target.value }))} placeholder="Cole aqui a URL do vídeo" /><p className="lesson-hint">Funciona com YouTube, Vimeo, PandaVideo, Bunny e players incorporados.</p></div>
+                </div>}
+
+                {lessonTab === 'materiais' && <div className="lesson-tab-body">
+                  <label style={label}>Materiais de apoio <small>PDF ou link — sobem junto quando você cadastrar a aula</small></label>
+                  {!pendingMaterials.length && !materiaisDaAula(lForm.id).length && <p className="lesson-empty">Nenhum material ainda. Adicione PDFs ou links — eles sobem junto quando você salvar a aula.</p>}
+                  {materiaisDaAula(lForm.id).map(m => <div className="lesson-material" key={m.id}><span>📎 {m.title}</span><button onClick={() => excluirMaterial(m)}>Excluir</button></div>)}
+                  {pendingMaterials.map(m => <div className="lesson-material" key={m.id}><span>📎 {m.title} <small>aguardando</small></span><button onClick={() => setPendingMaterials(p => p.filter(x => x.id !== m.id))}>Remover</button></div>)}
+                  <button className="lesson-add-material" onClick={abrirMaterialDaAula}>↥ Adicionar material de apoio</button>
+                </div>}
+
+                <div className="lesson-footer"><button className="cancelar" onClick={() => setModal(null)}>Cancelar</button><button onClick={salvarAula} disabled={salvando}>{salvando ? 'Salvando...' : lForm.id ? 'Salvar aula' : 'Cadastrar aula'}</button></div>
+
+                {materialEditor && <div className="lesson-material-overlay"><div className="lesson-material-modal">
+                  <button className="lesson-material-close" onClick={() => setMaterialEditor(false)}>×</button>
+                  <h2>Adicionar material</h2><p className="conteudo-sub">Material de apoio da aula, para download.</p>
+                  <div style={grupo}><label style={label}>Nome do material *</label><input style={campo} value={pendingForm.title} onChange={e => setPendingForm(f => ({ ...f, title: e.target.value }))} placeholder="Ex.: Checklist — Zerando o Estoque" /></div>
+                  <label style={label}>Como você quer adicionar?</label>
+                  <div className="lesson-material-modes"><button className={pendingForm.mode === 'pdf' ? 'on' : ''} onClick={() => setPendingForm(f => ({ ...f, mode: 'pdf' }))}>Subir PDF do computador</button><button className={pendingForm.mode === 'link' ? 'on' : ''} onClick={() => setPendingForm(f => ({ ...f, mode: 'link' }))}>Usar um link</button></div>
+                  {pendingForm.mode === 'pdf' ? <label className="lesson-drop">⬆️<b>{pendingForm.file?.name || 'Arraste o PDF aqui'}</b><small>ou clique para escolher — só PDF, até 20 MB</small><input hidden type="file" accept="application/pdf,.pdf" onChange={e => setPendingForm(f => ({ ...f, file: e.target.files?.[0] || null }))} /></label> : <div style={grupo}><label style={label}>Link do material *</label><input style={campo} value={pendingForm.link} onChange={e => setPendingForm(f => ({ ...f, link: e.target.value }))} placeholder="https://..." /></div>}
+                  <div className="lesson-footer"><button className="cancelar" onClick={() => setMaterialEditor(false)}>Cancelar</button><button onClick={adicionarMaterialPendente}>Adicionar material</button></div>
+                </div></div>}
               </>
             )}
 
@@ -364,7 +448,7 @@ export default function ConteudoCurso() {
               </>
             )}
 
-            {modal !== 'module' && modal !== 'course' && <button onClick={() => !salvando && setModal(null)} style={{ width: '100%', background: 'transparent', border: 'none', color: '#888', padding: '12px', fontSize: '13px', marginTop: '8px', cursor: 'pointer' }}>Cancelar</button>}
+            {modal !== 'module' && modal !== 'course' && modal !== 'lesson' && <button onClick={() => !salvando && setModal(null)} style={{ width: '100%', background: 'transparent', border: 'none', color: '#888', padding: '12px', fontSize: '13px', marginTop: '8px', cursor: 'pointer' }}>Cancelar</button>}
           </div>
         </div>
       )}
@@ -382,5 +466,7 @@ const conteudoCss = `
 .adm-cursos-content>main{max-width:none;margin:0;padding:0 0 20px}.adm-cursos-content>main>div{border-radius:10px!important}.adm-cursos-content>main>div>div:first-child{margin-bottom:8px!important}
 .conteudo-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(5px);display:grid;place-items:center;padding:16px;z-index:100}.conteudo-modal{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;background:#161618;border:1px solid #343439;border-radius:18px;padding:21px 21px 18px;box-shadow:0 26px 85px #000}.conteudo-modal.pequeno{width:min(450px,100%)}.conteudo-modal h2{font-size:18px;margin:0 0 3px}.conteudo-sub{color:#777;font-size:12px;margin:0 0 22px}.conteudo-fechar{position:absolute;right:20px;top:20px;width:30px;height:30px;border:1px solid #3c3c42;background:#202024;color:#888;border-radius:8px;font-size:19px;cursor:pointer}.conteudo-modal label small{color:#777;text-transform:none;font-weight:400;margin-left:4px}.conteudo-modal-footer{display:flex;justify-content:flex-end;gap:9px;border-top:1px solid #2c2c30;margin:20px -21px -18px;padding:14px 21px 18px}.conteudo-modal-footer .secundario{background:#202024;border:1px solid #44444a;color:#fff;border-radius:9px;padding:10px 16px;font-weight:800;cursor:pointer}
 .conteudo-capa-input{display:flex;align-items:center;gap:12px;background:#252529;border-radius:10px;padding:8px 10px}.conteudo-capa-input img{width:84px;height:46px;object-fit:cover;border-radius:7px}.conteudo-capa-input span{color:#777;font-size:12px}.conteudo-capa-input .escolher{margin:0 0 0 auto;border:1px solid #49494f;border-radius:8px;padding:9px 12px;cursor:pointer;text-transform:none;color:#fff}.conteudo-duas{display:grid;grid-template-columns:1fr 1fr;gap:12px}.conteudo-publicacao{display:flex;align-items:center;justify-content:space-between;background:#252529;border:0;border-radius:10px;color:#fff;padding:10px 12px;text-align:left;cursor:pointer}.conteudo-publicacao span{display:flex;flex-direction:column}.conteudo-publicacao small{color:#777}.conteudo-publicacao i{width:42px;height:24px;border-radius:20px;background:#3b3b40;position:relative}.conteudo-publicacao i u{position:absolute;width:18px;height:18px;top:3px;left:3px;background:#fff;border-radius:50%;transition:.2s}.conteudo-publicacao i.on{background:#D4AF37}.conteudo-publicacao i.on u{left:21px}
+.lesson-tabs{display:flex;gap:20px;border-bottom:1px solid #2d2d31;margin:13px -21px 0;padding:0 21px}.lesson-tabs button{position:relative;background:none;border:0;color:#777;padding:11px 3px 13px;font-size:12px;font-weight:800;cursor:pointer}.lesson-tabs button i{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#29292e;font-style:normal;font-size:10px;margin-right:6px}.lesson-tabs button.on{color:#D4AF37}.lesson-tabs button.on i{background:#D4AF37;color:#080808}.lesson-tabs button.on:after{content:'';position:absolute;height:2px;background:#D4AF37;left:0;right:0;bottom:-1px}.lesson-tab-body{padding:18px 0 2px}.lesson-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.lesson-cover{height:48px;background:#252529;border-radius:10px;padding:6px 9px;display:flex;align-items:center;gap:8px}.lesson-cover img{width:52px;height:36px;object-fit:cover;border-radius:6px}.lesson-cover span{font-size:18px}.lesson-cover label{margin:0 0 0 auto;color:#D4AF37;font-size:11px;cursor:pointer;text-transform:none}.lesson-publish{width:100%;display:flex;align-items:center;justify-content:space-between;background:#252529;border:0;border-radius:10px;color:#fff;padding:11px 13px;text-align:left;cursor:pointer}.lesson-publish span{display:flex;flex-direction:column}.lesson-publish small{font-size:10px;color:#777}.lesson-publish i{width:42px;height:24px;background:#3b3b40;border-radius:20px;position:relative}.lesson-publish i u{position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;left:3px;top:3px}.lesson-publish i.on{background:#D4AF37}.lesson-publish i.on u{left:21px}.lesson-hint,.lesson-empty{color:#777;font-size:10px;margin:7px 0}.lesson-material{display:flex;justify-content:space-between;gap:8px;border:1px solid #2e2e32;background:#222226;border-radius:8px;padding:8px 10px;margin:8px 0;font-size:11px}.lesson-material small{color:#777}.lesson-material button,.lesson-add-material{background:none;border:0;color:#D4AF37;font-size:11px;font-weight:800;cursor:pointer}.lesson-add-material{padding:10px 0}.lesson-footer{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid #2d2d31;margin:17px -21px -18px;padding:14px 21px 18px}.lesson-footer button{background:linear-gradient(135deg,#D4AF37,#F5D76E);border:0;color:#080808;border-radius:8px;padding:10px 15px;font-weight:900;cursor:pointer}.lesson-footer .cancelar{background:transparent;color:#aaa}
+.lesson-material-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);display:grid;place-items:center;padding:15px;z-index:130}.lesson-material-modal{position:relative;width:min(450px,100%);background:#171719;border:1px solid #37373d;border-radius:17px;padding:20px}.lesson-material-close{position:absolute;right:18px;top:17px;background:none;border:0;color:#D4AF37;font-size:19px;cursor:pointer}.lesson-material-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 14px}.lesson-material-modes button{background:#252529;border:1px solid transparent;color:#888;border-radius:9px;padding:9px;font-size:11px;font-weight:800;cursor:pointer}.lesson-material-modes button.on{border-color:#D4AF37;color:#D4AF37}.lesson-drop{min-height:108px;border:1px dashed #555;background:#252529;border-radius:11px;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;text-transform:none!important}.lesson-drop b{font-size:12px}.lesson-drop small{font-size:10px;color:#777}
 @media(max-width:700px){.conteudo-hero{flex-wrap:wrap}.conteudo-cover{width:100%;height:145px}.conteudo-actions{width:100%;flex-direction:row}.conteudo-actions button{flex:1;text-align:center}.conteudo-duas{grid-template-columns:1fr}}
 `
