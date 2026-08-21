@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 export default function CursosArea({ cores, ouro, ouroGrad }) {
   const router = useRouter()
   const [cursos, setCursos] = useState([])
+  const [carrosseis, setCarrosseis] = useState([])
   const [progresso, setProgresso] = useState({})
   const [carregando, setCarregando] = useState(true)
 
@@ -15,6 +16,8 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+
+      const { data: { session } } = await supabase.auth.getSession()
 
       const agora = new Date().toISOString()
       const ehAdmin = user.email === 'suporte@suzanazatorre.com.br'
@@ -26,6 +29,12 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
         .map(item => ehAdmin ? item : item.courses)
         .filter(curso => curso?.is_published)
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+
+      try {
+        const resposta = await fetch('/api/carrosseis', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+        const dados = await resposta.json()
+        if (ativo && resposta.ok) setCarrosseis(dados.carrosseis || [])
+      } catch (e) { /* mantém a seção padrão */ }
 
       if (liberados.length) {
         const ids = liberados.map(curso => curso.id)
@@ -49,14 +58,25 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
   }, [])
 
   const temCursos = useMemo(() => cursos.length > 0, [cursos])
+  const secoes = useMemo(() => {
+    if (!carrosseis.length) return [{ id: 'meus-cursos', title: 'Meus Cursos', subtitle: 'Conteúdos liberados para o seu acesso.', courses: cursos }]
+    const porId = Object.fromEntries(cursos.map(curso => [curso.id, curso]))
+    const configuradas = carrosseis.map(item => ({
+      id: item.id,
+      title: item.title,
+      subtitle: item.subtitle,
+      courses: (item.course_ids || []).map(id => porId[id]).filter(Boolean),
+    })).filter(item => item.courses.length)
+    return configuradas.length ? configuradas : [{ id: 'meus-cursos', title: 'Meus Cursos', subtitle: 'Conteúdos liberados para o seu acesso.', courses: cursos }]
+  }, [carrosseis, cursos])
 
   if (carregando) return <p style={{ color: cores.tx2, textAlign: 'center', padding: '50px 0' }}>Carregando seus cursos...</p>
 
   return (
-    <div style={{ maxWidth: '980px', margin: '0 auto' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 5px', color: cores.tx }}>🎓 Meus Cursos</h2>
-        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Conteúdos liberados para o seu acesso.</p>
+        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Escolha uma seção e continue avançando.</p>
       </div>
 
       {!temCursos ? (
@@ -66,11 +86,14 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
           <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Quando um curso for liberado para você, ele aparecerá aqui.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '16px' }}>
-          {cursos.map(curso => {
+        <div style={{ display: 'grid', gap: '27px' }}>
+          {secoes.map(secao => <section key={secao.id}>
+            <div style={{ marginBottom: '11px' }}><h3 style={{ fontSize: '18px', fontWeight: 900, color: cores.tx, margin: 0 }}>{secao.title}</h3>{secao.subtitle && <p style={{ fontSize: '12px', color: cores.tx2, margin: '4px 0 0' }}>{secao.subtitle}</p>}</div>
+            <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', padding: '2px 2px 10px', scrollSnapType: 'x proximity' }}>
+          {secao.courses.map(curso => {
             const p = progresso[curso.id] || { total: 0, feitas: 0, percentual: 0 }
             return (
-              <article key={curso.id} onClick={() => router.push(`/curso/${curso.slug}`)} style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
+              <article key={curso.id} onClick={() => router.push(`/curso/${curso.slug}`)} style={{ width: '260px', flex: '0 0 260px', scrollSnapAlign: 'start', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
                 <div style={{ aspectRatio: '16/9', background: cores.card2, overflow: 'hidden' }}>
                   {curso.cover_image_url ? <img src={curso.cover_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: '38px' }}>🎓</div>}
                 </div>
@@ -83,6 +106,8 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
               </article>
             )
           })}
+            </div>
+          </section>)}
         </div>
       )}
     </div>
