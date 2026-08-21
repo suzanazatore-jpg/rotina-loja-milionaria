@@ -43,9 +43,9 @@ export default function AdminPlanos() {
 
   async function carregar() {
     const [rp, rc, rv] = await Promise.all([
-      supabase.from('planos').select('*').order('criado_em'),
+      supabase.from('plans').select('*').order('created_at'),
       supabase.from('courses').select('id,title').order('title'),
-      supabase.from('plano_cursos').select('plano_id,curso_id'),
+      supabase.from('plan_courses').select('plan_id,course_id'),
     ])
     if (rp.error) {
       setMensagem('A estrutura de Planos ainda precisa ser aplicada no Supabase do app.')
@@ -63,12 +63,12 @@ export default function AdminPlanos() {
 
   function editar(plano) {
     setEditando(plano.id)
-    setNome(plano.nome || '')
-    setOfertaId(plano.oferta_id || '')
-    setPeriodoDias(plano.periodo_dias || '')
-    setPreco(plano.preco ?? '')
-    setUrlVenda(plano.url_venda || '')
-    setCursoIds(vinculos.filter(v => v.plano_id === plano.id).map(v => v.curso_id))
+    setNome(plano.name || '')
+    setOfertaId(plano.offer_id || '')
+    setPeriodoDias(plano.period_days || '')
+    setPreco(plano.price ?? '')
+    setUrlVenda(plano.sale_url || '')
+    setCursoIds(vinculos.filter(v => v.plan_id === plano.id).map(v => v.course_id))
     setMensagem('')
   }
 
@@ -81,27 +81,27 @@ export default function AdminPlanos() {
     if (!nome.trim()) { setMensagem('Informe o nome do plano.'); return }
     setSalvando(true); setMensagem('')
     const payload = {
-      nome: nome.trim(), oferta_id: ofertaId.trim() || null,
-      periodo_dias: periodoDias ? Number(periodoDias) : null,
-      preco: preco === '' ? null : Number(String(preco).replace(',', '.')),
-      url_venda: urlVenda.trim() || null, atualizado_em: new Date().toISOString(),
+      name: nome.trim(), offer_id: ofertaId.trim() || null,
+      period_days: periodoDias ? Number(periodoDias) : 365,
+      price: preco === '' ? null : Number(String(preco).replace(',', '.')),
+      sale_url: urlVenda.trim() || null, updated_at: new Date().toISOString(),
     }
     const resultado = editando
-      ? await supabase.from('planos').update(payload).eq('id', editando).select('id').single()
-      : await supabase.from('planos').insert(payload).select('id').single()
+      ? await supabase.from('plans').update(payload).eq('id', editando).select('id').single()
+      : await supabase.from('plans').insert(payload).select('id').single()
     if (resultado.error) { setMensagem('Não foi possível salvar: ' + resultado.error.message); setSalvando(false); return }
     const planoId = resultado.data.id
-    await supabase.from('plano_cursos').delete().eq('plano_id', planoId)
+    await supabase.from('plan_courses').delete().eq('plan_id', planoId)
     if (cursoIds.length) {
-      const { error } = await supabase.from('plano_cursos').insert(cursoIds.map(cursoId => ({ plano_id: planoId, curso_id: cursoId })))
+      const { error } = await supabase.from('plan_courses').insert(cursoIds.map(courseId => ({ plan_id: planoId, course_id: courseId })))
       if (error) { setMensagem('O plano foi salvo, mas os cursos não foram vinculados.'); setSalvando(false); return }
     }
     await carregar(); limpar(); setMensagem('✓ Plano salvo com sucesso.'); setSalvando(false)
   }
 
   async function excluir(plano) {
-    if (!confirm(`Excluir o plano "${plano.nome}"?`)) return
-    const { error } = await supabase.from('planos').delete().eq('id', plano.id)
+    if (!confirm(`Excluir o plano "${plano.name}"?`)) return
+    const { error } = await supabase.from('plans').delete().eq('id', plano.id)
     if (error) { setMensagem('Não foi possível excluir: ' + error.message); return }
     await carregar(); if (editando === plano.id) limpar(); setMensagem('✓ Plano excluído.')
   }
@@ -144,9 +144,9 @@ export default function AdminPlanos() {
 
         <div style={{ display: 'grid', gap: '10px' }}>
           {planos.map(plano => {
-            const total = vinculos.filter(v => v.plano_id === plano.id).length
+            const total = vinculos.filter(v => v.plan_id === plano.id).length
             return <div key={plano.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '15px', display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-              <div><strong>{plano.nome}</strong><p style={{ color: '#888', fontSize: '13px', margin: '4px 0 0' }}>{plano.periodo_dias ? `${plano.periodo_dias} dias` : 'Sem validade automática'} · {total} curso{total === 1 ? '' : 's'}</p></div>
+              <div><strong>{plano.name}</strong><p style={{ color: '#888', fontSize: '13px', margin: '4px 0 0' }}>{plano.period_days ? `${plano.period_days} dias` : 'Sem validade automática'} · {total} curso{total === 1 ? '' : 's'}</p></div>
               <div style={{ display: 'flex', gap: '8px' }}><button onClick={() => editar(plano)} style={botaoSecundario}>Editar</button><button onClick={() => excluir(plano)} style={{ ...botaoSecundario, color: '#f99' }}>Excluir</button></div>
             </div>
           })}
