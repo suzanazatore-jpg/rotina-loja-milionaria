@@ -27,14 +27,48 @@ export default function Admin() {
     init()
   }, [router])
 
-  const cards = [
-    { id: 'alunas', icone: '👥', titulo: 'Alunas', sub: 'Dados e contato', rota: '/admin/alunas' },
-    { id: 'aulas', icone: '🎓', titulo: 'Aulas', sub: 'Mentoria gravada', rota: '/admin/aulas' },
-    { id: 'calendario', icone: '📅', titulo: 'Calendário', sub: 'Conteúdo do mês', rota: '/admin/calendario' },
-    { id: 'campanhas', icone: '🎯', titulo: 'Campanhas', sub: 'Vendas prontas', rota: '/admin/campanhas' },
-    { id: 'cursos', icone: '🎬', titulo: 'Cursos', sub: 'Cursos e aulas', rota: '/admin/cursos' },
-    { id: 'planos', icone: '🏷️', titulo: 'Planos e Ofertas', sub: 'Acessos e cursos vinculados', rota: '/admin/planos' },
-    { id: 'rotina', icone: '🔄', titulo: 'Rotina', sub: 'Em breve', rota: '/admin/rotina' },
+  const grupos = [
+    {
+      titulo: 'Gerenciamento de Conteúdo e Usuários',
+      descricao: 'Gerencie o conteúdo e as alunas da sua área de membros.',
+      cards: [
+        { icone: '👥', titulo: 'Alunas e Acessos', sub: 'Cadastre alunas, libere cursos e gerencie acessos.', rota: '/admin/alunas' },
+        { icone: '🎬', titulo: 'Cursos e Aulas', sub: 'Crie cursos, módulos e aulas com vídeo e materiais.', rota: '/admin/cursos' },
+        { icone: '🏷️', titulo: 'Planos e Ofertas', sub: 'Defina planos, validade e cursos vinculados.', rota: '/admin/planos' },
+        { icone: '🎓', titulo: 'Aulas da Mentoria', sub: 'Gerencie as gravações e encontros da mentoria.', rota: '/admin/aulas' },
+        { icone: '📝', titulo: 'Termos de Uso', sub: 'Texto que a aluna aceita no primeiro acesso.', status: 'Em breve' },
+        { icone: '🏅', titulo: 'Certificados', sub: 'Certificados de conclusão para as alunas.', status: 'Depois' },
+      ],
+    },
+    {
+      titulo: 'Conteúdo do Aplicativo',
+      descricao: 'Configure o que a aluna encontra no painel principal.',
+      cards: [
+        { icone: '📅', titulo: 'Calendário', sub: 'Organize e publique o conteúdo mensal.', rota: '/admin/calendario' },
+        { icone: '🎯', titulo: 'Campanhas', sub: 'Disponibilize campanhas e ações de vendas.', rota: '/admin/campanhas' },
+        { icone: '🔄', titulo: 'Rotina', sub: 'Publique a rotina semanal das lojistas.', rota: '/admin/rotina' },
+        { icone: '🖼️', titulo: 'Banners do Painel', sub: 'Insira banners e novidades no topo do aplicativo.', status: 'Em breve' },
+        { icone: '▥', titulo: 'Carrosséis de Cursos', sub: 'Organize cursos em seções na área de membros.', status: 'Em breve' },
+      ],
+    },
+    {
+      titulo: 'Marketing e Comunicação',
+      descricao: 'Ações para comunicar e acompanhar suas alunas.',
+      cards: [
+        { icone: '💬', titulo: 'Comentários', sub: 'Veja e modere comentários feitos nas aulas.', status: 'Em breve' },
+        { icone: '✉️', titulo: 'Suporte', sub: 'Centralize as solicitações de suporte recebidas.', status: 'Em breve' },
+        { icone: '📣', titulo: 'Campanhas e Mensagens', sub: 'Envie comunicados e e-mails para suas alunas.', status: 'Em breve' },
+      ],
+    },
+    {
+      titulo: 'Configurações',
+      descricao: 'Preferências, segurança e administração do aplicativo.',
+      cards: [
+        { icone: '🎨', titulo: 'Preferências e Cores', sub: 'Ajuste a identidade visual do aplicativo.', status: 'Em breve' },
+        { icone: '🔐', titulo: 'Autenticação e Segurança', sub: 'Regras de login e proteção de acesso.', status: 'Depois' },
+        { icone: '👤', titulo: 'Administradores', sub: 'Defina outras pessoas com acesso administrativo.', status: 'Depois' },
+      ],
+    },
   ]
 
   if (carregando) {
@@ -69,24 +103,45 @@ export default function Admin() {
         </div>
       </header>
 
-      <main style={{ maxWidth: '720px', margin: '0 auto', padding: '24px 18px 60px' }}>
-        <p style={{ fontSize: '14px', color: '#888', margin: '0 0 18px' }}>Escolha o que você quer gerenciar:</p>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
-          {cards.map(card => (
-            <div
-              key={card.id}
-              onClick={() => router.push(card.rota)}
-              style={{
-                background: '#111111', border: '1px solid #2A2A2A', borderRadius: '14px',
-                padding: '18px', cursor: 'pointer',
-              }}
-            >
-              <div style={{ fontSize: '26px', marginBottom: '10px' }}>{card.icone}</div>
-              <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 2px', color: '#FFFFFF' }}>{card.titulo}</h3>
-              <p style={{ fontSize: '12px', margin: 0, color: '#888' }}>{card.sub}</p>
+      <main style={{ maxWidth: '1080px', margin: '0 auto', padding: '30px 18px 70px' }}>
+        {grupos.map(grupo => (
+          <section key={grupo.titulo} style={{ marginBottom: '30px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 4px' }}>{grupo.titulo}</h2>
+            <p style={{ fontSize: '13px', color: '#777', margin: '0 0 14px' }}>{grupo.descricao}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '12px' }}>
+              {grupo.cards.map(card => {
+                const ativo = Boolean(card.rota)
+                return (
+                  <button
+                    key={card.titulo}
+                    type="button"
+                    disabled={!ativo}
+                    onClick={() => ativo && router.push(card.rota)}
+                    style={{
+                      minHeight: '104px', display: 'flex', alignItems: 'flex-start', gap: '14px', textAlign: 'left',
+                      background: ativo ? '#131313' : '#0E0E0E', border: `1px solid ${ativo ? '#34302A' : '#202020'}`,
+                      borderLeft: `3px solid ${ativo ? ouro : '#343434'}`, borderRadius: '12px', padding: '17px',
+                      color: ativo ? '#FFF' : '#666', cursor: ativo ? 'pointer' : 'default',
+                    }}
+                  >
+                    <span style={{ width: '42px', height: '42px', flex: '0 0 42px', display: 'grid', placeItems: 'center', borderRadius: '10px', background: ativo ? 'rgba(212,175,55,.10)' : '#151515', color: ativo ? ouro : '#555', fontSize: '20px' }}>{card.icone}</span>
+                    <span style={{ minWidth: 0 }}>
+                      <span style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '7px', fontSize: '14px', fontWeight: 800, marginBottom: '5px' }}>
+                        {card.titulo}
+                        {card.status && <small style={{ background: '#252525', color: '#777', borderRadius: '5px', padding: '3px 6px', fontSize: '9px', textTransform: 'uppercase' }}>{card.status}</small>}
+                      </span>
+                      <span style={{ display: 'block', color: ativo ? '#8C8C8C' : '#4C4C4C', fontSize: '12px', lineHeight: 1.45 }}>{card.sub}</span>
+                    </span>
+                  </button>
+                )
+              })}
             </div>
-          ))}
+          </section>
+        ))}
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '18px', background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '14px 16px', color: '#888', fontSize: '12px' }}>
+          <span><b style={{ color: ouro }}>● Ativo</b> — pronto para usar</span>
+          <span><b style={{ color: '#555' }}>● Em breve</b> — entra nas próximas etapas</span>
         </div>
       </main>
     </div>
