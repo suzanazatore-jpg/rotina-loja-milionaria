@@ -184,9 +184,10 @@ export default function EditarCurso() {
 
         {id && (
           <>
-            <div style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '14px', margin: '22px 0 14px', fontSize: '13px', color: '#888' }}>
-              💡 <b style={{ color: '#CCC' }}>Módulos e aulas</b> deste curso entram no próximo arquivo.
-            </div>
+            <button onClick={() => router.push(`/admin/cursos/conteudo?id=${id}`)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '15px', margin: '22px 0 14px', cursor: 'pointer' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', fontWeight: 700, color: '#FFF' }}>📚 Gerenciar módulos e aulas</span>
+              <span style={{ color: ouro, fontSize: '18px' }}>→</span>
+            </button>
             <button onClick={excluir} disabled={salvando} style={{ width: '100%', background: 'transparent', color: '#E06A6A', border: '1px solid #5A2A2A', borderRadius: '10px', padding: '12px', fontSize: '14px', fontWeight: 700, cursor: 'pointer' }}>Excluir curso</button>
           </>
         )}
