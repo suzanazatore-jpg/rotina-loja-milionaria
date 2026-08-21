@@ -27,12 +27,14 @@ export default function ConteudoCurso() {
   const [course, setCourse] = useState(null)
   const [modules, setModules] = useState([])
   const [lessons, setLessons] = useState([])
+  const [materials, setMaterials] = useState([])
 
-  const [modal, setModal] = useState(null) // 'module' | 'lesson'
+  const [modal, setModal] = useState(null) // 'module' | 'lesson' | 'material'
   const [salvando, setSalvando] = useState(false)
   const [slugEditado, setSlugEditado] = useState(false)
   const [mForm, setMForm] = useState({ id: null, title: '', description: '', sort_order: 0, is_published: true })
   const [lForm, setLForm] = useState({ id: null, module_id: '', title: '', slug: '', video_url: '', duration_label: '', description: '', sort_order: 0, is_published: false, thumbnail_url: '' })
+  const [matForm, setMatForm] = useState({ lesson_id: '', title: '', mode: 'pdf', link: '', file: null })
 
   useEffect(() => {
     async function init() {
@@ -57,6 +59,8 @@ export default function ConteudoCurso() {
     setModules(m.data || [])
     const l = await supabase.from('lessons').select('*').eq('course_id', cid).order('sort_order').order('created_at')
     setLessons(l.data || [])
+    const mt = await supabase.from('materials').select('*').eq('course_id', cid).order('sort_order').order('created_at')
+    setMaterials(mt.data || [])
   }
 
   // ---------- Módulos ----------
@@ -99,6 +103,70 @@ export default function ConteudoCurso() {
   }
 
   function aulasDo(moduleId) { return lessons.filter(l => (l.module_id || '') === (moduleId || '')) }
+  function materiaisDaAula(lessonId) { return materials.filter(m => m.lesson_id === lessonId) }
+
+  async function moverAula(aula, direcao) {
+    const lista = aulasDo(aula.module_id || '')
+    const indice = lista.findIndex(item => item.id === aula.id)
+    const destino = indice + direcao
+    if (destino < 0 || destino >= lista.length) return
+    setErro('')
+    const outra = lista[destino]
+    const ordemAtual = Number(aula.sort_order) || indice
+    const ordemOutra = Number(outra.sort_order) || destino
+    const [r1, r2] = await Promise.all([
+      supabase.from('lessons').update({ sort_order: ordemOutra }).eq('id', aula.id),
+      supabase.from('lessons').update({ sort_order: ordemAtual }).eq('id', outra.id),
+    ])
+    if (r1.error || r2.error) { setErro(r1.error?.message || r2.error?.message); return }
+    await carregar(courseId)
+  }
+
+  function novoMaterial(lessonId = '') {
+    setMatForm({ lesson_id: lessonId, title: '', mode: 'pdf', link: '', file: null })
+    setModal('material')
+  }
+
+  async function salvarMaterial() {
+    if (!matForm.title.trim()) { setErro('Dê um nome ao material.'); return }
+    if (matForm.mode === 'pdf' && !matForm.file) { setErro('Escolha um arquivo PDF.'); return }
+    if (matForm.mode === 'link' && !/^https?:\/\//i.test(matForm.link.trim())) { setErro('Informe um link completo, começando com http.'); return }
+    setSalvando(true); setErro('')
+    try {
+      let fileUrl = matForm.link.trim()
+      if (matForm.mode === 'pdf') {
+        if (matForm.file.type !== 'application/pdf') throw new Error('O arquivo precisa ser PDF.')
+        if (matForm.file.size > 20 * 1024 * 1024) throw new Error('O PDF deve ter no máximo 20 MB.')
+        const seguro = matForm.file.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase()
+        const path = `${courseId}/${matForm.lesson_id || 'extras'}/${Date.now()}-${seguro}`
+        const up = await supabase.storage.from('course-materials').upload(path, matForm.file, { contentType: 'application/pdf', upsert: false })
+        if (up.error) throw up.error
+        fileUrl = `storage://course-materials/${path}`
+      }
+      const { error } = await supabase.from('materials').insert({
+        course_id: courseId, lesson_id: matForm.lesson_id || null, title: matForm.title.trim(),
+        file_url: fileUrl, sort_order: materials.filter(m => (m.lesson_id || '') === (matForm.lesson_id || '')).length,
+        is_published: true,
+      })
+      if (error) throw error
+      setModal(null)
+      await carregar(courseId)
+    } catch (e) {
+      setErro(e?.message || 'Não foi possível salvar o material.')
+    } finally { setSalvando(false) }
+  }
+
+  async function excluirMaterial(material) {
+    if (!window.confirm(`Excluir o material "${material.title}"?`)) return
+    if (material.file_url?.startsWith('storage://course-materials/')) {
+      const path = material.file_url.replace('storage://course-materials/', '')
+      const removido = await supabase.storage.from('course-materials').remove([path])
+      if (removido.error) { setErro(removido.error.message); return }
+    }
+    const { error } = await supabase.from('materials').delete().eq('id', material.id)
+    if (error) { setErro(error.message); return }
+    await carregar(courseId)
+  }
 
   if (carregando) return <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: '#888' }}>Carregando...</p></div>
 
@@ -111,6 +179,28 @@ export default function ConteudoCurso() {
   )
 
   const semModulo = aulasDo('')
+  const extras = materials.filter(m => !m.lesson_id)
+
+  function renderAula(l, lista) {
+    const indice = lista.findIndex(item => item.id === l.id)
+    const totalMateriais = materiaisDaAula(l.id).length
+    return (
+      <div key={l.id} style={{ background: '#0F0F0F', border: '1px solid #222', borderRadius: '10px', padding: '9px 10px', marginBottom: '7px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <span style={{ flex: 1, minWidth: 0, fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🎬 {l.title} {!l.is_published && <span style={{ color: '#777' }}>• rascunho</span>}</span>
+          <button onClick={() => moverAula(l, -1)} disabled={indice === 0} title="Subir" style={botaoIcone}>↑</button>
+          <button onClick={() => moverAula(l, 1)} disabled={indice === lista.length - 1} title="Descer" style={botaoIcone}>↓</button>
+          <button onClick={() => editarAula(l)} style={botaoTexto}>editar</button>
+          <button onClick={() => excluirAula(l)} style={{ ...botaoTexto, color: '#E06A6A' }}>excluir</button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, paddingTop: 8, borderTop: '1px solid #202020' }}>
+          <span style={{ flex: 1, color: '#777', fontSize: 11 }}>{totalMateriais} material(is)</span>
+          <button onClick={() => novoMaterial(l.id)} style={{ ...botaoTexto, color: ouro }}>＋ Material</button>
+          {materiaisDaAula(l.id).map(m => <button key={m.id} onClick={() => excluirMaterial(m)} title={m.title} style={{ ...botaoTexto, color: '#999' }}>📎 {m.title.length > 18 ? `${m.title.slice(0, 18)}…` : m.title} ×</button>)}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FFFFFF', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -146,13 +236,7 @@ export default function ConteudoCurso() {
               <button onClick={() => editarModulo(m)} style={{ background: '#1C1C1C', border: '1px solid #2A2A2A', color: '#DDD', borderRadius: '7px', padding: '6px 10px', fontSize: '12px', cursor: 'pointer' }}>Editar</button>
               <button onClick={() => excluirModulo(m)} style={{ background: 'transparent', border: '1px solid #5A2A2A', color: '#E06A6A', borderRadius: '7px', padding: '6px 10px', fontSize: '12px', cursor: 'pointer' }}>Excluir</button>
             </div>
-            {aulasDo(m.id).map(l => (
-              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#0F0F0F', border: '1px solid #222', borderRadius: '10px', padding: '9px 12px', marginBottom: '7px' }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🎬 {l.title} {!l.is_published && <span style={{ color: '#777' }}>• rascunho</span>}</span>
-                <button onClick={() => editarAula(l)} style={{ background: 'transparent', border: 'none', color: ouro, fontSize: '12px', cursor: 'pointer' }}>editar</button>
-                <button onClick={() => excluirAula(l)} style={{ background: 'transparent', border: 'none', color: '#E06A6A', fontSize: '12px', cursor: 'pointer' }}>excluir</button>
-              </div>
-            ))}
+            {aulasDo(m.id).map(l => renderAula(l, aulasDo(m.id)))}
             <button onClick={() => novaAula(m.id)} style={{ background: 'transparent', border: '1px dashed #333', color: ouro, borderRadius: '9px', padding: '8px', fontSize: '13px', width: '100%', cursor: 'pointer', marginTop: '4px' }}>＋ Nova aula neste módulo</button>
           </div>
         ))}
@@ -160,17 +244,22 @@ export default function ConteudoCurso() {
         {semModulo.length > 0 && (
           <div style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '14px', padding: '14px', marginBottom: '14px' }}>
             <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 700, color: '#888' }}>Aulas sem módulo</p>
-            {semModulo.map(l => (
-              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: '#0F0F0F', border: '1px solid #222', borderRadius: '10px', padding: '9px 12px', marginBottom: '7px' }}>
-                <span style={{ flex: 1, minWidth: 0, fontSize: '13px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>🎬 {l.title}</span>
-                <button onClick={() => editarAula(l)} style={{ background: 'transparent', border: 'none', color: ouro, fontSize: '12px', cursor: 'pointer' }}>editar</button>
-                <button onClick={() => excluirAula(l)} style={{ background: 'transparent', border: 'none', color: '#E06A6A', fontSize: '12px', cursor: 'pointer' }}>excluir</button>
-              </div>
-            ))}
+            {semModulo.map(l => renderAula(l, semModulo))}
           </div>
         )}
 
         <button onClick={() => novaAula('')} style={{ background: 'transparent', border: '1px dashed #333', color: '#AAA', borderRadius: '10px', padding: '11px', fontSize: '13px', width: '100%', cursor: 'pointer' }}>＋ Aula avulsa (sem módulo)</button>
+
+        <section style={{ marginTop: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+            <div><h2 style={{ margin: 0, fontSize: 17 }}>Material extra do curso</h2><p style={{ margin: '3px 0 0', color: '#777', fontSize: 12 }}>PDFs e links que não pertencem a uma aula específica.</p></div>
+            <button onClick={() => novoMaterial('')} style={{ background: 'transparent', border: `1px solid ${ouro}`, color: ouro, borderRadius: 8, padding: '8px 11px', fontWeight: 700, cursor: 'pointer' }}>＋ Material</button>
+          </div>
+          <div style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: 12, padding: 12 }}>
+            {!extras.length && <p style={{ margin: 0, color: '#666', fontSize: 13 }}>Nenhum material extra cadastrado.</p>}
+            {extras.map(m => <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 4px', borderBottom: '1px solid #222' }}><span style={{ flex: 1, fontSize: 13 }}>📎 {m.title}</span><span style={{ color: '#666', fontSize: 11 }}>{m.file_url?.startsWith('storage://') ? 'PDF' : 'Link'}</span><button onClick={() => excluirMaterial(m)} style={{ ...botaoTexto, color: '#E06A6A' }}>excluir</button></div>)}
+          </div>
+        </section>
       </main>
 
       {/* ---------- Modal ---------- */}
@@ -217,6 +306,20 @@ export default function ConteudoCurso() {
               </>
             )}
 
+            {modal === 'material' && (
+              <>
+                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: '0 0 5px' }}>Novo material</h2>
+                <p style={{ color: '#777', fontSize: 12, margin: '0 0 16px' }}>{matForm.lesson_id ? 'Vinculado à aula selecionada.' : 'Material extra do curso.'}</p>
+                <div style={grupo}><label style={label}>Nome *</label><input style={campo} value={matForm.title} onChange={e => setMatForm(f => ({ ...f, title: e.target.value }))} placeholder="Ex.: Checklist da aula" /></div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                  <button onClick={() => setMatForm(f => ({ ...f, mode: 'pdf' }))} style={{ ...botaoOpcao, borderColor: matForm.mode === 'pdf' ? ouro : '#333', color: matForm.mode === 'pdf' ? ouro : '#888' }}>PDF</button>
+                  <button onClick={() => setMatForm(f => ({ ...f, mode: 'link' }))} style={{ ...botaoOpcao, borderColor: matForm.mode === 'link' ? ouro : '#333', color: matForm.mode === 'link' ? ouro : '#888' }}>Link externo</button>
+                </div>
+                {matForm.mode === 'pdf' ? <div style={grupo}><label style={label}>Arquivo PDF *</label><input type="file" accept="application/pdf,.pdf" onChange={e => setMatForm(f => ({ ...f, file: e.target.files?.[0] || null }))} style={{ color: '#AAA', fontSize: 13 }} /><p style={{ color: '#666', fontSize: 11 }}>Máximo de 20 MB.</p></div> : <div style={grupo}><label style={label}>Endereço do link *</label><input style={campo} value={matForm.link} onChange={e => setMatForm(f => ({ ...f, link: e.target.value }))} placeholder="https://..." /></div>}
+                <button onClick={salvarMaterial} disabled={salvando} style={{ width: '100%', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', opacity: salvando ? .6 : 1 }}>{salvando ? 'Salvando...' : 'Salvar material'}</button>
+              </>
+            )}
+
             <button onClick={() => !salvando && setModal(null)} style={{ width: '100%', background: 'transparent', border: 'none', color: '#888', padding: '12px', fontSize: '13px', marginTop: '8px', cursor: 'pointer' }}>Cancelar</button>
           </div>
         </div>
@@ -224,3 +327,7 @@ export default function ConteudoCurso() {
     </div>
   )
 }
+
+const botaoTexto = { background: 'transparent', border: 'none', color: '#D4AF37', fontSize: '12px', cursor: 'pointer', padding: '3px' }
+const botaoIcone = { width: 25, height: 25, background: '#191919', color: '#AAA', border: '1px solid #2A2A2A', borderRadius: 6, cursor: 'pointer' }
+const botaoOpcao = { flex: 1, background: '#111', border: '1px solid #333', borderRadius: 9, padding: '10px', fontWeight: 700, cursor: 'pointer' }
