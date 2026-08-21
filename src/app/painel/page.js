@@ -180,7 +180,7 @@ export default function Painel() {
       try {
         const { data: bannersData } = await supabase
           .from('panel_banners')
-          .select('id,tag,title,body,sort_order')
+          .select('id,tag,title,body,image_url,link_url,sort_order')
           .order('sort_order', { ascending: true })
           .order('created_at', { ascending: true })
         if (bannersData?.length) {
@@ -189,6 +189,8 @@ export default function Painel() {
             tag: item.tag,
             titulo: item.title,
             texto: item.body,
+            imagem: item.image_url,
+            link: item.link_url,
           })))
         }
       } catch (e) { /* mantém os banners padrão */ }
@@ -378,13 +380,18 @@ export default function Painel() {
                 {/* CARROSSEL DESLIZANTE (abaixo da saudação) */}
                 <div style={{ marginTop: '18px', overflow: 'hidden', borderRadius: '14px' }}>
                   <div style={{ display: 'flex', transform: `translateX(-${bannerAtual * 100}%)`, transition: 'transform 0.5s ease' }}>
-                    {banners.map((banner, i) => (
-                      <div key={i} style={{ minWidth: '100%', boxSizing: 'border-box', background: '#0A0A0A', borderRadius: '14px', padding: '15px 16px', color: '#FFFFFF' }}>
-                        <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 5px', color: ouro }}>{banner.tag}</p>
-                        <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 3px' }}>{banner.titulo}</h3>
-                        <p style={{ fontSize: '12px', margin: 0, color: '#AAAAAA' }}>{banner.texto}</p>
+                    {banners.map((banner, i) => {
+                      const conteudo = banner.imagem
+                        ? <img src={banner.imagem} alt={banner.titulo || 'Banner'} style={{ width: '100%', aspectRatio: '16 / 5', objectFit: 'cover', display: 'block' }} />
+                        : <div style={{ background: '#0A0A0A', padding: '15px 16px', color: '#FFFFFF' }}>
+                            <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 5px', color: ouro }}>{banner.tag}</p>
+                            <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 3px' }}>{banner.titulo}</h3>
+                            <p style={{ fontSize: '12px', margin: 0, color: '#AAAAAA' }}>{banner.texto}</p>
+                          </div>
+                      return <div key={banner.id || i} style={{ minWidth: '100%', boxSizing: 'border-box', background: '#0A0A0A', borderRadius: '14px', overflow: 'hidden' }}>
+                        {banner.link ? <a href={banner.link} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>{conteudo}</a> : conteudo}
                       </div>
-                    ))}
+                    })}
                   </div>
                 </div>
                 {/* bolinhas */}

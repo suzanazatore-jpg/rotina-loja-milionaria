@@ -8,7 +8,7 @@ const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const ouro = '#D4AF37'
 const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
 const campo = { width: '100%', boxSizing: 'border-box', background: '#0A0A0A', color: '#FFF', border: '1px solid #333', borderRadius: '8px', padding: '10px 12px', fontSize: '14px' }
-const vazio = { tag: '📣 Aviso', title: '', body: '', sort_order: 0, is_active: true, starts_at: '', ends_at: '' }
+const vazio = { title: '', link_url: '', sort_order: 0, is_active: true, starts_at: '', ends_at: '', image_url: '' }
 
 function dataLocal(valor) {
   if (!valor) return ''
@@ -24,6 +24,8 @@ export default function AdminBanners() {
   const [token, setToken] = useState('')
   const [banners, setBanners] = useState([])
   const [form, setForm] = useState(vazio)
+  const [arquivo, setArquivo] = useState(null)
+  const [preview, setPreview] = useState('')
   const [editando, setEditando] = useState(null)
   const [salvando, setSalvando] = useState(false)
   const [mensagem, setMensagem] = useState('')
@@ -41,10 +43,11 @@ export default function AdminBanners() {
   }, [router])
 
   async function requisicao(method, body, accessToken = token) {
+    const formData = body instanceof FormData
     const resposta = await fetch('/api/admin/banners', {
       method,
-      headers: { Authorization: `Bearer ${accessToken}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
-      ...(body ? { body: JSON.stringify(body) } : {}),
+      headers: { Authorization: `Bearer ${accessToken}`, ...(!formData && body ? { 'Content-Type': 'application/json' } : {}) },
+      ...(body ? { body: formData ? body : JSON.stringify(body) } : {}),
     })
     const dados = await resposta.json()
     if (!resposta.ok) throw new Error(dados.error || 'Não foi possível concluir a operação.')
@@ -57,31 +60,46 @@ export default function AdminBanners() {
   }
 
   function alterar(nome, valor) { setForm(atual => ({ ...atual, [nome]: valor })) }
-  function limpar() { setEditando(null); setForm(vazio); setMensagem('') }
-  function editar(item) {
-    setEditando(item.id)
-    setForm({ ...item, body: item.body || '', starts_at: dataLocal(item.starts_at), ends_at: dataLocal(item.ends_at) })
+  function escolherArquivo(evento) {
+    const selecionado = evento.target.files?.[0] || null
+    if (selecionado && selecionado.size > 5 * 1024 * 1024) { setMensagem('A imagem deve ter no máximo 5 MB.'); evento.target.value = ''; return }
+    if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview)
+    setArquivo(selecionado); setPreview(selecionado ? URL.createObjectURL(selecionado) : form.image_url || '')
     setMensagem('')
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  function limpar() {
+    if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview)
+    setEditando(null); setForm(vazio); setArquivo(null); setPreview(''); setMensagem('')
+  }
+  function editar(item) {
+    if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview)
+    setEditando(item.id); setArquivo(null); setPreview(item.image_url || '')
+    setForm({ ...vazio, ...item, title: item.title || '', link_url: item.link_url || '', starts_at: dataLocal(item.starts_at), ends_at: dataLocal(item.ends_at) })
+    setMensagem(''); window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   async function salvar(evento) {
     evento.preventDefault()
-    if (!form.title.trim()) { setMensagem('Informe o título do banner.'); return }
+    if (!editando && !arquivo) { setMensagem('Escolha a imagem do banner.'); return }
     setSalvando(true); setMensagem('')
     try {
-      await requisicao(editando ? 'PATCH' : 'POST', {
-        ...form, ...(editando ? { id: editando } : {}),
-        starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
-        ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
-      })
+      const dados = new FormData()
+      if (arquivo) dados.append('image', arquivo)
+      if (editando) dados.append('id', editando)
+      dados.append('title', form.title)
+      dados.append('link_url', form.link_url)
+      dados.append('sort_order', String(form.sort_order))
+      dados.append('is_active', String(form.is_active))
+      dados.append('starts_at', form.starts_at ? new Date(form.starts_at).toISOString() : '')
+      dados.append('ends_at', form.ends_at ? new Date(form.ends_at).toISOString() : '')
+      await requisicao(editando ? 'PATCH' : 'POST', dados)
       await carregar(); limpar(); setMensagem('✓ Banner salvo com sucesso.')
     } catch (error) { setMensagem(error.message) }
     setSalvando(false)
   }
 
   async function excluir(item) {
-    if (!confirm(`Excluir o banner “${item.title}”?`)) return
+    if (!confirm('Excluir este banner?')) return
     try { await requisicao('DELETE', { id: item.id }); await carregar(); if (editando === item.id) limpar(); setMensagem('✓ Banner excluído.') }
     catch (error) { setMensagem(error.message) }
   }
@@ -102,16 +120,21 @@ export default function AdminBanners() {
       <main style={{ maxWidth: '900px', margin: '0 auto', padding: '26px 18px 60px' }}>
         <p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>ADMINISTRAÇÃO</p>
         <h1 style={{ fontSize: '24px', margin: '5px 0' }}>Banners do Painel</h1>
-        <p style={{ color: '#888', margin: '0 0 22px' }}>Gerencie os avisos exibidos no topo da página inicial das alunas.</p>
+        <p style={{ color: '#888', margin: '0 0 22px' }}>Suba as imagens que ficarão girando no topo do painel das alunas.</p>
         {mensagem && <div style={{ background: '#18150b', border: '1px solid #5b4c17', color: '#F5D76E', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
 
         <form onSubmit={salvar} style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '14px', padding: '18px', marginBottom: '22px' }}>
-          <h2 style={{ fontSize: '16px', margin: '0 0 15px' }}>{editando ? 'Editar banner' : 'Novo banner'}</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '12px' }}>
-            <label>Etiqueta<input value={form.tag} onChange={e => alterar('tag', e.target.value)} style={campo} placeholder="📣 Aviso" /></label>
-            <label>Título *<input value={form.title} onChange={e => alterar('title', e.target.value)} style={campo} placeholder="Ex.: Novidade desta semana" /></label>
+          <h2 style={{ fontSize: '16px', margin: '0 0 5px' }}>{editando ? 'Editar banner' : 'Novo banner'}</h2>
+          <p style={{ color: '#777', fontSize: '12px', margin: '0 0 15px' }}>Formato recomendado: 1920 × 600 px. JPG, PNG ou WEBP, até 5 MB.</p>
+          <label style={{ display: 'block', border: '1px dashed #5b4c17', borderRadius: '12px', background: '#0A0A0A', padding: '16px', cursor: 'pointer', textAlign: 'center' }}>
+            {preview ? <img src={preview} alt="Prévia do banner" style={{ width: '100%', aspectRatio: '16 / 5', objectFit: 'cover', borderRadius: '8px', display: 'block', marginBottom: '12px' }} /> : <div style={{ padding: '32px 12px', color: '#999' }}><strong style={{ color: ouro }}>↑ Escolher imagem do banner</strong><br /><small>ou arraste o arquivo para cá</small></div>}
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={escolherArquivo} style={{ display: 'none' }} />
+            {preview && <span style={{ color: ouro, fontSize: '13px', fontWeight: 700 }}>Trocar imagem</span>}
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px', marginTop: '14px' }}>
+            <label>Nome interno <small style={{ color: '#777' }}>(opcional)</small><input value={form.title} onChange={e => alterar('title', e.target.value)} style={campo} placeholder="Ex.: Campanha de agosto" /></label>
+            <label>Link ao clicar <small style={{ color: '#777' }}>(opcional)</small><input value={form.link_url} onChange={e => alterar('link_url', e.target.value)} style={campo} placeholder="https://" /></label>
           </div>
-          <label style={{ display: 'block', marginTop: '12px' }}>Texto<textarea value={form.body} onChange={e => alterar('body', e.target.value)} style={{ ...campo, minHeight: '80px', resize: 'vertical' }} placeholder="Mensagem que aparecerá no painel" /></label>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginTop: '12px' }}>
             <label>Ordem<input type="number" value={form.sort_order} onChange={e => alterar('sort_order', e.target.value)} style={campo} /></label>
             <label>Mostrar a partir de<input type="datetime-local" value={form.starts_at} onChange={e => alterar('starts_at', e.target.value)} style={campo} /></label>
@@ -119,17 +142,17 @@ export default function AdminBanners() {
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: '9px', marginTop: '15px', cursor: 'pointer' }}><input type="checkbox" checked={form.is_active} onChange={e => alterar('is_active', e.target.checked)} /> Banner publicado</label>
           <div style={{ display: 'flex', gap: '9px', marginTop: '17px' }}>
-            <button disabled={salvando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '8px', padding: '10px 17px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar banner'}</button>
+            <button disabled={salvando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '8px', padding: '10px 17px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Enviando...' : 'Salvar banner'}</button>
             {editando && <button type="button" onClick={limpar} style={botao}>Cancelar</button>}
           </div>
         </form>
 
-        <div style={{ display: 'grid', gap: '10px' }}>
-          {banners.map(item => <article key={item.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderLeft: `3px solid ${item.is_active ? ouro : '#444'}`, borderRadius: '12px', padding: '15px', display: 'flex', justifyContent: 'space-between', gap: '15px', alignItems: 'center' }}>
-            <div><small style={{ color: ouro }}>{item.tag}</small><strong style={{ display: 'block', marginTop: '4px' }}>{item.title}</strong><p style={{ color: '#888', fontSize: '13px', margin: '4px 0 0' }}>{item.body || 'Sem texto'} · ordem {item.sort_order} · {item.is_active ? 'publicado' : 'oculto'}</p></div>
-            <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap', justifyContent: 'flex-end' }}><button onClick={() => alternar(item)} style={botao}>{item.is_active ? 'Ocultar' : 'Publicar'}</button><button onClick={() => editar(item)} style={botao}>Editar</button><button onClick={() => excluir(item)} style={{ ...botao, color: '#f99' }}>Excluir</button></div>
+        <div style={{ display: 'grid', gap: '12px' }}>
+          {banners.map(item => <article key={item.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderLeft: `3px solid ${item.is_active ? ouro : '#444'}`, borderRadius: '12px', padding: '12px', display: 'grid', gridTemplateColumns: 'minmax(180px, 280px) 1fr', gap: '15px', alignItems: 'center' }}>
+            {item.image_url ? <img src={item.image_url} alt={item.title || 'Banner'} style={{ width: '100%', aspectRatio: '16 / 5', objectFit: 'cover', borderRadius: '8px' }} /> : <div style={{ background: '#222', color: '#777', padding: '20px', textAlign: 'center', borderRadius: '8px' }}>Sem imagem</div>}
+            <div><strong>{item.title || 'Banner sem nome'}</strong><p style={{ color: '#888', fontSize: '13px', margin: '4px 0 10px' }}>Ordem {item.sort_order} · {item.is_active ? 'publicado' : 'oculto'}</p><div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}><button onClick={() => alternar(item)} style={botao}>{item.is_active ? 'Ocultar' : 'Publicar'}</button><button onClick={() => editar(item)} style={botao}>Editar</button><button onClick={() => excluir(item)} style={{ ...botao, color: '#f99' }}>Excluir</button></div></div>
           </article>)}
-          {!banners.length && <div style={{ color: '#888', background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '18px' }}>Nenhum banner cadastrado. Enquanto a lista estiver vazia, o painel mantém os avisos atuais.</div>}
+          {!banners.length && <div style={{ color: '#888', background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '18px' }}>Nenhum banner de imagem cadastrado.</div>}
         </div>
       </main>
     </div>
