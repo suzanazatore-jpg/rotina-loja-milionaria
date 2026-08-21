@@ -162,7 +162,9 @@ export default function Painel() {
       } catch (e) { /* sem aulas ainda */ }
       // Carrega o calendário de conteúdo (PDFs, um por mês)
       try {
-        const { data: calData } = await supabase.from('calendario').select('*').order('mes_ano', { ascending: false })
+        const resposta = await fetch('/api/calendario', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        const resultado = await resposta.json()
+        const calData = resposta.ok ? resultado.calendarios : []
         if (calData) {
           setCalendario(calData)
           // Se não houver material no mês atual, seleciona o mês mais recente disponível
@@ -683,91 +685,31 @@ export default function Painel() {
 
               {/* CALENDÁRIO DE CONTEÚDO (PDFs por mês) */}
               {secao === 'calendario' && (
-                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-                  <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
-                    <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>📅 Calendário de Conteúdo</h2>
-                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Materiais em PDF para você consultar e baixar.</p>
+                <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+                  <div style={{ background: tema === 'escuro' ? 'linear-gradient(145deg,#17150f,#111)' : 'linear-gradient(145deg,#fffaf0,#fff)', border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, borderRadius: '18px', padding: '22px', marginBottom: '18px' }}>
+                    <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>PLANEJAMENTO MENSAL</p>
+                    <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 6px', color: cores.tx }}>Calendário de Conteúdo</h2>
+                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55 }}>Seu planejamento em PDF para consultar, salvar e acompanhar durante o mês.</p>
                   </div>
 
-                  {calendario.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '50px 20px', color: cores.tx3 }}>
-                      <div style={{ fontSize: '40px', marginBottom: '10px' }}>📅</div>
-                      <p style={{ fontSize: '14px', margin: 0 }}>Nenhum material disponível ainda. Em breve! 👑</p>
-                    </div>
-                  ) : (
-                    <>
-                      {/* ABAS POR MÊS */}
-                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '16px' }}>
-                        {calendario.map(item => (
-                          <button
-                            key={item.mes_ano}
-                            onClick={() => setMesSelecionado(item.mes_ano)}
-                            style={{
-                              flexShrink: 0, padding: '9px 16px', borderRadius: '99px', whiteSpace: 'nowrap',
-                              fontSize: '13px', fontWeight: 700, cursor: 'pointer',
-                              border: mesSelecionado === item.mes_ano ? 'none' : `1px solid ${cores.borda}`,
-                              background: mesSelecionado === item.mes_ano ? ouroGrad : cores.card,
-                              color: mesSelecionado === item.mes_ano ? '#0A0A0A' : cores.tx2,
-                            }}
-                          >
-                            {rotuloMesCurto(item.mes_ano)}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* MATERIAL DO MÊS SELECIONADO */}
-                      {(() => {
-                        const item = calendario.find(c => c.mes_ano === mesSelecionado)
-                        if (!item) {
-                          return (
-                            <div style={{ textAlign: 'center', padding: '50px 20px', color: cores.tx3 }}>
-                              <div style={{ fontSize: '40px', marginBottom: '10px' }}>📅</div>
-                              <p style={{ fontSize: '14px', margin: 0 }}>Nenhum material para este mês ainda.</p>
-                            </div>
-                          )
-                        }
-                        return (
-                          <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '16px' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-                              <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: ouroGrad, color: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '15px', flexShrink: 0 }}>📅</div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p style={{ fontSize: '11px', fontWeight: 700, color: ouro, margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{rotuloMesCompleto(item.mes_ano)}</p>
-                                <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: cores.tx }}>{item.titulo}</h3>
-                                {item.descricao && <p style={{ fontSize: '13px', color: cores.tx2, margin: '4px 0 0', lineHeight: 1.5 }}>{item.descricao}</p>}
-                              </div>
-                            </div>
-
-                            {item.arquivo_url && (
-                              <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
-                                <a
-                                  href={item.arquivo_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '9px',
-                                    background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx,
-                                    fontSize: '13px', fontWeight: 700, textDecoration: 'none', cursor: 'pointer',
-                                  }}
-                                >
-                                  👁️ Ver na tela
-                                </a>
-                                <button
-                                  onClick={() => baixarPdf(item)}
-                                  style={{
-                                    flex: 1, textAlign: 'center', padding: '10px', borderRadius: '9px',
-                                    background: ouroGrad, border: 'none', color: '#0A0A0A',
-                                    fontSize: '13px', fontWeight: 800, cursor: 'pointer',
-                                  }}
-                                >
-                                  ⬇️ Baixar
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </>
-                  )}
+                  {!calendario.length ? <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>📅</div><strong style={{ color: cores.tx2 }}>O próximo calendário aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há PDF disponível.</p></div> : <>
+                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{calendario.map(item => <button key={item.mes_ano} onClick={() => setMesSelecionado(item.mes_ano)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesSelecionado === item.mes_ano ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesSelecionado === item.mes_ano ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesSelecionado === item.mes_ano ? ouro : cores.tx2 }}>{rotuloMesCurto(item.mes_ano)}</button>)}</div>
+                    {(() => {
+                      const item = calendario.find(c => c.mes_ano === mesSelecionado) || calendario[0]
+                      if (!item) return null
+                      const [, numeroMes] = item.mes_ano.split('-')
+                      return <article style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '18px', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '17px', padding: '22px', borderBottom: `1px solid ${cores.borda}` }}>
+                          <div style={{ width: '72px', height: '78px', borderRadius: '14px', background: ouroGrad, color: '#0A0A0A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 10px 28px rgba(212,175,55,.18)' }}><small style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '.08em' }}>MÊS</small><strong style={{ fontSize: '28px', lineHeight: 1 }}>{numeroMes}</strong></div>
+                          <div style={{ minWidth: 0 }}><p style={{ fontSize: '11px', fontWeight: 800, color: ouro, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '.06em' }}>{rotuloMesCompleto(item.mes_ano)}</p><h3 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: cores.tx }}>{item.titulo}</h3><p style={{ fontSize: '13px', color: cores.tx2, margin: '6px 0 0', lineHeight: 1.5 }}>{item.descricao || 'Seu calendário mensal está pronto para acessar.'}</p></div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', padding: '16px', flexWrap: 'wrap' }}>
+                          <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx, fontSize: '13px', fontWeight: 800, textDecoration: 'none' }}>👁 Visualizar PDF</a>
+                          <button onClick={() => baixarPdf(item)} style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: ouroGrad, border: 'none', color: '#0A0A0A', fontSize: '13px', fontWeight: 900, cursor: 'pointer' }}>⬇ Baixar calendário</button>
+                        </div>
+                      </article>
+                    })()}
+                  </>}
                 </div>
               )}
 
