@@ -33,6 +33,7 @@ export default function Admin() {
     { id: 'calendario', icone: '📅', titulo: 'Calendário', sub: 'Conteúdo do mês', rota: '/admin/calendario' },
     { id: 'campanhas', icone: '🎯', titulo: 'Campanhas', sub: 'Vendas prontas', rota: '/admin/campanhas' },
     { id: 'cursos', icone: '🎬', titulo: 'Cursos', sub: 'Cursos e aulas', rota: '/admin/cursos' },
+    { id: 'planos', icone: '🏷️', titulo: 'Planos e Ofertas', sub: 'Acessos e cursos vinculados', rota: '/admin/planos' },
     { id: 'rotina', icone: '🔄', titulo: 'Rotina', sub: 'Em breve', rota: '/admin/rotina' },
   ]
 
