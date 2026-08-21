@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import AdminCursosShell from '../AdminCursosShell'
 
 // ════════ E-MAIL DO ADMIN ════════
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
@@ -35,6 +36,8 @@ export default function ConteudoCurso() {
   const [mForm, setMForm] = useState({ id: null, title: '', description: '', sort_order: 0, is_published: true })
   const [lForm, setLForm] = useState({ id: null, module_id: '', title: '', slug: '', video_url: '', duration_label: '', description: '', sort_order: 0, is_published: false, thumbnail_url: '' })
   const [matForm, setMatForm] = useState({ lesson_id: '', title: '', mode: 'pdf', link: '', file: null })
+  const [courseForm, setCourseForm] = useState({ title: '', subtitle: '', description: '', sort_order: 0, is_published: false, cover_image_url: '' })
+  const [coverFile, setCoverFile] = useState(null)
 
   useEffect(() => {
     async function init() {
@@ -52,9 +55,10 @@ export default function ConteudoCurso() {
   }, [router])
 
   async function carregar(cid) {
-    const c = await supabase.from('courses').select('id, title, slug').eq('id', cid).single()
+    const c = await supabase.from('courses').select('*').eq('id', cid).single()
     if (c.error) { setErro(c.error.message); return }
     setCourse(c.data)
+    setCourseForm({ title: c.data.title || '', subtitle: c.data.subtitle || '', description: c.data.description || '', sort_order: c.data.sort_order || 0, is_published: !!c.data.is_published, cover_image_url: c.data.cover_image_url || '' })
     const m = await supabase.from('modules').select('*').eq('course_id', cid).order('sort_order').order('created_at')
     setModules(m.data || [])
     const l = await supabase.from('lessons').select('*').eq('course_id', cid).order('sort_order').order('created_at')
@@ -168,6 +172,41 @@ export default function ConteudoCurso() {
     await carregar(courseId)
   }
 
+  function editarCurso() {
+    setCoverFile(null)
+    setCourseForm({ title: course.title || '', subtitle: course.subtitle || '', description: course.description || '', sort_order: course.sort_order || 0, is_published: !!course.is_published, cover_image_url: course.cover_image_url || '' })
+    setModal('course')
+  }
+
+  async function salvarCurso() {
+    if (!courseForm.title.trim()) { setErro('Dê um nome ao curso.'); return }
+    setSalvando(true); setErro('')
+    try {
+      let coverUrl = courseForm.cover_image_url || null
+      if (coverFile) {
+        if (!['image/jpeg', 'image/png'].includes(coverFile.type)) throw new Error('Escolha uma imagem JPG ou PNG.')
+        if (coverFile.size > 5 * 1024 * 1024) throw new Error('A capa deve ter no máximo 5 MB.')
+        const safe = coverFile.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]+/g, '-').toLowerCase()
+        const path = `covers/${courseId}-${Date.now()}-${safe}`
+        const up = await supabase.storage.from('course-covers').upload(path, coverFile, { contentType: coverFile.type, upsert: false })
+        if (up.error) throw up.error
+        coverUrl = supabase.storage.from('course-covers').getPublicUrl(path).data.publicUrl
+      }
+      const { error } = await supabase.from('courses').update({ title: courseForm.title.trim(), subtitle: courseForm.subtitle.trim() || null, description: courseForm.description.trim() || null, sort_order: Number(courseForm.sort_order) || 0, is_published: courseForm.is_published, cover_image_url: coverUrl }).eq('id', courseId)
+      if (error) throw error
+      setModal(null); await carregar(courseId)
+    } catch (e) { setErro(e?.message || 'Não foi possível salvar o curso.') }
+    finally { setSalvando(false) }
+  }
+
+  async function excluirCurso() {
+    if (!window.confirm(`Apagar o curso "${course.title}" e todo o conteúdo ligado a ele?`)) return
+    if (window.prompt('Digite APAGAR para confirmar:') !== 'APAGAR') return
+    const { error } = await supabase.from('courses').delete().eq('id', courseId)
+    if (error) { setErro(error.message); return }
+    router.push('/admin/cursos')
+  }
+
   if (carregando) return <div style={{ minHeight: '100vh', background: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><p style={{ color: '#888' }}>Carregando...</p></div>
 
   if (!autorizado) return (
@@ -203,19 +242,17 @@ export default function ConteudoCurso() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FFFFFF', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', padding: '16px 20px', borderBottom: '1px solid #2A2A2A', background: '#111', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', minWidth: 0 }}>
-          <button onClick={() => router.push(`/admin/cursos/editar?id=${courseId}`)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '7px 12px', fontSize: '13px', fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>← Curso</button>
-          <div style={{ minWidth: 0 }}>
-            <p style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: ouro, textTransform: 'uppercase', margin: 0 }}>Conteúdo</p>
-            <p style={{ fontSize: '15px', fontWeight: 800, margin: '1px 0 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{course?.title}</p>
-          </div>
-        </div>
-        <button onClick={novoModulo} style={{ background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '8px', padding: '9px 14px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>＋ Módulo</button>
-      </header>
+    <AdminCursosShell>
+      <style>{conteudoCss}</style>
+      <div className="conteudo-crumb">⚙ Administrador › <button onClick={() => router.push('/admin/cursos')}>Cursos</button> › {course?.title}</div>
+      <section className="conteudo-hero">
+        <div className="conteudo-cover" style={course?.cover_image_url ? { backgroundImage: `url(${course.cover_image_url})` } : {}}>{!course?.cover_image_url && <span>{course?.title}</span>}</div>
+        <div className="conteudo-info"><h1>{course?.title}</h1><p>{course?.description || course?.subtitle || 'Curso sem descrição.'}</p></div>
+        <div className="conteudo-actions"><button onClick={() => router.push('/painel')}>◉ Visualizar como aluna</button><button onClick={editarCurso}>✎ Editar curso</button><button onClick={excluirCurso}>♲ Apagar</button></div>
+      </section>
+      <div className="conteudo-title"><h2>Módulos e Aulas</h2><button onClick={novoModulo}>＋ Adicionar módulo</button></div>
 
-      <main style={{ maxWidth: '760px', margin: '0 auto', padding: '22px 16px 70px' }}>
+      <main>
         {erro && <div style={{ background: '#2A1515', border: '1px solid #5A2A2A', color: '#F5A5A5', borderRadius: '10px', padding: '12px 14px', fontSize: '13px', marginBottom: '16px' }}>{erro}</div>}
 
         {modules.length === 0 && semModulo.length === 0 && (
@@ -264,21 +301,16 @@ export default function ConteudoCurso() {
 
       {/* ---------- Modal ---------- */}
       {modal && (
-        <div onClick={() => !salvando && setModal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 50 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#141414', border: '1px solid #2A2A2A', borderRadius: '18px 18px 0 0', width: '100%', maxWidth: '560px', maxHeight: '90vh', overflowY: 'auto', padding: '20px 18px 26px' }}>
-            <div style={{ width: '40px', height: '4px', borderRadius: '999px', background: '#333', margin: '0 auto 16px' }} />
+        <div onClick={() => !salvando && setModal(null)} className="conteudo-overlay">
+          <div onClick={e => e.stopPropagation()} className={`conteudo-modal ${modal === 'module' ? 'pequeno' : ''}`}>
+            <button className="conteudo-fechar" onClick={() => !salvando && setModal(null)}>×</button>
 
             {modal === 'module' && (
               <>
-                <h2 style={{ fontSize: '17px', fontWeight: 800, margin: '0 0 16px' }}>{mForm.id ? 'Editar módulo' : 'Novo módulo'}</h2>
-                <div style={grupo}><label style={label}>Título *</label><input style={campo} value={mForm.title} onChange={e => setMForm(f => ({ ...f, title: e.target.value }))} /></div>
-                <div style={grupo}><label style={label}>Descrição</label><textarea style={{ ...campo, minHeight: '70px', resize: 'vertical' }} value={mForm.description} onChange={e => setMForm(f => ({ ...f, description: e.target.value }))} /></div>
-                <div style={grupo}><label style={label}>Ordem</label><input type="number" style={{ ...campo, maxWidth: '120px' }} value={mForm.sort_order} onChange={e => setMForm(f => ({ ...f, sort_order: e.target.value }))} /></div>
-                <div onClick={() => setMForm(f => ({ ...f, is_published: !f.is_published }))} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', margin: '4px 0 20px' }}>
-                  <div style={{ width: '44px', height: '26px', borderRadius: '999px', background: mForm.is_published ? ouroGrad : '#333', position: 'relative', flexShrink: 0 }}><div style={{ position: 'absolute', top: '3px', left: mForm.is_published ? '21px' : '3px', width: '20px', height: '20px', borderRadius: '50%', background: '#fff' }} /></div>
-                  <span style={{ fontSize: '14px', fontWeight: 600 }}>Publicado</span>
-                </div>
-                <button onClick={salvarModulo} disabled={salvando} style={{ width: '100%', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', opacity: salvando ? .6 : 1 }}>{salvando ? 'Salvando...' : 'Salvar módulo'}</button>
+                <h2>{mForm.id ? 'Editar módulo' : 'Novo módulo'}</h2>
+                <p className="conteudo-sub">Módulos ajudam a organizar as aulas do curso.</p>
+                <div style={grupo}><label style={label}>Nome do módulo *</label><input autoFocus style={campo} value={mForm.title} onChange={e => setMForm(f => ({ ...f, title: e.target.value }))} placeholder="Ex.: Módulo 1 — Comece por aqui" /></div>
+                <div className="conteudo-modal-footer"><button className="secundario" onClick={() => setModal(null)}>Cancelar</button><button onClick={salvarModulo} disabled={salvando}>{salvando ? 'Salvando...' : mForm.id ? 'Salvar' : 'Criar módulo'}</button></div>
               </>
             )}
 
@@ -320,14 +352,35 @@ export default function ConteudoCurso() {
               </>
             )}
 
-            <button onClick={() => !salvando && setModal(null)} style={{ width: '100%', background: 'transparent', border: 'none', color: '#888', padding: '12px', fontSize: '13px', marginTop: '8px', cursor: 'pointer' }}>Cancelar</button>
+            {modal === 'course' && (
+              <>
+                <h2>Editar curso</h2><p className="conteudo-sub">Atualize as informações do curso. A capa tem botão próprio.</p>
+                <div style={grupo}><label style={label}>Nome do curso *</label><input style={campo} value={courseForm.title} onChange={e => setCourseForm(f => ({ ...f, title: e.target.value }))} /></div>
+                <div style={grupo}><label style={label}>Subtítulo <small>opcional</small></label><input style={campo} value={courseForm.subtitle} onChange={e => setCourseForm(f => ({ ...f, subtitle: e.target.value }))} placeholder="Uma frase curta que aparece abaixo do nome" /></div>
+                <div style={grupo}><label style={label}>Descrição <small>opcional</small></label><textarea style={{ ...campo, minHeight: 78 }} value={courseForm.description} onChange={e => setCourseForm(f => ({ ...f, description: e.target.value }))} placeholder="Sobre o que é este curso..." /></div>
+                <div style={grupo}><label style={label}>Capa do curso <small>JPG ou PNG, até 5 MB</small></label><div className="conteudo-capa-input">{courseForm.cover_image_url ? <img src={courseForm.cover_image_url} alt="" /> : <span>Sem capa</span>}<label className="escolher">Escolher imagem<input hidden type="file" accept="image/jpeg,image/png" onChange={e => setCoverFile(e.target.files?.[0] || null)} /></label></div></div>
+                <div className="conteudo-duas"><div><label style={label}>Ordem de exibição</label><input type="number" style={campo} value={courseForm.sort_order} onChange={e => setCourseForm(f => ({ ...f, sort_order: e.target.value }))} /></div><button className="conteudo-publicacao" onClick={() => setCourseForm(f => ({ ...f, is_published: !f.is_published }))}><span><b>Publicação</b><small>{courseForm.is_published ? 'Publicado' : 'Oculto'}</small></span><i className={courseForm.is_published ? 'on' : ''}><u /></i></button></div>
+                <div className="conteudo-modal-footer"><button className="secundario" onClick={() => setModal(null)}>Cancelar</button><button onClick={salvarCurso} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar'}</button></div>
+              </>
+            )}
+
+            {modal !== 'module' && modal !== 'course' && <button onClick={() => !salvando && setModal(null)} style={{ width: '100%', background: 'transparent', border: 'none', color: '#888', padding: '12px', fontSize: '13px', marginTop: '8px', cursor: 'pointer' }}>Cancelar</button>}
           </div>
         </div>
       )}
-    </div>
+    </AdminCursosShell>
   )
 }
 
 const botaoTexto = { background: 'transparent', border: 'none', color: '#D4AF37', fontSize: '12px', cursor: 'pointer', padding: '3px' }
 const botaoIcone = { width: 25, height: 25, background: '#191919', color: '#AAA', border: '1px solid #2A2A2A', borderRadius: 6, cursor: 'pointer' }
 const botaoOpcao = { flex: 1, background: '#111', border: '1px solid #333', borderRadius: 9, padding: '10px', fontWeight: 700, cursor: 'pointer' }
+const conteudoCss = `
+.conteudo-crumb{color:#777;font-size:11px;margin-bottom:16px}.conteudo-crumb button{background:none;border:0;color:#a58e3d;text-decoration:underline;cursor:pointer}
+.conteudo-hero{display:flex;gap:17px;background:#171414;border:1px solid #302c2a;border-radius:13px;padding:16px;margin-bottom:28px;min-height:140px}.conteudo-cover{width:138px;height:92px;border-radius:9px;background:linear-gradient(135deg,#31270c,#0d0b07);background-size:cover;background-position:center;display:grid;place-items:center;padding:10px;flex:none}.conteudo-cover span{color:#e5ca66;text-align:center;text-transform:uppercase;font-size:10px;font-weight:900}.conteudo-info{flex:1}.conteudo-info h1{font-size:18px;margin:0 0 6px}.conteudo-info p{font-size:12px;color:#777;margin:0;line-height:1.5}.conteudo-actions{width:164px;display:flex;flex-direction:column;gap:7px}.conteudo-actions button{background:#151313;border:1px solid #302c2a;color:#fff;border-radius:8px;padding:8px 10px;font-size:11px;font-weight:800;text-align:left;cursor:pointer}
+.conteudo-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}.conteudo-title h2{font-size:16px;margin:0}.conteudo-title button,.conteudo-modal-footer>button:not(.secundario){background:linear-gradient(135deg,#D4AF37,#F5D76E);border:0;color:#090909;border-radius:9px;padding:10px 15px;font-weight:900;cursor:pointer}
+.adm-cursos-content>main{max-width:none;margin:0;padding:0 0 20px}.adm-cursos-content>main>div{border-radius:10px!important}.adm-cursos-content>main>div>div:first-child{margin-bottom:8px!important}
+.conteudo-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);backdrop-filter:blur(5px);display:grid;place-items:center;padding:16px;z-index:100}.conteudo-modal{position:relative;width:min(540px,100%);max-height:90vh;overflow:auto;background:#161618;border:1px solid #343439;border-radius:18px;padding:21px 21px 18px;box-shadow:0 26px 85px #000}.conteudo-modal.pequeno{width:min(450px,100%)}.conteudo-modal h2{font-size:18px;margin:0 0 3px}.conteudo-sub{color:#777;font-size:12px;margin:0 0 22px}.conteudo-fechar{position:absolute;right:20px;top:20px;width:30px;height:30px;border:1px solid #3c3c42;background:#202024;color:#888;border-radius:8px;font-size:19px;cursor:pointer}.conteudo-modal label small{color:#777;text-transform:none;font-weight:400;margin-left:4px}.conteudo-modal-footer{display:flex;justify-content:flex-end;gap:9px;border-top:1px solid #2c2c30;margin:20px -21px -18px;padding:14px 21px 18px}.conteudo-modal-footer .secundario{background:#202024;border:1px solid #44444a;color:#fff;border-radius:9px;padding:10px 16px;font-weight:800;cursor:pointer}
+.conteudo-capa-input{display:flex;align-items:center;gap:12px;background:#252529;border-radius:10px;padding:8px 10px}.conteudo-capa-input img{width:84px;height:46px;object-fit:cover;border-radius:7px}.conteudo-capa-input span{color:#777;font-size:12px}.conteudo-capa-input .escolher{margin:0 0 0 auto;border:1px solid #49494f;border-radius:8px;padding:9px 12px;cursor:pointer;text-transform:none;color:#fff}.conteudo-duas{display:grid;grid-template-columns:1fr 1fr;gap:12px}.conteudo-publicacao{display:flex;align-items:center;justify-content:space-between;background:#252529;border:0;border-radius:10px;color:#fff;padding:10px 12px;text-align:left;cursor:pointer}.conteudo-publicacao span{display:flex;flex-direction:column}.conteudo-publicacao small{color:#777}.conteudo-publicacao i{width:42px;height:24px;border-radius:20px;background:#3b3b40;position:relative}.conteudo-publicacao i u{position:absolute;width:18px;height:18px;top:3px;left:3px;background:#fff;border-radius:50%;transition:.2s}.conteudo-publicacao i.on{background:#D4AF37}.conteudo-publicacao i.on u{left:21px}
+@media(max-width:700px){.conteudo-hero{flex-wrap:wrap}.conteudo-cover{width:100%;height:145px}.conteudo-actions{width:100%;flex-direction:row}.conteudo-actions button{flex:1;text-align:center}.conteudo-duas{grid-template-columns:1fr}}
+`
