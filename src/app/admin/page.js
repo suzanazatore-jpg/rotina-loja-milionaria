@@ -47,7 +47,7 @@ export default function Admin() {
         { icone: '📅', titulo: 'Calendário', sub: 'Organize e publique o conteúdo mensal.', rota: '/admin/calendario' },
         { icone: '🎯', titulo: 'Campanhas', sub: 'Disponibilize campanhas e ações de vendas.', rota: '/admin/campanhas' },
         { icone: '🔄', titulo: 'Rotina', sub: 'Publique a rotina semanal das lojistas.', rota: '/admin/rotina' },
-        { icone: '🖼️', titulo: 'Banners do Painel', sub: 'Insira banners e novidades no topo do aplicativo.', status: 'Em breve' },
+        { icone: '🖼️', titulo: 'Banners do Painel', sub: 'Insira banners e novidades no topo do aplicativo.', rota: '/admin/banners' },
         { icone: '▥', titulo: 'Carrosséis de Cursos', sub: 'Organize cursos em seções na área de membros.', status: 'Em breve' },
       ],
     },

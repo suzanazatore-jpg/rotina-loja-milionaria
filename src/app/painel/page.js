@@ -10,8 +10,8 @@ const WHATSAPP = '558499814124'
 // ════════ E-MAIL DO ADMIN ════════
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 
-// ════════ BANNERS DO CARROSSEL (edite à vontade) ════════
-const BANNERS = [
+// Banners exibidos enquanto não houver conteúdo cadastrado no ADM.
+const BANNERS_PADRAO = [
   { tag: '📣 Aviso', titulo: 'Bem-vinda à sua área exclusiva!', texto: 'Use este espaço para avisos e novidades.' },
   { tag: '🎁 Bônus', titulo: 'Novos materiais liberados', texto: 'Confira os conteúdos do mês na área de conteúdos.' },
   { tag: '🔥 Oferta', titulo: 'Mentoria mensal ao vivo', texto: 'Não perca a próxima mentoria gravada.' },
@@ -92,6 +92,7 @@ export default function Painel() {
   const [aulaAberta, setAulaAberta] = useState(0)
   const [menuMobile, setMenuMobile] = useState(false)
   const [bannerAtual, setBannerAtual] = useState(0)
+  const [banners, setBanners] = useState(BANNERS_PADRAO)
 
   // Meus Dados
   const [nome, setNome] = useState('')
@@ -175,6 +176,22 @@ export default function Painel() {
         const { data: rotinaData } = await supabase.from('rotinas').select('*').eq('semana_inicio', segundaFeiraAtual()).limit(1)
         if (rotinaData && rotinaData.length > 0) setRotinaSemanal(rotinaData[0])
       } catch (e) { /* sem rotina ainda */ }
+      // Carrega os banners ativos gerenciados pelo ADM. Mantém os padrões como fallback.
+      try {
+        const { data: bannersData } = await supabase
+          .from('panel_banners')
+          .select('id,tag,title,body,sort_order')
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true })
+        if (bannersData?.length) {
+          setBanners(bannersData.map(item => ({
+            id: item.id,
+            tag: item.tag,
+            titulo: item.title,
+            texto: item.body,
+          })))
+        }
+      } catch (e) { /* mantém os banners padrão */ }
       setCarregando(false)
     }
     init()
@@ -182,9 +199,10 @@ export default function Painel() {
 
   // Carrossel automático
   useEffect(() => {
-    const t = setInterval(() => setBannerAtual(b => (b + 1) % BANNERS.length), 4000)
+    if (banners.length < 2) return undefined
+    const t = setInterval(() => setBannerAtual(b => (b + 1) % banners.length), 4000)
     return () => clearInterval(t)
-  }, [])
+  }, [banners.length])
 
   async function sair() {
     await supabase.auth.signOut()
@@ -360,7 +378,7 @@ export default function Painel() {
                 {/* CARROSSEL DESLIZANTE (abaixo da saudação) */}
                 <div style={{ marginTop: '18px', overflow: 'hidden', borderRadius: '14px' }}>
                   <div style={{ display: 'flex', transform: `translateX(-${bannerAtual * 100}%)`, transition: 'transform 0.5s ease' }}>
-                    {BANNERS.map((banner, i) => (
+                    {banners.map((banner, i) => (
                       <div key={i} style={{ minWidth: '100%', boxSizing: 'border-box', background: '#0A0A0A', borderRadius: '14px', padding: '15px 16px', color: '#FFFFFF' }}>
                         <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 5px', color: ouro }}>{banner.tag}</p>
                         <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 3px' }}>{banner.titulo}</h3>
@@ -371,7 +389,7 @@ export default function Painel() {
                 </div>
                 {/* bolinhas */}
                 <div style={{ display: 'flex', gap: '5px', marginTop: '10px', justifyContent: 'center' }}>
-                  {BANNERS.map((_, i) => (
+                  {banners.map((_, i) => (
                     <span key={i} onClick={() => setBannerAtual(i)} style={{ width: i === bannerAtual ? '18px' : '7px', height: '7px', borderRadius: '99px', background: i === bannerAtual ? '#0A0A0A' : 'rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'width .2s' }} />
                   ))}
                 </div>
