@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import CursosArea from './CursosArea'
 import SupportCenter from './SupportCenter'
+import VirtualAssistant from './VirtualAssistant'
+import './premium.css'
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
 const WHATSAPP = '558499814124'
@@ -89,7 +91,7 @@ export default function Painel() {
   const [usuario, setUsuario] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [secao, setSecao] = useState('inicio')
-  const [tema, setTema] = useState('escuro')
+  const [tema, setTema] = useState('claro')
   const [aulaAberta, setAulaAberta] = useState(0)
   const [menuMobile, setMenuMobile] = useState(false)
   const [bannerAtual, setBannerAtual] = useState(0)
@@ -299,6 +301,7 @@ export default function Painel() {
     { id: 'cursos', icone: '📚', label: 'Meus Cursos' },
     { id: 'premium', icone: '🔒', label: 'Conteudo Premium' },
     { id: 'suporte', icone: '💬', label: 'Suporte' },
+    { id: 'assistente', icone: '✦', label: 'Assistente Virtual' },
   ]
 
   if (carregando) {
@@ -361,7 +364,7 @@ export default function Painel() {
   const tituloSecao = menu.find(m => m.id === secao)?.label || (secao === 'dados' ? 'Meus Dados' : '')
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background .2s, color .2s' }}>
+    <div className={`premium-painel tema-${tema}`} style={{ display: 'flex', minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background .2s, color .2s' }}>
 
       {/* ═══════ SIDEBAR (desktop) ═══════ */}
       <aside className="sidebar-desktop" style={{ width: '230px', minWidth: '230px', background: cores.card, borderRight: `1px solid ${cores.borda}`, display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>
@@ -580,6 +583,13 @@ export default function Painel() {
               {secao === 'suporte' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
                   <SupportCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} whatsapp={WHATSAPP} />
+                </div>
+              )}
+
+              {/* ASSISTENTE VIRTUAL */}
+              {secao === 'assistente' && (
+                <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+                  <VirtualAssistant cores={cores} ouro={ouro} ouroGrad={ouroGrad} onOpenSupport={() => irPara('suporte')} />
                 </div>
               )}
 
