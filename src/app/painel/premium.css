@@ -1,0 +1,97 @@
+.premium-painel {
+  --premium-gold: #b48732;
+  --premium-gold-soft: #d8b45a;
+  --premium-cream: #f5f0e7;
+  --premium-paper: #fffdf8;
+  --premium-ink: #26211c;
+  --premium-muted: #776d61;
+  --premium-line: #e9dfcf;
+  letter-spacing: -0.01em;
+}
+
+.premium-painel.tema-claro {
+  background: var(--premium-cream) !important;
+  color: var(--premium-ink) !important;
+}
+
+.premium-painel.tema-escuro {
+  --premium-gold: #d4af37;
+  --premium-gold-soft: #f0d16d;
+  --premium-cream: #0b0b0b;
+  --premium-paper: #151515;
+  --premium-ink: #f5f1e8;
+  --premium-muted: #aaa294;
+  --premium-line: #2d2a25;
+  background: var(--premium-cream) !important;
+  color: var(--premium-ink) !important;
+}
+
+.premium-painel h1,
+.premium-painel h2,
+.premium-painel h3 {
+  letter-spacing: -0.025em;
+}
+
+.premium-painel button,
+.premium-painel a,
+.premium-painel input,
+.premium-painel select,
+.premium-painel textarea {
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease, background .18s ease;
+}
+
+.premium-painel button:hover,
+.premium-painel a:hover {
+  transform: translateY(-1px);
+}
+
+.premium-painel button:focus-visible,
+.premium-painel a:focus-visible,
+.premium-painel input:focus-visible,
+.premium-painel select:focus-visible,
+.premium-painel textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--premium-gold) 30%, transparent);
+  outline-offset: 2px;
+}
+
+.premium-painel .sidebar-desktop {
+  width: 244px !important;
+  min-width: 244px !important;
+  box-shadow: 12px 0 38px rgba(63, 45, 16, .05);
+}
+
+.premium-painel img {
+  max-width: 100%;
+}
+
+@media (min-width: 900px) {
+  .premium-painel main {
+    padding-left: 34px !important;
+    padding-right: 34px !important;
+  }
+}
+
+@media (max-width: 899px) {
+  .premium-painel .sidebar-desktop {
+    display: none !important;
+  }
+
+  .premium-painel main {
+    padding-bottom: 96px !important;
+  }
+
+  .premium-painel button,
+  .premium-painel a {
+    min-height: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-painel *,
+  .premium-painel *::before,
+  .premium-painel *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
