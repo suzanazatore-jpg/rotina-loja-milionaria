@@ -6,6 +6,7 @@ import CursosArea from './CursosArea'
 import SupportCenter from './SupportCenter'
 import VirtualAssistant from './VirtualAssistant'
 import SalesCenter from './SalesCenter'
+import HomeDashboard from './HomeDashboard'
 import './premium.css'
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
@@ -295,15 +296,9 @@ export default function Painel() {
   const menu = [
     { id: 'inicio', icone: '🏠', label: 'Início' },
     { id: 'vendas', icone: '▥', label: 'Vendas e Metas' },
-    { id: 'campanhas', icone: '🎯', label: 'Campanhas' },
-    { id: 'calendario', icone: '📅', label: 'Calendário' },
     { id: 'rotina', icone: '🔄', label: 'Rotina' },
-    { id: 'precificacao', icone: '📊', label: 'Precificação' },
-    { id: 'mentoria', icone: '🎓', label: 'Mentoria' },
-    { id: 'cursos', icone: '📚', label: 'Meus Cursos' },
-    { id: 'premium', icone: '🔒', label: 'Conteudo Premium' },
-    { id: 'suporte', icone: '💬', label: 'Suporte' },
-    { id: 'assistente', icone: '✦', label: 'Assistente Virtual' },
+    { id: 'conteudos', icone: '△', label: 'Conteúdos' },
+    { id: 'mais', icone: '•••', label: 'Mais' },
   ]
 
   if (carregando) {
@@ -417,64 +412,49 @@ export default function Painel() {
 
           {/* ─── INÍCIO ─── */}
           {secao === 'inicio' && (
-            <div>
-              {/* HERO DOURADO (cobre topo até "Acesse") — destaque no mobile */}
-              <div className="hero-dourado" style={{ background: ouroGrad, padding: '20px 22px 26px', color: '#0A0A0A', borderBottomLeftRadius: '24px', borderBottomRightRadius: '24px' }}>
-                {/* Linha do topo: menu + nome do app + tema (mobile) */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '18px' }}>
-                  <button onClick={() => setMenuMobile(true)} style={{ width: '40px', height: '40px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(0,0,0,0.08)', color: '#0A0A0A', fontSize: '20px', cursor: 'pointer' }}>☰</button>
-                  <p style={{ fontSize: '18px', fontWeight: 900, margin: 0, textAlign: 'center' }}>Rotina da Loja Milionária 👑</p>
-                  <button onClick={() => setTema(tema === 'escuro' ? 'claro' : 'escuro')} style={{ width: '40px', height: '40px', borderRadius: '12px', border: '1px solid rgba(0,0,0,0.15)', background: 'rgba(0,0,0,0.08)', color: '#0A0A0A', fontSize: '17px', cursor: 'pointer' }}>{tema === 'escuro' ? '☀️' : '🌙'}</button>
-                </div>
-                {/* Saudação */}
-                <p style={{ fontSize: '14px', margin: 0, opacity: 0.75 }}>{saudacao},</p>
-                <h1 style={{ fontSize: '26px', fontWeight: 900, margin: '2px 0 0' }}>{nomeExibe} 👑</h1>
-
-                {/* CARROSSEL DESLIZANTE (abaixo da saudação) */}
-                <div style={{ marginTop: '18px', overflow: 'hidden', borderRadius: '14px' }}>
-                  <div style={{ display: 'flex', transform: `translateX(-${bannerAtual * 100}%)`, transition: 'transform 0.5s ease' }}>
-                    {banners.map((banner, i) => {
-                      const conteudo = banner.imagem
-                        ? <img src={banner.imagem} alt={banner.titulo || 'Banner'} style={{ width: '100%', aspectRatio: '16 / 5', objectFit: 'cover', display: 'block' }} />
-                        : <div style={{ background: '#0A0A0A', padding: '15px 16px', color: '#FFFFFF' }}>
-                            <p style={{ fontSize: '10px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', margin: '0 0 5px', color: ouro }}>{banner.tag}</p>
-                            <h3 style={{ fontSize: '15px', fontWeight: 800, margin: '0 0 3px' }}>{banner.titulo}</h3>
-                            <p style={{ fontSize: '12px', margin: 0, color: '#AAAAAA' }}>{banner.texto}</p>
-                          </div>
-                      return <div key={banner.id || i} style={{ minWidth: '100%', boxSizing: 'border-box', background: '#0A0A0A', borderRadius: '14px', overflow: 'hidden' }}>
-                        {banner.link ? <a href={banner.link} target="_blank" rel="noopener noreferrer" style={{ display: 'block' }}>{conteudo}</a> : conteudo}
-                      </div>
-                    })}
-                  </div>
-                </div>
-                {/* bolinhas */}
-                <div style={{ display: 'flex', gap: '5px', marginTop: '10px', justifyContent: 'center' }}>
-                  {banners.map((_, i) => (
-                    <span key={i} onClick={() => setBannerAtual(i)} style={{ width: i === bannerAtual ? '18px' : '7px', height: '7px', borderRadius: '99px', background: i === bannerAtual ? '#0A0A0A' : 'rgba(0,0,0,0.3)', cursor: 'pointer', transition: 'width .2s' }} />
-                  ))}
-                </div>
-              </div>
-
-              {/* CONTEÚDO ABAIXO DO HERO */}
-              <div style={{ maxWidth: '900px', margin: '0 auto', padding: '20px 18px' }}>
-                <p style={{ fontSize: '14px', fontWeight: 700, color: cores.tx, margin: '0 0 12px' }}>Acesse seu conteúdo</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '11px' }}>
-                  <CardAcesso cores={cores} icone="🎯" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
-                  <CardAcesso cores={cores} icone="📅" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
-                  <CardAcesso cores={cores} icone="🔄" titulo="Rotina" sub="15 min por dia" onClick={() => irPara('rotina')} />
-                  <CardAcesso cores={cores} icone="📊" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
-                  <CardAcesso cores={cores} icone="🎓" titulo="Mentoria" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />
-                  <CardAcesso cores={cores} icone="📚" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
-                  <CardAcesso cores={cores} icone={temAcessoPremium ? '⭐' : '🔒'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Plano Implementação'} onClick={() => irPara('premium')} />
-                  <CardAcesso cores={cores} icone="💬" titulo="Suporte" sub="24h com IA" onClick={() => irPara('suporte')} />
-                </div>
-              </div>
-            </div>
+            <HomeDashboard
+              nome={nomeExibe}
+              saudacao={saudacao}
+              banners={banners}
+              bannerAtual={bannerAtual}
+              setBannerAtual={setBannerAtual}
+              cores={cores}
+              ouro={ouro}
+              ouroGrad={ouroGrad}
+              irPara={irPara}
+            />
           )}
 
           {/* ─── conteúdo interno (com padding) ─── */}
           {secao !== 'inicio' && (
             <div style={{ padding: '20px 18px' }}>
+
+              {/* CONTEÚDOS */}
+              {secao === 'conteudos' && (
+                <div className="premium-hub">
+                  <div className="premium-hub-heading"><p>CONTEÚDOS LIBERADOS</p><h2>Acesse seus materiais</h2><span>Cursos, campanhas, calendários e mentorias em um só lugar.</span></div>
+                  <div className="premium-hub-grid">
+                    <CardAcesso cores={cores} icone="◎" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
+                    <CardAcesso cores={cores} icone="□" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
+                    <CardAcesso cores={cores} icone="△" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
+                    <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />
+                    <CardAcesso cores={cores} icone={temAcessoPremium ? '☆' : '◇'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Conheça os planos'} onClick={() => irPara('premium')} />
+                  </div>
+                </div>
+              )}
+
+              {/* MAIS */}
+              {secao === 'mais' && (
+                <div className="premium-hub">
+                  <div className="premium-hub-heading"><p>CONTA E FERRAMENTAS</p><h2>Mais opções</h2><span>Atendimento, configurações e ferramentas da sua loja.</span></div>
+                  <div className="premium-hub-grid">
+                    <CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} destaque ouroGrad={ouroGrad} />
+                    <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação com IA" onClick={() => irPara('assistente')} />
+                    <CardAcesso cores={cores} icone="◌" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} />
+                    <CardAcesso cores={cores} icone="○" titulo="Meus Dados" sub="Informações da conta" onClick={() => irPara('dados')} />
+                  </div>
+                </div>
+              )}
 
               {/* MEUS DADOS (somente leitura — só o admin pode editar) */}
               {secao === 'dados' && (
