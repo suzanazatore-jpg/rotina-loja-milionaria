@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import CursosArea from './CursosArea'
 import SupportCenter from './SupportCenter'
 import VirtualAssistant from './VirtualAssistant'
+import SalesCenter from './SalesCenter'
 import './premium.css'
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
@@ -293,6 +294,7 @@ export default function Painel() {
 
   const menu = [
     { id: 'inicio', icone: '🏠', label: 'Início' },
+    { id: 'vendas', icone: '▥', label: 'Vendas e Metas' },
     { id: 'campanhas', icone: '🎯', label: 'Campanhas' },
     { id: 'calendario', icone: '📅', label: 'Calendário' },
     { id: 'rotina', icone: '🔄', label: 'Rotina' },
@@ -591,6 +593,11 @@ export default function Painel() {
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VirtualAssistant cores={cores} ouro={ouro} ouroGrad={ouroGrad} onOpenSupport={() => irPara('suporte')} />
                 </div>
+              )}
+
+              {/* VENDAS E METAS */}
+              {secao === 'vendas' && (
+                <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
               )}
 
               {/* CAMPANHAS DE VENDA (PDFs por mês) */}
