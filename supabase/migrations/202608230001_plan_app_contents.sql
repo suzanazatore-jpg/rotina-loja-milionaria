@@ -7,13 +7,26 @@ create table if not exists public.plan_app_contents (
 
 alter table public.plan_app_contents enable row level security;
 
+grant select, insert, update, delete on public.plan_app_contents to authenticated;
+grant select, insert, update, delete on public.plan_app_contents to service_role;
+
 create policy "Authenticated users can read plan app contents"
   on public.plan_app_contents for select
   to authenticated
   using (true);
 
-create policy "Authenticated admin can manage plan app contents"
-  on public.plan_app_contents for all
+create policy "Authenticated admin can insert plan app contents"
+  on public.plan_app_contents for insert
+  to authenticated
+  with check ((auth.jwt() ->> 'email') = 'suporte@suzanazatorre.com.br');
+
+create policy "Authenticated admin can update plan app contents"
+  on public.plan_app_contents for update
   to authenticated
   using ((auth.jwt() ->> 'email') = 'suporte@suzanazatorre.com.br')
   with check ((auth.jwt() ->> 'email') = 'suporte@suzanazatorre.com.br');
+
+create policy "Authenticated admin can delete plan app contents"
+  on public.plan_app_contents for delete
+  to authenticated
+  using ((auth.jwt() ->> 'email') = 'suporte@suzanazatorre.com.br');
