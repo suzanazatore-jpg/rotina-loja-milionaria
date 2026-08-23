@@ -7,6 +7,7 @@ import SupportCenter from './SupportCenter'
 import VirtualAssistant from './VirtualAssistant'
 import SalesCenter from './SalesCenter'
 import HomeDashboard from './HomeDashboard'
+import AppIcon from '@/app/components/AppIcon'
 import './premium.css'
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
@@ -93,7 +94,11 @@ export default function Painel() {
   const [usuario, setUsuario] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [secao, setSecao] = useState('inicio')
-  const [tema, setTema] = useState('claro')
+  const [tema, setTema] = useState(() => {
+    if (typeof window === 'undefined') return 'claro'
+    const salvo = window.localStorage.getItem('rotina-tema')
+    return salvo === 'escuro' ? 'escuro' : 'claro'
+  })
   const [aulaAberta, setAulaAberta] = useState(0)
   const [menuMobile, setMenuMobile] = useState(false)
   const [bannerAtual, setBannerAtual] = useState(0)
@@ -125,6 +130,11 @@ export default function Painel() {
   const [rotinaSemanal, setRotinaSemanal] = useState(null)
 
   const router = useRouter()
+
+  function alterarTema(novoTema) {
+    setTema(novoTema)
+    window.localStorage.setItem('rotina-tema', novoTema)
+  }
 
   const cores = tema === 'escuro'
     ? { bg: '#0A0A0A', card: '#111111', card2: '#1A1A1A', borda: '#2A2A2A', tx: '#FFFFFF', tx2: '#888888', tx3: '#555555' }
@@ -294,11 +304,20 @@ export default function Painel() {
   const isAdmin = usuario?.email === ADMIN_EMAIL
 
   const menu = [
-    { id: 'inicio', icone: '🏠', label: 'Início' },
-    { id: 'vendas', icone: '▥', label: 'Vendas e Metas' },
-    { id: 'rotina', icone: '🔄', label: 'Rotina' },
-    { id: 'conteudos', icone: '△', label: 'Conteúdos' },
-    { id: 'mais', icone: '•••', label: 'Mais' },
+    { id: 'inicio', icone: 'home', label: 'Início' },
+    { id: 'vendas', icone: 'goals', label: 'Vendas e Metas' },
+    { id: 'rotina', icone: 'routine', label: 'Rotina' },
+    { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
+    { id: 'dados', icone: 'profile', label: 'Meus Dados' },
+    { id: 'mais', icone: 'more', label: 'Mais' },
+  ]
+
+  const menuMobileItens = [
+    { id: 'inicio', icone: 'home', label: 'Início' },
+    { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
+    { id: 'rotina', icone: 'routine', label: 'Rotina' },
+    { id: 'assistente', icone: 'assistant', label: 'Assistente' },
+    { id: 'dados', icone: 'profile', label: 'Meus Dados' },
   ]
 
   if (carregando) {
@@ -378,7 +397,7 @@ export default function Painel() {
               borderLeft: secao === item.id ? `3px solid ${ouro}` : '3px solid transparent',
               fontWeight: secao === item.id ? 700 : 500,
             }}>
-              <span style={{ fontSize: '17px' }}>{item.icone}</span> {item.label}
+              <AppIcon name={item.icone} size={18} /> {item.label}
             </div>
           ))}
         </nav>
@@ -403,8 +422,8 @@ export default function Painel() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '4px' }}>
-            <button onClick={() => setTema('claro')} style={{ background: tema === 'claro' ? ouro : 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '7px', padding: '6px 9px', cursor: 'pointer', fontSize: '13px' }}>☀️</button>
-            <button onClick={() => setTema('escuro')} style={{ background: tema === 'escuro' ? ouro : 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '7px', padding: '6px 9px', cursor: 'pointer', fontSize: '13px' }}>🌙</button>
+            <button onClick={() => alterarTema('claro')} style={{ background: tema === 'claro' ? ouro : 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '7px', padding: '6px 9px', cursor: 'pointer', fontSize: '13px' }}>☀</button>
+            <button onClick={() => alterarTema('escuro')} style={{ background: tema === 'escuro' ? ouro : 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '7px', padding: '6px 9px', cursor: 'pointer', fontSize: '13px' }}>☾</button>
           </div>
         </header>
 
@@ -422,6 +441,8 @@ export default function Painel() {
               ouro={ouro}
               ouroGrad={ouroGrad}
               irPara={irPara}
+              tema={tema}
+              setTema={alterarTema}
             />
           )}
 
@@ -703,7 +724,7 @@ export default function Painel() {
             <div style={{ padding: '8px 14px 14px' }}>
               {menu.map(item => (
                 <div key={item.id} onClick={() => irPara(item.id)} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '13px 6px', cursor: 'pointer', fontSize: '15px', color: cores.tx, borderBottom: `1px solid ${cores.borda}`, fontWeight: 600 }}>
-                  <span style={{ fontSize: '18px' }}>{item.icone}</span> {item.label}
+                  <AppIcon name={item.icone} size={19} /> {item.label}
                 </div>
               ))}
               <button onClick={sair} style={{ width: '100%', marginTop: '16px', padding: '11px', background: 'transparent', color: ouro, border: `1px solid ${ouro}`, borderRadius: '8px', fontSize: '14px', fontWeight: 600, cursor: 'pointer' }}>Sair</button>
@@ -715,17 +736,14 @@ export default function Painel() {
         </div>
       )}
 
-      {/* ═══════ BOTTOM NAV (mobile) — só aparece FORA do início ═══════ */}
-      {secao !== 'inicio' && (
-        <nav className="bottom-nav" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, height: '62px', background: cores.card, borderTop: `1px solid ${cores.borda}`, zIndex: 90 }}>
+      {/* ═══════ BOTTOM NAV (mobile) — visível desde a primeira tela ═══════ */}
+        <nav className="bottom-nav" aria-label="Menu principal" style={{ display: 'none', position: 'fixed', bottom: 0, left: 0, right: 0, height: '68px', background: cores.card, borderTop: `1px solid ${cores.borda}`, zIndex: 90, boxShadow: '0 -8px 24px rgba(0,0,0,.08)' }}>
           <div style={{ display: 'flex', height: '100%' }}>
-            <button onClick={() => setSecao('inicio')} style={bniStyle(cores, ouro, false)}><span style={{ fontSize: '19px' }}>🏠</span>Início</button>
-            {menu.slice(1, 5).map(item => (
-              <button key={item.id} onClick={() => irPara(item.id)} style={bniStyle(cores, ouro, secao === item.id)}><span style={{ fontSize: '19px' }}>{item.icone}</span>{item.label}</button>
+            {menuMobileItens.map(item => (
+              <button key={item.id} onClick={() => irPara(item.id)} aria-current={secao === item.id ? 'page' : undefined} style={bniStyle(cores, ouro, secao === item.id)}><AppIcon name={item.icone} size={20} />{item.label}</button>
             ))}
           </div>
         </nav>
-      )}
 
       <style>{`
         @media (max-width: 720px) {

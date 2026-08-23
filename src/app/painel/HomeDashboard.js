@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 
 const brl = valor => Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara }) {
+export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema }) {
   const [resumo, setResumo] = useState({ meta: 0, mes: 0, hoje: 0 })
   const hoje = useMemo(() => new Date(), [])
 
@@ -34,7 +34,7 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
   ]
 
   return <div className="premium-home">
-    <header className="premium-welcome"><div><p>{saudacao},</p><h1>{nome}</h1><span>Vamos organizar sua loja e vender mais hoje?</span></div><button onClick={() => irPara('assistente')} aria-label="Abrir Assistente Virtual">✦</button></header>
+    <header className="premium-welcome"><div><p>{saudacao},</p><h1>{nome}</h1><span>Vamos organizar sua loja e vender mais hoje?</span></div><div className="premium-theme-switch" aria-label="Escolher tema"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')} aria-label="Usar tema claro">☀</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')} aria-label="Usar tema escuro">☾</button></div></header>
 
     <section className="premium-banner" aria-label="Novidades">
       <div className="premium-banner-track" style={{ transform: `translateX(-${bannerAtual * 100}%)` }}>

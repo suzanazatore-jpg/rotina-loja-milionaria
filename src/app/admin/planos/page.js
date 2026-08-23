@@ -12,6 +12,13 @@ const campo = {
   borderRadius: '8px', padding: '10px 12px', fontSize: '14px', boxSizing: 'border-box',
 }
 
+const CONTEUDOS_APP = [
+  { id: 'calendar', nome: 'Calendário', descricao: 'Calendário mensal de conteúdos' },
+  { id: 'campaigns', nome: 'Campanhas', descricao: 'Campanhas e ações de vendas' },
+  { id: 'routine', nome: 'Rotina', descricao: 'Rotina semanal da lojista' },
+  { id: 'team_goals', nome: 'Meta da Equipe', descricao: 'Metas da equipe e das vendedoras' },
+]
+
 export default function AdminPlanos() {
   const router = useRouter()
   const [carregando, setCarregando] = useState(true)
@@ -19,6 +26,7 @@ export default function AdminPlanos() {
   const [planos, setPlanos] = useState([])
   const [cursos, setCursos] = useState([])
   const [vinculos, setVinculos] = useState([])
+  const [conteudosPlanos, setConteudosPlanos] = useState([])
   const [editando, setEditando] = useState(null)
   const [nome, setNome] = useState('')
   const [ofertaId, setOfertaId] = useState('')
@@ -26,6 +34,7 @@ export default function AdminPlanos() {
   const [preco, setPreco] = useState('')
   const [urlVenda, setUrlVenda] = useState('')
   const [cursoIds, setCursoIds] = useState([])
+  const [conteudoIds, setConteudoIds] = useState([])
   const [salvando, setSalvando] = useState(false)
   const [mensagem, setMensagem] = useState('')
 
@@ -42,10 +51,11 @@ export default function AdminPlanos() {
   }, [router])
 
   async function carregar() {
-    const [rp, rc, rv] = await Promise.all([
+    const [rp, rc, rv, rconteudos] = await Promise.all([
       supabase.from('plans').select('*').order('created_at'),
       supabase.from('courses').select('id,title').order('title'),
       supabase.from('plan_courses').select('plan_id,course_id'),
+      supabase.from('plan_app_contents').select('plan_id,content_key'),
     ])
     if (rp.error) {
       setMensagem('A estrutura de Planos ainda precisa ser aplicada no Supabase do app.')
@@ -54,11 +64,12 @@ export default function AdminPlanos() {
     setPlanos(rp.data || [])
     setCursos(rc.data || [])
     setVinculos(rv.data || [])
+    setConteudosPlanos(rconteudos.data || [])
   }
 
   function limpar() {
     setEditando(null); setNome(''); setOfertaId(''); setPeriodoDias('')
-    setPreco(''); setUrlVenda(''); setCursoIds([])
+    setPreco(''); setUrlVenda(''); setCursoIds([]); setConteudoIds([])
   }
 
   function editar(plano) {
@@ -69,11 +80,16 @@ export default function AdminPlanos() {
     setPreco(plano.price ?? '')
     setUrlVenda(plano.sale_url || '')
     setCursoIds(vinculos.filter(v => v.plan_id === plano.id).map(v => v.course_id))
+    setConteudoIds(conteudosPlanos.filter(v => v.plan_id === plano.id).map(v => v.content_key))
     setMensagem('')
   }
 
   function alternarCurso(id) {
     setCursoIds(atual => atual.includes(id) ? atual.filter(x => x !== id) : [...atual, id])
+  }
+
+  function alternarConteudo(id) {
+    setConteudoIds(atual => atual.includes(id) ? atual.filter(x => x !== id) : [...atual, id])
   }
 
   async function salvar(e) {
@@ -95,6 +111,12 @@ export default function AdminPlanos() {
     if (cursoIds.length) {
       const { error } = await supabase.from('plan_courses').insert(cursoIds.map(courseId => ({ plan_id: planoId, course_id: courseId })))
       if (error) { setMensagem('O plano foi salvo, mas os cursos não foram vinculados.'); setSalvando(false); return }
+    }
+    const { error: erroLimparConteudos } = await supabase.from('plan_app_contents').delete().eq('plan_id', planoId)
+    if (erroLimparConteudos) { setMensagem('O plano foi salvo, mas a estrutura de Conteúdo do Aplicativo ainda precisa ser aplicada no Supabase.'); setSalvando(false); return }
+    if (conteudoIds.length) {
+      const { error } = await supabase.from('plan_app_contents').insert(conteudoIds.map(contentKey => ({ plan_id: planoId, content_key: contentKey })))
+      if (error) { setMensagem('O plano foi salvo, mas os conteúdos do aplicativo não foram vinculados.'); setSalvando(false); return }
     }
     await carregar(); limpar(); setMensagem('✓ Plano salvo com sucesso.'); setSalvando(false)
   }
@@ -136,6 +158,16 @@ export default function AdminPlanos() {
               {!cursos.length && <span style={{ color: '#777', fontSize: '13px' }}>Nenhum curso cadastrado no app.</span>}
             </div>
           </div>
+          <div style={{ marginTop: '18px', paddingTop: '16px', borderTop: '1px solid #2A2A2A' }}>
+            <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: '14px' }}>Conteúdo do Aplicativo</p>
+            <p style={{ margin: '0 0 11px', color: '#777', fontSize: '12px' }}>Escolha o que as alunas deste plano poderão acessar.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '9px' }}>
+              {CONTEUDOS_APP.map(item => {
+                const ativo = conteudoIds.includes(item.id)
+                return <button key={item.id} type="button" onClick={() => alternarConteudo(item.id)} aria-pressed={ativo} style={{ textAlign: 'left', border: ativo ? `1px solid ${ouro}` : '1px solid #333', background: ativo ? '#30280d' : '#171717', color: '#FFF', borderRadius: '10px', padding: '11px 12px', cursor: 'pointer' }}><strong style={{ display: 'block', fontSize: '13px' }}>{ativo ? '✓ ' : ''}{item.nome}</strong><small style={{ color: '#888', fontSize: '11px' }}>{item.descricao}</small></button>
+              })}
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: '9px', marginTop: '17px' }}>
             <button disabled={salvando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '8px', padding: '10px 17px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar plano'}</button>
             {editando && <button type="button" onClick={limpar} style={{ background: '#222', color: '#FFF', border: '1px solid #333', borderRadius: '8px', padding: '10px 17px', cursor: 'pointer' }}>Cancelar</button>}
@@ -145,8 +177,9 @@ export default function AdminPlanos() {
         <div style={{ display: 'grid', gap: '10px' }}>
           {planos.map(plano => {
             const total = vinculos.filter(v => v.plan_id === plano.id).length
+            const totalConteudos = conteudosPlanos.filter(v => v.plan_id === plano.id).length
             return <div key={plano.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '15px', display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center' }}>
-              <div><strong>{plano.name}</strong><p style={{ color: '#888', fontSize: '13px', margin: '4px 0 0' }}>{plano.period_days ? `${plano.period_days} dias` : 'Sem validade automática'} · {total} curso{total === 1 ? '' : 's'}</p></div>
+              <div><strong>{plano.name}</strong><p style={{ color: '#888', fontSize: '13px', margin: '4px 0 0' }}>{plano.period_days ? `${plano.period_days} dias` : 'Sem validade automática'} · {total} curso{total === 1 ? '' : 's'} · {totalConteudos} conteúdo{totalConteudos === 1 ? '' : 's'} do app</p></div>
               <div style={{ display: 'flex', gap: '8px' }}><button onClick={() => editar(plano)} style={botaoSecundario}>Editar</button><button onClick={() => excluir(plano)} style={{ ...botaoSecundario, color: '#f99' }}>Excluir</button></div>
             </div>
           })}

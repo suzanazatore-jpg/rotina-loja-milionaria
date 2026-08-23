@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import AppIcon from '@/app/components/AppIcon'
 
 // ════════ E-MAIL DO ADMIN ════════
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
@@ -32,9 +33,9 @@ export default function Admin() {
       titulo: 'Gerenciamento de Conteúdo e Usuários',
       descricao: 'Gerencie o conteúdo e as alunas da sua área de membros.',
       cards: [
-        { icone: '👥', titulo: 'Alunas e Acessos', sub: 'Cadastre alunas, libere cursos e gerencie acessos.', rota: '/admin/alunas' },
-        { icone: '🎬', titulo: 'Cursos e Aulas', sub: 'Crie cursos, módulos e aulas com vídeo e materiais.', rota: '/admin/cursos' },
-        { icone: '🏷️', titulo: 'Planos e Ofertas', sub: 'Defina planos, validade e cursos vinculados.', rota: '/admin/planos' },
+        { icone: 'users', titulo: 'Alunas e Acessos', sub: 'Cadastre alunas, libere cursos e gerencie acessos.', rota: '/admin/alunas' },
+        { icone: 'courses', titulo: 'Cursos e Aulas', sub: 'Crie cursos, módulos e aulas com vídeo e materiais.', rota: '/admin/cursos' },
+        { icone: 'plans', titulo: 'Planos e Ofertas', sub: 'Defina planos, validade, cursos e conteúdos vinculados.', rota: '/admin/planos' },
         { icone: '🎓', titulo: 'Aulas da Mentoria', sub: 'Gerencie as gravações e encontros da mentoria.', rota: '/admin/aulas' },
         { icone: '📝', titulo: 'Termos de Uso', sub: 'Texto que a aluna aceita no primeiro acesso.', rota: '/admin/termos' },
         { icone: '🏅', titulo: 'Certificados', sub: 'Certificados de conclusão para as alunas.', status: 'Depois' },
@@ -44,20 +45,21 @@ export default function Admin() {
       titulo: 'Conteúdo do Aplicativo',
       descricao: 'Configure o que a aluna encontra no painel principal.',
       cards: [
-        { icone: '📅', titulo: 'Calendário', sub: 'Organize e publique o conteúdo mensal.', rota: '/admin/calendario' },
-        { icone: '🎯', titulo: 'Campanhas', sub: 'Disponibilize campanhas e ações de vendas.', rota: '/admin/campanhas' },
-        { icone: '🔄', titulo: 'Rotina', sub: 'Publique a rotina semanal das lojistas.', rota: '/admin/rotina' },
-        { icone: '🖼️', titulo: 'Banners do Painel', sub: 'Insira banners e novidades no topo do aplicativo.', rota: '/admin/banners' },
-        { icone: '▥', titulo: 'Carrosséis de Cursos', sub: 'Organize cursos em seções na área de membros.', rota: '/admin/carrosseis' },
+        { icone: 'calendar', titulo: 'Calendário', sub: 'Organize e publique o conteúdo mensal.', rota: '/admin/calendario' },
+        { icone: 'campaigns', titulo: 'Campanhas', sub: 'Disponibilize campanhas e ações de vendas.', rota: '/admin/campanhas' },
+        { icone: 'routine', titulo: 'Rotina', sub: 'Publique a rotina semanal das lojistas.', rota: '/admin/rotina' },
+        { icone: 'goals', titulo: 'Meta da Equipe', sub: 'Configure metas de vendas da equipe e das vendedoras.', status: 'Em breve' },
       ],
     },
     {
       titulo: 'Marketing e Comunicação',
       descricao: 'Ações para comunicar e acompanhar suas alunas.',
       cards: [
-        { icone: '💬', titulo: 'Comentários', sub: 'Veja, responda e modere comentários feitos nas aulas.', rota: '/admin/comentarios' },
-        { icone: '✉️', titulo: 'Suporte', sub: 'Centralize e responda as solicitações das alunas.', rota: '/admin/suporte' },
-        { icone: '📣', titulo: 'Campanhas em Massa', sub: 'Envie mensagens por e-mail e WhatsApp.', rota: '/admin/comunicacao' },
+        { icone: 'banners', titulo: 'Banners do Painel', sub: 'Insira banners e novidades no topo do aplicativo.', rota: '/admin/banners' },
+        { icone: 'carousel', titulo: 'Carrosséis de Cursos', sub: 'Organize cursos em seções na área de membros.', rota: '/admin/carrosseis' },
+        { icone: 'comments', titulo: 'Comentários', sub: 'Veja, responda e modere comentários feitos nas aulas.', rota: '/admin/comentarios' },
+        { icone: 'support', titulo: 'Suporte', sub: 'Centralize e responda as solicitações das alunas.', rota: '/admin/suporte' },
+        { icone: 'broadcast', titulo: 'Campanhas em Massa', sub: 'Envie mensagens por e-mail e WhatsApp.', rota: '/admin/comunicacao' },
       ],
     },
     {
@@ -124,7 +126,7 @@ export default function Admin() {
                       color: ativo ? '#FFF' : '#666', cursor: ativo ? 'pointer' : 'default',
                     }}
                   >
-                    <span style={{ width: '42px', height: '42px', flex: '0 0 42px', display: 'grid', placeItems: 'center', borderRadius: '10px', background: ativo ? 'rgba(212,175,55,.10)' : '#151515', color: ativo ? ouro : '#555', fontSize: '20px' }}>{card.icone}</span>
+                    <span style={{ width: '42px', height: '42px', flex: '0 0 42px', display: 'grid', placeItems: 'center', borderRadius: '10px', background: ativo ? 'rgba(212,175,55,.10)' : '#151515', color: ativo ? ouro : '#555' }}><AppIcon name={card.icone} size={21} /></span>
                     <span style={{ minWidth: 0 }}>
                       <span style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '7px', fontSize: '14px', fontWeight: 800, marginBottom: '5px' }}>
                         {card.titulo}

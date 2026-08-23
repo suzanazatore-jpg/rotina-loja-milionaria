@@ -125,6 +125,11 @@ export default function AdminAlunas() {
   const [salvando, setSalvando] = useState(false)
   const [desativando, setDesativando] = useState(false)
   const [reenviando, setReenviando] = useState(false)
+  const [modoSenha, setModoSenha] = useState('automatica')
+  const [novaSenha, setNovaSenha] = useState('')
+  const [senhaDefinida, setSenhaDefinida] = useState(false)
+  const [acaoSenha, setAcaoSenha] = useState('')
+  const [msgSenha, setMsgSenha] = useState('')
   const [excluindo, setExcluindo] = useState(false)
 
   // Modal Nova aluna
@@ -197,6 +202,31 @@ export default function AdminAlunas() {
     setEdWhatsapp(aluna.whatsapp || '')
     setEdEmail(aluna.email || '')
     setMsg('')
+    setModoSenha('automatica'); setNovaSenha(''); setSenhaDefinida(false); setMsgSenha('')
+  }
+
+  function gerarSenhaAcesso() {
+    setModoSenha('automatica')
+    setNovaSenha(String(100000 + Math.floor(Math.random() * 900000)))
+    setSenhaDefinida(false); setMsgSenha('')
+  }
+
+  async function acaoAcesso(acao) {
+    if (!/^\d{6}$/.test(novaSenha)) { setMsgSenha('A senha precisa ter exatamente 6 números.'); return }
+    setAcaoSenha(acao); setMsgSenha('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/admin/redefinir-acesso', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }, body: JSON.stringify({ alunaId: gerAluna.id, senha: novaSenha, acao }) })
+      const json = await resp.json()
+      if (!resp.ok) throw new Error(json.error || 'Não foi possível concluir.')
+      if (acao === 'definir') { setSenhaDefinida(true); setMsgSenha('Senha definida — pronta para enviar.') }
+      if (acao === 'email') setMsgSenha(`E-mail enviado para ${json.destino}.`)
+      if (acao === 'whatsapp') {
+        if (json.enviado) setMsgSenha('Mensagem enviada pelo WhatsApp.')
+        else { window.open(json.whatsappUrl, '_blank', 'noopener,noreferrer'); setMsgSenha('WhatsApp aberto com a mensagem pronta para enviar.') }
+      }
+    } catch (error) { setMsgSenha(error.message) }
+    setAcaoSenha('')
   }
   function fecharGerenciar() {
     setGerenciando(null)
@@ -531,6 +561,26 @@ export default function AdminAlunas() {
             <div style={{ borderTop: '1px solid #2A2A2A', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button onClick={() => router.push(`/admin/alunas/acesso?id=${gerAluna.id}`)} style={{ width: '100%', padding: '11px', background: 'rgba(212,175,55,.08)', color: ouro, border: '1px solid #5b4c17', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>🎓 Gerenciar cursos e planos</button>
               <button onClick={reenviarBoasVindas} disabled={reenviando} style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{reenviando ? 'Enviando...' : '✉️ Reenviar e-mail de boas-vindas'}</button>
+              <section style={{ background: '#171415', border: '1px solid #302b2d', borderRadius: '12px', padding: '14px' }}>
+                <strong style={{ display: 'block', fontSize: '13px' }}>Reenviar acesso</strong>
+                <p style={{ color: '#777', fontSize: '11px', lineHeight: 1.45, margin: '4px 0 12px' }}>Defina uma senha temporária e envie por WhatsApp ou e-mail quando a aluna não conseguir entrar.</p>
+                {!senhaDefinida && <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 9 }}>
+                    <button onClick={gerarSenhaAcesso} style={{ padding: 9, background: '#211e22', color: '#fff', border: `1px solid ${modoSenha === 'automatica' ? ouro : '#39343a'}`, borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>Gerar automática</button>
+                    <button onClick={() => { setModoSenha('manual'); setNovaSenha(''); setSenhaDefinida(false) }} style={{ padding: 9, background: '#211e22', color: '#fff', border: `1px solid ${modoSenha === 'manual' ? ouro : '#39343a'}`, borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>Escolher senha</button>
+                  </div>
+                  {modoSenha === 'manual' && <input inputMode="numeric" maxLength={6} value={novaSenha} onChange={e => setNovaSenha(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Digite 6 números" style={{ ...inputEstilo, marginBottom: 9 }} />}
+                  {modoSenha === 'automatica' && novaSenha && <div style={{ ...inputEstilo, marginBottom: 9, fontWeight: 800, letterSpacing: '.08em' }}>{novaSenha}</div>}
+                  <button onClick={() => acaoAcesso('definir')} disabled={!novaSenha || acaoSenha} style={{ width: '100%', padding: 10, background: '#ff2b67', color: '#fff', border: 0, borderRadius: 8, fontWeight: 800, cursor: 'pointer', opacity: !novaSenha ? .45 : 1 }}>{acaoSenha === 'definir' ? 'Definindo...' : 'Definir senha'}</button>
+                </>}
+                {senhaDefinida && <>
+                  <p style={{ color: '#57d78d', fontSize: 11, fontWeight: 800, margin: '10px 0 7px' }}>✓ Senha definida — pronta para enviar</p>
+                  <div style={{ ...inputEstilo, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 9 }}><b style={{ letterSpacing: '.08em' }}>{novaSenha}</b><button onClick={() => navigator.clipboard.writeText(novaSenha)} style={{ background: '#242126', color: '#ddd', border: '1px solid #403b42', borderRadius: 6, padding: '5px 8px', cursor: 'pointer' }}>Copiar</button></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}><button onClick={() => acaoAcesso('whatsapp')} disabled={acaoSenha} style={{ padding: 9, background: '#25D366', color: '#071d0e', border: '1px solid #25D366', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{acaoSenha === 'whatsapp' ? 'Enviando...' : 'Enviar por WhatsApp'}</button><button onClick={() => acaoAcesso('email')} disabled={acaoSenha} style={{ padding: 9, background: '#211e22', color: '#fff', border: '1px solid #39343a', borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>{acaoSenha === 'email' ? 'Enviando...' : 'Enviar por e-mail'}</button></div>
+                  <button onClick={() => { setSenhaDefinida(false); setNovaSenha(''); setMsgSenha('') }} style={{ background: 'transparent', border: 0, color: '#888', textDecoration: 'underline', fontSize: 10, marginTop: 9, cursor: 'pointer' }}>Definir outra senha</button>
+                </>}
+                {msgSenha && <p style={{ color: msgSenha.includes('não') || msgSenha.includes('precisa') ? '#ff8c9f' : '#57d78d', border: '1px solid currentColor', borderRadius: 7, padding: 8, fontSize: 10, margin: '10px 0 0' }}>{msgSenha}</p>}
+              </section>
               {gerDesativada ? (
                 <button onClick={reativarAluna} disabled={desativando} style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{desativando ? 'Reativando...' : '✓ Reativar acesso (+30 dias)'}</button>
               ) : (
