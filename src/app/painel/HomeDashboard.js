@@ -34,7 +34,11 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
   ]
 
   return <div className="premium-home">
-    <header className="premium-welcome"><div><p>{saudacao},</p><h1>{nome}</h1><span>Vamos organizar sua loja e vender mais hoje?</span></div><div className="premium-theme-switch" aria-label="Escolher tema"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')} aria-label="Usar tema claro">☀</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')} aria-label="Usar tema escuro">☾</button></div></header>
+    <header className="premium-welcome">
+      <div className="premium-welcome-copy"><p>{saudacao},</p><h1>{nome}</h1><span>Vamos organizar sua loja e vender mais hoje?</span></div>
+      <div className="premium-suzana-photo" aria-hidden="true"><img src="/suzana-autoridade.jpg" alt="" /></div>
+      <div className="premium-theme-switch" aria-label="Escolher tema"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')} aria-label="Usar tema claro">☀</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')} aria-label="Usar tema escuro">☾</button></div>
+    </header>
 
     <section className="premium-banner" aria-label="Novidades">
       <div className="premium-banner-track" style={{ transform: `translateX(-${bannerAtual * 100}%)` }}>

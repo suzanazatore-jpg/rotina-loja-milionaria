@@ -71,12 +71,16 @@
 }
 
 .premium-welcome {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   margin-bottom: 22px;
 }
+
+.premium-welcome-copy { position: relative; z-index: 2; }
+.premium-suzana-photo { display: none; }
 
 .premium-welcome p,
 .premium-welcome span {
@@ -233,6 +237,62 @@
   }
 
   .premium-home { padding: 20px 16px 100px; }
+  .premium-welcome {
+    min-height: 184px;
+    overflow: hidden;
+    align-items: flex-start;
+    padding: 22px 14px 18px 18px;
+    margin: -20px -16px 16px;
+    border-bottom: 1px solid color-mix(in srgb, var(--premium-gold) 32%, var(--premium-line));
+    background: linear-gradient(115deg, #090909 0%, #17130d 58%, #382711 100%);
+    isolation: isolate;
+  }
+  .premium-welcome::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background: radial-gradient(circle at 82% 18%, rgba(212,175,55,.24), transparent 42%);
+    pointer-events: none;
+  }
+  .premium-welcome-copy { width: 58%; padding-top: 25px; }
+  .premium-welcome p, .premium-welcome span { color: rgba(255,255,255,.72); }
+  .premium-welcome h1 { color: #fff; font-size: clamp(27px, 8vw, 36px); line-height: 1; margin: 5px 0 9px; }
+  .premium-welcome span { display: block; max-width: 210px; font-size: 12px; line-height: 1.4; }
+  .premium-suzana-photo {
+    display: block;
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    right: 0;
+    width: 55%;
+    height: 100%;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.78) 22%, #000 48%);
+    mask-image: linear-gradient(to right, transparent 0%, rgba(0,0,0,.78) 22%, #000 48%);
+  }
+  .premium-suzana-photo::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(9,9,9,.30), transparent 52%);
+  }
+  .premium-suzana-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 43% center;
+    transform: scale(1.08);
+  }
+  .premium-welcome .premium-theme-switch {
+    position: absolute;
+    z-index: 3;
+    top: 10px;
+    left: 18px;
+    border-color: rgba(255,255,255,.18);
+    background: rgba(8,8,8,.58);
+    backdrop-filter: blur(8px);
+  }
   .premium-theme-switch button { width: 38px; height: 38px; min-height: 38px; }
   .premium-banner, .premium-banner article, .premium-banner img, .premium-banner-copy { min-height: 165px; }
   .premium-banner-copy { padding: 22px; }
