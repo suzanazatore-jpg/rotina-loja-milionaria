@@ -7,7 +7,7 @@ const paths = {
   plans: <><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></>,
   calendar: <><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></>,
   campaigns: <><path d="m3 11 16-7v16L3 13v-2Z"/><path d="M11.6 16.8 10 21H6l1.4-5.7M19 9v6"/></>,
-  routine: <><path d="M20 7h-9M14 3l-4 4 4 4M4 17h9M10 13l4 4-4 4"/></>,
+  routine: <><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 9l1.2 1.2L12 8M8.5 14l1.2 1.2L12 13M14 10h2M14 15h2"/></>,
   goals: <><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></>,
   banners: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 15 5-5 4 4 3-3 6 6M16 8h.01"/></>,
   carousel: <><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M2 8v8M22 8v8M9 9h6M9 13h6"/></>,

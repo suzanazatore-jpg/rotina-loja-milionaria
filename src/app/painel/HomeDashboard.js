@@ -45,18 +45,20 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
       <div className="premium-header-goal"><span>Meta do mês <b>{pct}%</b></span><div><i style={{ width: `${Math.min(100, pct)}%` }} /></div></div>
       <div className="premium-suzana-photo" aria-hidden="true"><img src="/suzana-autoridade.jpg" alt="" /></div>
       <div className="premium-theme-switch" aria-label="Escolher tema"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')} aria-label="Usar tema claro">☀</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')} aria-label="Usar tema escuro">☾</button></div>
+      <section className="premium-banner" aria-label="Novidades">
+        <div className="premium-banner-track" style={{ transform: `translateX(-${bannerAtual * 100}%)` }}>
+          {banners.map((banner, index) => <article key={banner.id || index}>
+            {banner.imagem ? <img src={banner.imagem} alt={banner.titulo || 'Novidade'} /> : <div className="premium-banner-copy"><small>{banner.tag || 'NOVIDADE'}</small><h2>{banner.titulo}</h2><p>{banner.texto}</p>{banner.link && <a href={banner.link} target="_blank" rel="noopener noreferrer">Ver agora</a>}</div>}
+          </article>)}
+        </div>
+        {banners.length > 1 && <div className="premium-banner-dots">{banners.map((_, index) => <button key={index} onClick={() => setBannerAtual(index)} className={index === bannerAtual ? 'on' : ''} aria-label={`Ver banner ${index + 1}`} />)}</div>}
+      </section>
     </header>
 
-    <section className="premium-banner" aria-label="Novidades">
-      <div className="premium-banner-track" style={{ transform: `translateX(-${bannerAtual * 100}%)` }}>
-        {banners.map((banner, index) => <article key={banner.id || index}>
-          {banner.imagem ? <img src={banner.imagem} alt={banner.titulo || 'Novidade'} /> : <div className="premium-banner-copy"><small>{banner.tag || 'NOVIDADE'}</small><h2>{banner.titulo}</h2><p>{banner.texto}</p>{banner.link && <a href={banner.link} target="_blank" rel="noopener noreferrer">Ver agora</a>}</div>}
-        </article>)}
-      </div>
-      {banners.length > 1 && <div className="premium-banner-dots">{banners.map((_, index) => <button key={index} onClick={() => setBannerAtual(index)} className={index === bannerAtual ? 'on' : ''} aria-label={`Ver banner ${index + 1}`} />)}</div>}
-    </section>
-
     <GradeAtalhos mobile />
+
+    <div className="premium-section-title"><h2>Acessos rápidos</h2><button onClick={() => irPara('conteudos')}>Ver todos</button></div>
+    <GradeAtalhos />
 
     <section className="premium-goal-card">
       <div><small>VENDAS DO MÊS</small><strong>{brl(resumo.mes)}</strong><span>{resumo.meta ? `de ${brl(resumo.meta)}` : 'Defina sua primeira meta mensal'}</span></div>
@@ -66,9 +68,6 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
     </section>
 
     <div className="premium-stats"><article><span>Vendas de hoje</span><strong>{brl(resumo.hoje)}</strong></article><article><span>Progresso mensal</span><strong style={{ color: ouro }}>{pct}%</strong></article></div>
-
-    <div className="premium-section-title"><h2>Acessos rápidos</h2><button onClick={() => irPara('conteudos')}>Ver todos</button></div>
-    <GradeAtalhos />
 
     <div className="premium-help-card"><div><small>PRECISA DE AJUDA?</small><h2>Assistente Virtual e Suporte</h2><p>Tire dúvidas rápidas com a IA ou abra um chamado para nossa equipe.</p></div><button onClick={() => irPara('assistente')}>Falar com a Assistente</button></div>
   </div>
