@@ -388,7 +388,7 @@
     font: inherit;
     cursor: pointer;
   }
-  .premium-mobile-shortcuts i { color: #b48732; font-style: normal; }
+  .premium-mobile-shortcuts i { color: #b48732; font-style: normal; filter: drop-shadow(0 3px 8px rgba(180,135,50,.12)); }
   .premium-mobile-shortcuts strong { max-width: 100%; font-size: 12px; line-height: 1.2; text-align: center; overflow-wrap: anywhere; }
   .premium-goal-card, .premium-stats, .premium-section-title, .premium-shortcuts, .premium-help-card { display: none; }
   .premium-shortcuts { grid-template-columns: 1fr 1fr; }

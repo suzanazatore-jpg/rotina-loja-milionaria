@@ -28,15 +28,15 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
 
   const pct = resumo.meta ? Math.round(resumo.mes / resumo.meta * 100) : 0
   const atalhos = [
-    ['calendar', 'Calendário', 'Conteúdo do mês', 'calendario'],
-    ['campaigns', 'Campanhas', 'Vendas prontas', 'campanhas'],
-    ['routine', 'Rotina', '15 minutos por dia', 'rotina'],
-    ['users', 'Meta da Equipe', 'Metas e resultados', 'vendas'],
-    ['courses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
-    ['assistant', 'Assistente AI', 'Ajuda inteligente', 'assistente'],
+    ['quickCalendar', 'Calendário', 'Conteúdo do mês', 'calendario'],
+    ['quickCampaigns', 'Campanhas', 'Vendas prontas', 'campanhas'],
+    ['quickRoutine', 'Rotina', '15 minutos por dia', 'rotina'],
+    ['quickTeam', 'Meta da Equipe', 'Metas e resultados', 'vendas'],
+    ['quickCourses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
+    ['quickAssistant', 'Assistente AI', 'Ajuda inteligente', 'assistente'],
   ]
 
-  const GradeAtalhos = ({ mobile = false }) => <div className={`${mobile ? 'premium-mobile-shortcuts' : 'premium-shortcuts'}`}>{atalhos.map(([icon, title, subtitle, target]) => <button key={target} onClick={() => irPara(target)}><i><AppIcon name={icon} size={mobile ? 34 : 22} /></i><strong>{title}</strong>{!mobile && <span>{subtitle}</span>}</button>)}</div>
+  const GradeAtalhos = ({ mobile = false }) => <div className={`${mobile ? 'premium-mobile-shortcuts' : 'premium-shortcuts'}`}>{atalhos.map(([icon, title, subtitle, target]) => <button key={target} onClick={() => irPara(target)}><i><AppIcon name={icon} size={mobile ? 36 : 30} strokeWidth={1.45} /></i><strong>{title}</strong>{!mobile && <span>{subtitle}</span>}</button>)}</div>
 
   return <div className="premium-home">
     <header className="premium-welcome">
