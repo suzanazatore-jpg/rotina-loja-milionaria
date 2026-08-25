@@ -401,7 +401,7 @@ export default function Painel() {
           <p style={{ fontSize: '16px', fontWeight: 800, color: cores.tx, margin: '2px 0 0' }}>Milionária 👑</p>
         </div>
         <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
-          {menuMobileDrawer.map(item => (
+          {menu.map(item => (
             <div key={item.id} onClick={() => irPara(item.id)} style={{
               display: 'flex', alignItems: 'center', gap: '11px', padding: '12px 18px', cursor: 'pointer', fontSize: '14px',
               color: secao === item.id ? ouro : cores.tx2,
