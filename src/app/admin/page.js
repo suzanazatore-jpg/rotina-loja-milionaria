@@ -48,7 +48,7 @@ export default function Admin() {
         { icone: 'calendar', titulo: 'Calendário', sub: 'Organize e publique o conteúdo mensal.', rota: '/admin/calendario' },
         { icone: 'campaigns', titulo: 'Campanhas', sub: 'Disponibilize campanhas e ações de vendas.', rota: '/admin/campanhas' },
         { icone: 'routine', titulo: 'Rotina', sub: 'Publique a rotina semanal das lojistas.', rota: '/admin/rotina' },
-        { icone: 'goals', titulo: 'Meta da Equipe', sub: 'Configure metas de vendas da equipe e das vendedoras.', status: 'Em breve' },
+        { icone: 'goals', titulo: 'Calculadora de Metas', sub: 'Metas, ranking e histórico das vendedoras.', status: 'Disponível' },
       ],
     },
     {
