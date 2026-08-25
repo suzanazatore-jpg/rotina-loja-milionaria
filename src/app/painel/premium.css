@@ -409,22 +409,19 @@
 /* Ajustes de navegação e capa */
 .premium-welcome-copy h1 { color: #fff !important; }
 .premium-ver-todos-mobile { display: none; }
+.premium-desktop-only-card > div { height: 100%; box-sizing: border-box; }
 
 @media (max-width: 899px) {
-  .premium-section-title {
-    display: flex !important;
-    margin-top: 16px;
-  }
-  .premium-section-title h2 { display: none; }
   .premium-ver-todos-desktop { display: none; }
-  .premium-ver-todos-mobile { display: inline-flex; margin-left: auto; }
+  .premium-ver-todos-mobile { display: inline-flex; }
   .premium-mobile-all-access,
-  .premium-mobile-support { display: block; }
-  .premium-mobile-all-access .premium-hub-grid,
-  .premium-mobile-support .premium-hub-grid { grid-template-columns: 1fr 1fr; }
+  .premium-mobile-support,
+  .premium-desktop-only-card { display: none !important; }
 }
 
 @media (min-width: 900px) {
   .premium-mobile-all-access,
-  .premium-mobile-support { display: none; }
+  .premium-mobile-support { display: block; }
+  .premium-mobile-all-access .premium-hub-grid,
+  .premium-mobile-support .premium-hub-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 }
