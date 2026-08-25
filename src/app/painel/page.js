@@ -120,6 +120,7 @@ export default function Painel() {
 
   // Aulas (vindas do banco)
   const [aulas, setAulas] = useState([])
+  const [mentoriaLiberada, setMentoriaLiberada] = useState(false)
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualValor())
@@ -170,11 +171,13 @@ export default function Painel() {
           }
         }
       } catch (e) { /* tabela pode não existir ainda */ }
-      // Carrega as aulas cadastradas no admin
+      // Confere se o plano da aluna libera as Aulas da Mentoria
       try {
-        const { data: aulasData } = await supabase.from('aulas').select('*').order('ordem', { ascending: true })
-        if (aulasData) setAulas(aulasData)
-      } catch (e) { /* sem aulas ainda */ }
+        const respostaMentoria = await fetch('/api/mentoria', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        const dadosMentoria = await respostaMentoria.json()
+        setMentoriaLiberada(respostaMentoria.ok && dadosMentoria.liberado === true)
+        if (respostaMentoria.ok) setAulas(dadosMentoria.aulas || [])
+      } catch (e) { setMentoriaLiberada(false) }
       // Carrega o calendário de conteúdo (PDFs, um por mês)
       try {
         const resposta = await fetch('/api/calendario', { headers: { Authorization: `Bearer ${session.access_token}` } })
@@ -458,7 +461,7 @@ export default function Painel() {
                     <CardAcesso cores={cores} icone="◎" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
                     <CardAcesso cores={cores} icone="□" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
                     <CardAcesso cores={cores} icone="△" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
-                    <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />
+                    {mentoriaLiberada && <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
                     <CardAcesso cores={cores} icone={temAcessoPremium ? '☆' : '◇'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Conheça os planos'} onClick={() => irPara('premium')} />
                   </div>
                 </div>
