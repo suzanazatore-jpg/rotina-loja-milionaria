@@ -36,7 +36,7 @@ export default function Admin() {
         { icone: 'users', titulo: 'Alunas e Acessos', sub: 'Cadastre alunas, libere cursos e gerencie acessos.', rota: '/admin/alunas' },
         { icone: 'courses', titulo: 'Cursos e Aulas', sub: 'Crie cursos, módulos e aulas com vídeo e materiais.', rota: '/admin/cursos' },
         { icone: 'plans', titulo: 'Planos e Ofertas', sub: 'Defina planos, validade, cursos e conteúdos vinculados.', rota: '/admin/planos' },
-        { icone: '🎓', titulo: 'Aulas da Mentoria', sub: 'Gerencie as gravações e encontros da mentoria.', rota: '/admin/aulas' },
+        { icone: 'quickCourses', titulo: 'Aulas da Mentoria', sub: 'Organize as gravações das mentorias EVS e CVM.', rota: '/admin/aulas' },
         { icone: '📝', titulo: 'Termos de Uso', sub: 'Texto que a aluna aceita no primeiro acesso.', rota: '/admin/termos' },
         { icone: '🏅', titulo: 'Certificados', sub: 'Certificados de conclusão para as alunas.', status: 'Depois' },
       ],
