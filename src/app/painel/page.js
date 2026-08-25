@@ -389,7 +389,7 @@ export default function Painel() {
     setMenuMobile(false)
   }
 
-  const tituloSecao = menu.find(m => m.id === secao)?.label || (secao === 'dados' ? 'Meus Dados' : '')
+  const tituloSecao = [...menu, ...menuMobileDrawer].find(m => m.id === secao)?.label || (secao === 'dados' ? 'Meus Dados' : '')
 
   return (
     <div className={`premium-painel tema-${tema}`} style={{ display: 'flex', minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background .2s, color .2s' }}>
