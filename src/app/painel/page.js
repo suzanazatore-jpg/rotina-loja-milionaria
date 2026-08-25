@@ -462,19 +462,38 @@ export default function Painel() {
           {secao !== 'inicio' && (
             <div style={{ padding: '20px 18px' }}>
 
-              {/* TODOS OS ACESSOS — página aberta pelo “Ver todos” no mobile */}
+              {/* TODOS OS ACESSOS — conteúdo completo em cascata no desktop */}
               {secao === 'acessos' && (
-                <div className="premium-hub premium-mobile-all-access">
-                  <div className="premium-hub-heading"><p>SEUS ACESSOS</p><h2>Tudo o que está liberado</h2><span>Acesse em um só lugar os recursos disponíveis para o seu plano.</span></div>
-                  <div className="premium-hub-grid">
-                    <CardAcesso cores={cores} icone="◎" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
-                    <CardAcesso cores={cores} icone="□" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
-                    <CardAcesso cores={cores} icone="▣" titulo="Rotina" sub="Planejamento semanal" onClick={() => irPara('rotina')} />
-                    <CardAcesso cores={cores} icone="△" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
-                    {mentoriaLiberada && <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
-                    <CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
-                    <CardAcesso cores={cores} icone="◎" titulo="Vendas e Metas" sub="Acompanhe seus resultados" onClick={() => irPara('vendas')} />
-                  </div>
+                <div className="premium-hub premium-mobile-all-access premium-access-cascade">
+                  <div className="premium-hub-heading"><p>SEUS ACESSOS</p><h2>Tudo o que está liberado</h2><span>Role a página para acessar todos os conteúdos disponíveis no seu plano.</span></div>
+
+                  <BlocoCascata titulo="Calendário" subtitulo="Planejamento mensal de conteúdo" cores={cores} ouro={ouro}>
+                    {calendario.length ? calendario.map(item => <ItemCascata key={item.id} titulo={item.titulo} descricao={item.descricao || rotuloMesCompleto(item.mes_ano)} url={item.arquivo_url} textoLink="Visualizar calendário" onDownload={() => baixarPdf(item)} cores={cores} ouroGrad={ouroGrad} />) : <VazioCascata texto="Nenhum calendário disponível." cores={cores} />}
+                  </BlocoCascata>
+
+                  <BlocoCascata titulo="Campanhas" subtitulo="Campanhas e ações de vendas" cores={cores} ouro={ouro}>
+                    {campanhas.length ? campanhas.map(item => <ItemCascata key={item.id} titulo={item.titulo} descricao={item.descricao || rotuloMesCompleto(item.mes_ano)} url={item.arquivo_url} textoLink="Visualizar campanha" onDownload={() => baixarPdf(item)} cores={cores} ouroGrad={ouroGrad} />) : <VazioCascata texto="Nenhuma campanha disponível." cores={cores} />}
+                  </BlocoCascata>
+
+                  <BlocoCascata titulo="Rotina" subtitulo="Execução da semana" cores={cores} ouro={ouro}>
+                    {rotinaSemanal ? <ItemCascata titulo={rotinaSemanal.titulo} descricao={rotinaSemanal.descricao || rotuloSemana(rotinaSemanal.semana_inicio)} url={rotinaSemanal.arquivo_url} textoLink="Visualizar rotina" onDownload={() => baixarPdf(rotinaSemanal)} cores={cores} ouroGrad={ouroGrad} /> : <VazioCascata texto="A rotina desta semana ainda não foi publicada." cores={cores} />}
+                  </BlocoCascata>
+
+                  <BlocoCascata titulo="Vendas e Meta da Equipe" subtitulo="Metas, vendas e resultados" cores={cores} ouro={ouro}>
+                    <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
+                  </BlocoCascata>
+
+                  <BlocoCascata titulo="Meus Cursos" subtitulo="Cursos liberados no seu plano" cores={cores} ouro={ouro}>
+                    <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
+                  </BlocoCascata>
+
+                  {mentoriaLiberada && <BlocoCascata titulo="Aulas da Mentoria" subtitulo="Gravações liberadas no seu plano" cores={cores} ouro={ouro}>
+                    <div className="premium-cascade-lessons">{aulas.map(aula => <button key={aula.id} onClick={() => router.push(`/mentoria?aula=${aula.id}`)}><span>{aula.ordem}</span><div><strong>{aula.titulo}</strong><small>{aula.descricao || 'Assistir aula'}</small></div><b>Assistir →</b></button>)}</div>
+                  </BlocoCascata>}
+
+                  <BlocoCascata titulo="Precificação" subtitulo="Ferramentas para preço, markup e descontos" cores={cores} ouro={ouro}>
+                    <div className="premium-cascade-tools"><button onClick={() => router.push('/calculadora')}><strong>Calculadora de Descontos</strong><span>Calcule descontos com segurança →</span></button><button onClick={() => router.push('/markup')}><strong>Calculadora de Markup</strong><span>Encontre o preço ideal de venda →</span></button></div>
+                  </BlocoCascata>
                 </div>
               )}
 
@@ -802,6 +821,24 @@ export default function Painel() {
 
 function bniStyle(cores, ouro, ativo) {
   return { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px', background: 'none', border: 'none', cursor: 'pointer', color: ativo ? ouro : cores.tx3, fontSize: '9px', fontWeight: 700 }
+}
+
+function BlocoCascata({ titulo, subtitulo, cores, ouro, children }) {
+  return <section className="premium-cascade-section" style={{ background: cores.card, border: `1px solid ${cores.borda}` }}>
+    <header><p style={{ color: ouro }}>{titulo}</p><span style={{ color: cores.tx2 }}>{subtitulo}</span></header>
+    <div>{children}</div>
+  </section>
+}
+
+function ItemCascata({ titulo, descricao, url, textoLink, onDownload, cores, ouroGrad }) {
+  return <article className="premium-cascade-item" style={{ background: cores.card2, border: `1px solid ${cores.borda}` }}>
+    <div><strong style={{ color: cores.tx }}>{titulo}</strong><p style={{ color: cores.tx2 }}>{descricao}</p></div>
+    <aside>{url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: cores.tx, border: `1px solid ${cores.borda}` }}>{textoLink}</a>}{url && <button onClick={onDownload} style={{ background: ouroGrad }}>Baixar</button>}</aside>
+  </article>
+}
+
+function VazioCascata({ texto, cores }) {
+  return <div className="premium-cascade-empty" style={{ color: cores.tx2, border: `1px dashed ${cores.borda}` }}>{texto}</div>
 }
 
 function CardAcesso({ cores, icone, titulo, sub, onClick, destaque, ouroGrad }) {
