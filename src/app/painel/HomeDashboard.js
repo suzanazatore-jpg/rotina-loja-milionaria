@@ -6,7 +6,7 @@ import AppIcon from '@/app/components/AppIcon'
 
 const brl = valor => Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado }) {
+export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado, metasLiberadas }) {
   const [resumo, setResumo] = useState({ meta: 0, mes: 0, hoje: 0 })
   const hoje = useMemo(() => new Date(), [])
 
@@ -31,7 +31,7 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
     ['quickCalendar', 'Calendário', 'Conteúdo do mês', 'calendario'],
     ['quickCampaigns', 'Campanhas', 'Vendas prontas', 'campanhas'],
     ['quickRoutine', 'Rotina', '15 minutos por dia', 'rotina'],
-    ['quickTeam', 'Meta da Equipe', 'Metas e resultados', 'vendas'],
+    ['quickTeam', 'Calculadora de Metas', metasLiberadas ? 'Metas, ranking e histórico' : 'Conteúdo do plano', 'vendas'],
     ['quickCourses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
   ]
   const atalhos = [
