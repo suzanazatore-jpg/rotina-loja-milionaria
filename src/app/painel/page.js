@@ -122,6 +122,7 @@ export default function Painel() {
   const [aulas, setAulas] = useState([])
   const [mentoriaLiberada, setMentoriaLiberada] = useState(false)
   const [assistenteLiberado, setAssistenteLiberado] = useState(false)
+  const [metasLiberadas, setMetasLiberadas] = useState(false)
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualValor())
@@ -183,7 +184,8 @@ export default function Painel() {
         const respostaAcessos = await fetch('/api/acessos-app', { headers: { Authorization: `Bearer ${session.access_token}` } })
         const dadosAcessos = await respostaAcessos.json()
         setAssistenteLiberado(respostaAcessos.ok && dadosAcessos.assistant === true)
-      } catch (e) { setAssistenteLiberado(false) }
+        setMetasLiberadas(respostaAcessos.ok && dadosAcessos.team_goals === true)
+      } catch (e) { setAssistenteLiberado(false); setMetasLiberadas(false) }
       // Carrega o calendário de conteúdo (PDFs, um por mês)
       try {
         const resposta = await fetch('/api/calendario', { headers: { Authorization: `Bearer ${session.access_token}` } })
@@ -392,6 +394,7 @@ export default function Painel() {
     if (id === 'markup') { router.push('/markup'); return }
     if (id === 'mentoria') { router.push('/mentoria'); return }
     if (id === 'assistente' && !assistenteLiberado) { setSecao('suporte'); setMenuMobile(false); return }
+    if (id === 'vendas' && !metasLiberadas) { setSecao('metas-bloqueadas'); setMenuMobile(false); return }
     setSecao(id)
     setMenuMobile(false)
   }
@@ -465,6 +468,7 @@ export default function Painel() {
               mentoriaLiberada={mentoriaLiberada}
               temAcessoPremium={temAcessoPremium}
               assistenteLiberado={assistenteLiberado}
+              metasLiberadas={metasLiberadas}
             />
           )}
 
@@ -489,9 +493,9 @@ export default function Painel() {
                     {rotinaSemanal ? <ItemCascata titulo={rotinaSemanal.titulo} descricao={rotinaSemanal.descricao || rotuloSemana(rotinaSemanal.semana_inicio)} url={rotinaSemanal.arquivo_url} textoLink="Visualizar rotina" onDownload={() => baixarPdf(rotinaSemanal)} cores={cores} ouroGrad={ouroGrad} /> : <VazioCascata texto="A rotina desta semana ainda não foi publicada." cores={cores} />}
                   </BlocoCascata>
 
-                  <BlocoCascata titulo="Vendas e Meta da Equipe" subtitulo="Metas, vendas e resultados" cores={cores} ouro={ouro}>
+                  {metasLiberadas && <BlocoCascata titulo="Calculadora de Metas" subtitulo="Metas, ranking e histórico da equipe" cores={cores} ouro={ouro}>
                     <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
-                  </BlocoCascata>
+                  </BlocoCascata>}
 
                   <BlocoCascata titulo="Meus Cursos" subtitulo="Cursos liberados no seu plano" cores={cores} ouro={ouro}>
                     <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
@@ -667,8 +671,10 @@ export default function Painel() {
 
               {/* VENDAS E METAS */}
               {secao === 'vendas' && (
-                <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
+                metasLiberadas ? <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} /> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
+
+              {secao === 'metas-bloqueadas' && <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />}
 
               {/* CAMPANHAS DE VENDA (PDFs por mês) */}
               {secao === 'campanhas' && (
@@ -849,6 +855,15 @@ function ItemCascata({ titulo, descricao, url, textoLink, onDownload, cores, our
 
 function VazioCascata({ texto, cores }) {
   return <div className="premium-cascade-empty" style={{ color: cores.tx2, border: `1px dashed ${cores.borda}` }}>{texto}</div>
+}
+
+function AcessoBloqueado({ titulo, texto, ouroGrad, cores }) {
+  return <div style={{ maxWidth: 620, margin: '38px auto', padding: '42px 22px', textAlign: 'center', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: 20 }}>
+    <div style={{ width: 64, height: 64, margin: '0 auto 16px', display: 'grid', placeItems: 'center', borderRadius: 20, background: ouroGrad, color: '#211A0E', fontSize: 28 }}>🔒</div>
+    <h2 style={{ color: cores.tx, margin: '0 0 8px' }}>{titulo}</h2>
+    <p style={{ color: cores.tx2, lineHeight: 1.55, margin: '0 0 18px' }}>{texto}<br />Fale com o suporte para conhecer os planos que liberam o acesso.</p>
+    <a href={`https://api.whatsapp.com/send?phone=${WHATSAPP}&text=Quero%20liberar%20a%20Calculadora%20de%20Metas`} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: ouroGrad, color: '#211A0E', borderRadius: 11, padding: '12px 18px', fontWeight: 900, textDecoration: 'none' }}>Conhecer planos</a>
+  </div>
 }
 
 function CardAcesso({ cores, icone, titulo, sub, onClick, destaque, ouroGrad }) {
