@@ -17,6 +17,7 @@ const CONTEUDOS_APP = [
   { id: 'campaigns', nome: 'Campanhas', descricao: 'Campanhas e ações de vendas' },
   { id: 'routine', nome: 'Rotina', descricao: 'Rotina semanal da lojista' },
   { id: 'team_goals', nome: 'Meta da Equipe', descricao: 'Metas da equipe e das vendedoras' },
+  { id: 'mentorship', nome: 'Aulas da Mentoria', descricao: 'Gravações e encontros da Mentoria' },
 ]
 
 export default function AdminPlanos() {
