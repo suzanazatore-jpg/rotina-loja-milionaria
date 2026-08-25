@@ -404,3 +404,24 @@
     animation: none !important;
   }
 }
+
+
+/* Ajustes de navegação e capa */
+.premium-welcome-copy h1 { color: #fff !important; }
+.premium-ver-todos-mobile { display: none; }
+.premium-desktop-only-card > div { height: 100%; box-sizing: border-box; }
+
+@media (max-width: 899px) {
+  .premium-ver-todos-desktop { display: none; }
+  .premium-ver-todos-mobile { display: inline-flex; }
+  .premium-mobile-all-access,
+  .premium-mobile-support,
+  .premium-desktop-only-card { display: none !important; }
+}
+
+@media (min-width: 900px) {
+  .premium-mobile-all-access,
+  .premium-mobile-support { display: block; }
+  .premium-mobile-all-access .premium-hub-grid,
+  .premium-mobile-support .premium-hub-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+}
