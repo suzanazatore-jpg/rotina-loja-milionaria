@@ -34,9 +34,12 @@ export default function Mentoria() {
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
-      const { data, error } = await supabase.from('aulas').select('*').order('ordem', { ascending: true })
-      if (error) { setErro('Não foi possível carregar as aulas da Mentoria.'); setCarregando(false); return }
-      const lista = data || []
+      const { data: { session } } = await supabase.auth.getSession()
+      const resposta = await fetch('/api/mentoria', { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+      const dados = await resposta.json()
+      if (resposta.status === 403) { setErro('As Aulas da Mentoria não estão incluídas no seu plano.'); setCarregando(false); return }
+      if (!resposta.ok) { setErro(dados.error || 'Não foi possível carregar as aulas da Mentoria.'); setCarregando(false); return }
+      const lista = dados.aulas || []
       const aulaNaUrl = new URLSearchParams(window.location.search).get('aula')
       setAulas(lista)
       setAulaId(atual => {
