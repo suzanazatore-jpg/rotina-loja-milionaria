@@ -94,7 +94,7 @@
 .premium-brand > b { width: 40px; height: 46px; display: grid; place-items: center; border: 2px solid #c89b35; color: #d7ac4d; font-family: Georgia, serif; font-size: 28px; line-height: 1; }
 .premium-brand > span { color: #fff; font-size: 11px; line-height: 1.25; letter-spacing: .16em; }
 .premium-brand > span strong { display: block; color: #e1b64f; font-weight: 700; }
-.premium-header-goal { display: block; position: absolute; z-index: 3; left: 32px; bottom: 158px; width: 34%; }
+.premium-header-goal { display: none; position: absolute; z-index: 3; left: 32px; bottom: 158px; width: 34%; }
 .premium-header-goal > span { display: block; color: #fff; font-size: 15px; margin-bottom: 9px; }
 .premium-header-goal b { color: #e1b64f; font-size: 18px; }
 .premium-header-goal > div { height: 7px; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.18); }
@@ -216,7 +216,10 @@
 .premium-goal-side b { color: var(--premium-gold); display: block; font-size: 25px; }
 .premium-progress { grid-column: 1 / -1; height: 8px; border-radius: 99px; background: color-mix(in srgb, var(--premium-line) 70%, transparent); overflow: hidden; }
 .premium-progress i { display: block; height: 100%; border-radius: inherit; }
-.premium-goal-card > button { grid-column: 1 / -1; justify-self: start; background: transparent; color: var(--premium-gold); border: 0; padding: 4px 0 0; font-weight: 900; cursor: pointer; }
+.premium-goal-footer { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-top: 2px; }
+.premium-goal-footer > span { color: var(--premium-muted); }
+.premium-goal-footer strong { display: inline; margin: 0 0 0 5px; font-family: inherit; font-size: 13px; }
+.premium-goal-footer button { background: transparent; color: var(--premium-gold); border: 0; padding: 4px 0 0; font-weight: 900; cursor: pointer; }
 
 .premium-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-bottom: 26px; }
 .premium-stats article { background: var(--premium-paper); border: 1px solid var(--premium-line); border-radius: 16px; padding: 16px; }

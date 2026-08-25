@@ -70,10 +70,11 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
       <div><small>VENDAS DO MÊS</small><strong>{brl(resumo.mes)}</strong><span>{resumo.meta ? `de ${brl(resumo.meta)}` : 'Defina sua primeira meta mensal'}</span></div>
       <div className="premium-goal-side"><b>{pct}%</b><span>da meta</span></div>
       <div className="premium-progress"><i style={{ width: `${Math.min(100, pct)}%`, background: ouroGrad }} /></div>
-      <button onClick={() => irPara('vendas')}>{resumo.meta ? 'Lançar vendas' : 'Definir meta mensal'} →</button>
+      <div className="premium-goal-footer">
+        <span>Vendas de hoje <strong>{brl(resumo.hoje)}</strong></span>
+        <button onClick={() => irPara('vendas')}>{resumo.meta ? 'Lançar vendas' : 'Definir meta mensal'} →</button>
+      </div>
     </section>
-
-    <div className="premium-stats"><article><span>Vendas de hoje</span><strong>{brl(resumo.hoje)}</strong></article><article><span>Progresso mensal</span><strong style={{ color: ouro }}>{pct}%</strong></article></div>
 
     <div className="premium-section-title"><h2>Acessos rápidos</h2></div>
     <GradeAtalhos />
