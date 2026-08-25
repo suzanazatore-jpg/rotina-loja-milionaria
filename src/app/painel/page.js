@@ -471,7 +471,6 @@ export default function Painel() {
                     <CardAcesso cores={cores} icone="□" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
                     <CardAcesso cores={cores} icone="▣" titulo="Rotina" sub="Planejamento semanal" onClick={() => irPara('rotina')} />
                     <CardAcesso cores={cores} icone="△" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
-                    <div className="premium-desktop-only-card"><CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} /></div>
                     {mentoriaLiberada && <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
                     <CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
                     <CardAcesso cores={cores} icone="◎" titulo="Vendas e Metas" sub="Acompanhe seus resultados" onClick={() => irPara('vendas')} />
@@ -487,6 +486,7 @@ export default function Painel() {
                     <CardAcesso cores={cores} icone="◎" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
                     <CardAcesso cores={cores} icone="□" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
                     <CardAcesso cores={cores} icone="△" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
+                    <div className="premium-desktop-only-card"><CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} /></div>
                     {mentoriaLiberada && <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
                     <CardAcesso cores={cores} icone={temAcessoPremium ? '☆' : '◇'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Conheça os planos'} onClick={() => irPara('premium')} />
                   </div>
