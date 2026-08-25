@@ -40,11 +40,12 @@ export async function GET(request) {
     const programas = await verificarAcesso(supabase, user)
     if (!programas.length) return NextResponse.json({ liberado: false, programas: [], aulas: [] }, { status: 403 })
 
+    const {data:cursos}=await supabase.from('courses').select('id,slug,title,subtitle,description,cover_image_url,mentorship_type').eq('is_mentorship',true).in('mentorship_type',programas).order('sort_order')
     const { data, error } = await supabase.from('aulas').select('*').in('mentorship_type', programas).order('ordem', { ascending: true })
     if (error) throw error
     const ids = (data || []).map(aula => aula.id)
     const { data: materiais } = ids.length ? await supabase.from('mentorship_materials').select('id,aula_id,title').in('aula_id', ids).order('sort_order') : { data: [] }
-    return NextResponse.json({ liberado: true, programas, aulas: data || [], materiais: materiais || [] })
+    return NextResponse.json({ liberado: true, programas, cursos: cursos || [], aulas: data || [], materiais: materiais || [] })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

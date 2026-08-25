@@ -26,6 +26,7 @@ export default function Mentoria() {
   const router = useRouter()
   const [aulas, setAulas] = useState([])
   const [programas, setProgramas] = useState([])
+  const [cursosMentoria, setCursosMentoria] = useState([])
   const [materiais, setMateriais] = useState([])
   const [abaConteudo, setAbaConteudo] = useState('informacoes')
   const [comentarios, setComentarios] = useState([])
@@ -53,6 +54,7 @@ export default function Mentoria() {
       setAulas(lista)
       setMateriais(dados.materiais || [])
       setProgramas(liberados)
+      setCursosMentoria(dados.cursos || [])
       setPrograma(programaNaUrl && liberados.includes(programaNaUrl) ? programaNaUrl : aulaNaUrl ? (lista.find(a => String(a.id) === String(aulaNaUrl))?.mentorship_type || null) : null)
       setAulaId(atual => {
         const selecionada = atual || aulaNaUrl
@@ -75,6 +77,8 @@ export default function Mentoria() {
   const percentual = aulasPrograma.length ? Math.round((concluidasPrograma / aulasPrograma.length) * 100) : 0
 
   function abrirPrograma(tipo) {
+    const curso = cursosMentoria.find(item => item.mentorship_type === tipo)
+    if (curso) { router.push(`/curso/${curso.slug}`); return }
     const primeira = aulas.find(aula => (aula.mentorship_type || 'evs') === tipo)
     setPrograma(tipo)
     setAulaId(primeira?.id || null)
@@ -134,7 +138,7 @@ export default function Mentoria() {
 
       {!programa ? <main className="mentoria-hub">
         <div className="mentoria-intro"><p>MENTORIAS LIBERADAS</p><h2>Escolha sua mentoria</h2><span>Acesse as gravações disponíveis no seu plano.</span></div>
-        <div className="mentoria-capas">{programas.map(tipo => <button key={tipo} onClick={() => abrirPrograma(tipo)} className={`mentoria-capa mentoria-capa-${tipo}`}><div className="mentoria-capa-arte"><small>SUZANA ZATORRE</small><strong>MENTORIA<br />{tipo.toUpperCase()}</strong><span>Estratégia • Equipe • Resultados</span><b>▶</b></div><div className="mentoria-capa-info"><strong>Mentoria {tipo.toUpperCase()}</strong><span>{aulas.filter(a => (a.mentorship_type || 'evs') === tipo).length} aula(s) disponível(is)</span></div></button>)}</div>
+        <div className="mentoria-capas">{programas.map(tipo => { const curso=cursosMentoria.find(item=>item.mentorship_type===tipo); return <button key={tipo} onClick={() => abrirPrograma(tipo)} className={`mentoria-capa mentoria-capa-${tipo}`}><div className="mentoria-capa-arte">{curso?.cover_image_url ? <img src={curso.cover_image_url} alt={`Capa da ${curso.title}`} style={{width:'100%',height:'100%',objectFit:'cover',position:'absolute',inset:0}} /> : <><small>SUZANA ZATORRE</small><strong>MENTORIA<br />{tipo.toUpperCase()}</strong><span>Estratégia • Equipe • Resultados</span></>}<b>▶</b></div><div className="mentoria-capa-info"><strong>{curso?.title || `Mentoria ${tipo.toUpperCase()}`}</strong><span>{curso?.subtitle || 'Aulas e encontros liberados'}</span></div></button> })}</div>
       </main> : <div className="mentoria-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 350px', maxWidth: '1500px', margin: '0 auto' }}>
         <main style={{ padding: '26px', minWidth: 0 }}>
           {aulaAtual ? <>

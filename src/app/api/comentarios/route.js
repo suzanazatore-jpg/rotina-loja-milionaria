@@ -15,10 +15,11 @@ async function usuarioDaRequisicao(request, supabase) {
 async function podeAcessarAula(supabase, user, lessonId) {
   const { data: aula } = await supabase.from('lessons').select('id,course_id').eq('id', lessonId).eq('is_published', true).maybeSingle()
   if (!aula) return null
-  const { data: curso } = await supabase.from('courses').select('id,comments_enabled').eq('id', aula.course_id).eq('is_published', true).maybeSingle()
+  const { data: curso } = await supabase.from('courses').select('id,title,comments_enabled,is_mentorship,mentorship_type').eq('id', aula.course_id).eq('is_published', true).maybeSingle()
   if (!curso?.comments_enabled) return null
   const { data: perfil } = await supabase.from('profiles').select('role,status').eq('id', user.id).maybeSingle()
   if (perfil?.role === 'admin' && perfil.status === 'active') return aula
+  if(curso.is_mentorship){const{data:pp}=await supabase.from('profile_plans').select('plan_id').eq('profile_id',user.id);const ids=(pp||[]).map(x=>x.plan_id);const{data:pm}=ids.length?await supabase.from('plan_mentorships').select('mentorship_type').in('plan_id',ids).eq('mentorship_type',curso.mentorship_type):{data:[]};return pm?.length?aula:null}
   const { data: matricula } = await supabase.from('enrollments').select('id').eq('profile_id', user.id).eq('course_id', aula.course_id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).maybeSingle()
   return matricula ? aula : null
 }
@@ -48,6 +49,7 @@ export async function POST(request) {
     if (!await podeAcessarAula(supabase, user, lesson_id)) return NextResponse.json({ error: 'Aula não liberada para comentários.' }, { status: 403 })
     const { data, error } = await supabase.from('lesson_comments').insert({ lesson_id, profile_id: user.id, body: texto, parent_id: null, is_admin_reply: false }).select('id,body,created_at').single()
     if (error) throw error
+    const {data:aula}=await supabase.from('lessons').select('title,course_id').eq('id',lesson_id).single();const{data:curso}=await supabase.from('courses').select('title,is_mentorship').eq('id',aula.course_id).single();if(curso?.is_mentorship){const{data:perfil}=await supabase.from('profiles').select('name,email,phone').eq('id',user.id).maybeSingle();try{await fetch('https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/51621/55jbK8UteOhv/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event:'mentorship_comment',student_name:perfil?.name||'',student_email:perfil?.email||user.email,student_phone:perfil?.phone||'',mentorship:curso.title,lesson:aula.title,message:texto})})}catch(_){}}
     return NextResponse.json({ comentario: { ...data, respostas: [] } }, { status: 201 })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }

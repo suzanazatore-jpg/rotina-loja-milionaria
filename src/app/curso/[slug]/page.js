@@ -52,8 +52,14 @@ export default function Curso({ params }) {
 
       const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
       if (perfil?.role !== 'admin' && user.email !== 'suporte@suzanazatorre.com.br') {
-        const { data: matricula } = await supabase.from('enrollments').select('id').eq('profile_id', user.id).eq('course_id', cursoData.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).maybeSingle()
-        if (!matricula) { setErro('Este curso não está liberado para o seu acesso.'); setCarregando(false); return }
+        if (cursoData.is_mentorship) {
+          const { data: pp } = await supabase.from('profile_plans').select('plan_id').eq('profile_id', user.id)
+          const ids=(pp||[]).map(x=>x.plan_id); const {data:pm}=ids.length?await supabase.from('plan_mentorships').select('mentorship_type').in('plan_id',ids).eq('mentorship_type',cursoData.mentorship_type):{data:[]}
+          if(!pm?.length){setErro('Esta mentoria não está liberada no seu plano.');setCarregando(false);return}
+        } else {
+          const { data: matricula } = await supabase.from('enrollments').select('id').eq('profile_id', user.id).eq('course_id', cursoData.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).maybeSingle()
+          if (!matricula) { setErro('Este curso não está liberado para o seu acesso.'); setCarregando(false); return }
+        }
       }
 
       const [mods, lessons, mats, progress] = await Promise.all([

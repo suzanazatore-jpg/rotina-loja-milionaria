@@ -29,7 +29,7 @@ export default function AdminCursos() {
       if (!session) { router.push('/login'); return }
       if (session.user.email !== ADMIN_EMAIL) { setCarregando(false); return }
       setAutorizado(true)
-      const { data, error } = await supabase.from('courses').select('id,slug,title,subtitle,cover_image_url,sort_order,is_published,modules(id),lessons(id)').order('sort_order').order('created_at')
+      const { data, error } = await supabase.from('courses').select('id,slug,title,subtitle,cover_image_url,sort_order,is_published,modules(id),lessons(id)').eq('is_mentorship',false).order('sort_order').order('created_at')
       if (error) setErro(error.message); else setCursos(data || [])
       setCarregando(false)
     }
