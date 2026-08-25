@@ -11,7 +11,7 @@ export default function AdminAulas() {
   const [autorizado, setAutorizado] = useState(false)
   const [aulas, setAulas] = useState([])
   const [editando, setEditando] = useState(null) // id da aula em edição, ou 'nova'
-  const [form, setForm] = useState({ ordem: '', titulo: '', descricao: '', video_url: '' })
+  const [form, setForm] = useState({ mentorship_type: 'evs', ordem: '', titulo: '', descricao: '', video_url: '' })
   const [salvando, setSalvando] = useState(false)
   const [msg, setMsg] = useState('')
   const router = useRouter()
@@ -41,24 +41,25 @@ export default function AdminAulas() {
   }
 
   function novaAula() {
-    setForm({ ordem: aulas.length + 1, titulo: '', descricao: '', video_url: '' })
+    setForm({ mentorship_type: 'evs', ordem: aulas.filter(a => (a.mentorship_type || 'evs') === 'evs').length + 1, titulo: '', descricao: '', video_url: '' })
     setEditando('nova')
   }
 
   function editarAula(aula) {
-    setForm({ ordem: aula.ordem, titulo: aula.titulo, descricao: aula.descricao || '', video_url: aula.video_url || '' })
+    setForm({ mentorship_type: aula.mentorship_type || 'evs', ordem: aula.ordem, titulo: aula.titulo, descricao: aula.descricao || '', video_url: aula.video_url || '' })
     setEditando(aula.id)
   }
 
   function cancelar() {
     setEditando(null)
-    setForm({ ordem: '', titulo: '', descricao: '', video_url: '' })
+    setForm({ mentorship_type: 'evs', ordem: '', titulo: '', descricao: '', video_url: '' })
   }
 
   async function salvar() {
     if (!form.titulo.trim()) { setMsg('⚠ O título é obrigatório.'); return }
     setSalvando(true); setMsg('')
     const dados = {
+      mentorship_type: form.mentorship_type,
       ordem: parseInt(form.ordem) || 0,
       titulo: form.titulo.trim(),
       descricao: form.descricao.trim(),
@@ -131,6 +132,7 @@ export default function AdminAulas() {
         {editando !== null && (
           <div style={{ background: '#111111', border: `1px solid ${ouro}`, borderRadius: '16px', padding: '20px', marginBottom: '20px' }}>
             <h2 style={{ fontSize: '16px', fontWeight: 800, margin: '0 0 16px' }}>{editando === 'nova' ? 'Nova aula' : 'Editar aula'}</h2>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '14px' }}>Mentoria<select value={form.mentorship_type} onChange={e => setForm({ ...form, mentorship_type: e.target.value })} style={{ width: '100%', marginTop: 6, padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: 9, color: '#FFF' }}><option value="evs">Mentoria EVS</option><option value="cvm">Mentoria CVM</option></select></label>
             <div style={{ display: 'flex', gap: '12px' }}>
               <div style={{ width: '90px' }}>
                 <Campo label="Ordem" valor={form.ordem} onChange={v => setForm({ ...form, ordem: v })} placeholder="1" ouro={ouro} />
@@ -160,6 +162,7 @@ export default function AdminAulas() {
             <div key={aula.id} style={{ background: '#111111', border: '1px solid #2A2A2A', borderRadius: '14px', padding: '16px', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '14px' }}>
               <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: ouroGrad, color: '#0A0A0A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 800, flexShrink: 0 }}>{aula.ordem}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ color: ouro, fontSize: 10, fontWeight: 900, letterSpacing: '.08em' }}>MENTORIA {(aula.mentorship_type || 'evs').toUpperCase()}</span>
                 <p style={{ fontSize: '14px', fontWeight: 700, margin: 0 }}>{aula.titulo}</p>
                 <p style={{ fontSize: '12px', color: '#888', margin: '2px 0 0' }}>{aula.descricao || 'Sem descrição'}</p>
                 <p style={{ fontSize: '11px', color: aula.video_url ? '#5dca8a' : '#e88', margin: '4px 0 0' }}>{aula.video_url ? '🎥 Vídeo cadastrado' : '⚠ Sem vídeo'}</p>

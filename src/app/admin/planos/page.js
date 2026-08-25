@@ -29,6 +29,7 @@ export default function AdminPlanos() {
   const [cursos, setCursos] = useState([])
   const [vinculos, setVinculos] = useState([])
   const [conteudosPlanos, setConteudosPlanos] = useState([])
+  const [mentoriasPlanos, setMentoriasPlanos] = useState([])
   const [formAberto, setFormAberto] = useState(false)
   const [editando, setEditando] = useState(null)
   const [nome, setNome] = useState('')
@@ -38,6 +39,7 @@ export default function AdminPlanos() {
   const [urlVenda, setUrlVenda] = useState('')
   const [cursoIds, setCursoIds] = useState([])
   const [conteudoIds, setConteudoIds] = useState([])
+  const [mentoriaTipos, setMentoriaTipos] = useState([])
   const [salvando, setSalvando] = useState(false)
   const [mensagem, setMensagem] = useState('')
 
@@ -54,11 +56,12 @@ export default function AdminPlanos() {
   }, [router])
 
   async function carregar() {
-    const [rp, rc, rv, rconteudos] = await Promise.all([
+    const [rp, rc, rv, rconteudos, rmentorias] = await Promise.all([
       supabase.from('plans').select('*').order('created_at'),
       supabase.from('courses').select('id,title').order('title'),
       supabase.from('plan_courses').select('plan_id,course_id'),
       supabase.from('plan_app_contents').select('plan_id,content_key'),
+      supabase.from('plan_mentorships').select('plan_id,mentorship_type'),
     ])
     if (rp.error) {
       setMensagem('A estrutura de Planos ainda precisa ser aplicada no Supabase do app.')
@@ -68,17 +71,18 @@ export default function AdminPlanos() {
     setCursos(rc.data || [])
     setVinculos(rv.data || [])
     setConteudosPlanos(rconteudos.data || [])
+    setMentoriasPlanos(rmentorias.data || [])
   }
 
   function limpar() {
     setEditando(null); setNome(''); setOfertaId(''); setPeriodoDias('')
-    setPreco(''); setUrlVenda(''); setCursoIds([]); setConteudoIds([])
+    setPreco(''); setUrlVenda(''); setCursoIds([]); setConteudoIds([]); setMentoriaTipos([])
     setFormAberto(false)
   }
 
   function cadastrar() {
     setEditando(null); setNome(''); setOfertaId(''); setPeriodoDias('')
-    setPreco(''); setUrlVenda(''); setCursoIds([]); setConteudoIds([])
+    setPreco(''); setUrlVenda(''); setCursoIds([]); setConteudoIds([]); setMentoriaTipos([])
     setMensagem(''); setFormAberto(true)
   }
 
@@ -91,6 +95,7 @@ export default function AdminPlanos() {
     setUrlVenda(plano.sale_url || '')
     setCursoIds(vinculos.filter(v => v.plan_id === plano.id).map(v => v.course_id))
     setConteudoIds(conteudosPlanos.filter(v => v.plan_id === plano.id).map(v => v.content_key))
+    setMentoriaTipos(mentoriasPlanos.filter(v => v.plan_id === plano.id).map(v => v.mentorship_type))
     setMensagem('')
     setFormAberto(true)
   }
@@ -100,7 +105,15 @@ export default function AdminPlanos() {
   }
 
   function alternarConteudo(id) {
-    setConteudoIds(atual => atual.includes(id) ? atual.filter(x => x !== id) : [...atual, id])
+    setConteudoIds(atual => {
+      const ativando = !atual.includes(id)
+      if (id === 'mentorship') setMentoriaTipos(tipos => ativando && !tipos.length ? ['evs'] : ativando ? tipos : [])
+      return ativando ? [...atual, id] : atual.filter(x => x !== id)
+    })
+  }
+
+  function alternarMentoria(tipo) {
+    setMentoriaTipos(atual => atual.includes(tipo) ? atual.filter(x => x !== tipo) : [...atual, tipo])
   }
 
   async function salvar(e) {
@@ -128,6 +141,12 @@ export default function AdminPlanos() {
     if (conteudoIds.length) {
       const { error } = await supabase.from('plan_app_contents').insert(conteudoIds.map(contentKey => ({ plan_id: planoId, content_key: contentKey })))
       if (error) { setMensagem('O plano foi salvo, mas os conteúdos do aplicativo não foram vinculados.'); setSalvando(false); return }
+    }
+    const { error: erroLimparMentorias } = await supabase.from('plan_mentorships').delete().eq('plan_id', planoId)
+    if (erroLimparMentorias) { setMensagem('O plano foi salvo, mas os tipos de Mentoria não foram atualizados.'); setSalvando(false); return }
+    if (conteudoIds.includes('mentorship') && mentoriaTipos.length) {
+      const { error } = await supabase.from('plan_mentorships').insert(mentoriaTipos.map(mentorshipType => ({ plan_id: planoId, mentorship_type: mentorshipType })))
+      if (error) { setMensagem('O plano foi salvo, mas as Mentorias não foram vinculadas.'); setSalvando(false); return }
     }
     await carregar(); limpar(); setMensagem('✓ Plano salvo com sucesso.'); setSalvando(false)
   }
@@ -173,7 +192,7 @@ export default function AdminPlanos() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}><label>Nome<input value={nome} onChange={e => setNome(e.target.value)} style={campo} placeholder="Ex.: Plano anual" /></label><label>ID da oferta do Guru<input value={ofertaId} onChange={e => setOfertaId(e.target.value)} style={campo} placeholder="Código da oferta" /></label><label>Validade em dias<input type="number" min="1" value={periodoDias} onChange={e => setPeriodoDias(e.target.value)} style={campo} placeholder="Ex.: 365" /></label><label>Preço<input value={preco} onChange={e => setPreco(e.target.value)} style={campo} placeholder="Ex.: 997,00" /></label></div>
             <label style={{ display: 'block', marginTop: 12 }}>Link de venda<input value={urlVenda} onChange={e => setUrlVenda(e.target.value)} style={campo} placeholder="https://" /></label>
             <section style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #302b30' }}><p style={{ margin: '0 0 9px', fontWeight: 800, fontSize: 14 }}>Cursos liberados</p><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{cursos.map(curso => <button key={curso.id} type="button" onClick={() => alternarCurso(curso.id)} style={{ border: cursoIds.includes(curso.id) ? `1px solid ${ouro}` : '1px solid #333', background: cursoIds.includes(curso.id) ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: '999px', padding: '8px 11px', cursor: 'pointer' }}>{cursoIds.includes(curso.id) ? '✓ ' : ''}{curso.title}</button>)}{!cursos.length && <span style={{ color: '#777', fontSize: 13 }}>Nenhum curso cadastrado.</span>}</div></section>
-            <section style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #302b30' }}><p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 14 }}>Conteúdo do Aplicativo</p><p style={{ margin: '0 0 11px', color: '#777', fontSize: 12 }}>Escolha o que as alunas deste plano poderão acessar.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 9 }}>{CONTEUDOS_APP.map(item => { const ativo = conteudoIds.includes(item.id); return <button key={item.id} type="button" onClick={() => alternarConteudo(item.id)} aria-pressed={ativo} style={{ textAlign: 'left', border: ativo ? `1px solid ${ouro}` : '1px solid #333', background: ativo ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: 10, padding: '11px 12px', cursor: 'pointer' }}><strong style={{ display: 'block', fontSize: 13 }}>{ativo ? '✓ ' : ''}{item.nome}</strong><small style={{ color: '#888', fontSize: 11 }}>{item.descricao}</small></button> })}</div></section>
+            <section style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #302b30' }}><p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 14 }}>Conteúdo do Aplicativo</p><p style={{ margin: '0 0 11px', color: '#777', fontSize: 12 }}>Escolha o que as alunas deste plano poderão acessar.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: 9 }}>{CONTEUDOS_APP.map(item => { const ativo = conteudoIds.includes(item.id); return <button key={item.id} type="button" onClick={() => alternarConteudo(item.id)} aria-pressed={ativo} style={{ textAlign: 'left', border: ativo ? `1px solid ${ouro}` : '1px solid #333', background: ativo ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: 10, padding: '11px 12px', cursor: 'pointer' }}><strong style={{ display: 'block', fontSize: 13 }}>{ativo ? '✓ ' : ''}{item.nome}</strong><small style={{ color: '#888', fontSize: 11 }}>{item.descricao}</small></button> })}</div>{conteudoIds.includes('mentorship') && <div style={{ marginTop: 12, padding: 13, border: '1px solid #3a3422', borderRadius: 10, background: '#100f0b' }}><strong style={{ display: 'block', fontSize: 13, marginBottom: 8 }}>Quais Aulas da Mentoria este plano libera?</strong><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{[['evs', 'Mentoria EVS'], ['cvm', 'Mentoria CVM']].map(([tipo, label]) => <button key={tipo} type="button" onClick={() => alternarMentoria(tipo)} style={{ border: mentoriaTipos.includes(tipo) ? `1px solid ${ouro}` : '1px solid #333', background: mentoriaTipos.includes(tipo) ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: 9, padding: '9px 12px', cursor: 'pointer', fontWeight: 800 }}>{mentoriaTipos.includes(tipo) ? '✓ ' : ''}{label}</button>)}</div></div>}</section>
           </div>
           <footer style={{ position: 'sticky', bottom: 0, display: 'flex', justifyContent: 'flex-end', gap: 9, padding: '14px 20px', background: '#171417', borderTop: '1px solid #302b30' }}><button type="button" onClick={limpar} disabled={salvando} style={{ background: '#242124', color: '#fff', border: '1px solid #3c373c', borderRadius: 9, padding: '10px 16px', fontWeight: 800, cursor: 'pointer' }}>Cancelar</button><button disabled={salvando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: 9, padding: '10px 17px', fontWeight: 900, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar plano'}</button></footer>
         </form>
