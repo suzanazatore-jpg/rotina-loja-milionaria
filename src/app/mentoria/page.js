@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const OURO = '#D4AF37'
@@ -24,9 +24,8 @@ function urlVideo(url) {
 
 export default function Mentoria() {
   const router = useRouter()
-  const busca = useSearchParams()
   const [aulas, setAulas] = useState([])
-  const [aulaId, setAulaId] = useState(busca.get('aula'))
+  const [aulaId, setAulaId] = useState(null)
   const [concluidas, setConcluidas] = useState(new Set())
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
@@ -38,8 +37,12 @@ export default function Mentoria() {
       const { data, error } = await supabase.from('aulas').select('*').order('ordem', { ascending: true })
       if (error) { setErro('Não foi possível carregar as aulas da Mentoria.'); setCarregando(false); return }
       const lista = data || []
+      const aulaNaUrl = new URLSearchParams(window.location.search).get('aula')
       setAulas(lista)
-      setAulaId(atual => atual && lista.some(aula => String(aula.id) === String(atual)) ? atual : lista[0]?.id || null)
+      setAulaId(atual => {
+        const selecionada = atual || aulaNaUrl
+        return selecionada && lista.some(aula => String(aula.id) === String(selecionada)) ? selecionada : lista[0]?.id || null
+      })
       try {
         const salvas = JSON.parse(window.localStorage.getItem(`mentoria-concluidas-${user.id}`) || '[]')
         setConcluidas(new Set(salvas.map(String)))
