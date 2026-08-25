@@ -464,7 +464,7 @@ export default function AdminAlunas() {
         </div>
       </header>
 
-      <main style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 18px 60px' }}>
+      <main style={{ width: 'calc(100% - 36px)', maxWidth: '1380px', margin: '0 auto', padding: '24px 0 60px' }}>
 
         {msg && <p style={{ fontSize: '13px', color: msg.startsWith('✓') ? '#5dca8a' : '#e88', margin: '0 0 16px', textAlign: 'center' }}>{msg}</p>}
 
