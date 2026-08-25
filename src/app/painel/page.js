@@ -319,9 +319,11 @@ export default function Painel() {
     { id: 'inicio', icone: 'home', label: 'Início' },
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     { id: 'rotina', icone: 'routine', label: 'Rotina' },
-    { id: 'assistente', icone: 'assistant', label: 'Assistente' },
+    { id: 'ajuda', icone: 'support', label: 'Suporte' },
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
   ]
+
+  const menuMobileDrawer = menu.map(item => item.id === 'mais' ? { id: 'ajuda', icone: 'support', label: 'Suporte' } : item)
 
   if (carregando) {
     return (
@@ -392,7 +394,7 @@ export default function Painel() {
           <p style={{ fontSize: '16px', fontWeight: 800, color: cores.tx, margin: '2px 0 0' }}>Milionária 👑</p>
         </div>
         <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
-          {menu.map(item => (
+          {menuMobileDrawer.map(item => (
             <div key={item.id} onClick={() => irPara(item.id)} style={{
               display: 'flex', alignItems: 'center', gap: '11px', padding: '12px 18px', cursor: 'pointer', fontSize: '14px',
               color: secao === item.id ? ouro : cores.tx2,
@@ -453,6 +455,22 @@ export default function Painel() {
           {secao !== 'inicio' && (
             <div style={{ padding: '20px 18px' }}>
 
+              {/* TODOS OS ACESSOS — página aberta pelo “Ver todos” no mobile */}
+              {secao === 'acessos' && (
+                <div className="premium-hub premium-mobile-all-access">
+                  <div className="premium-hub-heading"><p>SEUS ACESSOS</p><h2>Tudo o que está liberado</h2><span>Acesse em um só lugar os recursos disponíveis para o seu plano.</span></div>
+                  <div className="premium-hub-grid">
+                    <CardAcesso cores={cores} icone="◎" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
+                    <CardAcesso cores={cores} icone="□" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
+                    <CardAcesso cores={cores} icone="▣" titulo="Rotina" sub="Planejamento semanal" onClick={() => irPara('rotina')} />
+                    <CardAcesso cores={cores} icone="△" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
+                    {mentoriaLiberada && <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
+                    <CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
+                    <CardAcesso cores={cores} icone="◎" titulo="Vendas e Metas" sub="Acompanhe seus resultados" onClick={() => irPara('vendas')} />
+                  </div>
+                </div>
+              )}
+
               {/* CONTEÚDOS */}
               {secao === 'conteudos' && (
                 <div className="premium-hub">
@@ -467,7 +485,18 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* MAIS */}
+              {/* SUPORTE — navegação mobile */}
+              {secao === 'ajuda' && (
+                <div className="premium-hub premium-mobile-support">
+                  <div className="premium-hub-heading"><p>AJUDA E ATENDIMENTO</p><h2>Suporte e Assistente Virtual</h2><span>Escolha como você quer receber ajuda.</span></div>
+                  <div className="premium-hub-grid">
+                    <CardAcesso cores={cores} icone="◌" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} destaque ouroGrad={ouroGrad} />
+                    <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação rápida com IA" onClick={() => irPara('assistente')} />
+                  </div>
+                </div>
+              )}
+
+              {/* MAIS — mantido no desktop */}
               {secao === 'mais' && (
                 <div className="premium-hub">
                   <div className="premium-hub-heading"><p>CONTA E FERRAMENTAS</p><h2>Mais opções</h2><span>Atendimento, configurações e ferramentas da sua loja.</span></div>
