@@ -93,9 +93,10 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
           {secao.courses.map(curso => {
             const p = progresso[curso.id] || { total: 0, feitas: 0, percentual: 0 }
             return (
-              <article key={curso.id} onClick={() => router.push(`/curso/${curso.slug}`)} style={{ width: '260px', flex: '0 0 260px', scrollSnapAlign: 'start', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
-                <div style={{ aspectRatio: '16/9', background: cores.card2, overflow: 'hidden' }}>
-                  {curso.cover_image_url ? <img src={curso.cover_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: '38px' }}>🎓</div>}
+              <article key={curso.id} onClick={() => router.push(`/curso/${curso.slug}`)} style={{ width: '220px', flex: '0 0 220px', scrollSnapAlign: 'start', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
+                <div style={{ position: 'relative', aspectRatio: '2/3', background: cores.card2, overflow: 'hidden' }}>
+                  {curso.cover_image_url ? <img src={curso.cover_image_url} alt={`Capa do curso ${curso.title}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: '38px' }}>🎓</div>}
+                  <span aria-hidden="true" style={{ position: 'absolute', top: 16, right: 16, width: 38, height: 38, display: 'grid', placeItems: 'center', borderRadius: '50%', color: '#fff', background: 'rgba(20,20,20,.78)', border: '1px solid rgba(255,255,255,.24)', backdropFilter: 'blur(6px)', fontSize: 15 }}>▷</span>
                 </div>
                 <div style={{ padding: '16px' }}>
                   <h3 style={{ fontSize: '16px', fontWeight: 800, color: cores.tx, margin: '0 0 4px' }}>{curso.title}</h3>
