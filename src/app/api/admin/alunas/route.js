@@ -108,13 +108,20 @@ export async function GET(request) {
   try {
     const supabase = adminClient()
     if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
-    const [cursos, planos, matriculas, vinculos] = await Promise.all([
+    const [cursos, planos, matriculas, vinculos, planosAlunas, perfisAcesso] = await Promise.all([
       supabase.from('courses').select('id,title,slug').order('title'),
       supabase.from('plans').select('id,name,offer_id,period_days').order('name'),
-      supabase.from('enrollments').select('profile_id,course_id,status,created_at'),
+      supabase.from('enrollments').select('profile_id,course_id,status,created_at,purchased_at,expires_at'),
       supabase.from('plan_courses').select('plan_id,course_id'),
+      supabase.from('profile_plans').select('profile_id,plan_id,created_at'),
+      supabase.from('profiles').select('id,status'),
     ])
-    return NextResponse.json({ cursos: cursos.data || [], planos: planos.data || [], matriculas: matriculas.data || [], vinculos: vinculos.data || [] })
+    const erro = cursos.error || planos.error || matriculas.error || vinculos.error || planosAlunas.error || perfisAcesso.error
+    if (erro) throw erro
+    return NextResponse.json({
+      cursos: cursos.data || [], planos: planos.data || [], matriculas: matriculas.data || [],
+      vinculos: vinculos.data || [], planosAlunas: planosAlunas.data || [], perfisAcesso: perfisAcesso.data || [],
+    })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
