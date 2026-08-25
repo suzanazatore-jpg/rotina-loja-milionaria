@@ -23,17 +23,19 @@ export async function GET(request) {
     const alunaId = new URL(request.url).searchParams.get('id')
     if (!alunaId) return NextResponse.json({ error: 'Aluna não informada.' }, { status: 400 })
 
-    const [aluna, cursos, planos, vinculos, matriculas] = await Promise.all([
+    const [aluna, cursos, planos, vinculos, matriculas, planosAtuais] = await Promise.all([
       supabase.from('perfis').select('id,nome,email,whatsapp').eq('id', alunaId).maybeSingle(),
       supabase.from('courses').select('id,title,slug').order('title'),
       supabase.from('plans').select('id,name,period_days').order('name'),
       supabase.from('plan_courses').select('plan_id,course_id'),
       supabase.from('enrollments').select('course_id,status,purchased_at,expires_at').eq('profile_id', alunaId),
+      supabase.from('profile_plans').select('plan_id').eq('profile_id', alunaId),
     ])
     if (aluna.error || !aluna.data) return NextResponse.json({ error: 'Aluna não encontrada.' }, { status: 404 })
     return NextResponse.json({
       aluna: aluna.data, cursos: cursos.data || [], planos: planos.data || [],
       vinculos: vinculos.data || [], matriculas: matriculas.data || [],
+      planoIds: (planosAtuais.data || []).map(item => item.plan_id),
     })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -67,9 +69,19 @@ export async function POST(request) {
     const perfil = aluna.data
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: perfil.id, name: perfil.nome, email: perfil.email, phone: perfil.whatsapp,
-      role: 'student', status: 'active', mentoria_aplicada: (conteudos.data || []).some(item => item.content_key === 'mentorship'), updated_at: new Date().toISOString(),
+      role: 'student', status: 'active',
+      mentoria_aplicada: (conteudos.data || []).some(item => item.content_key === 'mentorship'),
+      assistant_enabled: (conteudos.data || []).some(item => item.content_key === 'assistant'),
+      updated_at: new Date().toISOString(),
     }, { onConflict: 'id' })
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 400 })
+
+    const { error: planosDeleteError } = await supabase.from('profile_plans').delete().eq('profile_id', alunaId)
+    if (planosDeleteError) return NextResponse.json({ error: planosDeleteError.message }, { status: 400 })
+    if (planoIds.length) {
+      const { error: planosInsertError } = await supabase.from('profile_plans').insert(planoIds.map(planId => ({ profile_id: alunaId, plan_id: planId })))
+      if (planosInsertError) return NextResponse.json({ error: planosInsertError.message }, { status: 400 })
+    }
 
     const { error: deleteError } = await supabase.from('enrollments').delete().eq('profile_id', alunaId)
     if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 400 })

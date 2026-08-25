@@ -121,6 +121,7 @@ export default function Painel() {
   // Aulas (vindas do banco)
   const [aulas, setAulas] = useState([])
   const [mentoriaLiberada, setMentoriaLiberada] = useState(false)
+  const [assistenteLiberado, setAssistenteLiberado] = useState(false)
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualValor())
@@ -178,6 +179,11 @@ export default function Painel() {
         setMentoriaLiberada(respostaMentoria.ok && dadosMentoria.liberado === true)
         if (respostaMentoria.ok) setAulas(dadosMentoria.aulas || [])
       } catch (e) { setMentoriaLiberada(false) }
+      try {
+        const respostaAcessos = await fetch('/api/acessos-app', { headers: { Authorization: `Bearer ${session.access_token}` } })
+        const dadosAcessos = await respostaAcessos.json()
+        setAssistenteLiberado(respostaAcessos.ok && dadosAcessos.assistant === true)
+      } catch (e) { setAssistenteLiberado(false) }
       // Carrega o calendário de conteúdo (PDFs, um por mês)
       try {
         const resposta = await fetch('/api/calendario', { headers: { Authorization: `Bearer ${session.access_token}` } })
@@ -319,7 +325,7 @@ export default function Painel() {
     { id: 'inicio', icone: 'home', label: 'Início' },
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     { id: 'rotina', icone: 'routine', label: 'Rotina' },
-    { id: 'assistente', icone: 'assistant', label: 'Assistente' },
+    ...(assistenteLiberado ? [{ id: 'assistente', icone: 'assistant', label: 'Assistente' }] : []),
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
   ]
 
@@ -385,6 +391,7 @@ export default function Painel() {
     if (id === 'calculadora') { router.push('/calculadora'); return }
     if (id === 'markup') { router.push('/markup'); return }
     if (id === 'mentoria') { router.push('/mentoria'); return }
+    if (id === 'assistente' && !assistenteLiberado) { setSecao('suporte'); setMenuMobile(false); return }
     setSecao(id)
     setMenuMobile(false)
   }
@@ -457,6 +464,7 @@ export default function Painel() {
               setTema={alterarTema}
               mentoriaLiberada={mentoriaLiberada}
               temAcessoPremium={temAcessoPremium}
+              assistenteLiberado={assistenteLiberado}
             />
           )}
 
@@ -517,10 +525,10 @@ export default function Painel() {
               {/* SUPORTE — navegação mobile */}
               {secao === 'ajuda' && (
                 <div className="premium-hub premium-mobile-support">
-                  <div className="premium-hub-heading"><p>AJUDA E ATENDIMENTO</p><h2>Suporte e Assistente Virtual</h2><span>Escolha como você quer receber ajuda.</span></div>
+                  <div className="premium-hub-heading"><p>AJUDA E ATENDIMENTO</p><h2>{assistenteLiberado ? 'Suporte e Assistente Virtual' : 'Suporte'}</h2><span>{assistenteLiberado ? 'Escolha como você quer receber ajuda.' : 'Envie sua dúvida e acompanhe a resposta por aqui.'}</span></div>
                   <div className="premium-hub-grid">
                     <CardAcesso cores={cores} icone="◌" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} destaque ouroGrad={ouroGrad} />
-                    <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação rápida com IA" onClick={() => irPara('assistente')} />
+                    {assistenteLiberado && <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação rápida com IA" onClick={() => irPara('assistente')} />}
                   </div>
                 </div>
               )}
@@ -531,7 +539,7 @@ export default function Painel() {
                   <div className="premium-hub-heading"><p>CONTA E FERRAMENTAS</p><h2>Mais opções</h2><span>Atendimento, configurações e ferramentas da sua loja.</span></div>
                   <div className="premium-hub-grid">
                     <CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} destaque ouroGrad={ouroGrad} />
-                    <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação com IA" onClick={() => irPara('assistente')} />
+                    {assistenteLiberado && <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação com IA" onClick={() => irPara('assistente')} />}
                     <CardAcesso cores={cores} icone="◌" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} />
                     <CardAcesso cores={cores} icone="○" titulo="Meus Dados" sub="Informações da conta" onClick={() => irPara('dados')} />
                   </div>
@@ -651,7 +659,7 @@ export default function Painel() {
               )}
 
               {/* ASSISTENTE VIRTUAL */}
-              {secao === 'assistente' && (
+              {secao === 'assistente' && assistenteLiberado && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VirtualAssistant cores={cores} ouro={ouro} ouroGrad={ouroGrad} onOpenSupport={() => irPara('suporte')} />
                 </div>

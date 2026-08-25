@@ -37,6 +37,7 @@ function AcessoAlunaConteudo() {
     const json = await resposta.json()
     if (!resposta.ok) { setMensagem(json.error || 'Não foi possível carregar.'); return }
     setDados(json)
+    setPlanos(json.planoIds || [])
     setCursos(json.matriculas.filter(m => m.status === 'active').map(m => m.course_id))
     const primeira = json.matriculas[0]
     if (primeira?.purchased_at) setCompra(primeira.purchased_at.slice(0, 10))

@@ -18,6 +18,7 @@ const CONTEUDOS_APP = [
   { id: 'routine', nome: 'Rotina', descricao: 'Rotina semanal da lojista' },
   { id: 'team_goals', nome: 'Meta da Equipe', descricao: 'Metas da equipe e das vendedoras' },
   { id: 'mentorship', nome: 'Aulas da Mentoria', descricao: 'Gravações e encontros da Mentoria' },
+  { id: 'assistant', nome: 'Assistente Virtual', descricao: 'Orientação inteligente dentro do aplicativo' },
 ]
 
 export default function AdminPlanos() {

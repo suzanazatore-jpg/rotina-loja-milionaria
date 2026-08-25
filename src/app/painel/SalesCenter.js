@@ -49,6 +49,12 @@ export default function SalesCenter({ cores, ouro, ouroGrad }) {
 
   useEffect(() => { carregar() }, [])
   useEffect(() => {
+    const atualizar = () => { if (document.visibilityState === 'visible') carregar() }
+    window.addEventListener('focus', atualizar)
+    document.addEventListener('visibilitychange', atualizar)
+    return () => { window.removeEventListener('focus', atualizar); document.removeEventListener('visibilitychange', atualizar) }
+  }, [])
+  useEffect(() => {
     const mapa = {}
     vendas.filter(item => item.sale_date === dataVenda).forEach(item => { mapa[item.salesperson_id] = String(item.amount || '') })
     setValores(mapa)

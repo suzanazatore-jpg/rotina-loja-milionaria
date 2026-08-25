@@ -44,7 +44,14 @@ async function prepararAcessos(supabase, cursoIds = [], planoIds = []) {
   if (cursos.error || planos.error || vinculos.error || conteudos.error) throw new Error('Não foi possível confirmar os cursos e planos selecionados.')
   const ids = [...new Set([...(cursos.data || []).map(c => c.id), ...(vinculos.data || []).map(v => v.course_id)])]
   const dias = Math.max(0, ...(planos.data || []).map(p => Number(p.period_days) || 0))
-  return { ids, dias, mentoria: (conteudos.data || []).some(item => item.content_key === 'mentorship'), titulo: cursos.data?.[0]?.title || planos.data?.[0]?.name || null }
+  return {
+    ids,
+    dias,
+    mentoria: (conteudos.data || []).some(item => item.content_key === 'mentorship'),
+    assistente: (conteudos.data || []).some(item => item.content_key === 'assistant'),
+    planoIds: planosUnicos,
+    titulo: cursos.data?.[0]?.title || planos.data?.[0]?.name || null,
+  }
 }
 
 async function criarUma(supabase, aluna, opcoes) {
@@ -73,11 +80,15 @@ async function criarUma(supabase, aluna, opcoes) {
   try {
     const [perfilAntigo, perfilCursos] = await Promise.all([
       supabase.from('perfis').insert({ id, nome, email, whatsapp: telefone || null, tipo_acesso: expiracao ? 'avista' : 'rotina', acesso_expira_em: expiracao?.slice(0, 10) || null }),
-      supabase.from('profiles').upsert({ id, name: nome, email, phone: telefone || null, role: 'student', status: 'active', mentoria_aplicada: opcoes.acessos.mentoria, updated_at: new Date().toISOString() }),
+      supabase.from('profiles').upsert({ id, name: nome, email, phone: telefone || null, role: 'student', status: 'active', mentoria_aplicada: opcoes.acessos.mentoria, assistant_enabled: opcoes.acessos.assistente, updated_at: new Date().toISOString() }),
     ])
     if (perfilAntigo.error || perfilCursos.error) throw perfilAntigo.error || perfilCursos.error
     if (opcoes.acessos.ids.length) {
       const { error } = await supabase.from('enrollments').insert(opcoes.acessos.ids.map(courseId => ({ profile_id: id, course_id: courseId, status: 'active', source: opcoes.origem, purchased_at: compra, expires_at: expiracao })))
+      if (error) throw error
+    }
+    if (opcoes.acessos.planoIds.length) {
+      const { error } = await supabase.from('profile_plans').insert(opcoes.acessos.planoIds.map(planId => ({ profile_id: id, plan_id: planId })))
       if (error) throw error
     }
   } catch (error) {

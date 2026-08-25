@@ -6,7 +6,7 @@ import AppIcon from '@/app/components/AppIcon'
 
 const brl = valor => Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium }) {
+export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado }) {
   const [resumo, setResumo] = useState({ meta: 0, mes: 0, hoje: 0 })
   const hoje = useMemo(() => new Date(), [])
 
@@ -33,17 +33,19 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
     ['quickRoutine', 'Rotina', '15 minutos por dia', 'rotina'],
     ['quickTeam', 'Meta da Equipe', 'Metas e resultados', 'vendas'],
     ['quickCourses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
-    ['quickAssistant', 'Assistente AI', 'Ajuda inteligente', 'assistente'],
   ]
   const atalhos = [
     ...atalhosBase.slice(0, 5),
     ['content', 'Precificação', 'Markup e descontos', 'precificacao'],
     ...(mentoriaLiberada ? [['quickCourses', 'Mentorias', 'Aulas gravadas', 'mentoria']] : []),
     ...(temAcessoPremium ? [['premium', 'Conteúdo Premium', 'Aulas exclusivas', 'premium']] : []),
-    atalhosBase[5],
+    ...(assistenteLiberado ? [['quickAssistant', 'Assistente AI', 'Ajuda inteligente', 'assistente']] : []),
   ]
 
-  const GradeAtalhos = ({ mobile = false }) => <div className={`${mobile ? 'premium-mobile-shortcuts' : 'premium-shortcuts'}`}>{(mobile ? atalhosBase : atalhos).map(([icon, title, subtitle, target]) => <button key={target} onClick={() => irPara(target)}><i><AppIcon name={icon} size={mobile ? 36 : 30} strokeWidth={1.45} /></i><strong>{title}</strong>{!mobile && <span>{subtitle}</span>}</button>)}</div>
+  const GradeAtalhos = ({ mobile = false }) => {
+    const itens = mobile && assistenteLiberado ? [...atalhosBase, ['quickAssistant', 'Assistente AI', 'Ajuda inteligente', 'assistente']] : (mobile ? atalhosBase : atalhos)
+    return <div className={`${mobile ? 'premium-mobile-shortcuts' : 'premium-shortcuts'}`}>{itens.map(([icon, title, subtitle, target]) => <button key={target} onClick={() => irPara(target)}><i><AppIcon name={icon} size={mobile ? 36 : 30} strokeWidth={1.45} /></i><strong>{title}</strong>{!mobile && <span>{subtitle}</span>}</button>)}</div>
+  }
 
   return <div className="premium-home">
     <header className="premium-welcome">
@@ -76,6 +78,6 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
     <div className="premium-section-title"><h2>Acessos rápidos</h2></div>
     <GradeAtalhos />
 
-    <div className="premium-help-card"><div><small>PRECISA DE AJUDA?</small><h2>Assistente Virtual e Suporte</h2><p>Tire dúvidas rápidas com a IA ou abra um chamado para nossa equipe.</p></div><button onClick={() => irPara('assistente')}>Falar com a Assistente</button></div>
+    <div className="premium-help-card"><div><small>SUPORTE</small><h2>Fale com o Suporte</h2><p>Envie sua dúvida e acompanhe a resposta da nossa equipe pelo aplicativo.</p></div><button onClick={() => irPara('suporte')}>Abrir suporte</button></div>
   </div>
 }

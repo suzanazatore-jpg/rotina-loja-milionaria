@@ -2,6 +2,45 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 function db() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } }) }
 async function user(request, supabase) { const token = request.headers.get('authorization')?.replace('Bearer ', ''); if (!token) return null; const { data: { user } } = await supabase.auth.getUser(token); return user }
+const BOTCONVERSA_WEBHOOK = 'https://new-backend.botconversa.com.br/api/v1/webhooks-automation/catch/51621/55jbK8UteOhv/'
+
+async function garantirPerfil(supabase, usuario) {
+  const { data: perfil } = await supabase.from('perfis').select('nome,email,whatsapp').eq('id', usuario.id).maybeSingle()
+  const dados = {
+    id: usuario.id,
+    name: perfil?.nome || usuario.email?.split('@')[0] || 'Aluna',
+    email: perfil?.email || usuario.email,
+    phone: perfil?.whatsapp || null,
+    role: 'student',
+    status: 'active',
+    updated_at: new Date().toISOString(),
+  }
+  const { error } = await supabase.from('profiles').upsert(dados, { onConflict: 'id' })
+  if (error) throw error
+  return dados
+}
+
+async function avisarBotConversa({ perfil, ticket, mensagem }) {
+  try {
+    const resposta = await fetch(BOTCONVERSA_WEBHOOK, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        evento: 'novo_chamado_suporte',
+        ticket_id: ticket.id,
+        assunto: ticket.subject,
+        categoria: ticket.category,
+        mensagem,
+        nome: perfil.name,
+        email: perfil.email,
+        telefone: perfil.phone,
+      }),
+    })
+    if (!resposta.ok) console.error('BotConversa recusou o chamado:', resposta.status)
+  } catch (error) {
+    console.error('Falha ao avisar o BotConversa:', error)
+  }
+}
 
 export async function GET(request) {
   const supabase = db(), usuario = await user(request, supabase); if (!usuario) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
@@ -14,10 +53,12 @@ export async function GET(request) {
 export async function POST(request) {
   const supabase = db(), usuario = await user(request, supabase); if (!usuario) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
   try { const body = await request.json(); const texto = String(body.message || '').trim()
-    if (body.ticket_id) { const { data: ticket } = await supabase.from('support_tickets').select('id,status').eq('id', body.ticket_id).eq('user_id', usuario.id).maybeSingle(); if (!ticket) throw new Error('Chamado não encontrado.'); if (!texto) throw new Error('Escreva sua mensagem.'); await supabase.from('support_messages').insert({ ticket_id: ticket.id, author_id: usuario.id, body: texto, is_admin: false }); await supabase.from('support_tickets').update({ status: 'aberto', updated_at: new Date().toISOString() }).eq('id', ticket.id); return NextResponse.json({ success: true }) }
+    const perfil = await garantirPerfil(supabase, usuario)
+    if (body.ticket_id) { const { data: ticket } = await supabase.from('support_tickets').select('id,status,subject,category').eq('id', body.ticket_id).eq('user_id', usuario.id).maybeSingle(); if (!ticket) throw new Error('Chamado não encontrado.'); if (!texto) throw new Error('Escreva sua mensagem.'); await supabase.from('support_messages').insert({ ticket_id: ticket.id, author_id: usuario.id, body: texto, is_admin: false }); await supabase.from('support_tickets').update({ status: 'aberto', updated_at: new Date().toISOString() }).eq('id', ticket.id); await avisarBotConversa({ perfil, ticket, mensagem: texto }); return NextResponse.json({ success: true }) }
     const subject = String(body.subject || '').trim(); if (subject.length < 3 || !texto) throw new Error('Preencha o assunto e a mensagem.')
     const { data: ticket, error } = await supabase.from('support_tickets').insert({ user_id: usuario.id, subject, category: body.category || 'duvida' }).select().single(); if (error) throw error
     const inserted = await supabase.from('support_messages').insert({ ticket_id: ticket.id, author_id: usuario.id, body: texto, is_admin: false }); if (inserted.error) { await supabase.from('support_tickets').delete().eq('id', ticket.id); throw inserted.error }
+    await avisarBotConversa({ perfil, ticket, mensagem: texto })
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }
