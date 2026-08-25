@@ -372,7 +372,7 @@ export default function Painel() {
   function irPara(id) {
     if (id === 'calculadora') { router.push('/calculadora'); return }
     if (id === 'markup') { router.push('/markup'); return }
-    if (id === 'markup') { router.push('/markup'); return }
+    if (id === 'mentoria') { router.push('/mentoria'); return }
     setSecao(id)
     setMenuMobile(false)
   }
