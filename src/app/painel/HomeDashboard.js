@@ -57,7 +57,7 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
 
     <GradeAtalhos mobile />
 
-    <div className="premium-section-title"><h2>Acessos rápidos</h2><button className="premium-ver-todos-desktop" onClick={() => irPara('conteudos')}>Ver todos</button><button className="premium-ver-todos-mobile" onClick={() => irPara('acessos')}>Ver todos</button></div>
+    <div className="premium-section-title"><h2>Acessos rápidos</h2><button className="premium-ver-todos-desktop" onClick={() => irPara('acessos')}>Ver todos</button><button className="premium-ver-todos-mobile" onClick={() => irPara('conteudos')}>Ver todos</button></div>
     <GradeAtalhos />
 
     <section className="premium-goal-card">
