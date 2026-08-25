@@ -65,10 +65,20 @@ function estaDesativada(aluna) {
 // Regra de status exibida: ativa a menos que o acesso tenha vencido
 // ou a assinatura esteja cancelada/inativa.
 function estaAtiva(aluna) {
+  if (aluna.status_acesso && aluna.status_acesso !== 'active') return false
   if (estaDesativada(aluna)) return false
   const s = String(aluna.status_assinatura || '').toLowerCase()
   if (s === 'cancelado' || s === 'cancelada' || s === 'inativo' || s === 'inativa') return false
   return true
+}
+
+function situacaoFinanceira(aluna) {
+  const status = String(aluna.status_assinatura || '').toLowerCase()
+  if (['atrasado', 'inadimplente', 'past_due', 'unpaid'].includes(status)) return { label: 'Em atraso', cor: '#ff8d8d', fundo: '#2a1010' }
+  if (['cancelado', 'cancelada'].includes(status)) return { label: 'Cancelada', cor: '#aaa', fundo: '#242424' }
+  if (estaDesativada(aluna)) return { label: 'Vencida', cor: '#ff8d8d', fundo: '#2a1010' }
+  if (!estaAtiva(aluna)) return { label: 'Suspensa', cor: '#e0b84a', fundo: '#2a2515' }
+  return { label: 'Em dia', cor: '#67d692', fundo: '#10251a' }
 }
 
 // Monta o rótulo de vencimento: prazo fixo (acesso_expira_em) vira "acesso até"/"venceu em";
@@ -102,6 +112,9 @@ export default function AdminAlunas() {
   const [planos, setPlanos] = useState([])
   const [matriculas, setMatriculas] = useState([])
   const [vinculosPlanos, setVinculosPlanos] = useState([])
+  const [planosAlunas, setPlanosAlunas] = useState([])
+  const [statusAcessos, setStatusAcessos] = useState({})
+  const [alterandoStatus, setAlterandoStatus] = useState('')
   const [msg, setMsg] = useState('')
 
   // Filtros
@@ -169,7 +182,12 @@ export default function AdminAlunas() {
       fetch('/api/admin/alunas', { headers: { Authorization: `Bearer ${session?.access_token || ''}` } }),
     ])
     if (lista.data) setAlunas(lista.data)
-    if (opcoesResp.ok) { const opcoes = await opcoesResp.json(); setCursos(opcoes.cursos || []); setPlanos(opcoes.planos || []); setMatriculas(opcoes.matriculas || []); setVinculosPlanos(opcoes.vinculos || []) }
+    if (opcoesResp.ok) {
+      const opcoes = await opcoesResp.json()
+      setCursos(opcoes.cursos || []); setPlanos(opcoes.planos || []); setMatriculas(opcoes.matriculas || []); setVinculosPlanos(opcoes.vinculos || [])
+      setPlanosAlunas(opcoes.planosAlunas || [])
+      setStatusAcessos(Object.fromEntries((opcoes.perfisAcesso || []).map(item => [item.id, item.status])))
+    }
     carregarAcessos() // não bloqueia a lista; preenche o "último acesso" quando chegar
   }
 
@@ -276,6 +294,18 @@ export default function AdminAlunas() {
     setDesativando(false)
   }
 
+  async function alternarStatus(aluna) {
+    const ativa = estaAtiva({ ...aluna, status_acesso: statusAcessos[aluna.id] })
+    setAlterandoStatus(aluna.id)
+    try {
+      const resposta = await chamarAdmin('PATCH', { id: aluna.id, acao: ativa ? 'desativar' : 'reativar' })
+      if (!resposta.ok) throw new Error(resposta.json.error)
+      await carregar()
+      aviso(ativa ? `✓ Acesso de ${aluna.nome || aluna.email} suspenso.` : `✓ Acesso de ${aluna.nome || aluna.email} reativado por 30 dias.`, 5000)
+    } catch (e) { aviso('⚠ Erro ao alterar o status: ' + e.message, 6000) }
+    setAlterandoStatus('')
+  }
+
   async function reenviarBoasVindas() {
     const ok = confirm(`Reenviar e-mail de boas-vindas para ${gerenciando.email}?\n\nUma nova senha será gerada e enviada. A senha antiga deixa de funcionar.`)
     if (!ok) return
@@ -338,7 +368,12 @@ export default function AdminAlunas() {
   }
 
   function baixarCsv() {
-    const linhas = [['Nome','Email','Telefone','Tipo de acesso','Data de expiração'], ...alunasFiltradas.map(a => [a.nome || '', a.email || '', a.whatsapp || '', a.tipo_acesso || '', a.acesso_expira_em || ''])]
+    const linhas = [['Nome','Email','Telefone','Plano','Data da compra ou cadastro','Data de expiração','Situação financeira','Status do acesso'], ...alunasFiltradas.map(a => {
+      const nomesPlanos = planos.filter(p => planosAlunas.some(item => item.profile_id === a.id && item.plan_id === p.id)).map(p => p.name).join(', ')
+      const compra = matriculas.filter(m => m.profile_id === a.id).map(m => m.purchased_at || m.created_at).filter(Boolean).sort()[0] || cadastros[a.id]
+      const comStatus = { ...a, status_acesso: statusAcessos[a.id] }
+      return [a.nome || '', a.email || '', a.whatsapp || '', nomesPlanos, compra || '', a.acesso_expira_em || '', situacaoFinanceira(comStatus).label, estaAtiva(comStatus) ? 'Ativo' : 'Suspenso']
+    })]
     const csv = '\uFEFF' + linhas.map(linha => linha.map(valor => `"${String(valor).replaceAll('"','""')}"`).join(';')).join('\r\n')
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a'); a.href = url; a.download = `alunas-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url)
@@ -377,17 +412,19 @@ export default function AdminAlunas() {
       if (cadastroFiltro && String(cadastros[a.id] || '').slice(0, 10) !== cadastroFiltro) return false
       if (ultimoFiltro && String(acessos[a.id] || '').slice(0, 10) !== ultimoFiltro) return false
       if (tipoFiltro !== 'todos' && a.tipo_acesso !== tipoFiltro) return false
-      if (statusFiltro === 'ativas' && !estaAtiva(a)) return false
+      const comStatus = { ...a, status_acesso: statusAcessos[a.id] }
+      if (statusFiltro === 'ativas' && !estaAtiva(comStatus)) return false
       if (statusFiltro === 'vencidas' && !estaDesativada(a)) return false
+      if (statusFiltro === 'atrasadas' && situacaoFinanceira(comStatus).label !== 'Em atraso') return false
+      if (statusFiltro === 'suspensas' && estaAtiva(comStatus)) return false
       if (statusFiltro === 'nunca' && acessos[a.id]) return false
       if (cursoFiltro && !matriculas.some(m => m.profile_id === a.id && m.course_id === cursoFiltro)) return false
       if (planoFiltro) {
-        const idsCurso = vinculosPlanos.filter(v => v.plan_id === planoFiltro).map(v => v.course_id)
-        if (!matriculas.some(m => m.profile_id === a.id && idsCurso.includes(m.course_id))) return false
+        if (!planosAlunas.some(item => item.profile_id === a.id && item.plan_id === planoFiltro)) return false
       }
       return true
     })
-  }, [alunas, busca, emailFiltro, tipoFiltro, statusFiltro, codigoFiltro, cadastroFiltro, ultimoFiltro, cursoFiltro, planoFiltro, acessos, cadastros, matriculas, vinculosPlanos])
+  }, [alunas, busca, emailFiltro, tipoFiltro, statusFiltro, codigoFiltro, cadastroFiltro, ultimoFiltro, cursoFiltro, planoFiltro, acessos, cadastros, matriculas, planosAlunas, statusAcessos])
 
   // ──────── Telas de bloqueio ────────
   if (carregando) {
@@ -411,7 +448,8 @@ export default function AdminAlunas() {
 
   const inputEstilo = { width: '100%', padding: '11px 13px', background: '#0A0A0A', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '14px', color: '#FFF', outline: 'none', boxSizing: 'border-box' }
   const labelEstilo = { display: 'block', fontSize: '12px', fontWeight: 700, color: '#888', marginBottom: '6px' }
-  const gerAluna = gerenciando ? alunas.find(a => a.id === gerenciando.id) || gerenciando : null
+  const gerAlunaBase = gerenciando ? alunas.find(a => a.id === gerenciando.id) || gerenciando : null
+  const gerAluna = gerAlunaBase ? { ...gerAlunaBase, status_acesso: statusAcessos[gerAlunaBase.id] } : null
   const gerDesativada = gerAluna ? estaDesativada(gerAluna) : false
 
   return (
@@ -454,7 +492,7 @@ export default function AdminAlunas() {
                   <label>Data de cadastro<input type="date" value={cadastroFiltro} onChange={e => setCadastroFiltro(e.target.value)} /></label>
                   <label>Data do último login<input type="date" value={ultimoFiltro} onChange={e => setUltimoFiltro(e.target.value)} /></label>
                   <label>Tipo de acesso<select value={tipoFiltro} onChange={e => setTipoFiltro(e.target.value)}><option value="todos">Todos</option>{tiposDisponiveis.map(t => <option key={t}>{t}</option>)}</select></label>
-                  <label>Status da aluna<select value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)}><option value="todas">Todas</option><option value="ativas">Ativas</option><option value="vencidas">Acesso expirado</option><option value="nunca">Nunca acessou</option></select></label>
+                  <label>Status da aluna<select value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)}><option value="todas">Todas</option><option value="ativas">Ativas</option><option value="atrasadas">Em atraso</option><option value="suspensas">Suspensas</option><option value="vencidas">Acesso expirado</option><option value="nunca">Nunca acessou</option></select></label>
                 </div> : <div className="filtro-campos">
                   <label>Curso<select value={cursoFiltro} onChange={e => setCursoFiltro(e.target.value)}><option value="">Todos os cursos</option>{cursos.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
                   <label>Plano<select value={planoFiltro} onChange={e => setPlanoFiltro(e.target.value)}><option value="">Todos os planos</option>{planos.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
@@ -471,25 +509,32 @@ export default function AdminAlunas() {
         {/* Tabela */}
         <div style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', overflow: 'hidden' }}>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '720px' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', minWidth: '1040px' }}>
               <thead>
                 <tr style={{ background: '#161616', color: '#888', textAlign: 'left' }}>
                   <th style={{ padding: '11px 14px', fontWeight: 600 }}>Aluna</th>
-                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Tipo</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Plano</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Compra / cadastro</th>
                   <th style={{ padding: '11px 14px', fontWeight: 600 }}>Último acesso</th>
                   <th style={{ padding: '11px 14px', fontWeight: 600 }}>Vencimento</th>
+                  <th style={{ padding: '11px 14px', fontWeight: 600 }}>Financeiro</th>
                   <th style={{ padding: '11px 14px', fontWeight: 600 }}>Status</th>
                   <th style={{ padding: '11px 14px', fontWeight: 600, textAlign: 'right' }}>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {alunasFiltradas.length === 0 ? (
-                  <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#666' }}>Nenhuma aluna encontrada.</td></tr>
+                  <tr><td colSpan={8} style={{ padding: '32px', textAlign: 'center', color: '#666' }}>Nenhuma aluna encontrada.</td></tr>
                 ) : alunasFiltradas.map(a => {
                   const venc = vencimentoInfo(a)
-                  const ativa = estaAtiva(a)
+                  const alunaComStatus = { ...a, status_acesso: statusAcessos[a.id] }
+                  const ativa = estaAtiva(alunaComStatus)
+                  const financeiro = situacaoFinanceira(alunaComStatus)
                   const acesso = acessos[a.id]
-                  const mentoria = a.tipo_acesso === 'mentoria'
+                  const idsPlanos = planosAlunas.filter(item => item.profile_id === a.id).map(item => item.plan_id)
+                  const nomesPlanos = planos.filter(item => idsPlanos.includes(item.id)).map(item => item.name)
+                  const compras = matriculas.filter(item => item.profile_id === a.id).map(item => item.purchased_at || item.created_at).filter(Boolean).sort()
+                  const dataCompra = compras[0] || cadastros[a.id]
                   return (
                     <tr key={a.id} style={{ borderTop: '1px solid #222' }}>
                       <td style={{ padding: '11px 14px' }}>
@@ -502,20 +547,18 @@ export default function AdminAlunas() {
                         </div>
                       </td>
                       <td style={{ padding: '11px 14px' }}>
-                        <span style={mentoria
-                          ? { background: ouroGrad, color: '#0A0A0A', borderRadius: '20px', padding: '2px 9px', fontSize: '11px', fontWeight: 700 }
-                          : { background: 'rgba(212,175,55,.1)', border: '1px solid rgba(212,175,55,.25)', color: ouro, borderRadius: '20px', padding: '2px 9px', fontSize: '11px', fontWeight: 600 }}>
-                          {a.tipo_acesso || '—'}
-                        </span>
+                        {nomesPlanos.length ? nomesPlanos.map(nome => <span key={nome} style={{ display: 'block', color: ouro, fontWeight: 700, marginBottom: 3 }}>{nome}</span>) : <span style={{ color: '#666' }}>Sem plano vinculado</span>}
                       </td>
+                      <td style={{ padding: '11px 14px', color: '#aaa', whiteSpace: 'nowrap' }}>{dataCompra ? formatarData(dataCompra) : '—'}</td>
                       <td style={{ padding: '11px 14px', color: '#aaa', whiteSpace: 'nowrap' }}>{acesso ? formatarData(acesso) : <span style={{ color: '#666' }}>nunca acessou</span>}</td>
                       <td style={{ padding: '11px 14px', color: CORES_TOM[venc.tom], whiteSpace: 'nowrap' }}>
                         {venc.data ? <>{venc.label}<br /><span style={{ color: venc.tom === '' ? '#ddd' : CORES_TOM[venc.tom] }}>{venc.data}</span></> : '—'}
                       </td>
+                      <td style={{ padding: '11px 14px' }}><span style={{ display: 'inline-block', color: financeiro.cor, background: financeiro.fundo, border: `1px solid ${financeiro.cor}55`, borderRadius: 20, padding: '3px 8px', fontSize: 11, fontWeight: 800, whiteSpace: 'nowrap' }}>{financeiro.label}</span></td>
                       <td style={{ padding: '11px 14px' }}>
-                        <span style={{ display: 'inline-block', width: '30px', height: '17px', borderRadius: '20px', background: ativa ? ouro : '#3A3A3A', position: 'relative', verticalAlign: 'middle' }}>
+                        <button type="button" onClick={() => alternarStatus(a)} disabled={alterandoStatus === a.id} aria-label={`${ativa ? 'Desativar' : 'Ativar'} acesso de ${a.nome || a.email}`} title={ativa ? 'Desativar acesso' : 'Ativar acesso'} style={{ display: 'inline-block', width: '34px', height: '20px', border: 0, padding: 0, borderRadius: '20px', background: ativa ? ouro : '#3A3A3A', position: 'relative', verticalAlign: 'middle', cursor: alterandoStatus === a.id ? 'wait' : 'pointer', opacity: alterandoStatus === a.id ? .55 : 1 }}>
                           <span style={{ position: 'absolute', top: '2px', [ativa ? 'right' : 'left']: '2px', width: '13px', height: '13px', borderRadius: '50%', background: ativa ? '#0A0A0A' : '#888' }} />
-                        </span>
+                        </button>
                       </td>
                       <td style={{ padding: '11px 14px', textAlign: 'right' }}>
                         <button onClick={() => abrirGerenciar(a)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '7px 13px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Gerenciar</button>
@@ -541,6 +584,15 @@ export default function AdminAlunas() {
                 <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>Gerenciar aluna</h2>
                 <p style={{ fontSize: '12px', color: '#888', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis' }}>{gerAluna.email}</p>
               </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: '8px', marginBottom: '18px' }}>
+              {[
+                ['Plano', planos.filter(p => planosAlunas.some(item => item.profile_id === gerAluna.id && item.plan_id === p.id)).map(p => p.name).join(', ') || 'Sem plano vinculado'],
+                ['Compra / cadastro', formatarData((matriculas.filter(m => m.profile_id === gerAluna.id).map(m => m.purchased_at || m.created_at).filter(Boolean).sort()[0]) || cadastros[gerAluna.id])],
+                ['Situação financeira', situacaoFinanceira(gerAluna).label],
+                ['Último acesso', acessos[gerAluna.id] ? formatarData(acessos[gerAluna.id]) : 'Nunca acessou'],
+              ].map(([rotulo, valor]) => <div key={rotulo} style={{ background: '#181818', border: '1px solid #2A2A2A', borderRadius: 9, padding: 10 }}><small style={{ display: 'block', color: '#777', marginBottom: 4 }}>{rotulo}</small><strong style={{ display: 'block', color: rotulo === 'Situação financeira' ? situacaoFinanceira(gerAluna).cor : '#eee', fontSize: 12, lineHeight: 1.35 }}>{valor}</strong></div>)}
             </div>
 
             <div style={{ marginBottom: '14px' }}>
