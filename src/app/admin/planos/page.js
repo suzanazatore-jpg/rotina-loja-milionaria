@@ -16,7 +16,7 @@ const CONTEUDOS_APP = [
   { id: 'calendar', nome: 'Calendário', descricao: 'Calendário mensal de conteúdos' },
   { id: 'campaigns', nome: 'Campanhas', descricao: 'Campanhas e ações de vendas' },
   { id: 'routine', nome: 'Rotina', descricao: 'Rotina semanal da lojista' },
-  { id: 'team_goals', nome: 'Meta da Equipe', descricao: 'Metas da equipe e das vendedoras' },
+  { id: 'team_goals', nome: 'Calculadora de Metas', descricao: 'Metas, ranking e histórico da equipe' },
   { id: 'assistant', nome: 'Assistente Virtual', descricao: 'Orientação inteligente dentro do aplicativo' },
 ]
 
