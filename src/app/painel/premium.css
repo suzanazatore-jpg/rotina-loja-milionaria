@@ -404,3 +404,27 @@
     animation: none !important;
   }
 }
+
+
+/* Ajustes de navegação e capa */
+.premium-welcome-copy h1 { color: #fff !important; }
+.premium-ver-todos-mobile { display: none; }
+
+@media (max-width: 899px) {
+  .premium-section-title {
+    display: flex !important;
+    margin-top: 16px;
+  }
+  .premium-section-title h2 { display: none; }
+  .premium-ver-todos-desktop { display: none; }
+  .premium-ver-todos-mobile { display: inline-flex; margin-left: auto; }
+  .premium-mobile-all-access,
+  .premium-mobile-support { display: block; }
+  .premium-mobile-all-access .premium-hub-grid,
+  .premium-mobile-support .premium-hub-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (min-width: 900px) {
+  .premium-mobile-all-access,
+  .premium-mobile-support { display: none; }
+}
