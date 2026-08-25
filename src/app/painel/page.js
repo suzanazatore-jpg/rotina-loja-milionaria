@@ -512,12 +512,12 @@ export default function Painel() {
                 <div className="premium-hub">
                   <div className="premium-hub-heading"><p>CONTEÚDOS LIBERADOS</p><h2>Acesse seus materiais</h2><span>Cursos, campanhas, calendários e mentorias em um só lugar.</span></div>
                   <div className="premium-hub-grid">
-                    <CardAcesso cores={cores} icone="◎" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
-                    <CardAcesso cores={cores} icone="□" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
-                    <CardAcesso cores={cores} icone="△" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
-                    <div className="premium-desktop-only-card"><CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} /></div>
-                    {mentoriaLiberada && <CardAcesso cores={cores} icone="▤" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
-                    <CardAcesso cores={cores} icone={temAcessoPremium ? '☆' : '◇'} titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Conheça os planos'} onClick={() => irPara('premium')} />
+                    <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
+                    <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
+                    <CardAcesso cores={cores} icone="quickCourses" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
+                    <div className="premium-desktop-only-card"><CardAcesso cores={cores} icone="content" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} /></div>
+                    {mentoriaLiberada && <CardAcesso cores={cores} icone="quickCourses" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
+                    <CardAcesso cores={cores} icone="content" titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Conheça os planos'} onClick={() => irPara('premium')} />
                   </div>
                 </div>
               )}
@@ -527,8 +527,8 @@ export default function Painel() {
                 <div className="premium-hub premium-mobile-support">
                   <div className="premium-hub-heading"><p>AJUDA E ATENDIMENTO</p><h2>{assistenteLiberado ? 'Suporte e Assistente Virtual' : 'Suporte'}</h2><span>{assistenteLiberado ? 'Escolha como você quer receber ajuda.' : 'Envie sua dúvida e acompanhe a resposta por aqui.'}</span></div>
                   <div className="premium-hub-grid">
-                    <CardAcesso cores={cores} icone="◌" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} destaque ouroGrad={ouroGrad} />
-                    {assistenteLiberado && <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação rápida com IA" onClick={() => irPara('assistente')} />}
+                    <CardAcesso cores={cores} icone="support" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} destaque ouroGrad={ouroGrad} />
+                    {assistenteLiberado && <CardAcesso cores={cores} icone="quickAssistant" titulo="Assistente Virtual" sub="Orientação rápida com IA" onClick={() => irPara('assistente')} />}
                   </div>
                 </div>
               )}
@@ -538,10 +538,10 @@ export default function Painel() {
                 <div className="premium-hub">
                   <div className="premium-hub-heading"><p>CONTA E FERRAMENTAS</p><h2>Mais opções</h2><span>Atendimento, configurações e ferramentas da sua loja.</span></div>
                   <div className="premium-hub-grid">
-                    <CardAcesso cores={cores} icone="◇" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} destaque ouroGrad={ouroGrad} />
-                    {assistenteLiberado && <CardAcesso cores={cores} icone="✦" titulo="Assistente Virtual" sub="Orientação com IA" onClick={() => irPara('assistente')} />}
-                    <CardAcesso cores={cores} icone="◌" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} />
-                    <CardAcesso cores={cores} icone="○" titulo="Meus Dados" sub="Informações da conta" onClick={() => irPara('dados')} />
+                    <CardAcesso cores={cores} icone="content" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} destaque ouroGrad={ouroGrad} />
+                    {assistenteLiberado && <CardAcesso cores={cores} icone="quickAssistant" titulo="Assistente Virtual" sub="Orientação com IA" onClick={() => irPara('assistente')} />}
+                    <CardAcesso cores={cores} icone="support" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} />
+                    <CardAcesso cores={cores} icone="profile" titulo="Meus Dados" sub="Informações da conta" onClick={() => irPara('dados')} />
                   </div>
                 </div>
               )}
@@ -858,7 +858,7 @@ function CardAcesso({ cores, icone, titulo, sub, onClick, destaque, ouroGrad }) 
       border: `1px solid ${destaque ? 'transparent' : cores.borda}`,
       borderRadius: '14px', padding: '16px', cursor: onClick ? 'pointer' : 'default',
     }}>
-      <div style={{ fontSize: '24px', marginBottom: '8px' }}>{icone}</div>
+      <div style={{ width: 46, height: 46, display: 'grid', placeItems: 'center', borderRadius: '50%', marginBottom: 11, color: destaque ? '#211A0E' : '#D4AF37', background: destaque ? 'rgba(255,255,255,.22)' : 'rgba(212,175,55,.10)', border: `1px solid ${destaque ? 'rgba(33,26,14,.25)' : 'rgba(212,175,55,.28)'}` }}><AppIcon name={icone} size={30} strokeWidth={1.45} /></div>
       <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 2px', color: destaque ? '#0A0A0A' : cores.tx }}>{titulo}</h3>
       <p style={{ fontSize: '11px', margin: 0, color: destaque ? '#0A0A0A' : cores.tx2, opacity: destaque ? 0.8 : 1 }}>{sub}</p>
     </div>
