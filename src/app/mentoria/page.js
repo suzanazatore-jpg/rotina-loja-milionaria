@@ -26,6 +26,11 @@ export default function Mentoria() {
   const router = useRouter()
   const [aulas, setAulas] = useState([])
   const [programas, setProgramas] = useState([])
+  const [materiais, setMateriais] = useState([])
+  const [abaConteudo, setAbaConteudo] = useState('informacoes')
+  const [comentarios, setComentarios] = useState([])
+  const [novoComentario, setNovoComentario] = useState('')
+  const [enviandoComentario, setEnviandoComentario] = useState(false)
   const [programa, setPrograma] = useState(null)
   const [aulaId, setAulaId] = useState(null)
   const [concluidas, setConcluidas] = useState(new Set())
@@ -46,6 +51,7 @@ export default function Mentoria() {
       const aulaNaUrl = new URLSearchParams(window.location.search).get('aula')
       const programaNaUrl = new URLSearchParams(window.location.search).get('programa')
       setAulas(lista)
+      setMateriais(dados.materiais || [])
       setProgramas(liberados)
       setPrograma(programaNaUrl && liberados.includes(programaNaUrl) ? programaNaUrl : aulaNaUrl ? (lista.find(a => String(a.id) === String(aulaNaUrl))?.mentorship_type || null) : null)
       setAulaId(atual => {
@@ -65,6 +71,7 @@ export default function Mentoria() {
   const aulaAtual = useMemo(() => aulasPrograma.find(aula => String(aula.id) === String(aulaId)) || aulasPrograma[0], [aulasPrograma, aulaId])
   const indiceAtual = aulasPrograma.findIndex(aula => aula.id === aulaAtual?.id)
   const concluidasPrograma = aulasPrograma.filter(a => concluidas.has(String(a.id))).length
+  const materiaisAula = materiais.filter(m => m.aula_id === aulaAtual?.id)
   const percentual = aulasPrograma.length ? Math.round((concluidasPrograma / aulasPrograma.length) * 100) : 0
 
   function abrirPrograma(tipo) {
@@ -75,9 +82,31 @@ export default function Mentoria() {
   }
 
   function escolherAula(id) {
+    setAbaConteudo('informacoes'); setComentarios([])
     setAulaId(id)
     router.replace(`/mentoria?programa=${programa}&aula=${id}`, { scroll: false })
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function abrirMaterial(material) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const resposta = await fetch(`/api/material-mentoria?id=${material.id}`, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+    const data = await resposta.json(); if (data.url) window.open(data.url, '_blank', 'noopener,noreferrer')
+  }
+
+  async function carregarComentarios() {
+    if (!aulaAtual) return
+    const { data: { session } } = await supabase.auth.getSession()
+    const resposta = await fetch(`/api/comentarios-mentoria?aula_id=${aulaAtual.id}`, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+    const data = await resposta.json(); if (resposta.ok) setComentarios(data.comentarios || [])
+  }
+
+  async function publicarComentario(e) {
+    e.preventDefault(); if (!novoComentario.trim() || !aulaAtual) return
+    setEnviandoComentario(true); const { data: { session } } = await supabase.auth.getSession()
+    const resposta = await fetch('/api/comentarios-mentoria', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify({ aula_id: aulaAtual.id, body: novoComentario.trim() }) })
+    const data = await resposta.json(); if (resposta.ok) { setComentarios(c => [data.comentario, ...c]); setNovoComentario('') }
+    setEnviandoComentario(false)
   }
 
   async function alternarConclusao() {
@@ -114,15 +143,17 @@ export default function Mentoria() {
             </div>
 
             <div style={{ display: 'flex', gap: 22, borderBottom: '1px solid #292929', marginTop: 20 }}>
-              <button style={abaAtiva}>Informações</button>
+              <button onClick={() => setAbaConteudo('informacoes')} style={abaStyle(abaConteudo === 'informacoes')}>Informações</button>
+              <button onClick={() => { setAbaConteudo('comentarios'); carregarComentarios() }} style={abaStyle(abaConteudo === 'comentarios')}>Comentários</button>
             </div>
 
-            <div style={{ padding: '22px 2px' }}>
+            {abaConteudo === 'informacoes' ? <div style={{ padding: '22px 2px' }}>
               <p style={{ color: OURO, fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', margin: '0 0 7px' }}>Aula da Mentoria</p>
               <h2 style={{ margin: '0 0 8px', fontSize: '24px' }}>{aulaAtual.titulo}</h2>
               {aulaAtual.descricao && <p style={{ color: '#AAA', fontSize: '14px', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>{aulaAtual.descricao}</p>}
               <button onClick={alternarConclusao} style={{ ...botaoPrincipal, background: concluidas.has(String(aulaAtual.id)) ? '#17351F' : GRADIENTE, color: concluidas.has(String(aulaAtual.id)) ? '#4ADE80' : '#0A0A0A' }}>{concluidas.has(String(aulaAtual.id)) ? '✓ Aula concluída' : 'Marcar como concluída'}</button>
-            </div>
+            </div> : <section style={{ padding: '22px 2px' }}><h3>Comentários e dúvidas</h3><p style={{ color: '#888', fontSize: 13 }}>Sua mensagem é privada e a resposta aparecerá aqui.</p><form onSubmit={publicarComentario}><textarea value={novoComentario} onChange={e => setNovoComentario(e.target.value)} maxLength={1000} placeholder="Escreva sua dúvida..." style={{ width:'100%',minHeight:95,boxSizing:'border-box',background:'#171717',color:'#fff',border:'1px solid #333',borderRadius:10,padding:12 }} /><button disabled={enviandoComentario} style={{...botaoPrincipal,marginTop:10}}>{enviandoComentario?'Enviando...':'Enviar comentário'}</button></form><div style={{display:'grid',gap:10,marginTop:18}}>{comentarios.map(c=><article key={c.id} style={{background:'#121212',border:'1px solid #292929',borderRadius:10,padding:13}}><p style={{margin:0,color:'#ddd'}}>{c.body}</p>{(c.respostas||[]).map(r=><div key={r.id} style={{borderLeft:`2px solid ${OURO}`,paddingLeft:10,marginTop:12}}><strong style={{color:OURO,fontSize:12}}>Resposta da Suzana</strong><p>{r.body}</p></div>)}</article>)}</div></section>}
+            {materiaisAula.length > 0 && <section style={{ borderTop: '1px solid #292929', padding: '20px 2px' }}><h3>Materiais desta aula</h3>{materiaisAula.map(m => <button key={m.id} onClick={() => abrirMaterial(m)} style={{...botaoSecundario,width:'100%',textAlign:'left',marginBottom:8}}>↗ {m.title}</button>)}</section>}
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', marginTop: '18px', borderTop: '1px solid #292929', paddingTop: '20px' }}>
               <button disabled={indiceAtual <= 0} onClick={() => escolherAula(aulasPrograma[indiceAtual - 1].id)} style={{ ...botaoSecundario, opacity: indiceAtual <= 0 ? .35 : 1 }}>← Aula anterior</button>
@@ -146,7 +177,7 @@ export default function Mentoria() {
 
 const botaoSecundario = { background: '#171717', color: '#DDD', border: '1px solid #333', borderRadius: '9px', padding: '9px 12px', fontWeight: 700, cursor: 'pointer' }
 const botaoPrincipal = { background: GRADIENTE, color: '#0A0A0A', border: 0, borderRadius: '9px', padding: '10px 14px', fontWeight: 900, cursor: 'pointer' }
-const abaAtiva = { background: 'transparent', color: OURO, border: 0, borderBottom: `2px solid ${OURO}`, padding: '0 0 10px', fontWeight: 800 }
+const abaStyle = ativa => ({ background: 'transparent', color: ativa ? OURO : '#777', border: 0, borderBottom: ativa ? `2px solid ${OURO}` : '2px solid transparent', padding: '0 0 10px', fontWeight: 800, cursor: 'pointer' })
 
 function Estado({ texto, botao }) {
   return <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#AAA', display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20 }}><div><p>{texto}</p>{botao && <button onClick={botao} style={botaoPrincipal}>Voltar ao painel</button>}</div></div>

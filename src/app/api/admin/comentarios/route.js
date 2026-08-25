@@ -28,26 +28,33 @@ export async function GET(request) {
   ])
   const byId = lista => new Map((lista || []).map(item => [item.id, item]))
   const p = byId(profiles), l = byId(lessons), c = byId(courses), m = byId(modules)
-  let comentarios = (roots || []).map(item => { const aula = l.get(item.lesson_id); return { ...item, aluna: p.get(item.profile_id)?.name || p.get(item.profile_id)?.email || 'Aluna', aula: aula?.title || 'Aula', modulo: m.get(aula?.module_id)?.title || '', curso: c.get(aula?.course_id)?.title || 'Curso', respostas: (replies || []).filter(reply => reply.parent_id === item.id) } })
+  let comentarios = (roots || []).map(item => { const aula = l.get(item.lesson_id); return { ...item, source: 'course', aluna: p.get(item.profile_id)?.name || p.get(item.profile_id)?.email || 'Aluna', aula: aula?.title || 'Aula', modulo: m.get(aula?.module_id)?.title || '', curso: c.get(aula?.course_id)?.title || 'Curso', respostas: (replies || []).filter(reply => reply.parent_id === item.id) } })
+  let mq = supabase.from('mentorship_comments').select('id,body,created_at,profile_id,aula_id,archived').is('parent_id', null).eq('is_admin_reply', false).order('created_at', { ascending: false }).limit(300)
+  mq = tab === 'arquivadas' ? mq.eq('archived', true) : mq.eq('archived', false)
+  const { data: mroots } = await mq
+  const mids=(mroots||[]).map(x=>x.id), mpids=[...new Set((mroots||[]).map(x=>x.profile_id))], maids=[...new Set((mroots||[]).map(x=>x.aula_id))]
+  const [{data:mreplies},{data:mprofiles},{data:maulas}] = await Promise.all([mids.length?supabase.from('mentorship_comments').select('id,body,created_at,parent_id').in('parent_id',mids).order('created_at'):Promise.resolve({data:[]}),mpids.length?supabase.from('profiles').select('id,name,email').in('id',mpids):Promise.resolve({data:[]}),maids.length?supabase.from('aulas').select('id,titulo,mentorship_type').in('id',maids):Promise.resolve({data:[]})])
+  const mp=byId(mprofiles), ma=byId(maulas)
+  comentarios.push(...(mroots||[]).map(item=>({ ...item, source:'mentorship', aluna:mp.get(item.profile_id)?.name||mp.get(item.profile_id)?.email||'Aluna', aula:ma.get(item.aula_id)?.titulo||'Aula', modulo:'', curso:`Mentoria ${(ma.get(item.aula_id)?.mentorship_type||'').toUpperCase()}`, respostas:(mreplies||[]).filter(r=>r.parent_id===item.id)})))
   if (tab === 'novas') comentarios = comentarios.filter(item => item.respostas.length === 0)
   return NextResponse.json({ comentarios })
 }
 
 export async function POST(request) {
   const supabase = adminClient(); const admin = await autorizar(request, supabase); if (!admin) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
-  try { const { parent_id, body } = await request.json(); const texto = String(body || '').trim(); if (!parent_id || !texto || texto.length > 1000) throw new Error('Resposta inválida.')
-    const { data: parent } = await supabase.from('lesson_comments').select('lesson_id').eq('id', parent_id).maybeSingle(); if (!parent) throw new Error('Comentário não encontrado.')
-    const { error } = await supabase.from('lesson_comments').insert({ lesson_id: parent.lesson_id, profile_id: admin.id, parent_id, is_admin_reply: true, body: texto }); if (error) throw error
+  try { const { parent_id, body, source } = await request.json(); const texto = String(body || '').trim(); if (!parent_id || !texto || texto.length > 1000) throw new Error('Resposta inválida.')
+    const table=source==='mentorship'?'mentorship_comments':'lesson_comments', key=source==='mentorship'?'aula_id':'lesson_id'; const { data: parent } = await supabase.from(table).select(key).eq('id', parent_id).maybeSingle(); if (!parent) throw new Error('Comentário não encontrado.')
+    const { error } = await supabase.from(table).insert({ [key]:parent[key], profile_id:admin.id, parent_id, is_admin_reply:true, body:texto }); if(error)throw error
     return NextResponse.json({ success: true })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }
 
 export async function PATCH(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
-  try { const { id, archived } = await request.json(); const { error } = await supabase.from('lesson_comments').update({ archived: Boolean(archived), archived_at: archived ? new Date().toISOString() : null }).eq('id', id); if (error) throw error; return NextResponse.json({ success: true }) } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
+  try { const { id, archived, source } = await request.json(); const table=source==='mentorship'?'mentorship_comments':'lesson_comments'; const { error } = await supabase.from(table).update({ archived: Boolean(archived) }).eq('id', id); if (error) throw error; return NextResponse.json({ success: true }) } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }
 
 export async function DELETE(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
-  try { const { id } = await request.json(); await supabase.from('lesson_comments').delete().eq('parent_id', id); const { error } = await supabase.from('lesson_comments').delete().eq('id', id); if (error) throw error; return NextResponse.json({ success: true }) } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
+  try { const { id, source } = await request.json(); const table=source==='mentorship'?'mentorship_comments':'lesson_comments'; await supabase.from(table).delete().eq('parent_id', id); const { error } = await supabase.from(table).delete().eq('id', id); if (error) throw error; return NextResponse.json({ success: true }) } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }

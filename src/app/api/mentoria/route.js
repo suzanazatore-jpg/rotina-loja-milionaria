@@ -42,7 +42,9 @@ export async function GET(request) {
 
     const { data, error } = await supabase.from('aulas').select('*').in('mentorship_type', programas).order('ordem', { ascending: true })
     if (error) throw error
-    return NextResponse.json({ liberado: true, programas, aulas: data || [] })
+    const ids = (data || []).map(aula => aula.id)
+    const { data: materiais } = ids.length ? await supabase.from('mentorship_materials').select('id,aula_id,title').in('aula_id', ids).order('sort_order') : { data: [] }
+    return NextResponse.json({ liberado: true, programas, aulas: data || [], materiais: materiais || [] })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
