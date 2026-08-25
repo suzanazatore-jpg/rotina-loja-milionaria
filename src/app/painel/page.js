@@ -455,6 +455,8 @@ export default function Painel() {
               irPara={irPara}
               tema={tema}
               setTema={alterarTema}
+              mentoriaLiberada={mentoriaLiberada}
+              temAcessoPremium={temAcessoPremium}
             />
           )}
 

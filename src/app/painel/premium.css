@@ -250,6 +250,14 @@
     padding-left: 34px !important;
     padding-right: 34px !important;
   }
+
+  .premium-home {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 @media (max-width: 899px) {
