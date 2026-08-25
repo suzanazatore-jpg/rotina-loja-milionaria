@@ -47,11 +47,12 @@ export async function POST(request) {
     const { alunaId, cursoIds = [], planoIds = [], dataCompra, dataExpiracao } = await request.json()
     if (!alunaId) return NextResponse.json({ error: 'Aluna não informada.' }, { status: 400 })
 
-    const [aluna, planos, vinculos, cursos] = await Promise.all([
+    const [aluna, planos, vinculos, cursos, conteudos] = await Promise.all([
       supabase.from('perfis').select('id,nome,email,whatsapp').eq('id', alunaId).maybeSingle(),
       planoIds.length ? supabase.from('plans').select('id,period_days').in('id', planoIds) : Promise.resolve({ data: [] }),
       planoIds.length ? supabase.from('plan_courses').select('plan_id,course_id').in('plan_id', planoIds) : Promise.resolve({ data: [] }),
       supabase.from('courses').select('id'),
+      planoIds.length ? supabase.from('plan_app_contents').select('content_key').in('plan_id', planoIds) : Promise.resolve({ data: [] }),
     ])
     if (aluna.error || !aluna.data) return NextResponse.json({ error: 'Aluna não encontrada.' }, { status: 404 })
 
@@ -66,7 +67,7 @@ export async function POST(request) {
     const perfil = aluna.data
     const { error: profileError } = await supabase.from('profiles').upsert({
       id: perfil.id, name: perfil.nome, email: perfil.email, phone: perfil.whatsapp,
-      role: 'student', status: 'active', updated_at: new Date().toISOString(),
+      role: 'student', status: 'active', mentoria_aplicada: (conteudos.data || []).some(item => item.content_key === 'mentorship'), updated_at: new Date().toISOString(),
     }, { onConflict: 'id' })
     if (profileError) return NextResponse.json({ error: profileError.message }, { status: 400 })
 
