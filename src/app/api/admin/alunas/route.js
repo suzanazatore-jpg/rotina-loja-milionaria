@@ -35,15 +35,16 @@ function dataIso(valor, fimDoDia = false) {
 async function prepararAcessos(supabase, cursoIds = [], planoIds = []) {
   const cursosAvulsos = [...new Set(cursoIds.filter(Boolean))]
   const planosUnicos = [...new Set(planoIds.filter(Boolean))]
-  const [cursos, planos, vinculos] = await Promise.all([
+  const [cursos, planos, vinculos, conteudos] = await Promise.all([
     cursosAvulsos.length ? supabase.from('courses').select('id,title').in('id', cursosAvulsos) : Promise.resolve({ data: [] }),
     planosUnicos.length ? supabase.from('plans').select('id,name,period_days').in('id', planosUnicos) : Promise.resolve({ data: [] }),
     planosUnicos.length ? supabase.from('plan_courses').select('plan_id,course_id').in('plan_id', planosUnicos) : Promise.resolve({ data: [] }),
+    planosUnicos.length ? supabase.from('plan_app_contents').select('plan_id,content_key').in('plan_id', planosUnicos) : Promise.resolve({ data: [] }),
   ])
-  if (cursos.error || planos.error || vinculos.error) throw new Error('Não foi possível confirmar os cursos e planos selecionados.')
+  if (cursos.error || planos.error || vinculos.error || conteudos.error) throw new Error('Não foi possível confirmar os cursos e planos selecionados.')
   const ids = [...new Set([...(cursos.data || []).map(c => c.id), ...(vinculos.data || []).map(v => v.course_id)])]
   const dias = Math.max(0, ...(planos.data || []).map(p => Number(p.period_days) || 0))
-  return { ids, dias, titulo: cursos.data?.[0]?.title || planos.data?.[0]?.name || null }
+  return { ids, dias, mentoria: (conteudos.data || []).some(item => item.content_key === 'mentorship'), titulo: cursos.data?.[0]?.title || planos.data?.[0]?.name || null }
 }
 
 async function criarUma(supabase, aluna, opcoes) {
@@ -72,7 +73,7 @@ async function criarUma(supabase, aluna, opcoes) {
   try {
     const [perfilAntigo, perfilCursos] = await Promise.all([
       supabase.from('perfis').insert({ id, nome, email, whatsapp: telefone || null, tipo_acesso: expiracao ? 'avista' : 'rotina', acesso_expira_em: expiracao?.slice(0, 10) || null }),
-      supabase.from('profiles').upsert({ id, name: nome, email, phone: telefone || null, role: 'student', status: 'active', updated_at: new Date().toISOString() }),
+      supabase.from('profiles').upsert({ id, name: nome, email, phone: telefone || null, role: 'student', status: 'active', mentoria_aplicada: opcoes.acessos.mentoria, updated_at: new Date().toISOString() }),
     ])
     if (perfilAntigo.error || perfilCursos.error) throw perfilAntigo.error || perfilCursos.error
     if (opcoes.acessos.ids.length) {
