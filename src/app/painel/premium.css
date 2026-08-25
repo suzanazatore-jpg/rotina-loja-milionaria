@@ -425,3 +425,34 @@
   .premium-mobile-all-access .premium-hub-grid,
   .premium-mobile-support .premium-hub-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 }
+
+.premium-access-cascade { max-width: 1080px; }
+.premium-access-cascade .premium-cascade-section { border-radius: 18px; padding: 20px; margin-bottom: 18px; }
+.premium-cascade-section > header { display: flex; align-items: flex-end; justify-content: space-between; gap: 15px; padding-bottom: 13px; margin-bottom: 13px; border-bottom: 1px solid var(--premium-line); }
+.premium-cascade-section > header p { margin: 0; font-family: Georgia, serif; font-size: 22px; font-weight: 800; }
+.premium-cascade-section > header span { font-size: 12px; }
+.premium-cascade-section > div { display: grid; gap: 10px; }
+.premium-cascade-item { display: flex; align-items: center; justify-content: space-between; gap: 18px; border-radius: 13px; padding: 15px; }
+.premium-cascade-item strong { font-size: 14px; }
+.premium-cascade-item p { font-size: 12px; line-height: 1.5; margin: 4px 0 0; }
+.premium-cascade-item aside { display: flex; gap: 8px; flex: 0 0 auto; }
+.premium-cascade-item a, .premium-cascade-item button { min-height: 38px; box-sizing: border-box; border-radius: 9px; padding: 9px 12px; text-decoration: none; font-size: 12px; font-weight: 800; cursor: pointer; }
+.premium-cascade-item button { color: #090909; border: 0; }
+.premium-cascade-empty { border-radius: 12px; padding: 22px; text-align: center; font-size: 13px; }
+.premium-cascade-lessons { display: grid; gap: 8px; }
+.premium-cascade-lessons button { display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 12px; width: 100%; background: var(--premium-paper); color: var(--premium-ink); border: 1px solid var(--premium-line); border-radius: 12px; padding: 12px; text-align: left; cursor: pointer; }
+.premium-cascade-lessons button > span { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--premium-gold); color: #17130c; font-weight: 900; }
+.premium-cascade-lessons strong, .premium-cascade-lessons small { display: block; }
+.premium-cascade-lessons small { color: var(--premium-muted); margin-top: 3px; }
+.premium-cascade-lessons b { color: var(--premium-gold); font-size: 12px; }
+.premium-cascade-tools { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.premium-cascade-tools button { background: var(--premium-paper); color: var(--premium-ink); border: 1px solid var(--premium-line); border-radius: 13px; padding: 17px; text-align: left; cursor: pointer; }
+.premium-cascade-tools strong, .premium-cascade-tools span { display: block; }
+.premium-cascade-tools span { color: var(--premium-gold); font-size: 12px; margin-top: 6px; }
+
+@media (max-width: 899px) {
+  .premium-cascade-item { align-items: flex-start; flex-direction: column; }
+  .premium-cascade-item aside { width: 100%; flex-wrap: wrap; }
+  .premium-cascade-item a, .premium-cascade-item button { flex: 1; text-align: center; }
+  .premium-cascade-tools { grid-template-columns: 1fr; }
+}
