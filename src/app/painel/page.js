@@ -325,9 +325,9 @@ export default function Painel() {
 
   const menuMobileItens = [
     { id: 'inicio', icone: 'home', label: 'Início' },
+    { id: 'cursos', icone: 'courses', label: 'Cursos' },
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
-    { id: 'rotina', icone: 'routine', label: 'Rotina' },
-    ...(assistenteLiberado ? [{ id: 'assistente', icone: 'assistant', label: 'Assistente' }] : []),
+    { id: 'ajuda', icone: 'support', label: 'Suporte' },
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
   ]
 
