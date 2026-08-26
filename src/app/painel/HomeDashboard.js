@@ -61,26 +61,21 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
 
   return <div className="premium-home">
     <div className="premium-mobile-home">
-      <header className="premium-mobile-header">
-        <div className="premium-brand"><b>R</b><span>ROTINA DA<strong>LOJA MILIONÁRIA</strong></span></div>
-        <div className="premium-theme-switch" aria-label="Escolher tema"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')} aria-label="Usar tema claro">☀</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')} aria-label="Usar tema escuro">☾</button></div>
-      </header>
+      <section className="premium-mobile-top">
+        <header className="premium-mobile-header">
+          <div className="premium-brand"><b>R</b><span>ROTINA DA<strong>LOJA MILIONÁRIA</strong></span></div>
+          <div className="premium-theme-switch" aria-label="Escolher tema"><button className={tema === 'claro' ? 'on' : ''} onClick={() => setTema('claro')} aria-label="Usar tema claro">☀</button><button className={tema === 'escuro' ? 'on' : ''} onClick={() => setTema('escuro')} aria-label="Usar tema escuro">☾</button></div>
+        </header>
 
-      <p className="premium-mobile-greeting">{saudacao}, <strong>{nome}</strong></p>
+        <p className="premium-mobile-greeting">{saudacao}, <strong>{nome}</strong></p>
 
-      <section className="premium-mobile-goal" aria-label="Resumo da meta mensal">
-        <div className="premium-mobile-goal-copy">
-          <span>Meta do mês</span>
-          <strong>{resumo.meta ? brl(resumo.meta) : 'Defina sua meta'}</strong>
-          <div className="premium-mobile-progress"><i style={{ width: `${Math.min(100, pct)}%` }} /></div>
-          <b>{pct}%</b>
-          <div className="premium-mobile-goal-numbers">
-            <span><AppIcon name="campaigns" size={18} /><small>Vendido</small><strong>{brl(resumo.mes)}</strong></span>
-            <span><AppIcon name="goals" size={18} /><small>Falta</small><strong>{brl(falta)}</strong></span>
+        <div className="premium-mobile-goal" aria-label="Boas-vindas">
+          <div className="premium-mobile-goal-copy">
+            <span>ROTINA DA LOJA MILIONÁRIA</span>
+            <strong>Vamos colocar sua loja em movimento?</strong>
           </div>
-          <button onClick={() => irPara('vendas')}>{resumo.meta ? 'Lançar venda' : 'Definir meta'} <span>›</span></button>
+          <div className="premium-mobile-goal-photo" aria-hidden="true"><img src="/suzana-autoridade.jpg" alt="" /></div>
         </div>
-        <div className="premium-mobile-goal-photo" aria-hidden="true"><img src="/suzana-autoridade.jpg" alt="" /></div>
       </section>
 
       <section className="premium-banner premium-mobile-banner" aria-label="Novidades">
@@ -113,6 +108,11 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
           <span><strong>Continue seus estudos</strong><small>Acesse suas aulas liberadas</small></span>
           <b>›</b>
         </button>
+      </section>
+
+      <section className="premium-mobile-support-card">
+        <div><small>SUPORTE</small><h2>Fale com o Suporte</h2><p>Envie sua dúvida e acompanhe a resposta da nossa equipe pelo aplicativo.</p></div>
+        <button onClick={() => irPara('suporte')}>Abrir suporte</button>
       </section>
     </div>
 
