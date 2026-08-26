@@ -56,7 +56,7 @@ export default function AdminPlanos() {
 
   async function carregar() {
     const [rp, rc, rv, rconteudos, rmentorias] = await Promise.all([
-      supabase.from('plans').select('*').order('created_at'),
+      supabase.from('plans').select('*').not('offer_id', 'like', '__individual_%').order('created_at'),
       supabase.from('courses').select('id,title').eq('is_mentorship', false).order('title'),
       supabase.from('plan_courses').select('plan_id,course_id'),
       supabase.from('plan_app_contents').select('plan_id,content_key'),
