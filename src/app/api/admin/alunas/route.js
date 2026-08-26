@@ -110,7 +110,7 @@ export async function GET(request) {
     if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
     const [cursos, planos, matriculas, vinculos, planosAlunas, perfisAcesso] = await Promise.all([
       supabase.from('courses').select('id,title,slug').order('title'),
-      supabase.from('plans').select('id,name,offer_id,period_days').order('name'),
+      supabase.from('plans').select('id,name,offer_id,period_days').not('offer_id', 'like', '__individual_%').order('name'),
       supabase.from('enrollments').select('profile_id,course_id,status,created_at,purchased_at,expires_at'),
       supabase.from('plan_courses').select('plan_id,course_id'),
       supabase.from('profile_plans').select('profile_id,plan_id,created_at'),
