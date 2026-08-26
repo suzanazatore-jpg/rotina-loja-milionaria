@@ -576,17 +576,19 @@ export default function AdminAlunas() {
 
       {/* ──────── Modal: Gerenciar aluna ──────── */}
       {gerenciando && (
-        <div onClick={fecharGerenciar} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px', zIndex: 50 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: '16px', padding: '22px', width: '100%', maxWidth: '440px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-              <span style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(212,175,55,.14)', color: ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '14px' }}>{iniciais(gerAluna.nome, gerAluna.email)}</span>
+        <div className="aluna-manager-overlay" onClick={fecharGerenciar}>
+          <div className="aluna-manager" onClick={e => e.stopPropagation()}>
+            <div className="aluna-manager-head">
+              <span style={{ width: '54px', height: '54px', borderRadius: '50%', background: 'rgba(212,175,55,.14)', color: ouro, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '15px', flexShrink: 0 }}>{iniciais(gerAluna.nome, gerAluna.email)}</span>
               <div style={{ minWidth: 0 }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0 }}>Gerenciar aluna</h2>
+                <h2 style={{ fontSize: '19px', fontWeight: 800, margin: 0 }}>{gerAluna.nome || 'Gerenciar aluna'}</h2>
                 <p style={{ fontSize: '12px', color: '#888', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis' }}>{gerAluna.email}</p>
               </div>
+              <span className="aluna-manager-status" style={{ color: estaAtiva(gerAluna) ? '#67d692' : '#ff8d8d', borderColor: estaAtiva(gerAluna) ? '#286b43' : '#672525' }}>{estaAtiva(gerAluna) ? 'Acesso ativo' : 'Acesso suspenso'}</span>
+              <button className="aluna-manager-close" onClick={fecharGerenciar} aria-label="Fechar">×</button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: '8px', marginBottom: '18px' }}>
+            <div className="aluna-manager-summary">
               {[
                 ['Plano', planos.filter(p => planosAlunas.some(item => item.profile_id === gerAluna.id && item.plan_id === p.id)).map(p => p.name).join(', ') || 'Sem plano vinculado'],
                 ['Compra / cadastro', formatarData((matriculas.filter(m => m.profile_id === gerAluna.id).map(m => m.purchased_at || m.created_at).filter(Boolean).sort()[0]) || cadastros[gerAluna.id])],
@@ -595,6 +597,9 @@ export default function AdminAlunas() {
               ].map(([rotulo, valor]) => <div key={rotulo} style={{ background: '#181818', border: '1px solid #2A2A2A', borderRadius: 9, padding: 10 }}><small style={{ display: 'block', color: '#777', marginBottom: 4 }}>{rotulo}</small><strong style={{ display: 'block', color: rotulo === 'Situação financeira' ? situacaoFinanceira(gerAluna).cor : '#eee', fontSize: 12, lineHeight: 1.35 }}>{valor}</strong></div>)}
             </div>
 
+            <div className="aluna-manager-grid">
+              <section className="aluna-manager-card">
+                <div className="aluna-manager-title"><strong>Dados da aluna</strong><span>Nome, e-mail e WhatsApp. Edite diretamente aqui.</span></div>
             <div style={{ marginBottom: '14px' }}>
               <label style={labelEstilo}>Nome</label>
               <input value={edNome} onChange={e => setEdNome(e.target.value)} placeholder="Nome completo" style={inputEstilo} />
@@ -607,15 +612,14 @@ export default function AdminAlunas() {
 
             <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
               <button onClick={salvarEdicao} disabled={salvando} style={{ flex: 1, padding: '11px', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{salvando ? 'Salvando...' : 'Salvar dados'}</button>
-              <button onClick={fecharGerenciar} style={{ padding: '11px 18px', background: 'transparent', color: '#888', border: '1px solid #2A2A2A', borderRadius: '9px', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>Fechar</button>
             </div>
+              <button onClick={() => router.push(`/admin/alunas/acesso?id=${gerAluna.id}`)} style={{ width: '100%', padding: '11px', background: 'rgba(212,175,55,.08)', color: ouro, border: '1px solid #5b4c17', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>🎓 Gerenciar planos, cursos e conteúdos</button>
+              <button onClick={reenviarBoasVindas} disabled={reenviando} style={{ width: '100%', padding: '11px', marginTop: 10, background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{reenviando ? 'Enviando...' : '✉️ Reenviar e-mail de boas-vindas'}</button>
+              </section>
 
-            <div style={{ borderTop: '1px solid #2A2A2A', paddingTop: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <button onClick={() => router.push(`/admin/alunas/acesso?id=${gerAluna.id}`)} style={{ width: '100%', padding: '11px', background: 'rgba(212,175,55,.08)', color: ouro, border: '1px solid #5b4c17', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>🎓 Gerenciar cursos e planos</button>
-              <button onClick={reenviarBoasVindas} disabled={reenviando} style={{ width: '100%', padding: '11px', background: 'transparent', color: '#5dca8a', border: '1px solid #2A5A3A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{reenviando ? 'Enviando...' : '✉️ Reenviar e-mail de boas-vindas'}</button>
+              <section className="aluna-manager-card aluna-manager-actions">
+              <div className="aluna-manager-title"><strong>Reenviar acesso</strong><span>Defina uma senha nova e envie por WhatsApp ou e-mail.</span></div>
               <section style={{ background: '#171415', border: '1px solid #302b2d', borderRadius: '12px', padding: '14px' }}>
-                <strong style={{ display: 'block', fontSize: '13px' }}>Reenviar acesso</strong>
-                <p style={{ color: '#777', fontSize: '11px', lineHeight: 1.45, margin: '4px 0 12px' }}>Defina uma senha temporária e envie por WhatsApp ou e-mail quando a aluna não conseguir entrar.</p>
                 {!senhaDefinida && <>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7, marginBottom: 9 }}>
                     <button onClick={gerarSenhaAcesso} style={{ padding: 9, background: '#211e22', color: '#fff', border: `1px solid ${modoSenha === 'automatica' ? ouro : '#39343a'}`, borderRadius: 8, fontSize: 11, fontWeight: 800, cursor: 'pointer' }}>Gerar automática</button>
@@ -639,6 +643,7 @@ export default function AdminAlunas() {
                 <button onClick={desativarAluna} disabled={desativando} title="O acesso é bloqueado, mas nenhum dado é apagado" style={{ width: '100%', padding: '11px', background: 'transparent', color: '#e88', border: '1px solid #5A1A1A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{desativando ? 'Desativando...' : '🚫 Desativar acesso'}</button>
               )}
               <button onClick={excluirAluna} disabled={excluindo} style={{ width: '100%', padding: '11px', background: '#2a1010', color: '#ff8d8d', border: '1px solid #672525', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{excluindo ? 'Excluindo...' : '🗑 Excluir aluna definitivamente'}</button>
+              </section>
             </div>
           </div>
         </div>
