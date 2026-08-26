@@ -14,6 +14,7 @@ function AcessoAlunaConteudo() {
   const [dados, setDados] = useState(null)
   const [cursos, setCursos] = useState([])
   const [planos, setPlanos] = useState([])
+  const [conteudosApp, setConteudosApp] = useState([])
   const [compra, setCompra] = useState('')
   const [expiracao, setExpiracao] = useState('')
   const [mensagem, setMensagem] = useState('')
@@ -39,6 +40,7 @@ function AcessoAlunaConteudo() {
     setDados(json)
     setPlanos(json.planoIds || [])
     setCursos(json.matriculas.filter(m => m.status === 'active').map(m => m.course_id))
+    setConteudosApp(json.conteudoIds || [])
     const primeira = json.matriculas[0]
     if (primeira?.purchased_at) setCompra(primeira.purchased_at.slice(0, 10))
     if (primeira?.expires_at) setExpiracao(primeira.expires_at.slice(0, 10))
@@ -51,7 +53,7 @@ function AcessoAlunaConteudo() {
     const accessToken = await token()
     const resposta = await fetch('/api/admin/acesso-aluna', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ alunaId, cursoIds: cursos, planoIds: planos, dataCompra: compra || null, dataExpiracao: expiracao || null }),
+      body: JSON.stringify({ alunaId, cursoIds: cursos, planoIds: planos, conteudoIds: conteudosApp, dataCompra: compra || null, dataExpiracao: expiracao || null }),
     })
     const json = await resposta.json()
     setMensagem(resposta.ok ? `✓ Acesso salvo: ${json.cursosLiberados} curso(s) liberado(s).` : json.error || 'Erro ao salvar.')
@@ -74,6 +76,9 @@ function AcessoAlunaConteudo() {
       </Secao>
       <Secao titulo="Cursos avulsos" subtitulo="Você pode liberar vários cursos além do plano.">
         <Chips itens={dados.cursos} selecionados={cursos} alternar={id => alternar(cursos, setCursos, id)} nome="title" vazio="Nenhum curso cadastrado ainda." />
+      </Secao>
+      <Secao titulo="Conteúdos do Aplicativo" subtitulo="Libere conteúdos extras somente para esta aluna, sem alterar o plano dela.">
+        <Chips itens={dados.conteudosApp || []} selecionados={conteudosApp} alternar={id => alternar(conteudosApp, setConteudosApp, id)} nome="name" vazio="Nenhum conteúdo disponível." />
       </Secao>
       <Secao titulo="Datas" subtitulo="A expiração individual tem prioridade sobre a validade do plano.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: '12px' }}>
