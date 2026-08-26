@@ -78,6 +78,16 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
         </div>
       </section>
 
+      <section className="premium-mobile-sales">
+        <h2>Vendas do mês</h2>
+        <div>
+          <span><i><AppIcon name="campaigns" size={21} /></i><small>Vendido</small><strong>{brl(resumo.mes)}</strong></span>
+          <span><i><AppIcon name="goals" size={21} /></i><small>Falta</small><strong>{brl(falta)}</strong></span>
+          <span><i><AppIcon name="calendar" size={21} /></i><small>Média diária</small><strong>{brl(mediaDiaria)}</strong></span>
+          <button className="premium-mobile-sales-action" onClick={() => irPara('vendas')}>{resumo.meta ? 'Lançar vendas' : 'Definir meta mensal'} <b>→</b></button>
+        </div>
+      </section>
+
       <section className="premium-banner premium-mobile-banner" aria-label="Novidades">
         <div className="premium-banner-track" style={{ transform: `translateX(-${bannerAtual * 100}%)` }}>
           {banners.map((banner, index) => <article key={banner.id || index}>
@@ -87,17 +97,8 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
         {banners.length > 1 && <div className="premium-banner-dots">{banners.map((_, index) => <button key={index} onClick={() => setBannerAtual(index)} className={index === bannerAtual ? 'on' : ''} aria-label={`Ver banner ${index + 1}`} />)}</div>}
       </section>
 
-      <section className="premium-mobile-sales">
-        <h2>Vendas do mês</h2>
-        <div>
-          <span><i><AppIcon name="campaigns" size={21} /></i><small>Vendido</small><strong>{brl(resumo.mes)}</strong></span>
-          <span><i><AppIcon name="goals" size={21} /></i><small>Falta</small><strong>{brl(falta)}</strong></span>
-          <span><i><AppIcon name="calendar" size={21} /></i><small>Média diária</small><strong>{brl(mediaDiaria)}</strong></span>
-        </div>
-      </section>
-
       <section className="premium-mobile-access">
-        <div className="premium-mobile-section-heading"><h2>Acessos rápidos</h2><button onClick={() => irPara('acessos')}>Ver todos <span>›</span></button></div>
+        <div className="premium-mobile-section-heading"><h2>Acessos rápidos</h2></div>
         <GradeAtalhos mobile atalhos={atalhos} atalhosBase={atalhosBase} irPara={irPara} mentoriaLiberada={mentoriaLiberada} metasLiberadas={metasLiberadas} />
       </section>
 
@@ -131,8 +132,6 @@ export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, se
         {banners.length > 1 && <div className="premium-banner-dots">{banners.map((_, index) => <button key={index} onClick={() => setBannerAtual(index)} className={index === bannerAtual ? 'on' : ''} aria-label={`Ver banner ${index + 1}`} />)}</div>}
       </section>
     </header>
-
-    <GradeAtalhos mobile atalhos={atalhos} atalhosBase={atalhosBase} irPara={irPara} mentoriaLiberada={mentoriaLiberada} metasLiberadas={metasLiberadas} />
 
     <section className="premium-goal-card">
       <div><small>VENDAS DO MÊS</small><strong>{brl(resumo.mes)}</strong><span>{resumo.meta ? `de ${brl(resumo.meta)}` : 'Defina sua primeira meta mensal'}</span></div>

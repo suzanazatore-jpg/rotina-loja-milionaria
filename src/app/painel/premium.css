@@ -324,6 +324,8 @@
   .premium-mobile-sales i { grid-row: 1 / 3; align-self: center; width: 33px; height: 33px; display: grid; place-items: center; border: 1px solid color-mix(in srgb, var(--premium-gold) 38%, var(--premium-line)); border-radius: 50%; color: var(--premium-gold); }
   .premium-mobile-sales small { overflow: hidden; color: var(--premium-muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
   .premium-mobile-sales strong { overflow: hidden; color: var(--premium-ink); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+  .premium-mobile-sales .premium-mobile-sales-action { grid-column: 1 / -1; min-height: 42px; margin: 16px 6px 0; border: 0; border-top: 1px solid var(--premium-line); border-radius: 0; padding: 14px 2px 0; background: transparent; color: var(--premium-gold); font-size: 12px; font-weight: 900; text-align: right; cursor: pointer; }
+  .premium-mobile-sales .premium-mobile-sales-action b { padding-left: 5px; font-size: 16px; }
 
   .premium-mobile-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .premium-mobile-section-heading button { min-height: 36px; border: 0; background: transparent; color: var(--premium-gold); font-size: 12px; font-weight: 800; cursor: pointer; }
