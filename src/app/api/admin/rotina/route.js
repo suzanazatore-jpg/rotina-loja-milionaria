@@ -37,6 +37,24 @@ export async function POST(request) {
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }
 
+export async function PUT(request) {
+  const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
+  try {
+    const { id, semana_inicio: semanaInicio, titulo: tituloInformado, descricao: descricaoInformada } = await request.json()
+    const titulo = String(tituloInformado || '').trim() || 'Rotina da semana'
+    const descricao = String(descricaoInformada || '').trim() || null
+    if (!id) throw new Error('Rotina não informada.')
+    if (!semanaValida(String(semanaInicio || ''))) throw new Error('Escolha uma segunda-feira válida.')
+
+    const { data: conflito } = await supabase.from('rotinas').select('id').eq('semana_inicio', semanaInicio).neq('id', id).maybeSingle()
+    if (conflito) throw new Error('Já existe uma rotina publicada para essa semana.')
+
+    const { data, error } = await supabase.from('rotinas').update({ semana_inicio: semanaInicio, titulo, descricao }).eq('id', id).select().single()
+    if (error) throw error
+    return NextResponse.json({ rotina: data })
+  } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
+}
+
 export async function DELETE(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
   try {
