@@ -38,6 +38,25 @@ export async function POST(request) {
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }
 
+export async function PUT(request) {
+  const supabase = adminClient()
+  if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
+  try {
+    const { id, mes_ano: mesAno, titulo: tituloInformado, descricao: descricaoInformada } = await request.json()
+    const titulo = String(tituloInformado || '').trim() || tituloPadrao(mesAno)
+    const descricao = String(descricaoInformada || '').trim() || null
+    if (!id) throw new Error('Campanha não informada.')
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(mesAno))) throw new Error('Selecione um mês válido.')
+
+    const { data: conflito } = await supabase.from('campanhas').select('id').eq('mes_ano', mesAno).neq('id', id).maybeSingle()
+    if (conflito) throw new Error('Já existe uma campanha publicada para esse mês.')
+
+    const { data, error } = await supabase.from('campanhas').update({ mes_ano: mesAno, titulo, descricao }).eq('id', id).select().single()
+    if (error) throw error
+    return NextResponse.json({ campanha: data })
+  } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
+}
+
 export async function DELETE(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
   const { id } = await request.json(); const { data: item } = await supabase.from('campanhas').select('*').eq('id', id).maybeSingle()
