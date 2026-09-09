@@ -357,14 +357,22 @@ export default function AdminAlunas() {
     return { ok: resp.ok, json: await resp.json() }
   }
 
-  async function excluirAluna() {
-    const confirmacao = window.prompt(`Para excluir definitivamente ${gerAluna.nome || gerAluna.email}, digite EXCLUIR.`)
+  async function excluirAluna(aluna) {
+    if (!aluna) return
+    const confirmacao = window.prompt(`Para excluir definitivamente ${aluna.nome || aluna.email}, digite EXCLUIR.`)
     if (confirmacao !== 'EXCLUIR') return
     setExcluindo(true)
-    const resposta = await chamarAdmin('DELETE', { id: gerAluna.id, confirmacao })
-    setExcluindo(false)
-    if (!resposta.ok) { aviso(`⚠ ${resposta.json.error}`, 6000); return }
-    fecharGerenciar(); await carregar(); aviso('✓ Aluna excluída definitivamente.', 5000)
+    try {
+      const resposta = await chamarAdmin('DELETE', { id: aluna.id, confirmacao })
+      if (!resposta.ok) { aviso(`⚠ ${resposta.json.error}`, 6000); return }
+      if (gerenciando?.id === aluna.id) fecharGerenciar()
+      await carregar()
+      aviso('✓ Aluna excluída definitivamente.', 5000)
+    } catch (error) {
+      aviso('⚠ Erro ao excluir: ' + error.message, 6000)
+    } finally {
+      setExcluindo(false)
+    }
   }
 
   function baixarCsv() {
@@ -561,7 +569,10 @@ export default function AdminAlunas() {
                         </button>
                       </td>
                       <td style={{ padding: '11px 14px', textAlign: 'right' }}>
-                        <button onClick={() => abrirGerenciar(a)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '7px 13px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Gerenciar</button>
+                        <div style={{ display: 'flex', gap: '7px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <button onClick={() => abrirGerenciar(a)} style={{ background: 'transparent', border: '1px solid #2A2A2A', borderRadius: '8px', color: ouro, padding: '7px 13px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>Gerenciar</button>
+                          <button onClick={() => excluirAluna(a)} disabled={excluindo} style={{ background: '#2a1010', border: '1px solid #672525', borderRadius: '8px', color: '#ff8d8d', padding: '7px 13px', fontSize: '12px', fontWeight: 700, cursor: excluindo ? 'wait' : 'pointer', whiteSpace: 'nowrap', opacity: excluindo ? .6 : 1 }}>Excluir</button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -642,7 +653,7 @@ export default function AdminAlunas() {
               ) : (
                 <button onClick={desativarAluna} disabled={desativando} title="O acesso é bloqueado, mas nenhum dado é apagado" style={{ width: '100%', padding: '11px', background: 'transparent', color: '#e88', border: '1px solid #5A1A1A', borderRadius: '9px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>{desativando ? 'Desativando...' : '🚫 Desativar acesso'}</button>
               )}
-              <button onClick={excluirAluna} disabled={excluindo} style={{ width: '100%', padding: '11px', background: '#2a1010', color: '#ff8d8d', border: '1px solid #672525', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{excluindo ? 'Excluindo...' : '🗑 Excluir aluna definitivamente'}</button>
+              <button onClick={() => excluirAluna(gerAluna)} disabled={excluindo} style={{ width: '100%', padding: '11px', background: '#2a1010', color: '#ff8d8d', border: '1px solid #672525', borderRadius: '9px', fontSize: '13px', fontWeight: 800, cursor: 'pointer' }}>{excluindo ? 'Excluindo...' : '🗑 Excluir aluna definitivamente'}</button>
               </section>
             </div>
           </div>
