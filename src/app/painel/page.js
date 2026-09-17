@@ -2,13 +2,23 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import CursosArea from './CursosArea'
-import SupportCenter from './SupportCenter'
-import VirtualAssistant from './VirtualAssistant'
-import SalesCenter from './SalesCenter'
+import dynamic from 'next/dynamic'
 import HomeDashboard from './HomeDashboard'
 import AppIcon from '@/app/components/AppIcon'
 import './premium.css'
+
+const CursosArea = dynamic(() => import('./CursosArea'), {
+  loading: () => <SectionLoading label="Abrindo seus cursos..." />,
+})
+const SupportCenter = dynamic(() => import('./SupportCenter'), {
+  loading: () => <SectionLoading label="Abrindo o suporte..." />,
+})
+const VirtualAssistant = dynamic(() => import('./VirtualAssistant'), {
+  loading: () => <SectionLoading label="Abrindo o assistente..." />,
+})
+const SalesCenter = dynamic(() => import('./SalesCenter'), {
+  loading: () => <SectionLoading label="Abrindo vendas e metas..." />,
+})
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
 const WHATSAPP = '558499814124'
@@ -22,6 +32,17 @@ const BANNERS_PADRAO = [
   { tag: '🎁 Bônus', titulo: 'Novos materiais liberados', texto: 'Confira os conteúdos do mês na área de conteúdos.' },
   { tag: '🔥 Oferta', titulo: 'Mentoria mensal ao vivo', texto: 'Não perca a próxima mentoria gravada.' },
 ]
+
+function SectionLoading({ label = 'Carregando...' }) {
+  return (
+    <div role="status" aria-live="polite" style={{ minHeight: '180px', display: 'grid', placeItems: 'center', padding: '28px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#D4AF37', fontSize: '13px', fontWeight: 800 }}>
+        <span className="premium-loading-spinner" aria-hidden="true" />
+        {label}
+      </div>
+    </div>
+  )
+}
 
 // ════════ HELPERS DE MÊS (usados na seção Calendário) ════════
 const NOMES_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -131,6 +152,7 @@ export default function Painel() {
   const [mesSelecionadoCamp, setMesSelecionadoCamp] = useState(mesAtualValor())
   // Rotina semanal (vinda do banco) — mostra só a rotina da semana atual
   const [rotinaSemanal, setRotinaSemanal] = useState(null)
+  const [conteudosCarregando, setConteudosCarregando] = useState(true)
 
   const router = useRouter()
 
@@ -146,100 +168,125 @@ export default function Painel() {
   const ouro = '#D4AF37'
   const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
 
-  // Verifica sessão e carrega dados do perfil
+  // Verifica sessão e carrega primeiro apenas os dados indispensáveis.
+  // Conteúdos secundários entram em paralelo depois que o painel já está visível.
   useEffect(() => {
-    async function init() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/login'); return }
-      setUsuario(session.user)
-      // Confere se existe uma versão dos Termos de Uso aguardando aceite.
-      if (session.user.email !== ADMIN_EMAIL) {
-        try {
-          const resposta = await fetch('/api/termos', { headers: { Authorization: `Bearer ${session.access_token}` } })
-          const termosData = await resposta.json()
-          if (resposta.ok && termosData.termos?.is_required && !termosData.aceito) setTermosPendentes(termosData.termos)
-        } catch (e) { /* não bloqueia por falha de conexão */ }
-      }
-      // Tenta carregar perfil salvo na tabela 'perfis'
-      try {
-        const { data } = await supabase.from('perfis').select('nome, whatsapp, tipo_acesso, acesso_expira_em, status_assinatura').eq('id', session.user.id).single()
-        if (data) {
-          setNome(data.nome || '')
-          setWhatsapp(data.whatsapp || '')
-          setTipoAcesso(data.tipo_acesso || 'rotina')
-          // Admin nunca é bloqueado, mesmo que o perfil tenha algum status estranho
-          if (session.user.email !== ADMIN_EMAIL) {
-            setAcesso(verificarAcesso(data))
-          }
-        }
-      } catch (e) { /* tabela pode não existir ainda */ }
-      // Confere se o plano da aluna libera as Aulas da Mentoria
-      try {
-        const respostaMentoria = await fetch('/api/mentoria', { headers: { Authorization: `Bearer ${session.access_token}` } })
-        const dadosMentoria = await respostaMentoria.json()
-        setMentoriaLiberada(respostaMentoria.ok && dadosMentoria.liberado === true)
-        if (respostaMentoria.ok) setAulas(dadosMentoria.aulas || [])
-      } catch (e) { setMentoriaLiberada(false) }
-      try {
-        const respostaAcessos = await fetch('/api/acessos-app', { headers: { Authorization: `Bearer ${session.access_token}` } })
-        const dadosAcessos = await respostaAcessos.json()
-        setAssistenteLiberado(respostaAcessos.ok && dadosAcessos.assistant === true)
-        setMetasLiberadas(respostaAcessos.ok && dadosAcessos.team_goals === true)
-      } catch (e) { setAssistenteLiberado(false); setMetasLiberadas(false) }
-      // Carrega o calendário de conteúdo (PDFs, um por mês)
-      try {
-        const resposta = await fetch('/api/calendario', { headers: { Authorization: `Bearer ${session.access_token}` } })
-        const resultado = await resposta.json()
-        const calData = resposta.ok ? resultado.calendarios : []
-        if (calData) {
-          setCalendario(calData)
-          // Se não houver material no mês atual, seleciona o mês mais recente disponível
-          const temMesAtual = calData.some(c => c.mes_ano === mesAtualValor())
-          if (!temMesAtual && calData.length > 0) {
-            setMesSelecionado(calData[0].mes_ano)
-          }
-        }
-      } catch (e) { /* sem calendário ainda */ }
-      // Carrega as campanhas (PDFs, um por mês)
-      try {
-        const resposta = await fetch('/api/campanhas', { headers: { Authorization: `Bearer ${session.access_token}` } })
-        const resultado = await resposta.json()
-        const campData = resposta.ok ? resultado.campanhas : []
-        if (campData) {
-          setCampanhas(campData)
-          const temMesAtual = campData.some(c => c.mes_ano === mesAtualValor())
-          if (!temMesAtual && campData.length > 0) {
-            setMesSelecionadoCamp(campData[0].mes_ano)
-          }
-        }
-      } catch (e) { /* sem campanhas ainda */ }
-      // Carrega a rotina da semana atual por uma rota autenticada.
-      try {
-        const resposta = await fetch(`/api/rotina?semana_inicio=${segundaFeiraAtual()}`, { headers: { Authorization: `Bearer ${session.access_token}` } })
-        const resultado = await resposta.json()
-        if (resposta.ok) setRotinaSemanal(resultado.rotina || null)
-      } catch (e) { /* sem rotina ainda */ }
-      // Carrega os banners ativos gerenciados pelo ADM. Mantém os padrões como fallback.
-      try {
-        const { data: bannersData } = await supabase
+    let cancelado = false
+    let timerSecundario
+
+    async function fetchJson(url, headers) {
+      const resposta = await fetch(url, { headers })
+      const dados = await resposta.json()
+      return { ok: resposta.ok, dados }
+    }
+
+    async function carregarSecundarios(session) {
+      const headers = { Authorization: `Bearer ${session.access_token}` }
+
+      const [calendarioResult, campanhasResult, rotinaResult, bannersResult] = await Promise.allSettled([
+        fetchJson('/api/calendario', headers),
+        fetchJson('/api/campanhas', headers),
+        fetchJson(`/api/rotina?semana_inicio=${segundaFeiraAtual()}`, headers),
+        supabase
           .from('panel_banners')
           .select('id,tag,title,body,image_url,link_url,sort_order')
           .order('sort_order', { ascending: true })
-          .order('created_at', { ascending: true })
-        if (bannersData?.length) {
-          setBanners(bannersData.map(item => ({
-            id: item.id,
-            tag: item.tag,
-            titulo: item.title,
-            texto: item.body,
-            imagem: item.image_url,
-            link: item.link_url,
-          })))
-        }
-      } catch (e) { /* mantém os banners padrão */ }
-      setCarregando(false)
+          .order('created_at', { ascending: true }),
+      ])
+
+      if (cancelado) return
+
+      if (calendarioResult.status === 'fulfilled' && calendarioResult.value.ok) {
+        const calData = calendarioResult.value.dados.calendarios || []
+        setCalendario(calData)
+        const temMesAtual = calData.some(c => c.mes_ano === mesAtualValor())
+        if (!temMesAtual && calData.length > 0) setMesSelecionado(calData[0].mes_ano)
+      }
+
+      if (campanhasResult.status === 'fulfilled' && campanhasResult.value.ok) {
+        const campData = campanhasResult.value.dados.campanhas || []
+        setCampanhas(campData)
+        const temMesAtual = campData.some(c => c.mes_ano === mesAtualValor())
+        if (!temMesAtual && campData.length > 0) setMesSelecionadoCamp(campData[0].mes_ano)
+      }
+
+      if (rotinaResult.status === 'fulfilled' && rotinaResult.value.ok) {
+        setRotinaSemanal(rotinaResult.value.dados.rotina || null)
+      }
+
+      if (bannersResult.status === 'fulfilled' && bannersResult.value.data?.length) {
+        setBanners(bannersResult.value.data.map(item => ({
+          id: item.id,
+          tag: item.tag,
+          titulo: item.title,
+          texto: item.body,
+          imagem: item.image_url,
+          link: item.link_url,
+        })))
+      }
+
+      setConteudosCarregando(false)
     }
-    init()
+
+    async function init() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) { router.push('/login'); return }
+        if (cancelado) return
+
+        setUsuario(session.user)
+        const headers = { Authorization: `Bearer ${session.access_token}` }
+
+        const termosPromise = session.user.email === ADMIN_EMAIL
+          ? Promise.resolve({ ok: true, dados: null })
+          : fetchJson('/api/termos', headers)
+
+        const [termosResult, perfilResult, mentoriaResult, acessosResult] = await Promise.allSettled([
+          termosPromise,
+          supabase.from('perfis').select('nome, whatsapp, tipo_acesso, acesso_expira_em, status_assinatura').eq('id', session.user.id).single(),
+          fetchJson('/api/mentoria', headers),
+          fetchJson('/api/acessos-app', headers),
+        ])
+
+        if (cancelado) return
+
+        if (termosResult.status === 'fulfilled' && termosResult.value.ok) {
+          const termosData = termosResult.value.dados
+          if (termosData?.termos?.is_required && !termosData.aceito) setTermosPendentes(termosData.termos)
+        }
+
+        if (perfilResult.status === 'fulfilled' && perfilResult.value.data) {
+          const perfil = perfilResult.value.data
+          setNome(perfil.nome || '')
+          setWhatsapp(perfil.whatsapp || '')
+          setTipoAcesso(perfil.tipo_acesso || 'rotina')
+          if (session.user.email !== ADMIN_EMAIL) setAcesso(verificarAcesso(perfil))
+        }
+
+        if (mentoriaResult.status === 'fulfilled') {
+          setMentoriaLiberada(mentoriaResult.value.ok && mentoriaResult.value.dados.liberado === true)
+          if (mentoriaResult.value.ok) setAulas(mentoriaResult.value.dados.aulas || [])
+        }
+
+        if (acessosResult.status === 'fulfilled') {
+          setAssistenteLiberado(acessosResult.value.ok && acessosResult.value.dados.assistant === true)
+          setMetasLiberadas(acessosResult.value.ok && acessosResult.value.dados.team_goals === true)
+        }
+
+        setCarregando(false)
+        timerSecundario = window.setTimeout(() => {
+          void carregarSecundarios(session)
+        }, 0)
+      } catch {
+        if (!cancelado) router.push('/login')
+      }
+    }
+
+    void init()
+    return () => {
+      cancelado = true
+      if (timerSecundario) window.clearTimeout(timerSecundario)
+    }
   }, [router])
 
   // Carrossel automático
@@ -454,6 +501,7 @@ export default function Painel() {
           {/* ─── INÍCIO ─── */}
           {secao === 'inicio' && (
             <HomeDashboard
+              userId={usuario?.id}
               nome={nomeExibe}
               saudacao={saudacao}
               banners={banners}
@@ -686,7 +734,7 @@ export default function Painel() {
                     <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55, maxWidth: '520px' }}>Estratégias prontas para movimentar sua loja, ativar clientes e vender mais.</p>
                   </div>
 
-                  {!campanhas.length ? <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>🎯</div><strong style={{ color: cores.tx2 }}>A próxima campanha aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há material disponível.</p></div> : <>
+                  {conteudosCarregando ? <SectionLoading label="Carregando campanhas..." /> : !campanhas.length ? <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>🎯</div><strong style={{ color: cores.tx2 }}>A próxima campanha aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há material disponível.</p></div> : <>
                     <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{campanhas.map(item => <button key={item.mes_ano} onClick={() => setMesSelecionadoCamp(item.mes_ano)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesSelecionadoCamp === item.mes_ano ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesSelecionadoCamp === item.mes_ano ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesSelecionadoCamp === item.mes_ano ? ouro : cores.tx2 }}>{rotuloMesCurto(item.mes_ano)}</button>)}</div>
                     {(() => {
                       const item = campanhas.find(c => c.mes_ano === mesSelecionadoCamp) || campanhas[0]
@@ -716,7 +764,7 @@ export default function Painel() {
                     <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55 }}>Seu planejamento em PDF para consultar, salvar e acompanhar durante o mês.</p>
                   </div>
 
-                  {!calendario.length ? <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>📅</div><strong style={{ color: cores.tx2 }}>O próximo calendário aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há PDF disponível.</p></div> : <>
+                  {conteudosCarregando ? <SectionLoading label="Carregando calendário..." /> : !calendario.length ? <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>📅</div><strong style={{ color: cores.tx2 }}>O próximo calendário aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há PDF disponível.</p></div> : <>
                     <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{calendario.map(item => <button key={item.mes_ano} onClick={() => setMesSelecionado(item.mes_ano)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesSelecionado === item.mes_ano ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesSelecionado === item.mes_ano ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesSelecionado === item.mes_ano ? ouro : cores.tx2 }}>{rotuloMesCurto(item.mes_ano)}</button>)}</div>
                     {(() => {
                       const item = calendario.find(c => c.mes_ano === mesSelecionado) || calendario[0]
@@ -748,7 +796,7 @@ export default function Painel() {
                     <div style={{ display: 'flex', gap: '7px', marginTop: '16px', flexWrap: 'wrap' }}>{['SEG','TER','QUA','QUI','SEX'].map(dia => <span key={dia} style={{ border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, background: cores.card, color: ouro, borderRadius: '7px', padding: '6px 10px', fontSize: '10px', fontWeight: 900 }}>{dia}</span>)}</div>
                   </div>
 
-                  {!rotinaSemanal ? (
+                  {conteudosCarregando ? <SectionLoading label="Carregando rotina da semana..." /> : !rotinaSemanal ? (
                     <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}>
                       <div style={{ fontSize: '42px', marginBottom: '10px' }}>🔄</div>
                       <strong style={{ color: cores.tx2 }}>A rotina desta semana aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>O material ainda não foi publicado.</p>
@@ -821,6 +869,15 @@ export default function Painel() {
         </nav>
 
       <style>{`
+        .premium-loading-spinner {
+          width: 18px;
+          height: 18px;
+          border: 2px solid rgba(212,175,55,.25);
+          border-top-color: #D4AF37;
+          border-radius: 50%;
+          animation: premium-spin .7s linear infinite;
+        }
+        @keyframes premium-spin { to { transform: rotate(360deg); } }
         @media (max-width: 720px) {
           .sidebar-desktop { display: none !important; }
           .menu-mobile-btn { display: block !important; }
