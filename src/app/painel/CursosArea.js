@@ -14,27 +14,35 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
   useEffect(() => {
     let ativo = true
     async function carregar() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const { data: { session } } = await supabase.auth.getSession()
+      const [{ data: { user } }, { data: { session } }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.getSession(),
+      ])
+      if (!user) {
+        if (ativo) setCarregando(false)
+        return
+      }
 
       const agora = new Date().toISOString()
       const ehAdmin = user.email === 'suporte@suzanazatorre.com.br'
-      const { data: matriculas } = ehAdmin
-        ? await supabase.from('courses').select('id,slug,title,subtitle,description,cover_image_url,sort_order,is_published').eq('is_published', true)
-        : await supabase.from('enrollments').select('course_id,expires_at,courses(id,slug,title,subtitle,description,cover_image_url,sort_order,is_published)').eq('profile_id', user.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${agora}`)
+      const cursosQuery = ehAdmin
+        ? supabase.from('courses').select('id,slug,title,subtitle,description,cover_image_url,sort_order,is_published').eq('is_published', true)
+        : supabase.from('enrollments').select('course_id,expires_at,courses(id,slug,title,subtitle,description,cover_image_url,sort_order,is_published)').eq('profile_id', user.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${agora}`)
+
+      const carrosseisPromise = fetch('/api/carrosseis', { headers: { Authorization: `Bearer ${session?.access_token}` } })
+        .then(async resposta => ({ ok: resposta.ok, dados: await resposta.json() }))
+
+      const [cursosResult, carrosseisResult] = await Promise.allSettled([cursosQuery, carrosseisPromise])
+      const matriculas = cursosResult.status === 'fulfilled' ? cursosResult.value.data : []
 
       const liberados = (matriculas || [])
         .map(item => ehAdmin ? item : item.courses)
         .filter(curso => curso?.is_published)
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
-      try {
-        const resposta = await fetch('/api/carrosseis', { headers: { Authorization: `Bearer ${session?.access_token}` } })
-        const dados = await resposta.json()
-        if (ativo && resposta.ok) setCarrosseis(dados.carrosseis || [])
-      } catch (e) { /* mantém a seção padrão */ }
+      if (ativo && carrosseisResult.status === 'fulfilled' && carrosseisResult.value.ok) {
+        setCarrosseis(carrosseisResult.value.dados.carrosseis || [])
+      }
 
       if (liberados.length) {
         const ids = liberados.map(curso => curso.id)
