@@ -168,8 +168,8 @@ export default function Painel() {
   const ouro = '#D4AF37'
   const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
 
-  // Verifica sessão e carrega primeiro apenas os dados indispensáveis.
-  // Conteúdos secundários entram em paralelo depois que o painel já está visível.
+  // Faz duas cargas consolidadas: primeiro o indispensável, depois os conteúdos.
+  // Assim a sessão é validada uma vez por etapa e o painel evita várias chamadas repetidas.
   useEffect(() => {
     let cancelado = false
     let timerSecundario
@@ -183,39 +183,25 @@ export default function Painel() {
     async function carregarSecundarios(session) {
       const headers = { Authorization: `Bearer ${session.access_token}` }
 
-      const [calendarioResult, campanhasResult, rotinaResult, bannersResult] = await Promise.allSettled([
-        fetchJson('/api/calendario', headers),
-        fetchJson('/api/campanhas', headers),
-        fetchJson(`/api/rotina?semana_inicio=${segundaFeiraAtual()}`, headers),
-        supabase
-          .from('panel_banners')
-          .select('id,tag,title,body,image_url,link_url,sort_order')
-          .order('sort_order', { ascending: true })
-          .order('created_at', { ascending: true }),
-      ])
+      try {
+        const { ok, dados } = await fetchJson(
+          `/api/painel-bootstrap?scope=content&semana_inicio=${segundaFeiraAtual()}`,
+          headers,
+        )
+        if (cancelado || !ok) return
 
-      if (cancelado) return
-
-      if (calendarioResult.status === 'fulfilled' && calendarioResult.value.ok) {
-        const calData = calendarioResult.value.dados.calendarios || []
+        const calData = dados.calendarios || []
         setCalendario(calData)
         const temMesAtual = calData.some(c => c.mes_ano === mesAtualValor())
         if (!temMesAtual && calData.length > 0) setMesSelecionado(calData[0].mes_ano)
-      }
 
-      if (campanhasResult.status === 'fulfilled' && campanhasResult.value.ok) {
-        const campData = campanhasResult.value.dados.campanhas || []
+        const campData = dados.campanhas || []
         setCampanhas(campData)
-        const temMesAtual = campData.some(c => c.mes_ano === mesAtualValor())
-        if (!temMesAtual && campData.length > 0) setMesSelecionadoCamp(campData[0].mes_ano)
-      }
+        const campanhasTemMesAtual = campData.some(c => c.mes_ano === mesAtualValor())
+        if (!campanhasTemMesAtual && campData.length > 0) setMesSelecionadoCamp(campData[0].mes_ano)
 
-      if (rotinaResult.status === 'fulfilled' && rotinaResult.value.ok) {
-        setRotinaSemanal(rotinaResult.value.dados.rotina || null)
-      }
-
-      if (bannersResult.status === 'fulfilled' && bannersResult.value.data?.length) {
-        setBanners(bannersResult.value.data.map(item => ({
+        setRotinaSemanal(dados.rotina || null)
+        if (dados.banners?.length) setBanners(dados.banners.map(item => ({
           id: item.id,
           tag: item.tag,
           titulo: item.title,
@@ -223,9 +209,9 @@ export default function Painel() {
           imagem: item.image_url,
           link: item.link_url,
         })))
+      } finally {
+        if (!cancelado) setConteudosCarregando(false)
       }
-
-      setConteudosCarregando(false)
     }
 
     async function init() {
@@ -237,41 +223,26 @@ export default function Painel() {
         setUsuario(session.user)
         const headers = { Authorization: `Bearer ${session.access_token}` }
 
-        const termosPromise = session.user.email === ADMIN_EMAIL
-          ? Promise.resolve({ ok: true, dados: null })
-          : fetchJson('/api/termos', headers)
-
-        const [termosResult, perfilResult, mentoriaResult, acessosResult] = await Promise.allSettled([
-          termosPromise,
-          supabase.from('perfis').select('nome, whatsapp, tipo_acesso, acesso_expira_em, status_assinatura').eq('id', session.user.id).single(),
-          fetchJson('/api/mentoria', headers),
-          fetchJson('/api/acessos-app', headers),
-        ])
-
+        const { ok, dados } = await fetchJson('/api/painel-bootstrap?scope=critical', headers)
+        if (!ok) throw new Error(dados.error || 'Não foi possível carregar o painel.')
         if (cancelado) return
 
-        if (termosResult.status === 'fulfilled' && termosResult.value.ok) {
-          const termosData = termosResult.value.dados
-          if (termosData?.termos?.is_required && !termosData.aceito) setTermosPendentes(termosData.termos)
+        if (dados.termos?.termos?.is_required && !dados.termos.aceito) {
+          setTermosPendentes(dados.termos.termos)
         }
 
-        if (perfilResult.status === 'fulfilled' && perfilResult.value.data) {
-          const perfil = perfilResult.value.data
+        if (dados.perfil) {
+          const perfil = dados.perfil
           setNome(perfil.nome || '')
           setWhatsapp(perfil.whatsapp || '')
           setTipoAcesso(perfil.tipo_acesso || 'rotina')
           if (session.user.email !== ADMIN_EMAIL) setAcesso(verificarAcesso(perfil))
         }
 
-        if (mentoriaResult.status === 'fulfilled') {
-          setMentoriaLiberada(mentoriaResult.value.ok && mentoriaResult.value.dados.liberado === true)
-          if (mentoriaResult.value.ok) setAulas(mentoriaResult.value.dados.aulas || [])
-        }
-
-        if (acessosResult.status === 'fulfilled') {
-          setAssistenteLiberado(acessosResult.value.ok && acessosResult.value.dados.assistant === true)
-          setMetasLiberadas(acessosResult.value.ok && acessosResult.value.dados.team_goals === true)
-        }
+        setMentoriaLiberada(dados.mentoria?.liberado === true)
+        setAulas(dados.mentoria?.aulas || [])
+        setAssistenteLiberado(dados.acessos?.assistant === true)
+        setMetasLiberadas(dados.acessos?.team_goals === true)
 
         setCarregando(false)
         timerSecundario = window.setTimeout(() => {
@@ -288,6 +259,28 @@ export default function Painel() {
       if (timerSecundario) window.clearTimeout(timerSecundario)
     }
   }, [router])
+
+  // Depois que a tela principal aparece, baixa os módulos mais usados em tempo ocioso.
+  // O primeiro toque em Cursos ou Vendas deixa de esperar o download do componente.
+  useEffect(() => {
+    if (carregando) return undefined
+
+    const preload = () => {
+      void Promise.allSettled([
+        import('./CursosArea'),
+        import('./SalesCenter'),
+        import('./SupportCenter'),
+      ])
+    }
+
+    if ('requestIdleCallback' in window) {
+      const idleId = window.requestIdleCallback(preload, { timeout: 1800 })
+      return () => window.cancelIdleCallback(idleId)
+    }
+
+    const timer = window.setTimeout(preload, 600)
+    return () => window.clearTimeout(timer)
+  }, [carregando])
 
   // Carrossel automático
   useEffect(() => {
@@ -546,7 +539,7 @@ export default function Painel() {
                   </BlocoCascata>}
 
                   <BlocoCascata titulo="Meus Cursos" subtitulo="Cursos liberados no seu plano" cores={cores} ouro={ouro}>
-                    <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
+                    <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} authenticatedUser={usuario} />
                   </BlocoCascata>
 
                   {mentoriaLiberada && <BlocoCascata titulo="Aulas da Mentoria" subtitulo="Gravações liberadas no seu plano" cores={cores} ouro={ouro}>
@@ -614,7 +607,7 @@ export default function Painel() {
               )}
 
               {/* MENTORIA / AULAS */}
-              {secao === 'cursos' && <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} />}
+              {secao === 'cursos' && <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} authenticatedUser={usuario} />}
 
               {secao === 'mentoria' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
