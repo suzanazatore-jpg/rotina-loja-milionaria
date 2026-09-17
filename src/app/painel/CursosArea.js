@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-export default function CursosArea({ cores, ouro, ouroGrad }) {
+export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = null }) {
   const router = useRouter()
   const [cursos, setCursos] = useState([])
   const [carrosseis, setCarrosseis] = useState([])
@@ -14,10 +14,11 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
   useEffect(() => {
     let ativo = true
     async function carregar() {
-      const [{ data: { user } }, { data: { session } }] = await Promise.all([
-        supabase.auth.getUser(),
+      const [{ data: { session } }, userResult] = await Promise.all([
         supabase.auth.getSession(),
+        authenticatedUser ? Promise.resolve(null) : supabase.auth.getUser(),
       ])
+      const user = authenticatedUser || userResult?.data?.user
       if (!user) {
         if (ativo) setCarregando(false)
         return
@@ -63,7 +64,7 @@ export default function CursosArea({ cores, ouro, ouroGrad }) {
     }
     carregar()
     return () => { ativo = false }
-  }, [])
+  }, [authenticatedUser])
 
   const temCursos = useMemo(() => cursos.length > 0, [cursos])
   const secoes = useMemo(() => {
