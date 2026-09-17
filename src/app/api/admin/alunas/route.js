@@ -32,6 +32,25 @@ function dataIso(valor, fimDoDia = false) {
   return Number.isNaN(data.getTime()) ? null : data.toISOString()
 }
 
+function maiorDataIso(...valores) {
+  const validas = valores.filter(Boolean).map(valor => new Date(valor)).filter(data => !Number.isNaN(data.getTime()))
+  if (!validas.length) return null
+  return new Date(Math.max(...validas.map(data => data.getTime()))).toISOString()
+}
+
+async function localizarUsuarioAuthPorEmail(supabase, email) {
+  const porPagina = 1000
+  for (let pagina = 1; pagina <= 20; pagina += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page: pagina, perPage: porPagina })
+    if (error) throw error
+    const usuarios = data?.users || []
+    const encontrado = usuarios.find(user => String(user.email || '').toLowerCase() === email)
+    if (encontrado) return encontrado
+    if (usuarios.length < porPagina) break
+  }
+  return null
+}
+
 async function prepararAcessos(supabase, cursoIds = [], planoIds = []) {
   const cursosAvulsos = [...new Set(cursoIds.filter(Boolean))]
   const planosUnicos = [...new Set(planoIds.filter(Boolean))]
@@ -54,54 +73,170 @@ async function prepararAcessos(supabase, cursoIds = [], planoIds = []) {
   }
 }
 
+async function garantirCursos(supabase, profileId, courseIds, origem, compra, expiracao) {
+  if (!courseIds.length) return 0
+
+  const { data: atuais, error: erroConsulta } = await supabase
+    .from('enrollments')
+    .select('course_id')
+    .eq('profile_id', profileId)
+    .in('course_id', courseIds)
+  if (erroConsulta) throw erroConsulta
+
+  const existentes = new Set((atuais || []).map(item => item.course_id))
+  const novos = courseIds.filter(courseId => !existentes.has(courseId))
+  const antigos = courseIds.filter(courseId => existentes.has(courseId))
+
+  if (novos.length) {
+    const { error } = await supabase.from('enrollments').insert(novos.map(courseId => ({
+      profile_id: profileId,
+      course_id: courseId,
+      status: 'active',
+      source: origem,
+      purchased_at: compra,
+      expires_at: expiracao,
+    })))
+    if (error) throw error
+  }
+
+  if (antigos.length) {
+    const atualizacao = { status: 'active', updated_at: new Date().toISOString() }
+    if (expiracao) atualizacao.expires_at = expiracao
+    const { error } = await supabase
+      .from('enrollments')
+      .update(atualizacao)
+      .eq('profile_id', profileId)
+      .in('course_id', antigos)
+    if (error) throw error
+  }
+
+  return novos.length
+}
+
+async function garantirPlanos(supabase, profileId, planIds) {
+  if (!planIds.length) return 0
+
+  const { data: atuais, error: erroConsulta } = await supabase
+    .from('profile_plans')
+    .select('plan_id')
+    .eq('profile_id', profileId)
+    .in('plan_id', planIds)
+  if (erroConsulta) throw erroConsulta
+
+  const existentes = new Set((atuais || []).map(item => item.plan_id))
+  const novos = planIds.filter(planId => !existentes.has(planId))
+  if (!novos.length) return 0
+
+  const { error } = await supabase.from('profile_plans').insert(novos.map(planId => ({ profile_id: profileId, plan_id: planId })))
+  if (error) throw error
+  return novos.length
+}
+
 async function criarUma(supabase, aluna, opcoes) {
   const nome = String(aluna.nome || '').trim()
   const email = String(aluna.email || '').trim().toLowerCase()
   const telefone = String(aluna.telefone || aluna.whatsapp || '').trim()
   if (!nome || !EMAIL.test(email)) throw new Error(`${nome || email || 'Linha sem nome'}: nome ou e-mail inválido.`)
 
-  const { data: existente } = await supabase.from('perfis').select('id').eq('email', email).maybeSingle()
-  if (existente) throw new Error(`${email}: já cadastrada.`)
+  const { data: perfilExistente, error: erroPerfil } = await supabase
+    .from('perfis')
+    .select('id,nome,email,whatsapp,tipo_acesso,acesso_expira_em')
+    .eq('email', email)
+    .maybeSingle()
+  if (erroPerfil) throw erroPerfil
 
-  const senha = opcoes.enviarBoasVindas ? senhaProvisoria() : null
-  const { data: auth, error: authError } = await supabase.auth.admin.createUser({
-    email, email_confirm: true, ...(senha ? { password: senha } : {}),
-    user_metadata: { name: nome, phone: telefone || null, source: opcoes.origem },
-  })
-  if (authError || !auth.user) throw new Error(`${email}: ${authError?.message || 'não foi possível criar o login'}.`)
+  let usuarioAuth = null
+  let criouAuth = false
+  let senha = null
 
-  const id = auth.user.id
-  let expiracao = dataIso(aluna.dataExpiracao, true)
-  if (!expiracao && opcoes.acessos.dias) {
-    const data = new Date(); data.setDate(data.getDate() + opcoes.acessos.dias); expiracao = data.toISOString()
+  if (perfilExistente?.id) {
+    const { data } = await supabase.auth.admin.getUserById(perfilExistente.id)
+    usuarioAuth = data?.user || null
   }
+
+  if (!usuarioAuth) usuarioAuth = await localizarUsuarioAuthPorEmail(supabase, email)
+
+  if (!usuarioAuth) {
+    senha = opcoes.enviarBoasVindas ? senhaProvisoria() : null
+    const { data: auth, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      ...(senha ? { password: senha } : {}),
+      user_metadata: { name: nome, phone: telefone || null, source: opcoes.origem },
+    })
+    if (authError || !auth.user) throw new Error(`${email}: ${authError?.message || 'não foi possível criar o login'}.`)
+    usuarioAuth = auth.user
+    criouAuth = true
+  }
+
+  const id = usuarioAuth.id
+  let expiracaoNova = dataIso(aluna.dataExpiracao, true)
+  if (!expiracaoNova && opcoes.acessos.dias) {
+    const data = new Date()
+    data.setDate(data.getDate() + opcoes.acessos.dias)
+    expiracaoNova = data.toISOString()
+  }
+  const expiracao = maiorDataIso(perfilExistente?.acesso_expira_em, expiracaoNova)
   const compra = dataIso(aluna.dataCompra) || new Date().toISOString()
 
   try {
+    const { data: perfilCursosAtual, error: erroPerfilCursosAtual } = await supabase
+      .from('profiles')
+      .select('mentoria_aplicada,assistant_enabled,status')
+      .eq('id', id)
+      .maybeSingle()
+    if (erroPerfilCursosAtual) throw erroPerfilCursosAtual
+
     const [perfilAntigo, perfilCursos] = await Promise.all([
-      supabase.from('perfis').insert({ id, nome, email, whatsapp: telefone || null, tipo_acesso: expiracao ? 'avista' : 'rotina', acesso_expira_em: expiracao?.slice(0, 10) || null }),
-      supabase.from('profiles').upsert({ id, name: nome, email, phone: telefone || null, role: 'student', status: 'active', mentoria_aplicada: opcoes.acessos.mentoria, assistant_enabled: opcoes.acessos.assistente, updated_at: new Date().toISOString() }),
+      supabase.from('perfis').upsert({
+        id,
+        nome,
+        email,
+        whatsapp: telefone || perfilExistente?.whatsapp || null,
+        tipo_acesso: expiracao ? 'avista' : (perfilExistente?.tipo_acesso || 'rotina'),
+        acesso_expira_em: expiracao?.slice(0, 10) || perfilExistente?.acesso_expira_em || null,
+      }, { onConflict: 'id' }),
+      supabase.from('profiles').upsert({
+        id,
+        name: nome,
+        email,
+        phone: telefone || null,
+        role: 'student',
+        status: perfilCursosAtual?.status === 'blocked' ? 'active' : (perfilCursosAtual?.status || 'active'),
+        mentoria_aplicada: Boolean(perfilCursosAtual?.mentoria_aplicada || opcoes.acessos.mentoria),
+        assistant_enabled: Boolean(perfilCursosAtual?.assistant_enabled || opcoes.acessos.assistente),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' }),
     ])
     if (perfilAntigo.error || perfilCursos.error) throw perfilAntigo.error || perfilCursos.error
-    if (opcoes.acessos.ids.length) {
-      const { error } = await supabase.from('enrollments').insert(opcoes.acessos.ids.map(courseId => ({ profile_id: id, course_id: courseId, status: 'active', source: opcoes.origem, purchased_at: compra, expires_at: expiracao })))
-      if (error) throw error
+
+    const [cursosNovos, planosNovos] = await Promise.all([
+      garantirCursos(supabase, id, opcoes.acessos.ids, opcoes.origem, compra, expiracaoNova),
+      garantirPlanos(supabase, id, opcoes.acessos.planoIds),
+    ])
+
+    let emailFalhou = false
+    if (senha) {
+      try { await enviarEmailBoasVindas({ nome, email, senha }) } catch { emailFalhou = true }
     }
-    if (opcoes.acessos.planoIds.length) {
-      const { error } = await supabase.from('profile_plans').insert(opcoes.acessos.planoIds.map(planId => ({ profile_id: id, plan_id: planId })))
-      if (error) throw error
+
+    return {
+      id,
+      nome,
+      email,
+      emailFalhou,
+      reutilizada: !criouAuth,
+      cursosNovos,
+      planosNovos,
     }
   } catch (error) {
-    await supabase.from('perfis').delete().eq('id', id)
-    await supabase.auth.admin.deleteUser(id)
+    if (criouAuth) {
+      await supabase.from('perfis').delete().eq('id', id)
+      await supabase.from('profiles').delete().eq('id', id)
+      await supabase.auth.admin.deleteUser(id)
+    }
     throw new Error(`${email}: ${error.message}`)
   }
-
-  let emailFalhou = false
-  if (senha) {
-    try { await enviarEmailBoasVindas({ nome, email, senha }) } catch { emailFalhou = true }
-  }
-  return { id, nome, email, emailFalhou }
 }
 
 export async function GET(request) {
@@ -139,13 +274,30 @@ export async function POST(request) {
     if (lista.length > limite) return NextResponse.json({ error: `Importe no máximo ${limite} alunas por vez.` }, { status: 400 })
 
     const acessos = await prepararAcessos(supabase, body.cursoIds || [], body.planoIds || [])
-    const criadas = []; const falhas = []
+    const criadas = []
+    const falhas = []
     for (const aluna of lista) {
-      try { criadas.push(await criarUma(supabase, aluna, { enviarBoasVindas, acessos, origem: body.modo === 'massa' ? 'admin-csv' : 'admin-manual' })) }
-      catch (error) { falhas.push(error.message) }
+      try {
+        criadas.push(await criarUma(supabase, aluna, {
+          enviarBoasVindas,
+          acessos,
+          origem: body.modo === 'massa' ? 'admin-csv' : 'admin-manual',
+        }))
+      } catch (error) {
+        falhas.push(error.message)
+      }
     }
     if (!criadas.length) return NextResponse.json({ error: falhas.join('\n') || 'Nenhuma aluna foi criada.' }, { status: 400 })
-    return NextResponse.json({ success: true, criadas: criadas.length, falhas, emailsFalhos: criadas.filter(a => a.emailFalhou).length }, { status: 201 })
+
+    const reutilizadas = criadas.filter(item => item.reutilizada).length
+    return NextResponse.json({
+      success: true,
+      criadas: criadas.length - reutilizadas,
+      reutilizadas,
+      processadas: criadas.length,
+      falhas,
+      emailsFalhos: criadas.filter(a => a.emailFalhou).length,
+    }, { status: 201 })
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
