@@ -52,6 +52,7 @@ export default function PwaInstallPrompt() {
   const pathname = usePathname()
   const [installEvent, setInstallEvent] = useState(null)
   const [device, setDevice] = useState(() => detectDevice())
+  const [installed, setInstalled] = useState(false)
   const [visible, setVisible] = useState(false)
   const [showInstructions, setShowInstructions] = useState(false)
   const [installing, setInstalling] = useState(false)
@@ -68,7 +69,15 @@ export default function PwaInstallPrompt() {
       setDevice(currentDevice)
       if (currentDevice.standalone) {
         markInstalled()
+        setInstalled(true)
         setVisible(false)
+        return
+      }
+
+      try {
+        setInstalled(window.localStorage.getItem(INSTALLED_KEY) === 'true')
+      } catch {
+        setInstalled(false)
       }
     })
 
@@ -79,6 +88,7 @@ export default function PwaInstallPrompt() {
 
     function handleInstalled() {
       markInstalled()
+      setInstalled(true)
       setVisible(false)
       setInstallEvent(null)
     }
@@ -111,17 +121,6 @@ export default function PwaInstallPrompt() {
     return () => window.clearTimeout(timer)
   }, [isPanel, device.standalone, canOfferInstall])
 
-  useEffect(() => {
-    if (!visible) return undefined
-
-    function closeOnEscape(event) {
-      if (event.key === 'Escape') remindLater()
-    }
-
-    window.addEventListener('keydown', closeOnEscape)
-    return () => window.removeEventListener('keydown', closeOnEscape)
-  }, [visible])
-
   function remindLater() {
     try {
       window.localStorage.setItem(DISMISSED_KEY, String(Date.now()))
@@ -144,6 +143,7 @@ export default function PwaInstallPrompt() {
       const choice = await installEvent.userChoice
       if (choice?.outcome === 'accepted') {
         markInstalled()
+        setInstalled(true)
         setVisible(false)
       } else {
         remindLater()
@@ -154,7 +154,33 @@ export default function PwaInstallPrompt() {
     }
   }
 
-  if (!visible || !isPanel || device.standalone) return null
+  function openInstallOptions() {
+    setShowInstructions(false)
+    setVisible(true)
+  }
+
+  if (!isPanel || device.standalone || installed || !canOfferInstall) return null
+
+  if (!visible) {
+    return (
+      <button
+        type="button"
+        onClick={openInstallOptions}
+        aria-label="Instalar o App Rotina"
+        style={{
+          position: 'fixed', right: '16px', bottom: '82px', zIndex: 89,
+          display: 'flex', alignItems: 'center', gap: '8px',
+          border: '1px solid rgba(255,255,255,.2)', borderRadius: '999px', padding: '11px 16px',
+          background: 'linear-gradient(135deg, #D4AF37, #F5D76E)', color: '#0A0A0A',
+          boxShadow: '0 10px 30px rgba(0,0,0,.28)', fontSize: '13px', fontWeight: 850, cursor: 'pointer',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        }}
+      >
+        <span aria-hidden="true" style={{ fontSize: '17px', lineHeight: 1 }}>↓</span>
+        Instalar aplicativo
+      </button>
+    )
+  }
 
   const instructions = device.embedded
     ? [
@@ -177,9 +203,6 @@ export default function PwaInstallPrompt() {
   return (
     <div
       role="presentation"
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) remindLater()
-      }}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
         padding: '18px', background: 'rgba(0,0,0,.68)', backdropFilter: 'blur(5px)',
@@ -195,7 +218,7 @@ export default function PwaInstallPrompt() {
           boxShadow: '0 24px 70px rgba(0,0,0,.5)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '13px' }}>
             <Image src="/pwa-icon-192.png" alt="" width={58} height={58} priority style={{ borderRadius: '15px', flex: '0 0 auto' }} />
             <div>
@@ -203,7 +226,6 @@ export default function PwaInstallPrompt() {
               <h2 id="pwa-install-title" style={{ margin: 0, fontSize: '20px', lineHeight: 1.2 }}>Tenha o App Rotina sempre à mão</h2>
             </div>
           </div>
-          <button type="button" aria-label="Fechar" onClick={remindLater} style={{ border: 0, background: 'transparent', color: '#888', fontSize: '23px', cursor: 'pointer', padding: '0 0 6px 8px' }}>×</button>
         </div>
 
         {!showInstructions ? (
