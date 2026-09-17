@@ -19,25 +19,24 @@ function GradeAtalhos({ mobile = false, atalhos, atalhosBase, irPara, mentoriaLi
   return <div className={mobile ? 'premium-mobile-shortcuts' : 'premium-shortcuts'}>{itens.map(([icon, title, subtitle, target]) => <button key={`${target}-${title}`} onClick={() => irPara(target)}><i><AppIcon name={icon} size={mobile ? 36 : 30} strokeWidth={1.45} /></i><strong>{title}</strong>{!mobile && <span>{subtitle}</span>}</button>)}</div>
 }
 
-export default function HomeDashboard({ nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado, metasLiberadas }) {
+export default function HomeDashboard({ userId, nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado, metasLiberadas }) {
   const [resumo, setResumo] = useState({ meta: 0, mes: 0, hoje: 0 })
   const hoje = useMemo(() => new Date(), [])
 
   useEffect(() => {
     async function carregar() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!userId) return
       const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
       const dataHoje = hoje.toISOString().slice(0, 10)
       const [{ data: goal }, { data: sales }] = await Promise.all([
-        supabase.from('sales_goals').select('monthly_target').eq('owner_id', user.id).eq('month_start', inicioMes).maybeSingle(),
-        supabase.from('daily_sales').select('sale_date,amount').eq('owner_id', user.id).gte('sale_date', inicioMes),
+        supabase.from('sales_goals').select('monthly_target').eq('owner_id', userId).eq('month_start', inicioMes).maybeSingle(),
+        supabase.from('daily_sales').select('sale_date,amount').eq('owner_id', userId).gte('sale_date', inicioMes),
       ])
       const lista = sales || []
       setResumo({ meta: Number(goal?.monthly_target || 0), mes: lista.reduce((s, i) => s + Number(i.amount || 0), 0), hoje: lista.filter(i => i.sale_date === dataHoje).reduce((s, i) => s + Number(i.amount || 0), 0) })
     }
     carregar()
-  }, [hoje])
+  }, [hoje, userId])
 
   const pct = resumo.meta ? Math.round(resumo.mes / resumo.meta * 100) : 0
   const falta = Math.max(0, resumo.meta - resumo.mes)
