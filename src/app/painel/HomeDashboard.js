@@ -185,7 +185,10 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
           <div className="premium-mobile-month-progress"><i style={{ width: `${Math.min(100, pct)}%` }} /></div>
           <footer><span>{pct}% da meta alcançada</span><span>{diasRestantes} {diasRestantes === 1 ? 'dia restante' : 'dias restantes'}</span></footer>
         </article>
-        <article className="premium-mobile-today-sales"><span><small>Vendas de hoje</small><strong>{brl(resumo.hoje)}</strong></span><button type="button" onClick={() => irPara('vendas')}>＋ {resumo.meta ? 'Lançar venda' : 'Definir meta'}</button></article>
+        <article className="premium-mobile-today-sales">
+          <span><small>VENDAS REGISTRADAS HOJE</small><strong>{brl(resumo.hoje)}</strong></span>
+          <button type="button" onClick={() => irPara('lancar-venda')}><b>＋ Lançar venda de hoje</b><small>Registre o resultado da equipe</small></button>
+        </article>
       </section>
 
       <PlanoHoje plano={planoHoje} concluidas={concluidas} salvando={salvandoTarefas} erro={erroProgresso} alternar={alternarTarefa} mediaDiaria={mediaDiaria} irPara={irPara} mobile />
@@ -241,7 +244,7 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
       <div className="premium-progress"><i style={{ width: `${Math.min(100, pct)}%`, background: ouroGrad }} /></div>
       <div className="premium-goal-footer">
         <span>Vendas de hoje <strong>{brl(resumo.hoje)}</strong></span>
-        <button onClick={() => irPara('vendas')}>{resumo.meta ? 'Lançar vendas' : 'Definir meta mensal'} →</button>
+        <button onClick={() => irPara('lancar-venda')}>＋ Lançar venda de hoje →</button>
       </div>
     </section>
 

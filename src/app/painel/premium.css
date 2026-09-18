@@ -354,11 +354,13 @@
   .premium-mobile-month-progress { height: 6px; overflow: hidden; margin-top: 14px; border-radius: 99px; background: var(--premium-line); }
   .premium-mobile-month-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #c05d8d, #ddb866); }
   .premium-mobile-month-goal > footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; color: var(--premium-muted); font-size: 8px; }
-  .premium-mobile-today-sales { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; padding: 12px 14px; border: 1px solid var(--premium-line); border-radius: 15px; background: var(--premium-paper); }
+  .premium-mobile-today-sales { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 9px; padding: 15px; border: 1px solid color-mix(in srgb, var(--premium-gold) 38%, var(--premium-line)); border-radius: 17px; background: var(--premium-paper); box-shadow: 0 10px 26px rgba(48,38,20,.08); }
   .premium-mobile-today-sales small, .premium-mobile-today-sales strong { display: block; }
-  .premium-mobile-today-sales small { color: var(--premium-muted); font-size: 9px; }
+  .premium-mobile-today-sales > span small { color: var(--premium-muted); font-size: 9px; font-weight: 800; letter-spacing: .05em; }
   .premium-mobile-today-sales strong { margin-top: 2px; color: var(--premium-ink); font-size: 18px; }
-  .premium-mobile-today-sales button { min-height: 38px; padding: 8px 13px; border: 0; border-radius: 11px; background: linear-gradient(135deg, #b48732, #ddba5b); color: #21190c; font-size: 10px; font-weight: 900; cursor: pointer; }
+  .premium-mobile-today-sales button { width: 100%; min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border: 0; border-radius: 13px; background: linear-gradient(135deg, #b48732, #e4c467); color: #21190c; text-align: left; box-shadow: 0 8px 18px rgba(180,135,50,.22); cursor: pointer; }
+  .premium-mobile-today-sales button b { font-size: 13px; font-weight: 950; }
+  .premium-mobile-today-sales button small { max-width: 98px; color: rgba(33,25,12,.72); font-size: 9px; font-weight: 750; line-height: 1.2; text-align: right; }
 
   .premium-daily-plan-mobile { display: block !important; margin: 0 0 26px; }
   .premium-daily-plan-mobile .premium-daily-focus { padding: 16px; }

@@ -115,6 +115,7 @@ export default function Painel() {
   const [usuario, setUsuario] = useState(null)
   const [carregando, setCarregando] = useState(true)
   const [secao, setSecao] = useState('inicio')
+  const [vendasAbaInicial, setVendasAbaInicial] = useState('painel')
   const [tema, setTema] = useState(() => {
     if (typeof window === 'undefined') return 'claro'
     const salvo = window.localStorage.getItem('rotina-tema')
@@ -434,7 +435,9 @@ export default function Painel() {
     if (id === 'markup') { router.push('/markup'); return }
     if (id === 'mentoria') { router.push('/mentoria'); return }
     if (id === 'assistente' && !assistenteLiberado) { setSecao('suporte'); setMenuMobile(false); return }
-    if (id === 'vendas' && !metasLiberadas) { setSecao('metas-bloqueadas'); setMenuMobile(false); return }
+    if ((id === 'vendas' || id === 'lancar-venda') && !metasLiberadas) { setSecao('metas-bloqueadas'); setMenuMobile(false); return }
+    if (id === 'lancar-venda') { setVendasAbaInicial('lancar'); setSecao('vendas'); setMenuMobile(false); return }
+    if (id === 'vendas') setVendasAbaInicial('painel')
     setSecao(id)
     setMenuMobile(false)
   }
@@ -713,7 +716,7 @@ export default function Painel() {
 
               {/* VENDAS E METAS */}
               {secao === 'vendas' && (
-                metasLiberadas ? <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} /> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
+                metasLiberadas ? <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} initialTab={vendasAbaInicial} /> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
 
               {secao === 'metas-bloqueadas' && <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />}
