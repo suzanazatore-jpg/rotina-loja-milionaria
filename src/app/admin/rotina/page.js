@@ -13,7 +13,7 @@ const botao = { background: '#1A1A1A', color: ouro, border: '1px solid #333', bo
 
 function formatarData(data) { const d = new Date(data); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 function segundaFeiraAtual() { const hoje = new Date(); const dia = hoje.getDay(); hoje.setDate(hoje.getDate() + (dia === 0 ? 1 : 1 - dia)); return formatarData(hoje) }
-function rotuloSemana(valor) { if (!valor) return ''; const [a,m,d] = valor.split('-').map(Number); const inicio = new Date(a,m-1,d); const fim = new Date(a,m-1,d+4); const fmt = x => `${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}`; return `De ${fmt(inicio)} a ${fmt(fim)}` }
+function rotuloSemana(valor) { if (!valor) return ''; const [a,m,d] = valor.split('-').map(Number); const inicio = new Date(a,m-1,d); const fim = new Date(a,m-1,d+6); const fmt = x => `${String(x.getDate()).padStart(2,'0')}/${String(x.getMonth()+1).padStart(2,'0')}`; return `De ${fmt(inicio)} a ${fmt(fim)}` }
 
 export default function AdminRotina() {
   const router = useRouter()

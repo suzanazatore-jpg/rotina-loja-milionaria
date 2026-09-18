@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { normalizarPlanoCampanha } from '@/lib/campaignPlan'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const BUCKET = 'campanhas'
@@ -21,19 +22,22 @@ export async function GET(request) {
 export async function POST(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
   try {
-    const form = await request.formData(); const arquivo = form.get('arquivo'); const mesAno = String(form.get('mes_ano') || ''); const titulo = String(form.get('titulo') || '').trim() || tituloPadrao(mesAno); const descricao = String(form.get('descricao') || '').trim() || null
+    const form = await request.formData(); const arquivo = form.get('arquivo'); const mesAno = String(form.get('mes_ano') || ''); const titulo = String(form.get('titulo') || '').trim() || tituloPadrao(mesAno); const descricao = String(form.get('descricao') || '').trim() || null; const planoInterativo = normalizarPlanoCampanha(JSON.parse(String(form.get('plano_interativo') || '{}')))
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mesAno)) throw new Error('Selecione um mês válido.')
-    if (!arquivo || typeof arquivo.arrayBuffer !== 'function' || arquivo.size === 0) throw new Error('Escolha o arquivo PDF.')
-    if (arquivo.type !== 'application/pdf') throw new Error('Envie somente arquivo PDF.')
-    if (arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
+    const temArquivo = arquivo && typeof arquivo.arrayBuffer === 'function' && arquivo.size > 0
+    if (temArquivo && arquivo.type !== 'application/pdf') throw new Error('Envie somente arquivo PDF.')
+    if (temArquivo && arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
     const { data: existente } = await supabase.from('campanhas').select('*').eq('mes_ano', mesAno).maybeSingle()
-    const caminho = `${mesAno}/${crypto.randomUUID()}.pdf`
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(caminho, await arquivo.arrayBuffer(), { contentType: 'application/pdf', cacheControl: '3600', upsert: false })
-    if (uploadError) throw new Error(`Não foi possível subir o PDF: ${uploadError.message}`)
-    const registro = { ordem: 1, mes_ano: mesAno, titulo, descricao, arquivo_url: null, arquivo_nome: caminho, storage_bucket: BUCKET }
+    let caminho = existente?.arquivo_nome || null
+    if (temArquivo) {
+      caminho = `${mesAno}/${crypto.randomUUID()}.pdf`
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(caminho, await arquivo.arrayBuffer(), { contentType: 'application/pdf', cacheControl: '3600', upsert: false })
+      if (uploadError) throw new Error(`Não foi possível subir o PDF: ${uploadError.message}`)
+    }
+    const registro = { ordem: 1, mes_ano: mesAno, titulo, descricao, plano_interativo: planoInterativo, arquivo_url: temArquivo ? null : (existente?.arquivo_url || null), arquivo_nome: caminho, storage_bucket: temArquivo ? BUCKET : (existente?.storage_bucket || BUCKET) }
     const resultado = existente ? await supabase.from('campanhas').update(registro).eq('id', existente.id).select().single() : await supabase.from('campanhas').insert(registro).select().single()
-    if (resultado.error) { await supabase.storage.from(BUCKET).remove([caminho]); throw resultado.error }
-    if (existente?.arquivo_nome) await supabase.storage.from(existente.storage_bucket || 'materiais').remove([existente.arquivo_nome])
+    if (resultado.error) { if (temArquivo) await supabase.storage.from(BUCKET).remove([caminho]); throw resultado.error }
+    if (temArquivo && existente?.arquivo_nome) await supabase.storage.from(existente.storage_bucket || 'materiais').remove([existente.arquivo_nome])
     return NextResponse.json({ campanha: resultado.data, substituido: Boolean(existente) }, { status: 201 })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }
@@ -42,7 +46,7 @@ export async function PUT(request) {
   const supabase = adminClient()
   if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
   try {
-    const { id, mes_ano: mesAno, titulo: tituloInformado, descricao: descricaoInformada } = await request.json()
+    const { id, mes_ano: mesAno, titulo: tituloInformado, descricao: descricaoInformada, plano_interativo: planoInformado } = await request.json()
     const titulo = String(tituloInformado || '').trim() || tituloPadrao(mesAno)
     const descricao = String(descricaoInformada || '').trim() || null
     if (!id) throw new Error('Campanha não informada.')
@@ -51,7 +55,7 @@ export async function PUT(request) {
     const { data: conflito } = await supabase.from('campanhas').select('id').eq('mes_ano', mesAno).neq('id', id).maybeSingle()
     if (conflito) throw new Error('Já existe uma campanha publicada para esse mês.')
 
-    const { data, error } = await supabase.from('campanhas').update({ mes_ano: mesAno, titulo, descricao }).eq('id', id).select().single()
+    const { data, error } = await supabase.from('campanhas').update({ mes_ano: mesAno, titulo, descricao, plano_interativo: normalizarPlanoCampanha(planoInformado) }).eq('id', id).select().single()
     if (error) throw error
     return NextResponse.json({ campanha: data })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
