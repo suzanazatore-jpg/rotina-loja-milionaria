@@ -64,6 +64,21 @@ export default function PwaInstallPrompt() {
   )
 
   useEffect(() => {
+    if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return undefined
+
+    let cancelled = false
+    navigator.serviceWorker.register('/sw.js', { scope: '/', updateViaCache: 'none' })
+      .then(registration => {
+        if (!cancelled) void registration.update()
+      })
+      .catch(() => {
+        // O aplicativo continua funcionando normalmente quando o navegador não aceita o cache local.
+      })
+
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
     const currentDevice = detectDevice()
     const frame = window.requestAnimationFrame(() => {
       setDevice(currentDevice)
