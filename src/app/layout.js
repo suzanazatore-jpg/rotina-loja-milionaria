@@ -34,11 +34,17 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+
   return (
     <html
       lang="pt-BR"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {supabaseUrl && <link rel="preconnect" href={supabaseUrl} crossOrigin="anonymous" />}
+        {supabaseUrl && <link rel="dns-prefetch" href={supabaseUrl} />}
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <AdminAlunasPlanInjector />
