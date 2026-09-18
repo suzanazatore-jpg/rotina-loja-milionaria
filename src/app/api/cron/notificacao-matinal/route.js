@@ -127,13 +127,13 @@ async function sendOne(supabase, row, today) {
 
 export async function GET(request) {
   const authorization = request.headers.get('authorization') || ''
-  const cronSecret = process.env.CRON_SECRET
+  const cronSecret = process.env.PUSH_CRON_SECRET || process.env.CRON_SECRET
   if (!cronSecret || authorization !== `Bearer ${cronSecret}`) {
     return Response.json({ error: 'Não autorizado.' }, { status: 401 })
   }
 
   try {
-    if (!getVapidPublicKey() || !process.env.VAPID_PRIVATE_KEY) {
+    if (!getVapidPublicKey() || !(process.env.PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY)) {
       return Response.json({ error: 'Chaves de notificação não configuradas.' }, { status: 503 })
     }
 

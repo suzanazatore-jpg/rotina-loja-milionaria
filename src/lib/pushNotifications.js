@@ -3,14 +3,14 @@ import webpush from 'web-push'
 let configured = false
 
 export function getVapidPublicKey() {
-  return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || ''
+  return process.env.PUSH_VAPID_PUBLIC_KEY || process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY || ''
 }
 
 function configureWebPush() {
   if (configured) return
 
   const publicKey = getVapidPublicKey()
-  const privateKey = process.env.VAPID_PRIVATE_KEY
+  const privateKey = process.env.PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY
   const subject = process.env.VAPID_SUBJECT || 'mailto:suporte@suzanazatorre.com.br'
 
   if (!publicKey || !privateKey) {
