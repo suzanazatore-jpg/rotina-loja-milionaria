@@ -1,7 +1,6 @@
-const SHELL_CACHE = 'rotina-shell-v1'
+const SHELL_CACHE = 'rotina-shell-v2'
 const APP_SHELL = [
   '/painel',
-  '/login',
   '/manifest.webmanifest',
   '/pwa-icon-192.png',
   '/pwa-icon-512.png',
@@ -61,7 +60,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
 
-  if (request.mode === 'navigate' && ['/painel', '/login'].includes(url.pathname)) {
+  if (request.mode === 'navigate' && url.pathname === '/painel') {
     event.respondWith(staleWhileRevalidate(request))
     return
   }
