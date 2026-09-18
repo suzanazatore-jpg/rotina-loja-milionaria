@@ -55,6 +55,7 @@ export default function Admin() {
       titulo: 'Marketing e Comunicação',
       descricao: 'Ações para comunicar e acompanhar suas alunas.',
       cards: [
+        { icone: 'goals', titulo: 'Leads do Raio-X', sub: 'Acompanhe diagnósticos, gargalos e contatos captados.', rota: '/admin/raio-x' },
         { icone: 'banners', titulo: 'Banners do Painel', sub: 'Insira banners e novidades no topo do aplicativo.', rota: '/admin/banners' },
         { icone: 'carousel', titulo: 'Carrosséis de Cursos', sub: 'Organize cursos em seções na área de membros.', rota: '/admin/carrosseis' },
         { icone: 'comments', titulo: 'Comentários', sub: 'Veja, responda e modere comentários feitos nas aulas.', rota: '/admin/comentarios' },
