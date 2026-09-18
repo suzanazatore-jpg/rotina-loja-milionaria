@@ -128,6 +128,6 @@ export default function InteractiveCalendar({ mesAno, actions = [], pdfItem, use
       {erro && <p className="interactive-calendar-error">{erro}</p>}
     </>}
 
-    {pdfItem?.arquivo_url && <section className="interactive-calendar-pdf" style={{ background: cores.card, borderColor: cores.borda }}><div><small style={{ color: ouro }}>MATERIAL COMPLEMENTAR</small><strong style={{ color: cores.tx }}>{pdfItem.titulo}</strong><p style={{ color: cores.tx2 }}>{pdfItem.descricao || 'Consulte também a versão completa em PDF.'}</p></div><div><a href={pdfItem.arquivo_url} target="_blank" rel="noopener noreferrer">Visualizar PDF</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar PDF</button></div></section>}
+    {pdfItem?.arquivo_url && <section className="interactive-calendar-pdf" style={{ background: cores.card, borderColor: cores.borda }}><div><small style={{ color: ouro }}>MATERIAL COMPLEMENTAR</small><strong style={{ color: cores.tx }}>{pdfItem.titulo}</strong><p style={{ color: cores.tx2 }}>{pdfItem.descricao || 'Consulte também o material completo.'}</p></div><div><a href={pdfItem.arquivo_url} target="_blank" rel="noopener noreferrer">Abrir material</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar material</button></div></section>}
   </div>
 }

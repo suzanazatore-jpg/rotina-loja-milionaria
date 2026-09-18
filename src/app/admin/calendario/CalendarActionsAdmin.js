@@ -87,8 +87,11 @@ export default function CalendarActionsAdmin({ token }) {
   const [carregando, setCarregando] = useState(true)
   const [mensagem, setMensagem] = useState('')
   const [salvando, setSalvando] = useState(false)
+  const [lendoArquivo, setLendoArquivo] = useState(false)
   const [modo, setModo] = useState(null)
   const [lote, setLote] = useState('')
+  const [arquivoFonte, setArquivoFonte] = useState(null)
+  const [acoesPreparadas, setAcoesPreparadas] = useState([])
   const [substituir, setSubstituir] = useState(true)
   const [edicaoId, setEdicaoId] = useState(null)
   const [form, setForm] = useState(() => formVazio(mesAtual()))
@@ -129,6 +132,13 @@ export default function CalendarActionsAdmin({ token }) {
     setModo('manual')
   }
 
+  function selecionarMes(valor) {
+    setMesAno(valor)
+    setArquivoFonte(null)
+    setAcoesPreparadas([])
+    setLote('')
+  }
+
   async function salvarManual(evento) {
     evento.preventDefault()
     const estavaEditando = Boolean(edicaoId)
@@ -151,9 +161,11 @@ export default function CalendarActionsAdmin({ token }) {
     setSalvando(true)
     setMensagem('')
     try {
-      const lista = interpretarLote(lote, mesAno)
+      const lista = acoesPreparadas.length ? acoesPreparadas : interpretarLote(lote, mesAno)
       const dados = await requisicao('POST', { modo: 'lote', mes_ano: mesAno, substituir, acoes: lista })
       setLote('')
+      setArquivoFonte(null)
+      setAcoesPreparadas([])
       setModo(null)
       await carregar()
       setMensagem(`✓ ${dados.total} ${dados.total === 1 ? 'ação importada' : 'ações importadas'} para ${NOMES[Number(mesAno.slice(5)) - 1]}.`)
@@ -163,11 +175,42 @@ export default function CalendarActionsAdmin({ token }) {
     setSalvando(false)
   }
 
-  async function lerArquivo(evento) {
-    const arquivo = evento.target.files?.[0]
-    if (!arquivo) return
-    if (arquivo.size > 2 * 1024 * 1024) { setMensagem('O arquivo deve ter no máximo 2 MB.'); return }
-    setLote(await arquivo.text())
+  async function interpretarArquivo() {
+    if (!arquivoFonte) { setMensagem('Escolha o PDF ou Word do mês.'); return }
+    setLendoArquivo(true)
+    setMensagem('')
+    try {
+      const formData = new FormData()
+      formData.append('arquivo', arquivoFonte)
+      formData.append('mes_ano', mesAno)
+      const resposta = await fetch('/api/admin/calendario/interpretar', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      const dados = await resposta.json()
+      if (!resposta.ok) throw new Error(dados.error || 'Não foi possível ler o arquivo.')
+      setAcoesPreparadas(dados.acoes || [])
+      setMensagem(`✓ ${dados.total} ${dados.total === 1 ? 'ação preparada' : 'ações preparadas'}. Revise antes de publicar.`)
+    } catch (error) {
+      setMensagem(error.message)
+    }
+    setLendoArquivo(false)
+  }
+
+  function escolherArquivo(evento) {
+    const arquivo = evento.target.files?.[0] || null
+    setArquivoFonte(arquivo)
+    setAcoesPreparadas([])
+    setMensagem('')
+  }
+
+  function atualizarPreparada(indice, campoNome, valor) {
+    setAcoesPreparadas(atual => atual.map((acao, posicao) => posicao === indice ? { ...acao, [campoNome]: valor } : acao))
+  }
+
+  function removerPreparada(indice) {
+    setAcoesPreparadas(atual => atual.filter((_, posicao) => posicao !== indice))
   }
 
   async function excluir(acao) {
@@ -184,20 +227,37 @@ export default function CalendarActionsAdmin({ token }) {
   return <section style={{ marginBottom: '28px' }}>
     <div style={{ background: '#111', border: '1px solid #34302A', borderRadius: '16px', padding: '20px', marginBottom: '14px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '14px', flexWrap: 'wrap' }}>
-        <div><small style={{ color: ouro, fontWeight: 900, letterSpacing: '.1em' }}>CALENDÁRIO INTERATIVO</small><h2 style={{ margin: '5px 0', fontSize: '19px' }}>Ações por data</h2><p style={{ margin: 0, color: '#888', fontSize: '13px' }}>Importe o mês inteiro de uma vez. O cadastro manual fica para ajustes pontuais.</p></div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}><button onClick={() => setModo(modo === 'lote' ? null : 'lote')} style={{ ...botao, background: modo === 'lote' ? '#2d270f' : botao.background }}>↑ Importar em lote</button><button onClick={() => abrirManual()} style={{ ...botao, background: ouroGrad, color: '#090909', fontWeight: 900 }}>+ Ação pontual</button></div>
+        <div><small style={{ color: ouro, fontWeight: 900, letterSpacing: '.1em' }}>CALENDÁRIO INTERATIVO</small><h2 style={{ margin: '5px 0', fontSize: '19px' }}>Ações por data</h2><p style={{ margin: 0, color: '#888', fontSize: '13px' }}>Envie o PDF ou Word do mês. O cadastro manual fica para ajustes pontuais.</p></div>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}><button onClick={() => setModo(modo === 'lote' ? null : 'lote')} style={{ ...botao, background: modo === 'lote' ? '#2d270f' : botao.background }}>↑ Importar PDF ou Word</button><button onClick={() => abrirManual()} style={{ ...botao, background: ouroGrad, color: '#090909', fontWeight: 900 }}>+ Ação pontual</button></div>
       </div>
     </div>
 
     {mensagem && <div style={{ background: '#18150b', border: '1px solid #5b4c17', color: '#F5D76E', padding: '11px 13px', borderRadius: '9px', marginBottom: '14px' }}>{mensagem}</div>}
 
     {modo === 'lote' && <form onSubmit={importar} style={{ background: '#111', border: '1px solid #34302A', borderRadius: '16px', padding: '20px', marginBottom: '14px' }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: '16px' }}>Importar o mês inteiro</h3>
-      <p style={{ color: '#888', fontSize: '12px', lineHeight: 1.5, margin: '0 0 14px' }}>Cole linhas do Excel ou Google Sheets. Ordem: Data | Tema | Descrição | Canal | Formato | Produto e CTA | Texto ou material | Link.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '12px', marginBottom: '12px' }}><label>Mês<select value={mesAno} onChange={evento => setMesAno(evento.target.value)} style={campo}>{meses.map(mes => <option key={mes.valor} value={mes.valor}>{mes.rotulo}</option>)}</select></label><label style={{ border: '1px dashed #66561e', borderRadius: '9px', padding: '10px 13px', cursor: 'pointer', color: ouro, alignSelf: 'end' }}>Escolher arquivo CSV ou TXT<input type="file" accept=".csv,.txt,text/csv,text/plain" onChange={lerArquivo} style={{ display: 'none' }} /></label></div>
-      <textarea value={lote} onChange={evento => setLote(evento.target.value)} rows={9} style={{ ...campo, resize: 'vertical', lineHeight: 1.55 }} placeholder={'01/10 | Lançamento da coleção | Apresente os produtos protagonistas | Instagram | Stories | Nova coleção — chame no WhatsApp | Grave três Stories mostrando detalhes | https://...'} />
+      <h3 style={{ margin: '0 0 6px', fontSize: '16px' }}>Enviar o planejamento do mês</h3>
+      <p style={{ color: '#888', fontSize: '12px', lineHeight: 1.5, margin: '0 0 14px' }}>Escolha o PDF ou Word. O aplicativo lê o material, organiza as ações por data e mostra uma prévia antes da publicação.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: '12px', marginBottom: '12px' }}>
+        <label>Mês<select value={mesAno} onChange={evento => selecionarMes(evento.target.value)} style={campo}>{meses.map(mes => <option key={mes.valor} value={mes.valor}>{mes.rotulo}</option>)}</select></label>
+        <label style={{ border: '1px dashed #66561e', borderRadius: '9px', padding: '10px 13px', cursor: 'pointer', color: ouro, alignSelf: 'end', minHeight: '43px', boxSizing: 'border-box' }}>{arquivoFonte ? `📄 ${arquivoFonte.name}` : 'Escolher PDF ou Word (.docx)'}<input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" onChange={escolherArquivo} style={{ display: 'none' }} /></label>
+      </div>
+      {!acoesPreparadas.length && <div style={{ display: 'flex', justifyContent: 'flex-end' }}><button type="button" onClick={interpretarArquivo} disabled={!arquivoFonte || lendoArquivo} style={{ ...botao, background: ouroGrad, color: '#090909', fontWeight: 900, opacity: !arquivoFonte || lendoArquivo ? .55 : 1 }}>{lendoArquivo ? 'Lendo e organizando...' : 'Ler arquivo e preparar ações'}</button></div>}
+
+      {acoesPreparadas.length > 0 && <div style={{ display: 'grid', gap: '9px', marginTop: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}><strong style={{ fontSize: '14px' }}>Prévia para revisão</strong><span style={{ color: '#888', fontSize: '12px' }}>{acoesPreparadas.length} {acoesPreparadas.length === 1 ? 'ação encontrada' : 'ações encontradas'}</span></div>
+        {acoesPreparadas.map((acao, indice) => <details key={`${acao.action_date}-${indice}`} style={{ background: '#0A0A0A', border: '1px solid #2F2F2F', borderRadius: '11px', padding: '11px 12px' }}>
+          <summary style={{ cursor: 'pointer', color: '#EEE', fontSize: '13px', fontWeight: 800 }}>{dataBr(acao.action_date)} — {acao.title}</summary>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '9px', marginTop: '12px' }}><label>Data<input type="date" value={acao.action_date} onChange={evento => atualizarPreparada(indice, 'action_date', evento.target.value)} style={campo} /></label><label>Tema<input value={acao.title} onChange={evento => atualizarPreparada(indice, 'title', evento.target.value)} style={campo} /></label></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: '9px', marginTop: '9px' }}><label>Canal<input value={acao.channel || ''} onChange={evento => atualizarPreparada(indice, 'channel', evento.target.value)} style={campo} /></label><label>Formato<input value={acao.content_format || ''} onChange={evento => atualizarPreparada(indice, 'content_format', evento.target.value)} style={campo} /></label><label>CTA<input value={acao.product_cta || ''} onChange={evento => atualizarPreparada(indice, 'product_cta', evento.target.value)} style={campo} /></label></div>
+          <label style={{ display: 'block', marginTop: '9px' }}>Descrição<input value={acao.description || ''} onChange={evento => atualizarPreparada(indice, 'description', evento.target.value)} style={campo} /></label>
+          <label style={{ display: 'block', marginTop: '9px' }}>Texto, legenda ou orientação<textarea value={acao.content_text || ''} onChange={evento => atualizarPreparada(indice, 'content_text', evento.target.value)} rows={4} style={{ ...campo, resize: 'vertical' }} /></label>
+          <button type="button" onClick={() => removerPreparada(indice)} style={{ ...botao, color: '#f99', marginTop: '9px' }}>Remover esta ação</button>
+        </details>)}
+      </div>}
+
+      <details style={{ marginTop: '14px', color: '#888', fontSize: '12px' }}><summary style={{ cursor: 'pointer', color: ouro }}>Alternativa: colar dados de uma planilha</summary><p>Ordem: Data | Tema | Descrição | Canal | Formato | Produto e CTA | Texto ou material | Link.</p><textarea value={lote} onChange={evento => { setLote(evento.target.value); setAcoesPreparadas([]) }} rows={7} style={{ ...campo, resize: 'vertical', lineHeight: 1.55 }} placeholder={'01/10 | Lançamento da coleção | Apresente os produtos protagonistas | Instagram | Stories | Nova coleção — chame no WhatsApp | Grave três Stories mostrando detalhes'} /></details>
       <label style={{ display: 'flex', gap: '9px', alignItems: 'center', color: '#AAA', fontSize: '13px', marginTop: '12px' }}><input type="checkbox" checked={substituir} onChange={evento => setSubstituir(evento.target.checked)} /> Substituir as ações já cadastradas neste mês</label>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}><button type="button" onClick={() => setModo(null)} style={botao}>Cancelar</button><button disabled={salvando} style={{ ...botao, background: ouroGrad, color: '#090909', fontWeight: 900 }}>{salvando ? 'Importando...' : 'Importar ações'}</button></div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}><button type="button" onClick={() => setModo(null)} style={botao}>Cancelar</button><button disabled={salvando || (!acoesPreparadas.length && !lote.trim())} style={{ ...botao, background: ouroGrad, color: '#090909', fontWeight: 900, opacity: salvando || (!acoesPreparadas.length && !lote.trim()) ? .55 : 1 }}>{salvando ? 'Publicando...' : 'Publicar ações'}</button></div>
     </form>}
 
     {modo === 'manual' && <form onSubmit={salvarManual} style={{ background: '#111', border: '1px solid #34302A', borderRadius: '16px', padding: '20px', marginBottom: '14px' }}>
@@ -211,7 +271,7 @@ export default function CalendarActionsAdmin({ token }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}><button type="button" onClick={() => setModo(null)} style={botao}>Cancelar</button><button disabled={salvando} style={{ ...botao, background: ouroGrad, color: '#090909', fontWeight: 900 }}>{salvando ? 'Salvando...' : 'Salvar ação'}</button></div>
     </form>}
 
-    <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: '12px', marginBottom: '10px', flexWrap: 'wrap' }}><label style={{ minWidth: '230px' }}>Mês das ações<select value={mesAno} onChange={evento => setMesAno(evento.target.value)} style={campo}>{meses.map(mes => <option key={mes.valor} value={mes.valor}>{mes.rotulo}</option>)}</select></label><span style={{ color: '#777', fontSize: '12px' }}>{acoes.length} {acoes.length === 1 ? 'ação cadastrada' : 'ações cadastradas'}</span></div>
+    <div style={{ display: 'flex', alignItems: 'end', justifyContent: 'space-between', gap: '12px', marginBottom: '10px', flexWrap: 'wrap' }}><label style={{ minWidth: '230px' }}>Mês das ações<select value={mesAno} onChange={evento => selecionarMes(evento.target.value)} style={campo}>{meses.map(mes => <option key={mes.valor} value={mes.valor}>{mes.rotulo}</option>)}</select></label><span style={{ color: '#777', fontSize: '12px' }}>{acoes.length} {acoes.length === 1 ? 'ação cadastrada' : 'ações cadastradas'}</span></div>
     <div style={{ display: 'grid', gap: '9px' }}>
       {carregando ? <div style={{ color: '#777', padding: '24px', textAlign: 'center' }}>Carregando ações...</div> : acoes.map(acao => <article key={acao.id} style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', padding: '13px' }}><div style={{ width: '48px', height: '48px', borderRadius: '11px', background: 'rgba(212,175,55,.12)', color: ouro, display: 'grid', placeItems: 'center', fontWeight: 900 }}>{String(acao.action_date).slice(8, 10)}</div><div style={{ flex: 1, minWidth: '210px' }}><strong style={{ fontSize: '14px' }}>{acao.title}</strong><p style={{ color: '#777', fontSize: '12px', margin: '4px 0 0' }}>{[acao.channel, acao.content_format, acao.product_cta].filter(Boolean).join(' • ') || acao.description || 'Sem detalhes adicionais'}</p></div><div style={{ display: 'flex', gap: '7px' }}><button onClick={() => abrirManual(acao)} style={botao}>Editar</button><button onClick={() => excluir(acao)} style={{ ...botao, color: '#f99' }}>Excluir</button></div></article>)}
       {!carregando && !acoes.length && <div style={{ textAlign: 'center', padding: '34px 20px', background: '#111', border: '1px solid #2A2A2A', borderRadius: '12px', color: '#777' }}>Nenhuma ação interativa cadastrada neste mês.</div>}
