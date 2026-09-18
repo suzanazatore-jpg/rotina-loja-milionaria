@@ -1,5 +1,77 @@
 @import "tailwindcss";
 
+.morning-notification-prompt {
+  position: fixed;
+  right: 20px;
+  bottom: 22px;
+  z-index: 9990;
+  width: min(390px, calc(100vw - 32px));
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: 18px;
+  border: 1px solid #403823;
+  border-radius: 20px;
+  background: #111111;
+  color: #ffffff;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, .42);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.morning-notification-icon {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: rgba(212, 175, 55, .13);
+  font-size: 20px;
+}
+
+.morning-notification-copy { min-width: 0; flex: 1; }
+.morning-notification-copy small { display: block; color: #d4af37; font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.morning-notification-copy strong { display: block; margin-top: 4px; font-size: 16px; line-height: 1.25; }
+.morning-notification-copy > p { margin: 6px 18px 0 0; color: #adadad; font-size: 12px; line-height: 1.45; }
+.morning-notification-copy .morning-notification-message { color: #efcc69; }
+.morning-notification-copy .morning-notification-message.success { color: #7bd7a8; }
+.morning-notification-copy .morning-notification-message.error { color: #ff9b9b; }
+
+.morning-notification-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.morning-notification-actions button {
+  min-height: 42px;
+  border-radius: 11px;
+  padding: 0 13px;
+  border: 0;
+  background: linear-gradient(135deg, #d4af37, #f5d76e);
+  color: #0a0a0a;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.morning-notification-actions button:disabled { cursor: wait; opacity: .7; }
+.morning-notification-actions button + button { border: 1px solid #343434; background: transparent; color: #b9b9b9; }
+
+.morning-notification-close {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: #777777;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+@media (max-width: 700px) {
+  .morning-notification-prompt {
+    right: 16px;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+  }
+}
+
 :root {
   --background: #0A0A0A;
   --foreground: #ededed;

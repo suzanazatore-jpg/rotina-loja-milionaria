@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'rotina-shell-v2'
+const SHELL_CACHE = 'rotina-shell-v3'
 const APP_SHELL = [
   '/painel',
   '/manifest.webmanifest',
@@ -68,4 +68,46 @@ self.addEventListener('fetch', event => {
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(cacheFirst(request))
   }
+})
+
+self.addEventListener('push', event => {
+  let payload = {}
+
+  try {
+    payload = event.data ? event.data.json() : {}
+  } catch {
+    payload = { body: event.data ? event.data.text() : '' }
+  }
+
+  const title = payload.title || 'Rotina da Loja Milionária'
+  const options = {
+    body: payload.body || 'Sua rotina de hoje já está disponível.',
+    icon: payload.icon || '/pwa-icon-192.png',
+    badge: payload.badge || '/pwa-icon-192.png',
+    tag: payload.tag || 'rotina-matinal',
+    renotify: false,
+    data: {
+      url: payload.url || '/painel',
+    },
+  }
+
+  event.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+
+  const targetUrl = new URL(event.notification.data?.url || '/painel', self.location.origin).href
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(windowClients => {
+        const sameOriginClient = windowClients.find(client => new URL(client.url).origin === self.location.origin)
+
+        if (sameOriginClient) {
+          return sameOriginClient.navigate(targetUrl).then(client => client?.focus())
+        }
+
+        return self.clients.openWindow(targetUrl)
+      }),
+  )
 })
