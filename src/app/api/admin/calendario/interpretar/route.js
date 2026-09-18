@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { CanvasFactory } from 'pdf-parse/worker'
 import { PDFParse } from 'pdf-parse'
 import mammoth from 'mammoth'
 
@@ -62,7 +63,7 @@ async function extrairTexto(arquivo, extensao) {
     return resultado.value
   }
 
-  const parser = new PDFParse({ data: buffer })
+  const parser = new PDFParse({ data: buffer, CanvasFactory })
   try {
     const resultado = await parser.getText()
     return resultado.text
