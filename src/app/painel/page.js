@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import HomeDashboard from './HomeDashboard'
 import CampaignJourney from './CampaignJourney'
+import InteractiveCalendar from './InteractiveCalendar'
 import AppIcon from '@/app/components/AppIcon'
 import './premium.css'
 
@@ -148,6 +149,7 @@ export default function Painel() {
   const [metasLiberadas, setMetasLiberadas] = useState(false)
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
+  const [acoesCalendario, setAcoesCalendario] = useState([])
   const [mesSelecionado, setMesSelecionado] = useState(mesAtualValor())
   // Campanhas (vindo do banco)
   const [campanhas, setCampanhas] = useState([])
@@ -193,9 +195,14 @@ export default function Painel() {
         if (cancelado || !ok) return
 
         const calData = dados.calendarios || []
+        const actionData = dados.acoes_calendario || []
         setCalendario(calData)
-        const temMesAtual = calData.some(c => c.mes_ano === mesAtualValor())
-        if (!temMesAtual && calData.length > 0) setMesSelecionado(calData[0].mes_ano)
+        setAcoesCalendario(actionData)
+        const mesesCalendario = [...new Set([
+          ...calData.map(item => item.mes_ano),
+          ...actionData.map(item => String(item.action_date).slice(0, 7)),
+        ])].filter(Boolean).sort().reverse()
+        setMesSelecionado(atual => mesesCalendario.includes(atual) ? atual : (mesesCalendario.includes(mesAtualValor()) ? mesAtualValor() : mesesCalendario[0] || mesAtualValor()))
 
         const campData = dados.campanhas || []
         setCampanhas(campData)
@@ -515,6 +522,7 @@ export default function Painel() {
               assistenteLiberado={assistenteLiberado}
               metasLiberadas={metasLiberadas}
               rotinaSemanal={rotinaSemanal}
+              calendarActions={acoesCalendario}
             />
           )}
 
@@ -743,33 +751,29 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* CALENDÁRIO DE CONTEÚDO (PDFs por mês) */}
+              {/* CALENDÁRIO DE CONTEÚDO INTERATIVO */}
               {secao === 'calendario' && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <div style={{ background: tema === 'escuro' ? 'linear-gradient(145deg,#17150f,#111)' : 'linear-gradient(145deg,#fffaf0,#fff)', border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, borderRadius: '18px', padding: '22px', marginBottom: '18px' }}>
                     <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>PLANEJAMENTO MENSAL</p>
                     <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 6px', color: cores.tx }}>Calendário de Conteúdo</h2>
-                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55 }}>Seu planejamento em PDF para consultar, salvar e acompanhar durante o mês.</p>
+                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55 }}>Abra cada data, execute a ação e acompanhe seu progresso durante o mês.</p>
                   </div>
 
-                  {conteudosCarregando ? <SectionLoading label="Carregando calendário..." /> : !calendario.length ? <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>📅</div><strong style={{ color: cores.tx2 }}>O próximo calendário aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há PDF disponível.</p></div> : <>
-                    <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{calendario.map(item => <button key={item.mes_ano} onClick={() => setMesSelecionado(item.mes_ano)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesSelecionado === item.mes_ano ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesSelecionado === item.mes_ano ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesSelecionado === item.mes_ano ? ouro : cores.tx2 }}>{rotuloMesCurto(item.mes_ano)}</button>)}</div>
-                    {(() => {
-                      const item = calendario.find(c => c.mes_ano === mesSelecionado) || calendario[0]
-                      if (!item) return null
-                      const [, numeroMes] = item.mes_ano.split('-')
-                      return <article style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '18px', overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '17px', padding: '22px', borderBottom: `1px solid ${cores.borda}` }}>
-                          <div style={{ width: '72px', height: '78px', borderRadius: '14px', background: ouroGrad, color: '#0A0A0A', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 10px 28px rgba(212,175,55,.18)' }}><small style={{ fontSize: '10px', fontWeight: 900, letterSpacing: '.08em' }}>MÊS</small><strong style={{ fontSize: '28px', lineHeight: 1 }}>{numeroMes}</strong></div>
-                          <div style={{ minWidth: 0 }}><p style={{ fontSize: '11px', fontWeight: 800, color: ouro, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '.06em' }}>{rotuloMesCompleto(item.mes_ano)}</p><h3 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: cores.tx }}>{item.titulo}</h3><p style={{ fontSize: '13px', color: cores.tx2, margin: '6px 0 0', lineHeight: 1.5 }}>{item.descricao || 'Seu calendário mensal está pronto para acessar.'}</p></div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '10px', padding: '16px', flexWrap: 'wrap' }}>
-                          <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx, fontSize: '13px', fontWeight: 800, textDecoration: 'none' }}>👁 Visualizar PDF</a>
-                          <button onClick={() => baixarPdf(item)} style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: ouroGrad, border: 'none', color: '#0A0A0A', fontSize: '13px', fontWeight: 900, cursor: 'pointer' }}>⬇ Baixar calendário</button>
-                        </div>
-                      </article>
-                    })()}
-                  </>}
+                  {conteudosCarregando ? <SectionLoading label="Carregando calendário..." /> : (() => {
+                    const meses = [...new Set([
+                      ...calendario.map(item => item.mes_ano),
+                      ...acoesCalendario.map(item => String(item.action_date).slice(0, 7)),
+                    ])].filter(Boolean).sort().reverse()
+                    if (!meses.length) return <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>📅</div><strong style={{ color: cores.tx2 }}>O próximo calendário aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há ações disponíveis.</p></div>
+                    const mesAtivo = meses.includes(mesSelecionado) ? mesSelecionado : meses[0]
+                    const itemPdf = calendario.find(item => item.mes_ano === mesAtivo)
+                    const acoesDoMes = acoesCalendario.filter(item => String(item.action_date).startsWith(`${mesAtivo}-`))
+                    return <>
+                      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{meses.map(mes => <button key={mes} onClick={() => setMesSelecionado(mes)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesAtivo === mes ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesAtivo === mes ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesAtivo === mes ? ouro : cores.tx2 }}>{rotuloMesCurto(mes)}</button>)}</div>
+                      <InteractiveCalendar mesAno={mesAtivo} actions={acoesDoMes} pdfItem={itemPdf} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => itemPdf && baixarPdf(itemPdf)} />
+                    </>
+                  })()}
                 </div>
               )}
 

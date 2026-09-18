@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import CalendarActionsAdmin from './CalendarActionsAdmin'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const ouro = '#D4AF37'
@@ -92,10 +93,14 @@ export default function AdminCalendario() {
     <header style={{ padding: '16px 20px', borderBottom: '1px solid #2A2A2A', background: '#111', position: 'sticky', top: 0, zIndex: 10 }}><button onClick={() => router.push('/admin')} style={{ background: 'transparent', border: '1px solid #333', borderRadius: '8px', color: ouro, padding: '7px 12px', cursor: 'pointer' }}>← Admin</button></header>
     <main style={{ maxWidth: '920px', margin: '0 auto', padding: '26px 18px 60px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '22px' }}>
-        <div><p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>ADMINISTRAÇÃO</p><h1 style={{ fontSize: '24px', margin: '5px 0' }}>Calendário mensal</h1><p style={{ color: '#888', margin: 0 }}>Publique o PDF que as alunas poderão visualizar e baixar.</p></div>
+        <div><p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>ADMINISTRAÇÃO</p><h1 style={{ fontSize: '24px', margin: '5px 0' }}>Calendário mensal</h1><p style={{ color: '#888', margin: 0 }}>Organize as ações interativas e mantenha o PDF como material complementar.</p></div>
         {!formAberto && <button onClick={() => abrirPara()} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '11px 17px', fontWeight: 900, cursor: 'pointer' }}>+ Publicar calendário</button>}
       </div>
       {mensagem && <div style={{ background: '#18150b', border: '1px solid #5b4c17', color: '#F5D76E', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
+
+      <CalendarActionsAdmin token={token} />
+
+      <div style={{ margin: '4px 0 14px' }}><small style={{ color: ouro, fontWeight: 900, letterSpacing: '.1em' }}>MATERIAL COMPLEMENTAR</small><h2 style={{ fontSize: '19px', margin: '5px 0' }}>PDF mensal</h2><p style={{ color: '#777', fontSize: '13px', margin: 0 }}>O PDF atual continua disponível para visualizar e baixar.</p></div>
 
       {formAberto && <form onSubmit={enviar} style={{ background: '#111', border: '1px solid #34302A', borderRadius: '16px', padding: '20px', marginBottom: '22px' }}>
         <h2 style={{ fontSize: '17px', margin: '0 0 5px' }}>{modoForm === 'editar' ? 'Editar calendário' : modoForm === 'substituir' ? 'Substituir calendário' : 'Publicar calendário'}</h2><p style={{ color: '#777', fontSize: '12px', margin: '0 0 17px' }}>{modoForm === 'editar' ? 'Corrija as informações abaixo. O PDF atual será mantido.' : 'Se já existir um PDF no mês escolhido, ele será substituído.'}</p>

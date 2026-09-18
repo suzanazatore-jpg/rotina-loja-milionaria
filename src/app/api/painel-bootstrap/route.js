@@ -114,8 +114,14 @@ async function signFile(supabase, item, bucket) {
 }
 
 async function loadContent(supabase, weekStart) {
-  const [calendarResult, campaignsResult, routineResult, bannersResult] = await Promise.allSettled([
+  const [calendarResult, calendarActionsResult, campaignsResult, routineResult, bannersResult] = await Promise.allSettled([
     supabase.from('calendario').select('*').order('mes_ano', { ascending: false }),
+    supabase
+      .from('calendar_actions')
+      .select('id,action_date,title,description,channel,content_format,product_cta,content_text,material_url,sort_order')
+      .eq('is_published', true)
+      .order('action_date', { ascending: true })
+      .order('sort_order', { ascending: true }),
     supabase.from('campanhas').select('*').order('mes_ano', { ascending: false }),
     supabase.from('rotinas').select('*').eq('semana_inicio', weekStart).maybeSingle(),
     supabase
@@ -127,6 +133,9 @@ async function loadContent(supabase, weekStart) {
 
   const calendarRows = calendarResult.status === 'fulfilled' && !calendarResult.value.error
     ? calendarResult.value.data || []
+    : []
+  const calendarActions = calendarActionsResult.status === 'fulfilled' && !calendarActionsResult.value.error
+    ? calendarActionsResult.value.data || []
     : []
   const campaignRows = campaignsResult.status === 'fulfilled' && !campaignsResult.value.error
     ? campaignsResult.value.data || []
@@ -144,7 +153,7 @@ async function loadContent(supabase, weekStart) {
     routine ? signFile(supabase, routine, 'rotinas') : null,
   ])
 
-  return { calendarios, campanhas, rotina, banners }
+  return { calendarios, acoes_calendario: calendarActions, campanhas, rotina, banners }
 }
 
 export async function GET(request) {
