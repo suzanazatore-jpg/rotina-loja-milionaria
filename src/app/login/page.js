@@ -25,7 +25,14 @@ export default function Login() {
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       setManterConectada(getRememberLoginPreference())
-      setEmail(getStoredLoginEmail())
+
+      const parametrosDoLink = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+      const emailDoLink = (parametrosDoLink.get('email') || '').trim().toLowerCase()
+      setEmail(emailDoLink || getStoredLoginEmail())
+
+      if (emailDoLink) {
+        window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`)
+      }
     })
     return () => window.cancelAnimationFrame(frame)
   }, [])
