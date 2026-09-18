@@ -65,7 +65,16 @@ function PlanoHoje({ plano, concluidas, salvando, erro, alternar, mediaDiaria, i
   </section>
 }
 
-export default function HomeDashboard({ userId, nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado, metasLiberadas, rotinaSemanal }) {
+function AgendaCalendarioHoje({ acoes, irPara }) {
+  if (!acoes.length) return null
+  return <section className="premium-calendar-today-card">
+    <header><div><small>CALENDÁRIO DE CONTEÚDO</small><h2>{acoes.length === 1 ? '1 ação programada para hoje' : `${acoes.length} ações programadas para hoje`}</h2></div><AppIcon name="calendar" size={22} /></header>
+    <div>{acoes.slice(0, 3).map(acao => <article key={acao.id}><span>•</span><div><strong>{acao.title}</strong><small>{[acao.channel, acao.content_format].filter(Boolean).join(' • ') || 'Abra para ver a orientação completa'}</small></div></article>)}</div>
+    <button type="button" onClick={() => irPara('calendario')}>Abrir ações de hoje →</button>
+  </section>
+}
+
+export default function HomeDashboard({ userId, nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado, metasLiberadas, rotinaSemanal, calendarActions = [] }) {
   const [resumo, setResumo] = useState({ meta: 0, mes: 0, hoje: 0 })
   const [concluidas, setConcluidas] = useState(() => new Set())
   const [salvandoTarefas, setSalvandoTarefas] = useState(() => new Set())
@@ -73,6 +82,7 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
   const hoje = useMemo(() => new Date(), [])
   const dataHoje = useMemo(() => dataLocal(hoje), [hoje])
   const planoHoje = useMemo(() => planoDoDia(rotinaSemanal?.plano_dias, hoje), [hoje, rotinaSemanal?.plano_dias])
+  const acoesHoje = useMemo(() => calendarActions.filter(acao => acao.action_date === dataHoje), [calendarActions, dataHoje])
 
   useEffect(() => {
     async function carregar() {
@@ -192,6 +202,7 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
       </section>
 
       <PlanoHoje plano={planoHoje} concluidas={concluidas} salvando={salvandoTarefas} erro={erroProgresso} alternar={alternarTarefa} mediaDiaria={mediaDiaria} irPara={irPara} mobile />
+      <AgendaCalendarioHoje acoes={acoesHoje} irPara={irPara} />
 
       <section className="premium-banner premium-mobile-banner" aria-label="Novidades">
         <div className="premium-banner-track" style={{ transform: `translateX(-${bannerAtual * 100}%)` }}>
@@ -249,6 +260,7 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
     </section>
 
     <PlanoHoje plano={planoHoje} concluidas={concluidas} salvando={salvandoTarefas} erro={erroProgresso} alternar={alternarTarefa} mediaDiaria={mediaDiaria} irPara={irPara} />
+    <AgendaCalendarioHoje acoes={acoesHoje} irPara={irPara} />
 
     <div className="premium-section-title"><h2>Acessos rápidos</h2></div>
     <GradeAtalhos atalhos={atalhos} atalhosBase={atalhosBase} irPara={irPara} mentoriaLiberada={mentoriaLiberada} metasLiberadas={metasLiberadas} />
