@@ -2,6 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
 import AdminAlunasPlanInjector from "./components/AdminAlunasPlanInjector";
+import MorningNotificationPrompt from "./components/MorningNotificationPrompt";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,6 +50,7 @@ export default function RootLayout({ children }) {
         {children}
         <AdminAlunasPlanInjector />
         <PwaInstallPrompt />
+        <MorningNotificationPrompt />
       </body>
     </html>
   );
