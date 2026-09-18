@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import AppIcon from '@/app/components/AppIcon'
+import { planoDoDia } from '@/lib/dailyPlan'
 
 const brl = valor => Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const dataLocal = data => `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`
+
+function capitalizar(valor) {
+  return valor ? valor.charAt(0).toUpperCase() + valor.slice(1) : ''
+}
 
 function GradeAtalhos({ mobile = false, atalhos, atalhosBase, irPara, mentoriaLiberada, metasLiberadas }) {
   const itensMobile = [
@@ -19,15 +25,59 @@ function GradeAtalhos({ mobile = false, atalhos, atalhosBase, irPara, mentoriaLi
   return <div className={mobile ? 'premium-mobile-shortcuts' : 'premium-shortcuts'}>{itens.map(([icon, title, subtitle, target]) => <button key={`${target}-${title}`} onClick={() => irPara(target)}><i><AppIcon name={icon} size={mobile ? 36 : 30} strokeWidth={1.45} /></i><strong>{title}</strong>{!mobile && <span>{subtitle}</span>}</button>)}</div>
 }
 
-export default function HomeDashboard({ userId, nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado, metasLiberadas }) {
+function PlanoHoje({ plano, concluidas, salvando, erro, alternar, mediaDiaria, irPara, mobile = false }) {
+  const tarefas = plano.tarefas.filter(tarefa => tarefa.titulo)
+  const totalConcluidas = tarefas.filter(tarefa => concluidas.has(tarefa.id)).length
+  const percentual = tarefas.length ? Math.round(totalConcluidas / tarefas.length * 100) : 0
+
+  return <section className={`premium-daily-plan ${mobile ? 'premium-daily-plan-mobile' : ''}`} aria-labelledby={mobile ? 'plano-hoje-mobile' : 'plano-hoje-desktop'}>
+    <article className="premium-daily-focus">
+      <small><AppIcon name="goals" size={15} /> FOCO COMERCIAL DO DIA</small>
+      <h2>{plano.foco_titulo}</h2>
+      <p>{plano.foco_descricao}</p>
+    </article>
+
+    <div className="premium-daily-heading">
+      <h2 id={mobile ? 'plano-hoje-mobile' : 'plano-hoje-desktop'}>Seu plano de hoje</h2>
+      <span>{totalConcluidas} de {tarefas.length} concluídas</span>
+    </div>
+    <div className="premium-daily-progress" aria-label={`${percentual}% do plano concluído`}><i style={{ width: `${percentual}%` }} /></div>
+
+    <div className="premium-daily-tasks">
+      {tarefas.map(tarefa => {
+        const concluida = concluidas.has(tarefa.id)
+        const descricao = tarefa.descricao.replace('{meta_diaria}', brl(mediaDiaria))
+        return <button key={tarefa.id} type="button" className={concluida ? 'done' : ''} onClick={() => alternar(tarefa.id)} disabled={salvando.has(tarefa.id)} aria-pressed={concluida}>
+          <span className="premium-daily-check" aria-hidden="true">{concluida ? '✓' : ''}</span>
+          <span className="premium-daily-task-copy"><strong>{tarefa.titulo}</strong><small>{descricao}</small></span>
+          <AppIcon name={tarefa.icone} size={18} />
+        </button>
+      })}
+    </div>
+
+    {erro && <p className="premium-daily-error" role="status">{erro}</p>}
+
+    <article className="premium-daily-guidance">
+      <span aria-hidden="true">✣</span>
+      <div><strong>Próxima orientação da Suzana</strong><p>{plano.orientacao}</p></div>
+      <button type="button" onClick={() => irPara('rotina')}>Ver rotina</button>
+    </article>
+  </section>
+}
+
+export default function HomeDashboard({ userId, nome, saudacao, banners, bannerAtual, setBannerAtual, cores, ouro, ouroGrad, irPara, tema, setTema, mentoriaLiberada, temAcessoPremium, assistenteLiberado, metasLiberadas, rotinaSemanal }) {
   const [resumo, setResumo] = useState({ meta: 0, mes: 0, hoje: 0 })
+  const [concluidas, setConcluidas] = useState(() => new Set())
+  const [salvandoTarefas, setSalvandoTarefas] = useState(() => new Set())
+  const [erroProgresso, setErroProgresso] = useState('')
   const hoje = useMemo(() => new Date(), [])
+  const dataHoje = useMemo(() => dataLocal(hoje), [hoje])
+  const planoHoje = useMemo(() => planoDoDia(rotinaSemanal?.plano_dias, hoje), [hoje, rotinaSemanal?.plano_dias])
 
   useEffect(() => {
     async function carregar() {
       if (!userId) return
       const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
-      const dataHoje = hoje.toISOString().slice(0, 10)
       const [{ data: goal }, { data: sales }] = await Promise.all([
         supabase.from('sales_goals').select('monthly_target').eq('owner_id', userId).eq('month_start', inicioMes).maybeSingle(),
         supabase.from('daily_sales').select('sale_date,amount').eq('owner_id', userId).gte('sale_date', inicioMes),
@@ -36,13 +86,59 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
       setResumo({ meta: Number(goal?.monthly_target || 0), mes: lista.reduce((s, i) => s + Number(i.amount || 0), 0), hoje: lista.filter(i => i.sale_date === dataHoje).reduce((s, i) => s + Number(i.amount || 0), 0) })
     }
     carregar()
-  }, [hoje, userId])
+  }, [dataHoje, hoje, userId])
+
+  useEffect(() => {
+    let ativo = true
+    async function carregarProgresso() {
+      if (!userId) return
+      const { data, error } = await supabase.from('daily_task_progress').select('task_id').eq('owner_id', userId).eq('task_date', dataHoje)
+      if (!ativo) return
+      if (error) {
+        setErroProgresso('Não foi possível carregar seu progresso agora.')
+        return
+      }
+      setConcluidas(new Set((data || []).map(item => item.task_id)))
+    }
+    void carregarProgresso()
+    return () => { ativo = false }
+  }, [dataHoje, userId])
+
+  async function alternarTarefa(taskId) {
+    if (!userId || salvandoTarefas.has(taskId)) return
+    const estavaConcluida = concluidas.has(taskId)
+    setErroProgresso('')
+    setSalvandoTarefas(atual => new Set(atual).add(taskId))
+    setConcluidas(atual => {
+      const proximo = new Set(atual)
+      if (estavaConcluida) proximo.delete(taskId)
+      else proximo.add(taskId)
+      return proximo
+    })
+
+    const resultado = estavaConcluida
+      ? await supabase.from('daily_task_progress').delete().eq('owner_id', userId).eq('task_date', dataHoje).eq('task_id', taskId)
+      : await supabase.from('daily_task_progress').insert({ owner_id: userId, task_date: dataHoje, task_id: taskId })
+
+    if (resultado.error) {
+      setConcluidas(atual => {
+        const restaurado = new Set(atual)
+        if (estavaConcluida) restaurado.add(taskId)
+        else restaurado.delete(taskId)
+        return restaurado
+      })
+      setErroProgresso('Não foi possível salvar. Toque novamente para tentar.')
+    }
+    setSalvandoTarefas(atual => { const proximo = new Set(atual); proximo.delete(taskId); return proximo })
+  }
 
   const pct = resumo.meta ? Math.round(resumo.mes / resumo.meta * 100) : 0
   const falta = Math.max(0, resumo.meta - resumo.mes)
   const diasNoMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).getDate()
   const diasRestantes = Math.max(1, diasNoMes - hoje.getDate() + 1)
   const mediaDiaria = falta / diasRestantes
+  const dataPorExtenso = capitalizar(new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(hoje))
+  const mesAtual = capitalizar(new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(hoje))
   const atalhosBase = [
     ['quickCalendar', 'Calendário', 'Conteúdo do mês', 'calendario'],
     ['quickCampaigns', 'Campanhas', 'Vendas prontas', 'campanhas'],
@@ -77,15 +173,22 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
         </div>
       </section>
 
-      <section className="premium-mobile-sales">
-        <h2>Vendas do mês</h2>
-        <div>
-          <span><i><AppIcon name="campaigns" size={21} /></i><small>Vendido</small><strong>{brl(resumo.mes)}</strong></span>
-          <span><i><AppIcon name="goals" size={21} /></i><small>Falta</small><strong>{brl(falta)}</strong></span>
-          <span><i><AppIcon name="calendar" size={21} /></i><small>Média diária</small><strong>{brl(mediaDiaria)}</strong></span>
-          <button className="premium-mobile-sales-action" onClick={() => irPara('vendas')}>{resumo.meta ? 'Lançar vendas' : 'Definir meta mensal'} <b>→</b></button>
-        </div>
+      <section className="premium-mobile-today">
+        <p className="premium-mobile-date"><AppIcon name="calendar" size={14} /> {dataPorExtenso}</p>
+        <article className="premium-mobile-month-goal">
+          <header><strong>META DA LOJA</strong><span>{mesAtual}</span></header>
+          <div className="premium-mobile-month-values">
+            <span><small>Meta</small><b>{brl(resumo.meta)}</b></span>
+            <span><small>Vendido</small><b>{brl(resumo.mes)}</b></span>
+            <span><small>Faltam</small><b>{brl(falta)}</b></span>
+          </div>
+          <div className="premium-mobile-month-progress"><i style={{ width: `${Math.min(100, pct)}%` }} /></div>
+          <footer><span>{pct}% da meta alcançada</span><span>{diasRestantes} {diasRestantes === 1 ? 'dia restante' : 'dias restantes'}</span></footer>
+        </article>
+        <article className="premium-mobile-today-sales"><span><small>Vendas de hoje</small><strong>{brl(resumo.hoje)}</strong></span><button type="button" onClick={() => irPara('vendas')}>＋ {resumo.meta ? 'Lançar venda' : 'Definir meta'}</button></article>
       </section>
+
+      <PlanoHoje plano={planoHoje} concluidas={concluidas} salvando={salvandoTarefas} erro={erroProgresso} alternar={alternarTarefa} mediaDiaria={mediaDiaria} irPara={irPara} mobile />
 
       <section className="premium-banner premium-mobile-banner" aria-label="Novidades">
         <div className="premium-banner-track" style={{ transform: `translateX(-${bannerAtual * 100}%)` }}>
@@ -141,6 +244,8 @@ export default function HomeDashboard({ userId, nome, saudacao, banners, bannerA
         <button onClick={() => irPara('vendas')}>{resumo.meta ? 'Lançar vendas' : 'Definir meta mensal'} →</button>
       </div>
     </section>
+
+    <PlanoHoje plano={planoHoje} concluidas={concluidas} salvando={salvandoTarefas} erro={erroProgresso} alternar={alternarTarefa} mediaDiaria={mediaDiaria} irPara={irPara} />
 
     <div className="premium-section-title"><h2>Acessos rápidos</h2></div>
     <GradeAtalhos atalhos={atalhos} atalhosBase={atalhosBase} irPara={irPara} mentoriaLiberada={mentoriaLiberada} metasLiberadas={metasLiberadas} />
