@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import HomeDashboard from './HomeDashboard'
+import CampaignJourney from './CampaignJourney'
 import AppIcon from '@/app/components/AppIcon'
 import './premium.css'
 
@@ -83,7 +84,7 @@ function rotuloSemana(semanaInicio) {
   const [ano, mes, dia] = semanaInicio.split('-').map(Number)
   const inicio = new Date(ano, mes - 1, dia)
   const fim = new Date(inicio)
-  fim.setDate(inicio.getDate() + 4)
+  fim.setDate(inicio.getDate() + 6)
   const fmt = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`
   return `Semana de ${fmt(inicio)} a ${fmt(fim)}`
 }
@@ -736,17 +737,7 @@ export default function Painel() {
                     {(() => {
                       const item = campanhas.find(c => c.mes_ano === mesSelecionadoCamp) || campanhas[0]
                       if (!item) return null
-                      return <article style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '18px', overflow: 'hidden' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '17px', padding: '22px', borderBottom: `1px solid ${cores.borda}` }}>
-                          <div style={{ width: '74px', height: '74px', borderRadius: '18px', background: ouroGrad, color: '#0A0A0A', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: '30px', boxShadow: '0 10px 28px rgba(212,175,55,.18)' }}>🎯</div>
-                          <div style={{ minWidth: 0 }}><p style={{ fontSize: '11px', fontWeight: 800, color: ouro, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '.06em' }}>{rotuloMesCompleto(item.mes_ano)}</p><h3 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: cores.tx }}>{item.titulo}</h3><p style={{ fontSize: '13px', color: cores.tx2, margin: '6px 0 0', lineHeight: 1.5 }}>{item.descricao || 'Sua campanha mensal está pronta para colocar em prática.'}</p></div>
-                        </div>
-                        <div style={{ padding: '14px 16px 0', color: cores.tx2, fontSize: '12px' }}><span style={{ color: ouro }}>●</span> Material estratégico em PDF</div>
-                        <div style={{ display: 'flex', gap: '10px', padding: '14px 16px 16px', flexWrap: 'wrap' }}>
-                          <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx, fontSize: '13px', fontWeight: 800, textDecoration: 'none' }}>👁 Visualizar campanha</a>
-                          <button onClick={() => baixarPdf(item)} style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: ouroGrad, border: 'none', color: '#0A0A0A', fontSize: '13px', fontWeight: 900, cursor: 'pointer' }}>⬇ Baixar campanha</button>
-                        </div>
-                      </article>
+                      return <CampaignJourney item={item} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => baixarPdf(item)} />
                     })()}
                   </>}
                 </div>
@@ -790,7 +781,7 @@ export default function Painel() {
                     <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>EXECUÇÃO DA SEMANA</p>
                     <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 6px', color: cores.tx }}>Rotina da Loja</h2>
                     <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55, maxWidth: '520px' }}>Ações objetivas para sua loja não depender do improviso e manter o time em movimento.</p>
-                    <div style={{ display: 'flex', gap: '7px', marginTop: '16px', flexWrap: 'wrap' }}>{['SEG','TER','QUA','QUI','SEX'].map(dia => <span key={dia} style={{ border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, background: cores.card, color: ouro, borderRadius: '7px', padding: '6px 10px', fontSize: '10px', fontWeight: 900 }}>{dia}</span>)}</div>
+                    <div style={{ display: 'flex', gap: '7px', marginTop: '16px', flexWrap: 'wrap' }}>{['SEG','TER','QUA','QUI','SEX','SÁB','DOM'].map(dia => <span key={dia} style={{ border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, background: cores.card, color: ouro, borderRadius: '7px', padding: '6px 10px', fontSize: '10px', fontWeight: 900 }}>{dia}</span>)}</div>
                   </div>
 
                   {conteudosCarregando ? <SectionLoading label="Carregando rotina da semana..." /> : !rotinaSemanal ? (
