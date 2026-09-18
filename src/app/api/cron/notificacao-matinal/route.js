@@ -127,8 +127,9 @@ async function sendOne(supabase, row, today) {
 
 export async function GET(request) {
   const authorization = request.headers.get('authorization') || ''
-  const cronSecret = process.env.PUSH_CRON_SECRET || process.env.CRON_SECRET
-  if (!cronSecret || authorization !== `Bearer ${cronSecret}`) {
+  const cronSecrets = [process.env.CRON_SECRET, process.env.PUSH_CRON_SECRET].filter(Boolean)
+  const authorized = cronSecrets.some(secret => authorization === `Bearer ${secret}`)
+  if (!authorized) {
     return Response.json({ error: 'Não autorizado.' }, { status: 401 })
   }
 
