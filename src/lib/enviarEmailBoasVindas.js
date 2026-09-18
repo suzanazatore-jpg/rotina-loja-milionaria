@@ -17,7 +17,13 @@ export async function enviarEmailBoasVindas({ nome, email, senha }) {
     throw new Error("BREVO_API_KEY não configurada no .env.local");
   }
 
-  const linkLogin = process.env.NEXT_PUBLIC_LOGIN_URL || "https://exemplo.com/login";
+  const loginUrl = new URL(
+    process.env.NEXT_PUBLIC_LOGIN_URL || "https://rotina.suzanazatorre.com.br/login"
+  );
+  loginUrl.hash = new URLSearchParams({
+    email: String(email || "").trim().toLowerCase(),
+  }).toString();
+  const linkLogin = loginUrl.toString();
 
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
