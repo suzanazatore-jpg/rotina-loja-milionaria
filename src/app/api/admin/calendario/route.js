@@ -4,6 +4,11 @@ import { NextResponse } from 'next/server'
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const BUCKET = 'calendarios'
 const MAX_FILE_SIZE = 20 * 1024 * 1024
+const TIPOS_PERMITIDOS = {
+  pdf: 'application/pdf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+}
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 function adminClient() {
@@ -50,14 +55,15 @@ export async function POST(request) {
     const titulo = String(form.get('titulo') || '').trim() || tituloPadrao(mesAno)
     const descricao = String(form.get('descricao') || '').trim() || null
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mesAno)) throw new Error('Selecione um mês válido.')
-    if (!arquivo || typeof arquivo.arrayBuffer !== 'function' || arquivo.size === 0) throw new Error('Escolha o arquivo PDF.')
-    if (arquivo.type !== 'application/pdf') throw new Error('Envie somente arquivo PDF.')
-    if (arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
+    if (!arquivo || typeof arquivo.arrayBuffer !== 'function' || arquivo.size === 0) throw new Error('Escolha o arquivo PDF ou Word.')
+    const extensao = String(arquivo.name || '').split('.').pop()?.toLowerCase()
+    if (!TIPOS_PERMITIDOS[extensao]) throw new Error('Envie um arquivo PDF ou Word (.doc ou .docx).')
+    if (arquivo.size > MAX_FILE_SIZE) throw new Error('O arquivo deve ter no máximo 20 MB.')
 
     const { data: existente } = await supabase.from('calendario').select('*').eq('mes_ano', mesAno).maybeSingle()
-    const caminho = `${mesAno}/${crypto.randomUUID()}.pdf`
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(caminho, await arquivo.arrayBuffer(), { contentType: 'application/pdf', cacheControl: '3600', upsert: false })
-    if (uploadError) throw new Error(`Não foi possível subir o PDF: ${uploadError.message}`)
+    const caminho = `${mesAno}/${crypto.randomUUID()}.${extensao}`
+    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(caminho, await arquivo.arrayBuffer(), { contentType: TIPOS_PERMITIDOS[extensao], cacheControl: '3600', upsert: false })
+    if (uploadError) throw new Error(`Não foi possível subir o material: ${uploadError.message}`)
 
     const registro = { ordem: 1, mes_ano: mesAno, titulo, descricao, arquivo_url: null, arquivo_nome: caminho, storage_bucket: BUCKET }
     const resultado = existente
