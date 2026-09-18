@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { normalizarPlanoDias } from '@/lib/dailyPlan'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const BUCKET = 'rotinas'
@@ -9,6 +10,11 @@ function adminClient() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_UR
 async function autorizar(request, supabase) { const token = request.headers.get('authorization')?.replace('Bearer ', ''); if (!token) return false; const { data: { user } } = await supabase.auth.getUser(token); return user?.email === ADMIN_EMAIL }
 function semanaValida(valor) { return /^\d{4}-\d{2}-\d{2}$/.test(valor) && new Date(`${valor}T12:00:00Z`).getUTCDay() === 1 }
 async function comLinks(supabase, itens) { return Promise.all((itens || []).map(async item => { if (item.storage_bucket === BUCKET && item.arquivo_nome) { const { data } = await supabase.storage.from(BUCKET).createSignedUrl(item.arquivo_nome, 3600); return { ...item, arquivo_url: data?.signedUrl || null } } return item })) }
+function lerPlanoDias(valor) {
+  if (!valor) return normalizarPlanoDias({}, { preencherPadrao: true })
+  const plano = typeof valor === 'string' ? JSON.parse(valor) : valor
+  return normalizarPlanoDias(plano, { preencherPadrao: true })
+}
 
 export async function GET(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
@@ -20,19 +26,22 @@ export async function GET(request) {
 export async function POST(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
   try {
-    const form = await request.formData(); const arquivo = form.get('arquivo'); const semanaInicio = String(form.get('semana_inicio') || ''); const titulo = String(form.get('titulo') || '').trim() || 'Rotina da semana'; const descricao = String(form.get('descricao') || '').trim() || null
+    const form = await request.formData(); const arquivo = form.get('arquivo'); const semanaInicio = String(form.get('semana_inicio') || ''); const titulo = String(form.get('titulo') || '').trim() || 'Rotina da semana'; const descricao = String(form.get('descricao') || '').trim() || null; const planoDias = lerPlanoDias(form.get('plano_dias'))
     if (!semanaValida(semanaInicio)) throw new Error('Escolha uma segunda-feira válida.')
-    if (!arquivo || typeof arquivo.arrayBuffer !== 'function' || arquivo.size === 0) throw new Error('Escolha o arquivo PDF.')
-    if (arquivo.type !== 'application/pdf') throw new Error('Envie somente arquivo PDF.')
-    if (arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
+    const temArquivo = Boolean(arquivo && typeof arquivo.arrayBuffer === 'function' && arquivo.size > 0)
+    if (temArquivo && arquivo.type !== 'application/pdf') throw new Error('Envie somente arquivo PDF.')
+    if (temArquivo && arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
     const { data: existente } = await supabase.from('rotinas').select('*').eq('semana_inicio', semanaInicio).maybeSingle()
-    const caminho = `${semanaInicio}/${crypto.randomUUID()}.pdf`
-    const { error: uploadError } = await supabase.storage.from(BUCKET).upload(caminho, await arquivo.arrayBuffer(), { contentType: 'application/pdf', cacheControl: '3600', upsert: false })
-    if (uploadError) throw new Error(`Não foi possível subir o PDF: ${uploadError.message}`)
-    const registro = { ordem: 1, semana_inicio: semanaInicio, titulo, descricao, arquivo_url: null, arquivo_nome: caminho, storage_bucket: BUCKET }
+    let caminho = existente?.arquivo_nome || null
+    if (temArquivo) {
+      caminho = `${semanaInicio}/${crypto.randomUUID()}.pdf`
+      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(caminho, await arquivo.arrayBuffer(), { contentType: 'application/pdf', cacheControl: '3600', upsert: false })
+      if (uploadError) throw new Error(`Não foi possível subir o PDF: ${uploadError.message}`)
+    }
+    const registro = { ordem: 1, semana_inicio: semanaInicio, titulo, descricao, plano_dias: planoDias, arquivo_url: null, arquivo_nome: caminho, storage_bucket: BUCKET }
     const resultado = existente ? await supabase.from('rotinas').update(registro).eq('id', existente.id).select().single() : await supabase.from('rotinas').insert(registro).select().single()
-    if (resultado.error) { await supabase.storage.from(BUCKET).remove([caminho]); throw resultado.error }
-    if (existente?.arquivo_nome) await supabase.storage.from(existente.storage_bucket || 'materiais').remove([existente.arquivo_nome])
+    if (resultado.error) { if (temArquivo && caminho) await supabase.storage.from(BUCKET).remove([caminho]); throw resultado.error }
+    if (temArquivo && existente?.arquivo_nome) await supabase.storage.from(existente.storage_bucket || 'materiais').remove([existente.arquivo_nome])
     return NextResponse.json({ rotina: resultado.data, substituido: Boolean(existente) }, { status: 201 })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
 }
@@ -40,7 +49,7 @@ export async function POST(request) {
 export async function PUT(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
   try {
-    const { id, semana_inicio: semanaInicio, titulo: tituloInformado, descricao: descricaoInformada } = await request.json()
+    const { id, semana_inicio: semanaInicio, titulo: tituloInformado, descricao: descricaoInformada, plano_dias: planoDiasInformado } = await request.json()
     const titulo = String(tituloInformado || '').trim() || 'Rotina da semana'
     const descricao = String(descricaoInformada || '').trim() || null
     if (!id) throw new Error('Rotina não informada.')
@@ -49,7 +58,9 @@ export async function PUT(request) {
     const { data: conflito } = await supabase.from('rotinas').select('id').eq('semana_inicio', semanaInicio).neq('id', id).maybeSingle()
     if (conflito) throw new Error('Já existe uma rotina publicada para essa semana.')
 
-    const { data, error } = await supabase.from('rotinas').update({ semana_inicio: semanaInicio, titulo, descricao }).eq('id', id).select().single()
+    const atualizacao = { semana_inicio: semanaInicio, titulo, descricao }
+    if (planoDiasInformado !== undefined) atualizacao.plano_dias = lerPlanoDias(planoDiasInformado)
+    const { data, error } = await supabase.from('rotinas').update(atualizacao).eq('id', id).select().single()
     if (error) throw error
     return NextResponse.json({ rotina: data })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }

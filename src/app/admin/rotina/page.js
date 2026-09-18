@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { criarPlanoDiarioPadrao, DIAS_PLANO, ICONES_TAREFA, normalizarPlanoDias } from '@/lib/dailyPlan'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const ouro = '#D4AF37'
@@ -27,6 +28,8 @@ export default function AdminRotina() {
   const [titulo, setTitulo] = useState('')
   const [descricao, setDescricao] = useState('')
   const [arquivo, setArquivo] = useState(null)
+  const [diaAtivo, setDiaAtivo] = useState('1')
+  const [planoDias, setPlanoDias] = useState(criarPlanoDiarioPadrao)
   const [enviando, setEnviando] = useState(false)
   const [mensagem, setMensagem] = useState('')
 
@@ -48,21 +51,34 @@ export default function AdminRotina() {
     return dados
   }
   async function carregar(accessToken = token) { try { const dados = await requisicao('GET', null, accessToken); setItens(dados.rotinas || []) } catch (error) { setMensagem(error.message) } }
-  function fechar() { setFormAberto(false); setModoForm('publicar'); setItemEmEdicao(null); setSemanaInicio(segundaFeiraAtual()); setTitulo(''); setDescricao(''); setArquivo(null) }
-  function abrir(item = null, modo = 'publicar') { setModoForm(modo); setItemEmEdicao(item); setSemanaInicio(item?.semana_inicio || segundaFeiraAtual()); setTitulo(item?.titulo || ''); setDescricao(item?.descricao || ''); setArquivo(null); setMensagem(''); setFormAberto(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  function fechar() { setFormAberto(false); setModoForm('publicar'); setItemEmEdicao(null); setSemanaInicio(segundaFeiraAtual()); setTitulo(''); setDescricao(''); setArquivo(null); setDiaAtivo('1'); setPlanoDias(criarPlanoDiarioPadrao()) }
+  function abrir(item = null, modo = 'publicar') { setModoForm(modo); setItemEmEdicao(item); setSemanaInicio(item?.semana_inicio || segundaFeiraAtual()); setTitulo(item?.titulo || ''); setDescricao(item?.descricao || ''); setArquivo(null); setDiaAtivo('1'); setPlanoDias(normalizarPlanoDias(item?.plano_dias)); setMensagem(''); setFormAberto(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+
+  function atualizarDia(campoNome, valor) {
+    setPlanoDias(atual => ({ ...atual, [diaAtivo]: { ...atual[diaAtivo], [campoNome]: valor } }))
+  }
+
+  function atualizarTarefa(indice, campoNome, valor) {
+    setPlanoDias(atual => ({
+      ...atual,
+      [diaAtivo]: {
+        ...atual[diaAtivo],
+        tarefas: atual[diaAtivo].tarefas.map((tarefa, posicao) => posicao === indice ? { ...tarefa, [campoNome]: valor } : tarefa),
+      },
+    }))
+  }
 
   async function enviar(evento) {
     evento.preventDefault()
-    if (modoForm !== 'editar' && !arquivo) { setMensagem('Escolha o arquivo PDF.'); return }
     if (arquivo && arquivo.type !== 'application/pdf') { setMensagem('Envie somente um arquivo PDF.'); return }
     if (arquivo && arquivo.size > 20 * 1024 * 1024) { setMensagem('O PDF deve ter no máximo 20 MB.'); return }
     setEnviando(true); setMensagem('')
     try {
       if (modoForm === 'editar') {
-        await requisicao('PUT', { id: itemEmEdicao.id, semana_inicio: semanaInicio, titulo, descricao })
+        await requisicao('PUT', { id: itemEmEdicao.id, semana_inicio: semanaInicio, titulo, descricao, plano_dias: planoDias })
         await carregar(); fechar(); setMensagem('✓ Rotina atualizada com sucesso.')
       } else {
-        const form = new FormData(); form.append('arquivo', arquivo); form.append('semana_inicio', semanaInicio); form.append('titulo', titulo); form.append('descricao', descricao)
+        const form = new FormData(); if (arquivo) form.append('arquivo', arquivo); form.append('semana_inicio', semanaInicio); form.append('titulo', titulo); form.append('descricao', descricao); form.append('plano_dias', JSON.stringify(planoDias))
         const dados = await requisicao('POST', form); await carregar(); fechar(); setMensagem(dados.substituido ? '✓ Rotina da semana substituída.' : '✓ Rotina semanal publicada.')
       }
     } catch (error) { setMensagem(error.message) }
@@ -76,18 +92,33 @@ export default function AdminRotina() {
   return <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FFF', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
     <header style={{ padding: '16px 20px', borderBottom: '1px solid #2A2A2A', background: '#111', position: 'sticky', top: 0, zIndex: 10 }}><button onClick={() => router.push('/admin')} style={{ ...botao, background: 'transparent' }}>← Admin</button></header>
     <main style={{ maxWidth: '920px', margin: '0 auto', padding: '26px 18px 60px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '22px' }}><div><p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>ADMINISTRAÇÃO</p><h1 style={{ fontSize: '24px', margin: '5px 0' }}>Rotina semanal</h1><p style={{ color: '#888', margin: 0 }}>Publique o PDF que orienta as ações da lojista de segunda a sexta.</p></div>{!formAberto && <button onClick={() => abrir()} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '11px 17px', fontWeight: 900, cursor: 'pointer' }}>+ Publicar rotina</button>}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '22px' }}><div><p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>ADMINISTRAÇÃO</p><h1 style={{ fontSize: '24px', margin: '5px 0' }}>Rotina semanal</h1><p style={{ color: '#888', margin: 0 }}>Prepare o plano diário interativo e, se quiser, complemente com um PDF.</p></div>{!formAberto && <button onClick={() => abrir()} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '11px 17px', fontWeight: 900, cursor: 'pointer' }}>+ Criar rotina</button>}</div>
       {mensagem && <div style={{ background: '#18150b', border: '1px solid #5b4c17', color: '#F5D76E', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
 
       {formAberto && <form onSubmit={enviar} style={{ background: '#111', border: '1px solid #34302A', borderRadius: '16px', padding: '20px', marginBottom: '22px' }}>
-        <h2 style={{ fontSize: '17px', margin: '0 0 5px' }}>{modoForm === 'editar' ? 'Editar rotina semanal' : modoForm === 'substituir' ? 'Substituir rotina semanal' : 'Publicar rotina da semana'}</h2><p style={{ color: '#777', fontSize: '12px', margin: '0 0 17px' }}>{modoForm === 'editar' ? 'Corrija as informações abaixo. O PDF atual será mantido.' : 'Se a semana já tiver um PDF, o novo arquivo substituirá o anterior.'}</p>
-        {modoForm !== 'editar' && <label style={{ display: 'block', border: '1px dashed #66561e', background: '#0A0A0A', borderRadius: '12px', padding: '26px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: '15px' }}><strong style={{ color: ouro, display: 'block', marginBottom: '5px' }}>{arquivo ? `📄 ${arquivo.name}` : '↑ Escolher o PDF da rotina'}</strong><small style={{ color: '#777' }}>{arquivo ? `${(arquivo.size / 1024 / 1024).toFixed(1)} MB` : 'Arquivo PDF de até 20 MB'}</small><input type="file" accept="application/pdf" onChange={e => setArquivo(e.target.files?.[0] || null)} style={{ display: 'none' }} /></label>}
+        <h2 style={{ fontSize: '17px', margin: '0 0 5px' }}>{modoForm === 'editar' ? 'Editar rotina semanal' : modoForm === 'substituir' ? 'Substituir rotina semanal' : 'Publicar rotina da semana'}</h2><p style={{ color: '#777', fontSize: '12px', margin: '0 0 17px' }}>{modoForm === 'editar' ? 'Atualize o plano interativo. O PDF atual será mantido.' : 'O plano diário aparece na tela Hoje. O PDF é complementar e opcional.'}</p>
+        {modoForm !== 'editar' && <label style={{ display: 'block', border: '1px dashed #66561e', background: '#0A0A0A', borderRadius: '12px', padding: '22px 16px', textAlign: 'center', cursor: 'pointer', marginBottom: '15px' }}><strong style={{ color: ouro, display: 'block', marginBottom: '5px' }}>{arquivo ? `📄 ${arquivo.name}` : '↑ Adicionar PDF complementar (opcional)'}</strong><small style={{ color: '#777' }}>{arquivo ? `${(arquivo.size / 1024 / 1024).toFixed(1)} MB` : 'Arquivo PDF de até 20 MB'}</small><input type="file" accept="application/pdf" onChange={e => setArquivo(e.target.files?.[0] || null)} style={{ display: 'none' }} /></label>}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '12px' }}><label>Segunda-feira da semana *<input type="date" value={semanaInicio} onChange={e => setSemanaInicio(e.target.value)} style={{ ...campo, colorScheme: 'dark' }} /><small style={{ display: 'block', color: '#777', marginTop: '4px' }}>{rotuloSemana(semanaInicio)}</small></label><label>Nome <small style={{ color: '#777' }}>(opcional)</small><input value={titulo} onChange={e => setTitulo(e.target.value)} style={campo} placeholder="Rotina da semana" /></label></div>
         <label style={{ display: 'block', marginTop: '12px' }}>Descrição <small style={{ color: '#777' }}>(opcional)</small><input value={descricao} onChange={e => setDescricao(e.target.value)} style={campo} placeholder="Explique rapidamente o foco da semana" /></label>
-        <div style={{ display: 'flex', gap: '9px', justifyContent: 'flex-end', marginTop: '17px' }}><button type="button" onClick={fechar} style={botao}>Cancelar</button><button disabled={enviando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '10px 17px', fontWeight: 900, cursor: 'pointer' }}>{enviando ? 'Salvando...' : modoForm === 'editar' ? 'Salvar alterações' : modoForm === 'substituir' ? 'Substituir PDF' : 'Publicar PDF'}</button></div>
+
+        <section style={{ marginTop: '20px', paddingTop: '18px', borderTop: '1px solid #292929' }}>
+          <div style={{ marginBottom: '13px' }}><strong style={{ display: 'block', fontSize: '15px' }}>Plano diário interativo</strong><small style={{ color: '#777' }}>Escolha um dia e edite o foco, a orientação e as cinco ações.</small></div>
+          <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '12px' }}>{DIAS_PLANO.map(dia => <button key={dia.key} type="button" onClick={() => setDiaAtivo(dia.key)} style={{ ...botao, flex: '0 0 auto', color: diaAtivo === dia.key ? '#090909' : ouro, background: diaAtivo === dia.key ? ouroGrad : '#161616', borderColor: diaAtivo === dia.key ? 'transparent' : '#333', fontWeight: 900 }}>{dia.curto}</button>)}</div>
+          <div style={{ display: 'grid', gap: '11px', padding: '15px', border: '1px solid #2e2b24', borderRadius: '13px', background: '#0d0d0d' }}>
+            <label>Foco comercial do dia<input value={planoDias[diaAtivo]?.foco_titulo || ''} onChange={e => atualizarDia('foco_titulo', e.target.value)} style={campo} placeholder="Ex.: Recuperar oportunidades abertas" maxLength={120} /></label>
+            <label>Explicação do foco<textarea value={planoDias[diaAtivo]?.foco_descricao || ''} onChange={e => atualizarDia('foco_descricao', e.target.value)} style={{ ...campo, minHeight: '72px', resize: 'vertical', fontFamily: 'inherit' }} placeholder="Explique o que a lojista deve priorizar" maxLength={280} /></label>
+            <div style={{ display: 'grid', gap: '9px' }}>{(planoDias[diaAtivo]?.tarefas || []).map((tarefa, indice) => <div key={tarefa.id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '8px', alignItems: 'end' }}>
+              <label style={{ fontSize: '11px', color: '#AAA' }}>Ícone<select value={tarefa.icone} onChange={e => atualizarTarefa(indice, 'icone', e.target.value)} style={campo}>{ICONES_TAREFA.map(icone => <option key={icone.value} value={icone.value}>{icone.label}</option>)}</select></label>
+              <label style={{ fontSize: '11px', color: '#AAA' }}>Ação {indice + 1}<input value={tarefa.titulo} onChange={e => atualizarTarefa(indice, 'titulo', e.target.value)} style={campo} maxLength={100} /></label>
+              <label style={{ fontSize: '11px', color: '#AAA' }}>Complemento<input value={tarefa.descricao} onChange={e => atualizarTarefa(indice, 'descricao', e.target.value)} style={campo} maxLength={160} /></label>
+            </div>)}</div>
+            <label>Próxima orientação da Suzana<textarea value={planoDias[diaAtivo]?.orientacao || ''} onChange={e => atualizarDia('orientacao', e.target.value)} style={{ ...campo, minHeight: '72px', resize: 'vertical', fontFamily: 'inherit' }} placeholder="Mensagem exibida depois do checklist" maxLength={280} /></label>
+          </div>
+        </section>
+        <div style={{ display: 'flex', gap: '9px', justifyContent: 'flex-end', marginTop: '17px' }}><button type="button" onClick={fechar} style={botao}>Cancelar</button><button disabled={enviando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '10px 17px', fontWeight: 900, cursor: 'pointer' }}>{enviando ? 'Salvando...' : modoForm === 'editar' ? 'Salvar alterações' : modoForm === 'substituir' ? 'Salvar e substituir PDF' : 'Publicar rotina'}</button></div>
       </form>}
 
-      <section style={{ display: 'grid', gap: '12px' }}>{itens.map(item => <article key={item.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderLeft: `3px solid ${ouro}`, borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}><div style={{ width: '52px', height: '52px', borderRadius: '13px', background: 'rgba(212,175,55,.10)', display: 'grid', placeItems: 'center', fontSize: '24px' }}>🔄</div><div style={{ flex: 1, minWidth: '190px' }}><small style={{ color: ouro, fontWeight: 800, textTransform: 'uppercase' }}>{rotuloSemana(item.semana_inicio)}</small><h3 style={{ fontSize: '15px', margin: '4px 0 3px' }}>{item.titulo}</h3><p style={{ color: '#777', fontSize: '12px', margin: 0 }}>{item.descricao || 'Rotina prática para executar durante a semana'}</p></div><div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>{item.arquivo_url && <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ ...botao, textDecoration: 'none' }}>Visualizar</a>}<button onClick={() => abrir(item, 'editar')} style={botao}>Editar</button><button onClick={() => abrir(item, 'substituir')} style={botao}>Substituir</button><button onClick={() => excluir(item)} style={{ ...botao, color: '#f99' }}>Excluir</button></div></article>)}
+      <section style={{ display: 'grid', gap: '12px' }}>{itens.map(item => <article key={item.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderLeft: `3px solid ${ouro}`, borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}><div style={{ width: '52px', height: '52px', borderRadius: '13px', background: 'rgba(212,175,55,.10)', display: 'grid', placeItems: 'center', fontSize: '24px' }}>✓</div><div style={{ flex: 1, minWidth: '190px' }}><small style={{ color: ouro, fontWeight: 800, textTransform: 'uppercase' }}>{rotuloSemana(item.semana_inicio)}</small><h3 style={{ fontSize: '15px', margin: '4px 0 3px' }}>{item.titulo}</h3><p style={{ color: '#777', fontSize: '12px', margin: 0 }}>{item.descricao || 'Rotina prática para executar durante a semana'}</p><span style={{ display: 'inline-block', marginTop: '7px', padding: '4px 7px', borderRadius: '99px', background: '#1d291f', color: '#81d39d', fontSize: '10px', fontWeight: 800 }}>Plano diário interativo</span></div><div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>{item.arquivo_url && <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ ...botao, textDecoration: 'none' }}>Visualizar PDF</a>}<button onClick={() => abrir(item, 'editar')} style={botao}>Editar plano</button><button onClick={() => abrir(item, 'substituir')} style={botao}>PDF</button><button onClick={() => excluir(item)} style={{ ...botao, color: '#f99' }}>Excluir</button></div></article>)}
       {!itens.length && <div style={{ textAlign: 'center', padding: '48px 20px', background: '#111', border: '1px solid #2A2A2A', borderRadius: '14px', color: '#777' }}><div style={{ fontSize: '38px' }}>🔄</div><p style={{ marginBottom: 0 }}>Nenhuma rotina publicada.</p></div>}</section>
     </main>
   </div>

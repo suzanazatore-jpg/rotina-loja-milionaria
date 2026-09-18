@@ -223,6 +223,38 @@
 .premium-goal-footer strong { display: inline; margin: 0 0 0 5px; font-family: inherit; font-size: 13px; }
 .premium-goal-footer button { background: transparent; color: var(--premium-gold); border: 0; padding: 4px 0 0; font-weight: 900; cursor: pointer; }
 
+.premium-daily-plan { max-width: 820px; margin: 24px auto 30px; }
+.premium-daily-focus { padding: 20px; border: 1px solid color-mix(in srgb, var(--premium-gold) 22%, #2d241b); border-radius: 18px; background: linear-gradient(135deg, #17130f, #33271b); color: #fff; }
+.premium-daily-focus small { display: flex; align-items: center; gap: 7px; color: #dcb963; font-size: 10px; font-weight: 850; letter-spacing: .08em; }
+.premium-daily-focus h2 { color: #fff; font-size: 20px; margin: 9px 0 5px; }
+.premium-daily-focus p { max-width: 680px; margin: 0; color: rgba(255,255,255,.68); font-size: 12px; line-height: 1.55; }
+.premium-daily-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 15px; margin: 19px 0 9px; }
+.premium-daily-heading h2 { color: var(--premium-ink); font-size: 20px; margin: 0; }
+.premium-daily-heading span { color: var(--premium-muted); font-size: 11px; }
+.premium-daily-progress { height: 6px; overflow: hidden; margin-bottom: 12px; border-radius: 99px; background: color-mix(in srgb, var(--premium-line) 88%, var(--premium-muted)); }
+.premium-daily-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #56c89b, #8ee1b8); transition: width .25s ease; }
+.premium-daily-tasks { display: grid; gap: 9px; }
+.premium-daily-tasks > button { width: 100%; min-height: 66px; display: grid; grid-template-columns: 26px 1fr 22px; align-items: center; gap: 11px; padding: 11px 13px; border: 1px solid var(--premium-line); border-radius: 14px; background: var(--premium-paper); color: var(--premium-ink); text-align: left; cursor: pointer; transition: border-color .18s, background .18s, transform .18s; }
+.premium-daily-tasks > button:active { transform: scale(.992); }
+.premium-daily-tasks > button:disabled { cursor: wait; opacity: .72; }
+.premium-daily-tasks > button.done { border-color: #285c48; background: #143f31; color: #fff; }
+.premium-daily-check { width: 24px; height: 24px; display: grid; place-items: center; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--premium-muted) 45%, transparent); border-radius: 8px; color: #12372b; font-size: 15px; font-weight: 900; }
+.premium-daily-tasks > button.done .premium-daily-check { border-color: #72d8ad; background: #72d8ad; }
+.premium-daily-task-copy { min-width: 0; }
+.premium-daily-task-copy strong, .premium-daily-task-copy small { display: block; }
+.premium-daily-task-copy strong { overflow: hidden; color: inherit; font-size: 13px; line-height: 1.25; text-overflow: ellipsis; }
+.premium-daily-task-copy small { overflow: hidden; margin-top: 4px; color: var(--premium-muted); font-size: 10px; line-height: 1.3; text-overflow: ellipsis; }
+.premium-daily-tasks > button.done small { color: rgba(255,255,255,.68); }
+.premium-daily-tasks > button.done strong { text-decoration: line-through; text-decoration-color: rgba(255,255,255,.45); }
+.premium-daily-tasks > button > svg { color: var(--premium-muted); }
+.premium-daily-tasks > button.done > svg { color: #83dcb7; }
+.premium-daily-error { margin: 9px 2px 0; color: #d65b5b; font-size: 11px; }
+.premium-daily-guidance { display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 10px; margin-top: 13px; padding: 15px; border: 1px solid color-mix(in srgb, var(--premium-gold) 24%, var(--premium-line)); border-radius: 16px; background: color-mix(in srgb, var(--premium-paper) 92%, var(--premium-gold)); }
+.premium-daily-guidance > span { align-self: start; color: var(--premium-gold); font-size: 18px; }
+.premium-daily-guidance strong { color: var(--premium-ink); font-size: 12px; }
+.premium-daily-guidance p { margin: 4px 0 0; color: var(--premium-muted); font-size: 10px; line-height: 1.45; }
+.premium-daily-guidance button { min-height: 36px; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--premium-gold); font-size: 10px; font-weight: 850; cursor: pointer; }
+
 .premium-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-bottom: 26px; }
 .premium-stats article { background: var(--premium-paper); border: 1px solid var(--premium-line); border-radius: 16px; padding: 16px; }
 .premium-stats span { color: var(--premium-muted); font-size: 11px; }
@@ -269,6 +301,7 @@
   .premium-home { padding: 0 16px 108px; }
   .premium-home > .premium-welcome,
   .premium-home > .premium-goal-card,
+  .premium-home > .premium-daily-plan,
   .premium-home > .premium-section-title,
   .premium-home > .premium-shortcuts,
   .premium-home > .premium-help-card { display: none; }
@@ -304,6 +337,36 @@
   .premium-mobile-goal-copy > button span { padding-left: 12px; font-size: 19px; line-height: 0; }
   .premium-mobile-goal-photo { position: absolute; z-index: 0; inset: 0 0 0 auto; width: 65%; }
   .premium-mobile-goal-photo img { width: 100%; height: 100%; object-fit: cover; object-position: 45% center; filter: brightness(.82) contrast(1.04); }
+
+  .premium-mobile-today { margin: 0 0 16px; }
+  .premium-mobile-date { display: flex; align-items: center; gap: 6px; margin: 0 2px 9px; color: var(--premium-gold); font-size: 10px; font-weight: 800; }
+  .premium-mobile-month-goal { padding: 15px; border: 1px solid var(--premium-line); border-radius: 18px; background: var(--premium-paper); box-shadow: 0 10px 26px rgba(48,38,20,.06); }
+  .premium-mobile-month-goal > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+  .premium-mobile-month-goal > header strong { color: var(--premium-gold); font-size: 10px; letter-spacing: .08em; }
+  .premium-mobile-month-goal > header span { color: var(--premium-muted); font-size: 10px; }
+  .premium-mobile-month-values { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .premium-mobile-month-values > span { min-width: 0; }
+  .premium-mobile-month-values > span + span { padding-left: 10px; border-left: 1px solid var(--premium-line); }
+  .premium-mobile-month-values small, .premium-mobile-month-values b { display: block; }
+  .premium-mobile-month-values small { color: var(--premium-muted); font-size: 9px; }
+  .premium-mobile-month-values b { overflow: hidden; margin-top: 3px; color: var(--premium-ink); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+  .premium-mobile-month-values > span:last-child b { color: #cb6b91; }
+  .premium-mobile-month-progress { height: 6px; overflow: hidden; margin-top: 14px; border-radius: 99px; background: var(--premium-line); }
+  .premium-mobile-month-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #c05d8d, #ddb866); }
+  .premium-mobile-month-goal > footer { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; color: var(--premium-muted); font-size: 8px; }
+  .premium-mobile-today-sales { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; padding: 12px 14px; border: 1px solid var(--premium-line); border-radius: 15px; background: var(--premium-paper); }
+  .premium-mobile-today-sales small, .premium-mobile-today-sales strong { display: block; }
+  .premium-mobile-today-sales small { color: var(--premium-muted); font-size: 9px; }
+  .premium-mobile-today-sales strong { margin-top: 2px; color: var(--premium-ink); font-size: 18px; }
+  .premium-mobile-today-sales button { min-height: 38px; padding: 8px 13px; border: 0; border-radius: 11px; background: linear-gradient(135deg, #b48732, #ddba5b); color: #21190c; font-size: 10px; font-weight: 900; cursor: pointer; }
+
+  .premium-daily-plan-mobile { display: block !important; margin: 0 0 26px; }
+  .premium-daily-plan-mobile .premium-daily-focus { padding: 16px; }
+  .premium-daily-plan-mobile .premium-daily-focus h2 { font-size: 16px; }
+  .premium-daily-plan-mobile .premium-daily-heading h2 { font-size: 16px; }
+  .premium-daily-plan-mobile .premium-daily-heading span { font-size: 9px; }
+  .premium-daily-plan-mobile .premium-daily-guidance { grid-template-columns: 22px 1fr; }
+  .premium-daily-plan-mobile .premium-daily-guidance button { grid-column: 2; justify-self: start; min-height: 28px; padding: 2px 0; }
 
   .premium-mobile-banner { min-height: 142px; margin-bottom: 28px; border-radius: 20px; box-shadow: 0 12px 28px rgba(48,38,20,.08); }
   .premium-mobile-banner article,

@@ -355,7 +355,7 @@ export default function Painel() {
   const isAdmin = usuario?.email === ADMIN_EMAIL
 
   const menu = [
-    { id: 'inicio', icone: 'home', label: 'Início' },
+    { id: 'inicio', icone: 'home', label: 'Hoje' },
     { id: 'vendas', icone: 'goals', label: 'Vendas e Metas' },
     { id: 'rotina', icone: 'routine', label: 'Rotina' },
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
@@ -364,7 +364,7 @@ export default function Painel() {
   ]
 
   const menuMobileItens = [
-    { id: 'inicio', icone: 'home', label: 'Início' },
+    { id: 'inicio', icone: 'home', label: 'Hoje' },
     { id: 'cursos', icone: 'courses', label: 'Cursos' },
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     { id: 'ajuda', icone: 'support', label: 'Suporte' },
@@ -372,7 +372,7 @@ export default function Painel() {
   ]
 
   const menuMobileDrawer = [
-    { id: 'inicio', icone: 'home', label: 'Início' },
+    { id: 'inicio', icone: 'home', label: 'Hoje' },
     { id: 'vendas', icone: 'goals', label: 'Vendas e Metas' },
     { id: 'rotina', icone: 'routine', label: 'Rotina' },
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
@@ -510,6 +510,7 @@ export default function Painel() {
               temAcessoPremium={temAcessoPremium}
               assistenteLiberado={assistenteLiberado}
               metasLiberadas={metasLiberadas}
+              rotinaSemanal={rotinaSemanal}
             />
           )}
 
