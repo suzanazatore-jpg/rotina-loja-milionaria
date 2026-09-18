@@ -26,11 +26,11 @@ function Progress({ value, gradient }) {
   return <div className="tg-progress"><i style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: gradient }} /></div>
 }
 
-export default function SalesCenter({ cores, ouro, ouroGrad }) {
+export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'painel' }) {
   const today = useMemo(() => new Date(), [])
   const currentMonth = monthStart(today)
   const [user, setUser] = useState(null)
-  const [tab, setTab] = useState('painel')
+  const [tab, setTab] = useState(initialTab)
   const [selectedMonth, setSelectedMonth] = useState(currentMonth)
   const [goals, setGoals] = useState([])
   const [goal, setGoal] = useState({ monthly_target: 0, open_days: 26, weekday_weights: DEFAULT_WEIGHTS, closed_dates: [] })
@@ -64,6 +64,7 @@ export default function SalesCenter({ cores, ouro, ouroGrad }) {
   }
 
   useEffect(() => { load() }, [])
+  useEffect(() => { setTab(initialTab) }, [initialTab])
   useEffect(() => { setGoal(goals.find(item => item.month_start === selectedMonth) || { monthly_target: 0, open_days: 26, weekday_weights: DEFAULT_WEIGHTS, closed_dates: [] }) }, [goals, selectedMonth])
   useEffect(() => {
     const amounts = {}; const tickets = {}; const notes = {}
