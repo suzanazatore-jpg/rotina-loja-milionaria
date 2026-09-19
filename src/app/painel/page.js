@@ -48,6 +48,8 @@ function SectionLoading({ label = 'Carregando...' }) {
 
 // ════════ HELPERS DE MÊS (usados na seção Calendário) ════════
 const NOMES_MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const MESES_OCULTOS = new Set(['2026-03', '2026-06', '2026-07', '2026-08'])
+const mesOculto = mesAno => MESES_OCULTOS.has(mesAno)
 
 function mesAtualValor() {
   const hoje = new Date()
@@ -160,6 +162,11 @@ export default function Painel() {
 
   const router = useRouter()
 
+  useEffect(() => {
+    const destino = new URLSearchParams(window.location.search).get('secao')
+    if (destino === 'conteudos') setSecao('conteudos')
+  }, [])
+
   function alterarTema(novoTema) {
     setTema(novoTema)
     window.localStorage.setItem('rotina-tema', novoTema)
@@ -194,8 +201,8 @@ export default function Painel() {
         )
         if (cancelado || !ok) return
 
-        const calData = dados.calendarios || []
-        const actionData = dados.acoes_calendario || []
+        const calData = (dados.calendarios || []).filter(item => !mesOculto(item.mes_ano))
+        const actionData = (dados.acoes_calendario || []).filter(item => !mesOculto(String(item.action_date).slice(0, 7)))
         setCalendario(calData)
         setAcoesCalendario(actionData)
         const mesesCalendario = [...new Set([
@@ -204,7 +211,7 @@ export default function Painel() {
         ])].filter(Boolean).sort().reverse()
         setMesSelecionado(atual => mesesCalendario.includes(atual) ? atual : (mesesCalendario.includes(mesAtualValor()) ? mesAtualValor() : mesesCalendario[0] || mesAtualValor()))
 
-        const campData = dados.campanhas || []
+        const campData = (dados.campanhas || []).filter(item => !mesOculto(item.mes_ano))
         setCampanhas(campData)
         const campanhasTemMesAtual = campData.some(c => c.mes_ano === mesAtualValor())
         if (!campanhasTemMesAtual && campData.length > 0) setMesSelecionadoCamp(campData[0].mes_ano)
@@ -573,9 +580,8 @@ export default function Painel() {
                     <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
                     <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
                     <CardAcesso cores={cores} icone="quickCourses" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
-                    <div className="premium-desktop-only-card"><CardAcesso cores={cores} icone="content" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} /></div>
+                    <CardAcesso cores={cores} icone="content" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
                     {mentoriaLiberada && <CardAcesso cores={cores} icone="quickCourses" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
-                    <CardAcesso cores={cores} icone="content" titulo="Conteúdo Premium" sub={temAcessoPremium ? 'Aulas exclusivas' : 'Conheça os planos'} onClick={() => irPara('premium')} />
                   </div>
                 </div>
               )}
@@ -620,10 +626,11 @@ export default function Painel() {
               )}
 
               {/* MENTORIA / AULAS */}
-              {secao === 'cursos' && <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} authenticatedUser={usuario} />}
+              {secao === 'cursos' && <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} authenticatedUser={usuario} onBack={() => setSecao('conteudos')} />}
 
               {secao === 'mentoria' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                  <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
                     <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>🎓 Mentoria Mensal</h2>
                     <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Aulas gravadas ao vivo. A primeira já fica aberta — é só apertar o play.</p>
@@ -660,6 +667,8 @@ export default function Painel() {
 
               {secao === 'precificacao' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                  <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo="Como usar a precificação" />
                   <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
                     <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>📊 Precificação</h2>
                     <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Ferramentas para precificar com lucro real.</p>
@@ -679,36 +688,6 @@ export default function Painel() {
                 </div>
               )}
 
-              {secao === 'premium' && (
-                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
-                  {!temAcessoPremium ? (
-                    <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '40px 20px', textAlign: 'center' }}>
-                      <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔒</div>
-                      <h2 style={{ fontSize: '20px', fontWeight: 800, color: cores.tx, margin: '0 0 10px' }}>Conteúdo Premium</h2>
-                      <p style={{ fontSize: '14px', color: cores.tx2, margin: '0 0 20px', lineHeight: 1.6 }}>
-                        Este conteúdo está disponível nos planos<br />
-                        <strong style={{ color: ouro }}>Implementação</strong> e <strong style={{ color: ouro }}>Mentoria Impulso</strong>.
-                      </p>
-                      <a href={'https://api.whatsapp.com/send?phone=' + WHATSAPP + '&text=Quero%20saber%20mais%20sobre%20o%20plano%20de%20Implementacao'} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', background: ouroGrad, color: '#0A0A0A', borderRadius: '12px', padding: '12px 24px', fontSize: '14px', fontWeight: 800, textDecoration: 'none' }}>
-                        💬 Quero fazer upgrade
-                      </a>
-                    </div>
-                  ) : (
-                    <div>
-                      <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
-                        <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>⭐ Conteúdo Premium</h2>
-                        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Aulas e materiais exclusivos do seu plano.</p>
-                      </div>
-                      <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '40px 20px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '44px', marginBottom: '12px' }}>🎬</div>
-                        <h3 style={{ fontSize: '16px', fontWeight: 700, color: cores.tx, margin: '0 0 6px' }}>Em breve!</h3>
-                        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Os conteúdos exclusivos serão liberados em breve. 👑</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* SUPORTE */}
               {secao === 'suporte' && (
                 <div style={{ maxWidth: '720px', margin: '0 auto' }}>
@@ -725,7 +704,7 @@ export default function Painel() {
 
               {/* VENDAS E METAS */}
               {secao === 'vendas' && (
-                metasLiberadas ? <SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} initialTab={vendasAbaInicial} /> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
+                metasLiberadas ? <div style={{ maxWidth: '980px', margin: '0 auto' }}><VideoEmBreve cores={cores} ouro={ouro} titulo="Como bater a meta" /><SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} initialTab={vendasAbaInicial} /></div> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
 
               {secao === 'metas-bloqueadas' && <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />}
@@ -733,6 +712,8 @@ export default function Painel() {
               {/* CAMPANHAS DE VENDA (PDFs por mês) */}
               {secao === 'campanhas' && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+                  <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo="Como usar a campanha do mês" />
                   <div style={{ position: 'relative', overflow: 'hidden', background: tema === 'escuro' ? 'linear-gradient(135deg,#1b1608,#111 65%)' : 'linear-gradient(135deg,#fff4c7,#fff 70%)', border: `1px solid ${tema === 'escuro' ? '#554717' : '#ddc779'}`, borderRadius: '18px', padding: '23px', marginBottom: '18px' }}>
                     <div style={{ position: 'absolute', right: '-18px', top: '-22px', fontSize: '100px', opacity: .055 }}>🎯</div>
                     <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>AÇÃO DO MÊS</p>
@@ -754,6 +735,8 @@ export default function Painel() {
               {/* CALENDÁRIO DE CONTEÚDO INTERATIVO */}
               {secao === 'calendario' && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+                  <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo="Como usar o calendário de conteúdo" />
                   <div style={{ background: tema === 'escuro' ? 'linear-gradient(145deg,#17150f,#111)' : 'linear-gradient(145deg,#fffaf0,#fff)', border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, borderRadius: '18px', padding: '22px', marginBottom: '18px' }}>
                     <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>PLANEJAMENTO MENSAL</p>
                     <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 6px', color: cores.tx }}>Calendário de Conteúdo</h2>
@@ -780,6 +763,8 @@ export default function Painel() {
               {/* ROTINA SEMANAL (PDF da semana atual, sem abas) */}
               {secao === 'rotina' && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
+                  <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo="Como executar a rotina da loja" />
                   <div style={{ position: 'relative', overflow: 'hidden', background: tema === 'escuro' ? 'linear-gradient(135deg,#17150d,#111 70%)' : 'linear-gradient(135deg,#fff7d5,#fff 70%)', border: `1px solid ${tema === 'escuro' ? '#554717' : '#ddc779'}`, borderRadius: '18px', padding: '23px', marginBottom: '18px' }}>
                     <div style={{ position: 'absolute', right: '-15px', top: '-24px', fontSize: '105px', opacity: .055 }}>🔄</div>
                     <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>EXECUÇÃO DA SEMANA</p>
@@ -882,6 +867,22 @@ export default function Painel() {
       `}</style>
     </div>
   )
+}
+
+function VoltarConteudos({ onClick, cores }) {
+  return <button onClick={onClick} style={{ background: 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '9px', color: cores.tx, padding: '9px 12px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', marginBottom: '14px' }}>← Voltar aos conteúdos</button>
+}
+
+function VideoEmBreve({ cores, ouro, titulo }) {
+  return <section style={{ marginBottom: '18px' }}>
+    <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: '16px', border: `1px solid ${cores.borda}`, background: `linear-gradient(145deg, ${cores.card2}, ${cores.card})`, display: 'grid', placeItems: 'center', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ textAlign: 'center', padding: '20px' }}>
+        <div style={{ width: '54px', height: '54px', margin: '0 auto 12px', borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(212,175,55,.14)', border: `1px solid ${ouro}`, color: ouro, fontSize: '20px' }}>▶</div>
+        <strong style={{ display: 'block', color: cores.tx, fontSize: '18px', marginBottom: '5px' }}>Em breve</strong>
+        <span style={{ color: cores.tx2, fontSize: '13px' }}>{titulo}</span>
+      </div>
+    </div>
+  </section>
 }
 
 function bniStyle(cores, ouro, ativo) {
