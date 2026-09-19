@@ -17,8 +17,7 @@ function GradeAtalhos({ mobile = false, atalhos, atalhosBase, irPara, mentoriaLi
     ...atalhosBase.slice(0, 4),
     ['quickCourses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
     ...(mentoriaLiberada ? [['quickCourses', 'Mentorias', 'Aulas gravadas', 'mentoria']] : []),
-    ...(metasLiberadas ? [['quickTeam', 'Meta da Equipe', 'Metas e ranking', 'vendas']] : []),
-    ['content', 'Materiais', 'Conteúdos liberados', 'conteudos'],
+
   ]
   const itens = mobile ? itensMobile : atalhos
 
