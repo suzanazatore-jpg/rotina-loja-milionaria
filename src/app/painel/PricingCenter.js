@@ -8,7 +8,7 @@ const brl = valor => Number(valor || 0).toLocaleString('pt-BR', { style: 'curren
 const numero = valor => Number(String(valor || '').replace(',', '.')) || 0
 const dataHora = valor => new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(valor))
 
-function CampoNumero({ label, value, onChange, prefix = 'R$', suffix = '', min = 0, max, step = '0.01', hint }) {
+function CampoNumero({ label, value, onChange, prefix = 'R$', suffix = '', min = 0, max, step = '0.01', hint, placeholder = 'Ex.: 0,00' }) {
   return <label className="pricing-field">
     <span>{label}</span>
     <div className="pricing-input-wrap">
@@ -21,7 +21,7 @@ function CampoNumero({ label, value, onChange, prefix = 'R$', suffix = '', min =
         step={step}
         value={value}
         onChange={event => onChange(event.target.value)}
-        placeholder="0,00"
+        placeholder={placeholder}
       />
       {suffix && <b>{suffix}</b>}
     </div>
@@ -162,18 +162,21 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
 
     <section className="pricing-main-grid">
       <div className="pricing-panel pricing-form-panel">
-        <div className="pricing-title"><span>1</span><div><h2>Dados do produto</h2><p>Preencha os custos para calcular o preço ideal.</p></div></div>
+        <div className="pricing-title"><span>1</span><div><h2>Conte quanto custa esse produto</h2><p>Preencha um campo de cada vez. O resultado aparece automaticamente ao lado.</p></div></div>
+
+        <div className="pricing-form-help"><b>É bem simples:</b> informe o valor pago na peça e os gastos que existem em cada venda. Se não tiver taxa ou gasto extra, digite <strong>0</strong>.</div>
 
         <label className="pricing-field pricing-product-field">
-          <span>Produto</span>
-          <div className="pricing-input-wrap"><input type="text" maxLength={120} value={produto} onChange={event => setProduto(event.target.value)} placeholder="Ex.: Vestido alfaiataria" /></div>
+          <span>Qual produto você está precificando?</span>
+          <div className="pricing-input-wrap"><input type="text" maxLength={120} value={produto} onChange={event => setProduto(event.target.value)} placeholder="Ex.: Vestido de alfaiataria" /></div>
+          <small>Digite um nome que você reconheça depois no histórico.</small>
         </label>
 
         <div className="pricing-fields-grid">
-          <CampoNumero label="Custo do produto" value={custo} onChange={setCusto} hint="Quanto você pagou" />
-          <CampoNumero label="Taxas e impostos" value={taxas} onChange={setTaxas} hint="Maquininha, marketplace..." />
-          <CampoNumero label="Outros custos" value={extras} onChange={setExtras} hint="Embalagem, frete..." />
-          <CampoNumero label="Margem desejada" value={margem} onChange={setMargem} prefix="" suffix="%" min={21} max={90} step="1" hint="Entre 21% e 90%" />
+          <CampoNumero label="Quanto você pagou na peça?" value={custo} onChange={setCusto} placeholder="Ex.: 45,00" hint="Digite o custo de compra de uma unidade." />
+          <CampoNumero label="Quanto paga de taxas na venda?" value={taxas} onChange={setTaxas} placeholder="Ex.: 5,00" hint="Cartão, marketplace ou imposto. Se não tiver, digite 0." />
+          <CampoNumero label="Tem embalagem, frete ou outro gasto?" value={extras} onChange={setExtras} placeholder="Ex.: 3,50" hint="Some os outros gastos de uma peça. Se não tiver, digite 0." />
+          <CampoNumero label="Qual margem de lucro você deseja?" value={margem} onChange={setMargem} prefix="" suffix="%" min={21} max={90} step="1" placeholder="Ex.: 50" hint="Exemplo: para uma margem de 50%, digite 50." />
         </div>
 
         <div className="pricing-cost-total"><span>Custo total do produto</span><strong>{brl(calculo.custoTotal)}</strong></div>
@@ -237,7 +240,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
       </div>}
     </section>
 
-    <style jsx>{`
+    <style jsx global>{`
       .pricing-center{max-width:1040px;margin:0 auto;color:var(--pricing-text)}
       .pricing-hero{display:flex;align-items:center;justify-content:space-between;gap:22px;margin-bottom:18px;padding:5px 2px}
       .pricing-hero small{color:var(--pricing-gold);font-size:10px;font-weight:900;letter-spacing:.14em}
@@ -253,16 +256,17 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
       .pricing-panel{background:var(--pricing-card);border:1px solid var(--pricing-border);border-radius:18px;padding:20px}
       .pricing-title{display:flex;align-items:flex-start;gap:11px;margin-bottom:18px}.pricing-title>span{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:#fff5cf;color:#7c6200;font-size:12px;font-weight:900;flex:none}.pricing-title h2{font-size:16px;margin:0 0 3px;font-weight:850}.pricing-title p{font-size:11px;color:var(--pricing-muted);margin:0;line-height:1.4}
       :global(.tema-escuro) .pricing-title>span{background:#2b250e;color:var(--pricing-gold)}
-      .pricing-field{display:block}.pricing-field>span{display:block;font-size:11px;font-weight:800;margin-bottom:6px}.pricing-field>small{display:block;color:var(--pricing-muted-2);font-size:9px;margin-top:4px}.pricing-product-field{margin-bottom:13px}
-      .pricing-input-wrap{display:flex;align-items:center;background:var(--pricing-card-2);border:1px solid var(--pricing-border);border-radius:9px;overflow:hidden;transition:border .2s}.pricing-input-wrap:focus-within{border-color:var(--pricing-gold)}.pricing-input-wrap b{color:var(--pricing-muted);font-size:11px;padding-left:11px}.pricing-input-wrap b:last-child{padding:0 11px 0 3px}.pricing-input-wrap input{min-width:0;width:100%;border:0;outline:0;background:transparent;color:var(--pricing-text);font-size:13px;font-weight:650;padding:10px 11px}.pricing-input-wrap input[type=number]{appearance:textfield}.pricing-input-wrap input::-webkit-outer-spin-button,.pricing-input-wrap input::-webkit-inner-spin-button{appearance:none;margin:0}
-      .pricing-fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.pricing-cost-total{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding:13px 14px;background:var(--pricing-card-2);border-radius:10px}.pricing-cost-total span{font-size:11px;color:var(--pricing-muted)}.pricing-cost-total strong{font-size:15px}
+      .pricing-form-help{margin:-5px 0 16px;padding:11px 12px;border-left:3px solid var(--pricing-gold);border-radius:0 9px 9px 0;background:color-mix(in srgb,var(--pricing-gold) 8%,var(--pricing-card));color:var(--pricing-muted);font-size:10px;line-height:1.55}.pricing-form-help b,.pricing-form-help strong{color:var(--pricing-text)}
+      .pricing-field{display:block}.pricing-field>span{display:block;font-size:12px;font-weight:850;margin-bottom:7px;line-height:1.35}.pricing-field>small{display:block;color:var(--pricing-muted);font-size:9px;line-height:1.4;margin-top:6px}.pricing-product-field{margin-bottom:16px}
+      .pricing-input-wrap{display:flex!important;align-items:center!important;min-height:52px;background:var(--pricing-card-2)!important;border:1px solid var(--pricing-border)!important;border-radius:10px!important;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.03);transition:border .2s,box-shadow .2s}.pricing-input-wrap:focus-within{border-color:var(--pricing-gold)!important;box-shadow:0 0 0 3px color-mix(in srgb,var(--pricing-gold) 14%,transparent)}.pricing-input-wrap b{display:block;color:var(--pricing-gold);font-size:13px;font-weight:900;padding-left:13px;white-space:nowrap}.pricing-input-wrap b:last-child{padding:0 13px 0 3px}.pricing-input-wrap input{display:block!important;min-width:0;width:100%!important;height:52px!important;border:0!important;outline:0!important;background:transparent!important;color:var(--pricing-text)!important;font-size:16px!important;font-weight:750!important;padding:0 12px!important;box-shadow:none!important}.pricing-input-wrap input::placeholder{color:var(--pricing-muted-2)!important;font-weight:500;opacity:.9}.pricing-input-wrap input[type=number]{appearance:textfield}.pricing-input-wrap input::-webkit-outer-spin-button,.pricing-input-wrap input::-webkit-inner-spin-button{appearance:none;margin:0}
+      .pricing-fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px 12px}.pricing-cost-total{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding:13px 14px;background:var(--pricing-card-2);border-radius:10px}.pricing-cost-total span{font-size:11px;color:var(--pricing-muted)}.pricing-cost-total strong{font-size:15px}
       .pricing-result-panel{background:linear-gradient(145deg,var(--pricing-card),var(--pricing-card-2))}.pricing-price-main{text-align:center;border:1px solid color-mix(in srgb,var(--pricing-gold) 45%,var(--pricing-border));background:color-mix(in srgb,var(--pricing-gold) 7%,var(--pricing-card));border-radius:14px;padding:20px 12px;margin-bottom:11px}.pricing-price-main small{display:block;color:var(--pricing-gold);font-size:9px;font-weight:900;letter-spacing:.1em}.pricing-price-main strong{display:block;font-size:31px;line-height:1.1;margin:7px 0 4px}.pricing-price-main span{font-size:10px;color:var(--pricing-muted)}
       .pricing-indicators{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.pricing-indicator{min-width:0;background:var(--pricing-card);border:1px solid var(--pricing-border);border-radius:10px;padding:10px}.pricing-indicator span,.pricing-indicator small{display:block;color:var(--pricing-muted);font-size:9px}.pricing-indicator strong{display:block;font-size:13px;margin-top:4px;overflow-wrap:anywhere}.pricing-indicator small{font-size:8px;margin-top:2px}.pricing-indicator-main strong{color:var(--pricing-gold);font-size:18px}.pricing-save{width:100%;border:0;border-radius:10px;padding:12px 16px;margin-top:13px;color:#090909;font-size:12px;font-weight:900;cursor:pointer}.pricing-save:disabled{opacity:.5;cursor:not-allowed}
       .pricing-discount{margin-bottom:14px}.pricing-discount-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:18px;align-items:end}.pricing-range>div:first-child{display:flex;justify-content:space-between;align-items:center;font-size:11px}.pricing-range>div:first-child strong{color:var(--pricing-gold);font-size:22px}.pricing-range input{width:100%;accent-color:var(--pricing-gold);margin:14px 0 4px}.pricing-range-labels{display:flex;justify-content:space-between;color:var(--pricing-muted-2);font-size:9px}.pricing-promo-result{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}
       .pricing-status{display:grid;grid-template-columns:auto 1fr 150px;gap:11px;align-items:center;border-radius:11px;padding:11px 13px;margin-top:15px}.pricing-status>span{width:25px;height:25px;display:grid;place-items:center;border-radius:50%;font-weight:900}.pricing-status strong,.pricing-status small{display:block}.pricing-status strong{font-size:11px}.pricing-status small{font-size:9px;margin-top:2px}.pricing-status i{display:block;height:5px;border-radius:8px;background:rgba(0,0,0,.12);overflow:hidden}.pricing-status em{display:block;height:100%;border-radius:inherit}.pricing-status.safe{background:#e9f8ee;color:#237341}.pricing-status.safe>span{background:#c8edd5}.pricing-status.safe em{background:#3faf68}.pricing-status.danger{background:#fff0f0;color:#aa3038}.pricing-status.danger>span{background:#f8d1d3}.pricing-status.danger em{background:#dc555c}:global(.tema-escuro) .pricing-status.safe{background:#10291a;color:#78d697}:global(.tema-escuro) .pricing-status.danger{background:#311517;color:#ff8c92}
       .pricing-history-list{display:grid;gap:8px}.pricing-history-list article{display:grid;grid-template-columns:minmax(190px,1fr) 120px 110px auto;gap:12px;align-items:center;background:var(--pricing-card-2);border:1px solid var(--pricing-border);border-radius:11px;padding:11px 12px}.pricing-history-product{display:flex;align-items:center;gap:10px;min-width:0}.pricing-history-product>span{width:35px;height:35px;display:grid;place-items:center;background:var(--pricing-card);border-radius:9px}.pricing-history-product div{min-width:0}.pricing-history-product strong,.pricing-history-product small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pricing-history-product strong{font-size:12px}.pricing-history-product small,.pricing-history-number small{font-size:9px;color:var(--pricing-muted);margin-top:3px}.pricing-history-number strong{display:block;font-size:12px;margin-top:3px}.pricing-history-actions{display:flex;gap:5px}.pricing-history-actions button{border:1px solid var(--pricing-border);background:var(--pricing-card);color:var(--pricing-text);border-radius:8px;padding:8px 9px;font-size:10px;font-weight:750;cursor:pointer}.pricing-history-actions .delete{color:#cf4f56}.pricing-empty{display:flex;flex-direction:column;align-items:center;text-align:center;color:var(--pricing-muted);font-size:11px;padding:26px}.pricing-empty strong{color:var(--pricing-text);font-size:13px;margin-bottom:4px}
       @media(max-width:820px){.pricing-main-grid{grid-template-columns:1fr}.pricing-discount-grid{grid-template-columns:1fr}.pricing-history-list article{grid-template-columns:1fr 1fr}.pricing-history-product{grid-column:1/-1}.pricing-history-actions{justify-content:flex-end}}
-      @media(max-width:560px){.pricing-center{margin:-4px}.pricing-hero{align-items:flex-start}.pricing-hero h1{font-size:23px}.pricing-hero p{font-size:12px}.pricing-safety{min-width:92px;padding:10px}.pricing-safety strong{font-size:20px}.pricing-panel{padding:16px;border-radius:15px}.pricing-fields-grid{grid-template-columns:1fr}.pricing-indicators,.pricing-promo-result{grid-template-columns:1fr 1fr}.pricing-indicators .pricing-indicator:last-child,.pricing-promo-result .pricing-indicator:first-child{grid-column:1/-1}.pricing-status{grid-template-columns:auto 1fr}.pricing-status i{grid-column:1/-1}.pricing-history-list article{grid-template-columns:1fr 1fr;gap:9px}.pricing-history-actions{grid-column:1/-1}.pricing-history-actions button{flex:1}.pricing-title{margin-bottom:15px}}
+      @media(max-width:560px){.pricing-center{margin:-4px}.pricing-hero{align-items:flex-start}.pricing-hero h1{font-size:23px}.pricing-hero p{font-size:12px}.pricing-safety{min-width:92px;padding:10px}.pricing-safety strong{font-size:20px}.pricing-panel{padding:16px;border-radius:15px}.pricing-fields-grid{grid-template-columns:1fr;gap:18px}.pricing-field>span{font-size:13px}.pricing-field>small{font-size:10px}.pricing-input-wrap{min-height:56px}.pricing-input-wrap input{height:56px!important}.pricing-indicators,.pricing-promo-result{grid-template-columns:1fr 1fr}.pricing-indicators .pricing-indicator:last-child,.pricing-promo-result .pricing-indicator:first-child{grid-column:1/-1}.pricing-status{grid-template-columns:auto 1fr}.pricing-status i{grid-column:1/-1}.pricing-history-list article{grid-template-columns:1fr 1fr;gap:9px}.pricing-history-actions{grid-column:1/-1}.pricing-history-actions button{flex:1}.pricing-title{margin-bottom:15px}.pricing-form-help{font-size:11px;margin-bottom:18px}}
     `}</style>
   </div>
 }

@@ -684,6 +684,7 @@ export default function Painel() {
               {secao === 'precificacao' && (
                 precificacaoLiberada ? <div style={{ maxWidth: '1040px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo="Como usar a calculadora de precificação" />
                   <PricingCenter userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
                 </div> : <AcessoBloqueado titulo="Precificação e Lucro" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
