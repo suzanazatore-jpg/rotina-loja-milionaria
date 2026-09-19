@@ -30,11 +30,13 @@ const FOCOS_PADRAO = {
 }
 
 const TAREFAS_PADRAO = [
-  { icone: 'goals', titulo: 'Conferir a meta com a equipe', descricao: 'Meta diária: {meta_diaria}' },
-  { icone: 'comments', titulo: 'Responder o WhatsApp da loja', descricao: 'Não deixe nenhuma conversa pendente' },
-  { icone: 'routine', titulo: 'Retomar orçamentos quentes', descricao: 'Comece pelos contatos das últimas 48 horas' },
-  { icone: 'users', titulo: 'Chamar 10 clientes no WhatsApp', descricao: 'Use o roteiro sugerido para hoje' },
-  { icone: 'campaigns', titulo: 'Publicar a campanha do dia', descricao: 'Stories + Status do WhatsApp' },
+  { icone: 'goals', titulo: 'Conferir a meta do dia', descricao: 'Meta diária: {meta_diaria}' },
+  { icone: 'users', titulo: 'Executar atendimento ativo', descricao: 'Aborde, sonde e conduza cada cliente para o próximo passo' },
+  { icone: 'comments', titulo: 'Movimentar o WhatsApp', descricao: 'Responda as conversas e faça os contatos planejados' },
+  { icone: 'routine', titulo: 'Fazer pós-venda', descricao: 'Retome clientes recentes e fortaleça o relacionamento' },
+  { icone: 'routine', titulo: 'Recuperar oportunidades', descricao: 'Volte aos orçamentos e atendimentos que não fecharam' },
+  { icone: 'users', titulo: 'Prospectar novas clientes', descricao: 'Gere novos contatos para abastecer a carteira da loja' },
+  { icone: 'campaigns', titulo: 'Oferecer produtos adicionais', descricao: 'Aumente o valor da venda com combinações úteis' },
 ]
 
 function texto(valor, limite) {
@@ -67,8 +69,8 @@ export function normalizarPlanoDias(valor, { preencherPadrao = true } = {}) {
     if (!atual || typeof atual !== 'object' || Array.isArray(atual)) continue
 
     const padrao = planoPadraoDoDia(dia.key)
-    const tarefasRecebidas = Array.isArray(atual.tarefas) ? atual.tarefas.slice(0, 5) : []
-    const tarefas = Array.from({ length: 5 }, (_, indice) => {
+    const tarefasRecebidas = Array.isArray(atual.tarefas) ? atual.tarefas.slice(0, 7) : []
+    const tarefas = Array.from({ length: 7 }, (_, indice) => {
       const tarefa = tarefasRecebidas[indice] || {}
       const fallback = padrao.tarefas[indice]
       const icone = ICONES_PERMITIDOS.has(tarefa.icone) ? tarefa.icone : fallback.icone
