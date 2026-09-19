@@ -128,7 +128,7 @@ export default function AdminRotina() {
         <label style={{ display: 'block', marginTop: '12px' }}>Descrição <small style={{ color: '#777' }}>(opcional)</small><input value={descricao} onChange={e => setDescricao(e.target.value)} style={campo} placeholder="Explique rapidamente o foco da semana" /></label>
 
         <section style={{ marginTop: '20px', paddingTop: '18px', borderTop: '1px solid #292929' }}>
-          <div style={{ marginBottom: '13px' }}><strong style={{ display: 'block', fontSize: '15px' }}>Plano diário interativo</strong><small style={{ color: '#777' }}>Escolha um dia e edite o foco, a orientação e as cinco ações.</small></div>
+          <div style={{ marginBottom: '13px' }}><strong style={{ display: 'block', fontSize: '15px' }}>Plano diário interativo</strong><small style={{ color: '#777' }}>Escolha um dia e edite o foco, a orientação e as sete frentes de vendas.</small></div>
           <div style={{ display: 'flex', gap: '7px', overflowX: 'auto', paddingBottom: '8px', marginBottom: '12px' }}>{DIAS_PLANO.map(dia => <button key={dia.key} type="button" onClick={() => setDiaAtivo(dia.key)} style={{ ...botao, flex: '0 0 auto', color: diaAtivo === dia.key ? '#090909' : ouro, background: diaAtivo === dia.key ? ouroGrad : '#161616', borderColor: diaAtivo === dia.key ? 'transparent' : '#333', fontWeight: 900 }}>{dia.curto}</button>)}</div>
           <div style={{ display: 'grid', gap: '11px', padding: '15px', border: '1px solid #2e2b24', borderRadius: '13px', background: '#0d0d0d' }}>
             <label>Foco comercial do dia<input value={planoDias[diaAtivo]?.foco_titulo || ''} onChange={e => atualizarDia('foco_titulo', e.target.value)} style={campo} placeholder="Ex.: Recuperar oportunidades abertas" maxLength={120} /></label>
