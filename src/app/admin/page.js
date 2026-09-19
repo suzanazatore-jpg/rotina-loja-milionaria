@@ -49,6 +49,7 @@ export default function Admin() {
         { icone: 'campaigns', titulo: 'Campanhas', sub: 'Disponibilize campanhas e ações de vendas.', rota: '/admin/campanhas' },
         { icone: 'routine', titulo: 'Rotina', sub: 'Publique a rotina semanal das lojistas.', rota: '/admin/rotina' },
         { icone: 'goals', titulo: 'Calculadora de Metas', sub: 'Metas, ranking e histórico das vendedoras.', rota: '/admin/metas' },
+        { icone: '🎬', titulo: 'Vídeos Explicativos', sub: 'Cadastre as aulas rápidas das ferramentas do aplicativo.', rota: '/admin/videos' },
       ],
     },
     {
