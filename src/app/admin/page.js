@@ -60,6 +60,7 @@ export default function Admin() {
         { icone: 'carousel', titulo: 'Carrosséis de Cursos', sub: 'Organize cursos em seções na área de membros.', rota: '/admin/carrosseis' },
         { icone: 'comments', titulo: 'Comentários', sub: 'Veja, responda e modere comentários feitos nas aulas.', rota: '/admin/comentarios' },
         { icone: 'support', titulo: 'Suporte', sub: 'Centralize e responda as solicitações das alunas.', rota: '/admin/suporte' },
+        { icone: 'notifications', titulo: 'Notificações', sub: 'Edite os avisos das 8h e 9h e envie testes.', rota: '/admin/notificacoes' },
         { icone: 'broadcast', titulo: 'Campanhas em Massa', sub: 'Envie mensagens por e-mail e WhatsApp.', rota: '/admin/comunicacao' },
       ],
     },

@@ -5,19 +5,19 @@ const PAGE_SIZE = 500
 const BATCH_SIZE = 20
 const SAO_PAULO_OFFSET = '-03:00'
 
-const NOTIFICATIONS = {
+export const NOTIFICATION_DEFAULTS = {
   motivacional: {
     hour: 8,
-    title: firstName => firstName ? `Bom dia, ${firstName}! 💛` : 'Bom dia! 💛',
-    body: 'Respire, organize o foco e comece com confiança. Hoje é mais uma oportunidade de movimentar sua loja. Toque para entrar no app.',
+    enabled: true,
+    title_template: 'Bom dia, {{nome}}! 💛',
+    body_template: 'Respire, organize o foco e comece com confiança. Hoje é mais uma oportunidade de movimentar sua loja. Toque para entrar no app.',
     tag: 'rotina-motivacional',
   },
   rotina: {
     hour: 9,
-    title: () => 'Vamos começar a rotina de hoje? ✨',
-    body: firstName => firstName
-      ? `${firstName}, sua primeira ação já está te esperando. Abra o app e avance um passo de cada vez.`
-      : 'Sua primeira ação já está te esperando. Abra o app e avance um passo de cada vez.',
+    enabled: true,
+    title_template: 'Vamos começar a rotina de hoje? ✨',
+    body_template: '{{nome}}, sua primeira ação já está te esperando. Abra o app e avance um passo de cada vez.',
     tag: 'rotina-pratica',
   },
 }
@@ -47,6 +47,22 @@ function slotStart(today, hour) {
 
 function firstName(value) {
   return String(value || '').trim().split(/\s+/)[0].slice(0, 30)
+}
+
+export function renderNotificationTemplate(template, name) {
+  return String(template || '').replaceAll('{{nome}}', firstName(name) || 'lojista')
+}
+
+async function loadNotification(supabase, type) {
+  const fallback = NOTIFICATION_DEFAULTS[type]
+  const { data, error } = await supabase
+    .from('notification_settings')
+    .select('id,enabled,title_template,body_template')
+    .eq('id', type)
+    .maybeSingle()
+
+  if (error) throw error
+  return { ...fallback, ...(data || {}) }
 }
 
 async function loadPendingSubscriptions(supabase, sentBefore) {
@@ -116,8 +132,8 @@ async function sendOne(supabase, row, today, notification) {
         keys: { p256dh: row.p256dh, auth: row.auth },
       },
       {
-        title: notification.title(row.firstName),
-        body: typeof notification.body === 'function' ? notification.body(row.firstName) : notification.body,
+        title: renderNotificationTemplate(notification.title_template, row.firstName),
+        body: renderNotificationTemplate(notification.body_template, row.firstName),
         icon: '/pwa-icon-192.png',
         badge: '/pwa-icon-192.png',
         tag: `${notification.tag}-${today}`,
@@ -148,8 +164,8 @@ async function sendOne(supabase, row, today, notification) {
 }
 
 export async function handleScheduledPush(request, type) {
-  const notification = NOTIFICATIONS[type]
-  if (!notification) return Response.json({ error: 'Notificação inválida.' }, { status: 400 })
+  const fallback = NOTIFICATION_DEFAULTS[type]
+  if (!fallback) return Response.json({ error: 'Notificação inválida.' }, { status: 400 })
 
   const authorization = request.headers.get('authorization') || ''
   const cronSecrets = [process.env.CRON_SECRET, process.env.PUSH_CRON_SECRET].filter(Boolean)
@@ -162,6 +178,13 @@ export async function handleScheduledPush(request, type) {
     }
 
     const supabase = serverClient()
+    const notification = await loadNotification(supabase, type)
+    if (!notification.enabled) {
+      return Response.json(
+        { success: true, type, skipped: true, reason: 'Notificação pausada no Escritório.' },
+        { headers: { 'Cache-Control': 'no-store' } },
+      )
+    }
     const today = dateInSaoPaulo()
     const pendingSubscriptions = await loadPendingSubscriptions(supabase, slotStart(today, notification.hour))
     const subscriptions = await filterEligibleSubscriptions(supabase, pendingSubscriptions)
