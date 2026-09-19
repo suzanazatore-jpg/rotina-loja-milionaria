@@ -3,8 +3,12 @@
   "regions": ["gru1"],
   "crons": [
     {
-      "path": "/api/cron/notificacao-matinal",
+      "path": "/api/cron/notificacao-motivacional",
       "schedule": "0 11 * * *"
+    },
+    {
+      "path": "/api/cron/notificacao-matinal",
+      "schedule": "0 12 * * *"
     }
   ]
 }
