@@ -704,7 +704,7 @@ export default function Painel() {
               {/* ASSISTENTE VIRTUAL */}
               {secao === 'assistente' && assistenteLiberado && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
-                  <VirtualAssistant cores={cores} ouro={ouro} ouroGrad={ouroGrad} onOpenSupport={() => irPara('suporte')} />
+                  <VirtualAssistant cores={cores} ouro={ouro} ouroGrad={ouroGrad} onOpenSupport={() => irPara('suporte')} onNavigate={irPara} />
                 </div>
               )}
 

@@ -50,6 +50,7 @@ export default function Admin() {
         { icone: 'routine', titulo: 'Rotina', sub: 'Publique a rotina semanal das lojistas.', rota: '/admin/rotina' },
         { icone: 'goals', titulo: 'Calculadora de Metas', sub: 'Metas, ranking e histórico das vendedoras.', rota: '/admin/metas' },
         { icone: '🎬', titulo: 'Vídeos Explicativos', sub: 'Cadastre as aulas rápidas das ferramentas do aplicativo.', rota: '/admin/videos' },
+        { icone: 'quickAssistant', titulo: 'Base da Assistente', sub: 'Ensine a Assistente com PDFs, Word e orientações da Suzana.', rota: '/admin/assistente' },
       ],
     },
     {
