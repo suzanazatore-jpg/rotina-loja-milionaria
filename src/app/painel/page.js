@@ -531,6 +531,7 @@ export default function Painel() {
               metasLiberadas={metasLiberadas}
               rotinaSemanal={rotinaSemanal}
               calendarActions={acoesCalendario}
+              campaign={campanhas.find(item => item.mes_ano === mesAtualValor()) || campanhas[0] || null}
             />
           )}
 
