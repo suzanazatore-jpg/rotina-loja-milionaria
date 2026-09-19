@@ -381,10 +381,10 @@ export default function Painel() {
 
   const menuMobileItens = [
     { id: 'inicio', icone: 'home', label: 'Hoje' },
-    { id: 'cursos', icone: 'courses', label: 'Cursos' },
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     { id: 'ajuda', icone: 'support', label: 'Suporte' },
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
+    { id: 'assistente', icone: 'quickAssistant', label: 'Assistente' },
   ]
 
   const menuMobileDrawer = [
