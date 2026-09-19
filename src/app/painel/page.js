@@ -23,6 +23,9 @@ const VirtualAssistant = dynamic(() => import('./VirtualAssistant'), {
 const SalesCenter = dynamic(() => import('./SalesCenter'), {
   loading: () => <SectionLoading label="Abrindo vendas e metas..." />,
 })
+const PricingCenter = dynamic(() => import('./PricingCenter'), {
+  loading: () => <SectionLoading label="Abrindo precificação e lucro..." />,
+})
 
 // ════════ NÚMERO DO WHATSAPP DO SUPORTE ════════
 const WHATSAPP = '558499814124'
@@ -151,6 +154,7 @@ export default function Painel() {
   const [mentoriaLiberada, setMentoriaLiberada] = useState(false)
   const [assistenteLiberado, setAssistenteLiberado] = useState(false)
   const [metasLiberadas, setMetasLiberadas] = useState(false)
+  const [precificacaoLiberada, setPrecificacaoLiberada] = useState(false)
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
   const [acoesCalendario, setAcoesCalendario] = useState([])
@@ -167,7 +171,7 @@ export default function Painel() {
   useEffect(() => {
     const destino = new URLSearchParams(window.location.search).get('secao')
     const timer = window.setTimeout(() => {
-      if (['inicio', 'rotina', 'vendas', 'conteudos', 'calendario', 'campanhas'].includes(destino)) setSecao(destino)
+      if (['inicio', 'rotina', 'vendas', 'conteudos', 'calendario', 'campanhas', 'precificacao'].includes(destino)) setSecao(destino)
     }, 0)
     return () => window.clearTimeout(timer)
   }, [])
@@ -264,6 +268,7 @@ export default function Painel() {
         setAulas(dados.mentoria?.aulas || [])
         setAssistenteLiberado(dados.acessos?.assistant === true)
         setMetasLiberadas(dados.acessos?.team_goals === true)
+        setPrecificacaoLiberada(dados.acessos?.pricing === true)
 
         setCarregando(false)
         timerSecundario = window.setTimeout(() => {
@@ -291,6 +296,7 @@ export default function Painel() {
         import('./CursosArea'),
         import('./SalesCenter'),
         import('./SupportCenter'),
+        import('./PricingCenter'),
       ])
     }
 
@@ -456,13 +462,14 @@ export default function Painel() {
     if (id === 'mentoria') { router.push('/mentoria'); return }
     if (id === 'assistente' && !assistenteLiberado) { setSecao('suporte'); setMenuMobile(false); return }
     if ((id === 'vendas' || id === 'lancar-venda') && !metasLiberadas) { setSecao('metas-bloqueadas'); setMenuMobile(false); return }
+    if (id === 'precificacao' && !precificacaoLiberada) { setSecao('precificacao-bloqueada'); setMenuMobile(false); return }
     if (id === 'lancar-venda') { setVendasAbaInicial('lancar'); setSecao('vendas'); setMenuMobile(false); return }
     if (id === 'vendas') setVendasAbaInicial('painel')
     setSecao(id)
     setMenuMobile(false)
   }
 
-  const tituloSecao = [...menu, ...menuMobileDrawer].find(m => m.id === secao)?.label || (secao === 'dados' ? 'Meus Dados' : '')
+  const tituloSecao = [...menu, ...menuMobileDrawer].find(m => m.id === secao)?.label || (secao === 'dados' ? 'Meus Dados' : secao === 'precificacao' ? 'Precificação e Lucro' : '')
 
   return (
     <div className={`premium-painel tema-${tema}`} style={{ display: 'flex', minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background .2s, color .2s' }}>
@@ -535,6 +542,7 @@ export default function Painel() {
               temAcessoPremium={temAcessoPremium}
               assistenteLiberado={assistenteLiberado}
               metasLiberadas={metasLiberadas}
+              precificacaoLiberada={precificacaoLiberada}
               rotinaSemanal={rotinaSemanal}
               calendarActions={acoesCalendario}
               campaign={campanhas.find(item => item.mes_ano === mesAtualValor()) || campanhas[0] || null}
@@ -574,9 +582,9 @@ export default function Painel() {
                     <div className="premium-cascade-lessons">{aulas.map(aula => <button key={aula.id} onClick={() => router.push(`/mentoria?aula=${aula.id}`)}><span>{aula.ordem}</span><div><strong>{aula.titulo}</strong><small>{aula.descricao || 'Assistir aula'}</small></div><b>Assistir →</b></button>)}</div>
                   </BlocoCascata>}
 
-                  <BlocoCascata titulo="Precificação" subtitulo="Ferramentas para preço, markup e descontos" cores={cores} ouro={ouro}>
-                    <div className="premium-cascade-tools"><button onClick={() => router.push('/calculadora')}><strong>Calculadora de Descontos</strong><span>Calcule descontos com segurança →</span></button><button onClick={() => router.push('/markup')}><strong>Calculadora de Markup</strong><span>Encontre o preço ideal de venda →</span></button></div>
-                  </BlocoCascata>
+                  {precificacaoLiberada && <BlocoCascata titulo="Precificação e Lucro" subtitulo="Preço ideal, margem, descontos e histórico" cores={cores} ouro={ouro}>
+                    <div className="premium-cascade-tools"><button onClick={() => irPara('precificacao')}><strong>Abrir calculadora de lucro</strong><span>Precifique e simule descontos com segurança →</span></button></div>
+                  </BlocoCascata>}
                 </div>
               )}
 
@@ -588,7 +596,7 @@ export default function Painel() {
                     <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
                     <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
                     <CardAcesso cores={cores} icone="quickCourses" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
-                    <CardAcesso cores={cores} icone="content" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} />
+                    {precificacaoLiberada && <CardAcesso cores={cores} icone="content" titulo="Precificação e Lucro" sub="Preço, margem e descontos" onClick={() => irPara('precificacao')} />}
                     {mentoriaLiberada && <CardAcesso cores={cores} icone="quickCourses" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
                   </div>
                 </div>
@@ -610,7 +618,7 @@ export default function Painel() {
                 <div className="premium-hub">
                   <div className="premium-hub-heading"><p>CONTA E FERRAMENTAS</p><h2>Mais opções</h2><span>Atendimento, configurações e ferramentas da sua loja.</span></div>
                   <div className="premium-hub-grid">
-                    <CardAcesso cores={cores} icone="content" titulo="Precificação" sub="Markup e descontos" onClick={() => irPara('precificacao')} destaque ouroGrad={ouroGrad} />
+                    {precificacaoLiberada && <CardAcesso cores={cores} icone="content" titulo="Precificação e Lucro" sub="Preço, margem e descontos" onClick={() => irPara('precificacao')} destaque ouroGrad={ouroGrad} />}
                     {assistenteLiberado && <CardAcesso cores={cores} icone="quickAssistant" titulo="Assistente Virtual" sub="Orientação com IA" onClick={() => irPara('assistente')} />}
                     <CardAcesso cores={cores} icone="support" titulo="Suporte" sub="Chamados e atendimento" onClick={() => irPara('suporte')} />
                     <CardAcesso cores={cores} icone="profile" titulo="Meus Dados" sub="Informações da conta" onClick={() => irPara('dados')} />
@@ -674,27 +682,13 @@ export default function Painel() {
               )}
 
               {secao === 'precificacao' && (
-                <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+                precificacaoLiberada ? <div style={{ maxWidth: '1040px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
-                  <VideoEmBreve cores={cores} ouro={ouro} titulo="Como usar a precificação" />
-                  <div style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '18px', marginBottom: '16px' }}>
-                    <h2 style={{ fontSize: '19px', fontWeight: 800, margin: '0 0 5px', color: cores.tx }}>📊 Precificação</h2>
-                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.5 }}>Ferramentas para precificar com lucro real.</p>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '14px' }}>
-                    <div onClick={() => router.push('/calculadora')} style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '24px 20px', cursor: 'pointer', textAlign: 'center' }}>
-                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>🧮</div>
-                      <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 4px', color: cores.tx }}>Calculadora</h3>
-                      <p style={{ fontSize: '12px', color: cores.tx2, margin: 0 }}>Calcule descontos</p>
-                    </div>
-                    <div onClick={() => router.push('/markup')} style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '14px', padding: '24px 20px', cursor: 'pointer', textAlign: 'center' }}>
-                      <div style={{ fontSize: '36px', marginBottom: '10px' }}>📊</div>
-                      <h3 style={{ fontSize: '16px', fontWeight: 700, margin: '0 0 4px', color: cores.tx }}>Markup</h3>
-                      <p style={{ fontSize: '12px', color: cores.tx2, margin: 0 }}>Preço ideal de venda</p>
-                    </div>
-                  </div>
-                </div>
+                  <PricingCenter userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
+                </div> : <AcessoBloqueado titulo="Precificação e Lucro" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
+
+              {secao === 'precificacao-bloqueada' && <AcessoBloqueado titulo="Precificação e Lucro" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />}
 
               {/* SUPORTE */}
               {secao === 'suporte' && (

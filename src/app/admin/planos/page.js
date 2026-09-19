@@ -17,6 +17,7 @@ const CONTEUDOS_APP = [
   { id: 'campaigns', nome: 'Campanhas', descricao: 'Campanhas e ações de vendas' },
   { id: 'routine', nome: 'Rotina', descricao: 'Rotina semanal da lojista' },
   { id: 'team_goals', nome: 'Calculadora de Metas', descricao: 'Metas, ranking e histórico da equipe' },
+  { id: 'pricing', nome: 'Precificação e Lucro', descricao: 'Preço ideal, margem, descontos e histórico' },
   { id: 'assistant', nome: 'Assistente Virtual', descricao: 'Orientação inteligente dentro do aplicativo' },
 ]
 

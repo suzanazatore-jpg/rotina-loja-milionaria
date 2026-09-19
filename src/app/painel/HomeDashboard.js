@@ -38,6 +38,7 @@ export default function HomeDashboard({
   mentoriaLiberada,
   assistenteLiberado,
   metasLiberadas,
+  precificacaoLiberada,
   rotinaSemanal,
   calendarActions = [],
   campaign = null,
@@ -106,6 +107,7 @@ export default function HomeDashboard({
     ['quickRoutine', 'Rotina', 'Plano prático da semana', 'rotina'],
     ['quickCourses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
     ...(metasLiberadas ? [['quickTeam', 'Vendas e Metas', 'Resultados da equipe', 'vendas']] : []),
+    ...(precificacaoLiberada ? [['content', 'Precificação e Lucro', 'Preço, margem e descontos', 'precificacao']] : []),
     ...(mentoriaLiberada ? [['quickCourses', 'Mentorias', 'Encontros e gravações', 'mentoria']] : []),
     ...(assistenteLiberado ? [['quickAssistant', 'Assistente', 'Ajuda inteligente', 'assistente']] : []),
   ]

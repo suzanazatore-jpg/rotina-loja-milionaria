@@ -82,7 +82,7 @@ async function loadCritical(supabase, user) {
     : { data: [], error: null }
 
   const contents = isAdmin
-    ? ['calendar', 'campaigns', 'routine', 'team_goals', 'mentorship', 'assistant']
+    ? ['calendar', 'campaigns', 'routine', 'team_goals', 'mentorship', 'assistant', 'pricing']
     : [...new Set((appContentsResult.data || []).map(item => item.content_key))]
   const active = isAdmin || profile?.status === 'active'
 
@@ -103,6 +103,7 @@ async function loadCritical(supabase, user) {
     acessos: {
       assistant: active && (isAdmin || profile?.assistant_enabled === true || contents.includes('assistant')),
       team_goals: active && (isAdmin || contents.includes('team_goals')),
+      pricing: active && (isAdmin || contents.includes('pricing')),
       contents,
     },
   }
