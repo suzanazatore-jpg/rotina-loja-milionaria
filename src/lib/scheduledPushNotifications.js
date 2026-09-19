@@ -41,6 +41,43 @@ export function dateInSaoPaulo() {
   return `${values.year}-${values.month}-${values.day}`
 }
 
+function dateTimeInSaoPaulo(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(now)
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]))
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+  }
+}
+
+function previousDate(date) {
+  const value = new Date(`${date}T12:00:00Z`)
+  value.setUTCDate(value.getUTCDate() - 1)
+  return value.toISOString().slice(0, 10)
+}
+
+function dispatcherContext(request) {
+  const current = dateTimeInSaoPaulo()
+  const expression = request.headers.get('x-vercel-cron-schedule') || ''
+  const match = expression.match(/^(\d{1,2})\s+(\d{1,2})\s+\*\s+\*\s+\*$/)
+  if (!match) return { ...current, weekday: new Date(`${current.date}T12:00:00Z`).getUTCDay() }
+
+  const utcMinutes = Number(match[2]) * 60 + Number(match[1])
+  const localMinutes = (utcMinutes - 180 + 1440) % 1440
+  const currentMinutes = Number(current.time.slice(0, 2)) * 60 + Number(current.time.slice(3, 5))
+  const date = localMinutes > currentMinutes + 720 ? previousDate(current.date) : current.date
+  const time = `${String(Math.floor(localMinutes / 60)).padStart(2, '0')}:${String(localMinutes % 60).padStart(2, '0')}`
+  return { date, time, weekday: new Date(`${date}T12:00:00Z`).getUTCDay() }
+}
+
 function slotStart(today, hour) {
   return new Date(`${today}T${String(hour).padStart(2, '0')}:00:00${SAO_PAULO_OFFSET}`).toISOString()
 }
@@ -168,6 +205,23 @@ async function loadPendingSubscriptions(supabase, sentBefore) {
   return subscriptions
 }
 
+async function loadAllActiveSubscriptions(supabase) {
+  const subscriptions = []
+  let from = 0
+  while (true) {
+    const { data, error } = await supabase
+      .from('push_subscriptions')
+      .select('id,user_id,endpoint,p256dh,auth,last_sent_at')
+      .eq('active', true)
+      .range(from, from + PAGE_SIZE - 1)
+    if (error) throw error
+    subscriptions.push(...(data || []))
+    if (!data || data.length < PAGE_SIZE) break
+    from += PAGE_SIZE
+  }
+  return subscriptions
+}
+
 async function filterEligibleSubscriptions(supabase, subscriptions) {
   const userIds = [...new Set(subscriptions.map(item => item.user_id))]
   if (!userIds.length) return []
@@ -223,6 +277,130 @@ async function sendOne(supabase, row, today, notification) {
       return 'inactive'
     }
     return 'failed'
+  }
+}
+
+async function sendOneForSchedule(supabase, row, today, notification, schedule) {
+  try {
+    const values = { name: row.firstName, action: row.routineAction }
+    await sendPushNotification(
+      { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
+      {
+        title: renderNotificationTemplate(notification.title_template, values),
+        body: renderNotificationTemplate(notification.body_template, values),
+        icon: '/pwa-icon-192.png',
+        badge: '/pwa-icon-192.png',
+        tag: `${notification.tag}-${schedule.id}-${today}`,
+        url: '/painel',
+      },
+    )
+    const { error } = await supabase
+      .from('push_subscriptions')
+      .update({ last_sent_on: today, last_sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', row.id)
+      .eq('active', true)
+    if (error) throw error
+    return 'sent'
+  } catch (error) {
+    if (error?.statusCode === 404 || error?.statusCode === 410) {
+      await markInactive(supabase, row.id)
+      return 'inactive'
+    }
+    return 'failed'
+  }
+}
+
+async function loadDueSchedules(supabase, context) {
+  const { data, error } = await supabase
+    .from('notification_schedules')
+    .select('id,label,notification_type,send_time,weekdays,title_template,body_template,enabled,position')
+    .eq('enabled', true)
+    .eq('send_time', `${context.time}:00`)
+    .order('position')
+    .order('id')
+  if (error) throw error
+  return (data || []).filter(item => Array.isArray(item.weekdays) && item.weekdays.includes(context.weekday))
+}
+
+async function claimScheduleRun(supabase, scheduleId, date) {
+  const { error } = await supabase.from('notification_schedule_runs').insert({ schedule_id: scheduleId, run_date: date })
+  if (error?.code === '23505') return false
+  if (error) throw error
+  return true
+}
+
+async function finishScheduleRun(supabase, scheduleId, date, status, totals, errorMessage = null) {
+  const { error } = await supabase
+    .from('notification_schedule_runs')
+    .update({ status, ...totals, error_message: errorMessage, completed_at: new Date().toISOString() })
+    .eq('schedule_id', scheduleId)
+    .eq('run_date', date)
+  if (error) throw error
+}
+
+async function notificationForSchedule(supabase, schedule, date) {
+  if (schedule.notification_type === 'personalizada') {
+    return {
+      enabled: true,
+      title_template: schedule.title_template,
+      body_template: schedule.body_template,
+      tag: 'rotina-personalizada',
+    }
+  }
+  return loadNotificationForDate(supabase, schedule.notification_type, date)
+}
+
+async function runSchedule(supabase, schedule, context) {
+  if (!await claimScheduleRun(supabase, schedule.id, context.date)) {
+    return { id: schedule.id, label: schedule.label, skipped: true, reason: 'Horário já processado.' }
+  }
+
+  const totals = { sent: 0, inactive: 0, failed: 0 }
+  try {
+    const notification = await notificationForSchedule(supabase, schedule, context.date)
+    if (!notification.enabled) {
+      await finishScheduleRun(supabase, schedule.id, context.date, 'completed', totals)
+      return { id: schedule.id, label: schedule.label, skipped: true, reason: 'Conteúdo pausado no Escritório.', ...totals }
+    }
+    const activeSubscriptions = await loadAllActiveSubscriptions(supabase)
+    let subscriptions = await filterEligibleSubscriptions(supabase, activeSubscriptions)
+    if (schedule.notification_type === 'rotina') subscriptions = await attachRoutineActions(supabase, subscriptions, context.date)
+    for (let index = 0; index < subscriptions.length; index += BATCH_SIZE) {
+      const results = await Promise.all(subscriptions.slice(index, index + BATCH_SIZE).map(row => (
+        sendOneForSchedule(supabase, row, context.date, notification, schedule)
+      )))
+      results.forEach(result => { totals[result] += 1 })
+    }
+    await finishScheduleRun(supabase, schedule.id, context.date, 'completed', totals)
+    return { id: schedule.id, label: schedule.label, total: subscriptions.length, ...totals }
+  } catch (error) {
+    await finishScheduleRun(supabase, schedule.id, context.date, 'failed', totals, String(error.message || error).slice(0, 500))
+    return { id: schedule.id, label: schedule.label, error: error.message || 'Falha no envio.', ...totals }
+  }
+}
+
+export async function handleNotificationDispatcher(request) {
+  const authorization = request.headers.get('authorization') || ''
+  const cronSecrets = [process.env.CRON_SECRET, process.env.PUSH_CRON_SECRET].filter(Boolean)
+  if (!cronSecrets.some(secret => authorization === `Bearer ${secret}`)) {
+    return Response.json({ error: 'Não autorizado.' }, { status: 401 })
+  }
+
+  try {
+    if (!getVapidPublicKey() || !(process.env.PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY)) {
+      return Response.json({ error: 'Chaves de notificação não configuradas.' }, { status: 503 })
+    }
+    const supabase = serverClient()
+    const context = dispatcherContext(request)
+    const schedules = await loadDueSchedules(supabase, context)
+    const results = []
+    for (const schedule of schedules) results.push(await runSchedule(supabase, schedule, context))
+    return Response.json(
+      { success: true, date: context.date, time: context.time, schedules: schedules.length, results },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
+  } catch (error) {
+    return Response.json({ error: error.message }, { status: 500, headers: { 'Cache-Control': 'no-store' } })
   }
 }
 

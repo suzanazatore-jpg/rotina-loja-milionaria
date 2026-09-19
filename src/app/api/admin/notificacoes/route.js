@@ -11,7 +11,9 @@ import {
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const TYPES = ['motivacional', 'rotina']
+const SCHEDULE_TYPES = [...TYPES, 'personalizada']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const SCHEDULE_TIME = /^(?:[01]\d|2[0-3]):(?:00|30)$/
 
 function adminClient() {
   return createClient(
@@ -55,6 +57,36 @@ function cleanMessage(value, index) {
   }
 }
 
+function cleanSchedule(value, index) {
+  const type = String(value?.notification_type || '')
+  const label = String(value?.label || '').trim()
+  const sendTime = String(value?.send_time || '').slice(0, 5)
+  const weekdays = [...new Set((Array.isArray(value?.weekdays) ? value.weekdays : []).map(Number))].sort((a, b) => a - b)
+  const title = String(value?.title_template || '').trim()
+  const body = String(value?.body_template || '').trim()
+  if (!SCHEDULE_TYPES.includes(type)) throw new Error(`O horário ${index + 1} possui um tipo inválido.`)
+  if (!label || label.length > 80) throw new Error(`O nome do horário ${index + 1} deve ter entre 1 e 80 caracteres.`)
+  if (!SCHEDULE_TIME.test(sendTime)) throw new Error(`Escolha um horário válido de 30 em 30 minutos no item ${index + 1}.`)
+  if (!weekdays.length || weekdays.some(day => !Number.isInteger(day) || day < 0 || day > 6)) {
+    throw new Error(`Escolha pelo menos um dia da semana no horário ${index + 1}.`)
+  }
+  if (type === 'personalizada' && (!title || title.length > 80 || !body || body.length > 240)) {
+    throw new Error(`Preencha o título e a mensagem personalizada do horário ${index + 1}.`)
+  }
+  return {
+    id: UUID.test(String(value?.id || '')) ? value.id : crypto.randomUUID(),
+    label,
+    notification_type: type,
+    send_time: `${sendTime}:00`,
+    weekdays,
+    title_template: type === 'personalizada' ? title : null,
+    body_template: type === 'personalizada' ? body : null,
+    enabled: value.enabled !== false,
+    position: index + 1,
+    updated_at: new Date().toISOString(),
+  }
+}
+
 async function loadSettings(supabase) {
   const { data, error } = await supabase
     .from('notification_settings')
@@ -74,6 +106,16 @@ async function loadMessages(supabase) {
     .order('id')
   if (error) throw error
   return data || []
+}
+
+async function loadSchedules(supabase) {
+  const { data, error } = await supabase
+    .from('notification_schedules')
+    .select('id,label,notification_type,send_time,weekdays,title_template,body_template,enabled,position,updated_at')
+    .order('position')
+    .order('send_time')
+  if (error) throw error
+  return (data || []).map(item => ({ ...item, send_time: String(item.send_time || '').slice(0, 5) }))
 }
 
 async function saveMessages(supabase, messages) {
@@ -99,11 +141,32 @@ async function saveMessages(supabase, messages) {
   return cleaned
 }
 
+async function saveSchedules(supabase, schedules) {
+  if (schedules.length > 20) throw new Error('Você pode cadastrar até 20 horários de notificação.')
+  const cleaned = schedules.map(cleanSchedule)
+  if (new Set(cleaned.map(item => item.id)).size !== cleaned.length) throw new Error('Existem horários duplicados.')
+
+  const { data: existing, error: existingError } = await supabase.from('notification_schedules').select('id')
+  if (existingError) throw existingError
+  if (cleaned.length) {
+    const { error } = await supabase.from('notification_schedules').upsert(cleaned, { onConflict: 'id' })
+    if (error) throw error
+  }
+  const kept = new Set(cleaned.map(item => item.id))
+  const removed = (existing || []).map(item => item.id).filter(id => !kept.has(id))
+  if (removed.length) {
+    const { error } = await supabase.from('notification_schedules').delete().in('id', removed)
+    if (error) throw error
+  }
+  return cleaned
+}
+
 async function loadAdminPayload(supabase, admin) {
   const today = dateInSaoPaulo()
-  const [settings, messages, activeResult, mineResult] = await Promise.all([
+  const [settings, messages, schedules, activeResult, mineResult] = await Promise.all([
     loadSettings(supabase),
     loadMessages(supabase),
+    loadSchedules(supabase),
     supabase.from('push_subscriptions').select('id', { count: 'exact', head: true }).eq('active', true),
     supabase.from('push_subscriptions').select('id', { count: 'exact', head: true }).eq('active', true).eq('user_id', admin.id),
   ])
@@ -115,6 +178,7 @@ async function loadAdminPayload(supabase, admin) {
   return {
     settings,
     messages,
+    schedules,
     activeDevices: activeResult.count || 0,
     myActiveDevices: mineResult.count || 0,
     todayMessageId: motivational.message_id || null,
@@ -144,6 +208,7 @@ export async function PUT(request) {
       throw new Error('Envie as duas configurações de notificação.')
     }
     if (!Array.isArray(body.messages)) throw new Error('Envie o banco de mensagens motivacionais.')
+    if (!Array.isArray(body.schedules)) throw new Error('Envie os horários de notificação.')
     const settings = body.settings.map(cleanSetting)
     if (new Set(settings.map(item => item.id)).size !== TYPES.length) throw new Error('As configurações estão duplicadas.')
     const motivational = settings.find(item => item.id === 'motivacional')
@@ -151,7 +216,7 @@ export async function PUT(request) {
       throw new Error('Mantenha pelo menos uma mensagem motivacional ativa ou pause o envio das 8h.')
     }
 
-    await saveMessages(supabase, body.messages)
+    await Promise.all([saveMessages(supabase, body.messages), saveSchedules(supabase, body.schedules)])
     const { error } = await supabase.from('notification_settings').upsert(settings, { onConflict: 'id' })
     if (error) throw error
     return response({ success: true, ...(await loadAdminPayload(supabase, admin)) })

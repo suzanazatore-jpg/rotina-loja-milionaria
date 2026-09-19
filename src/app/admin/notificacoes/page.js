@@ -6,6 +6,21 @@ import { supabase } from '@/lib/supabase'
 
 const GOLD = '#D4AF37'
 const TYPES = ['motivacional', 'rotina']
+const DAYS = [
+  { value: 1, label: 'SEG' }, { value: 2, label: 'TER' }, { value: 3, label: 'QUA' },
+  { value: 4, label: 'QUI' }, { value: 5, label: 'SEX' }, { value: 6, label: 'SÁB' },
+  { value: 0, label: 'DOM' },
+]
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const hour = String(Math.floor(index / 2)).padStart(2, '0')
+  const minute = index % 2 ? '30' : '00'
+  return `${hour}:${minute}`
+})
+const SCHEDULE_TYPE_LABELS = {
+  motivacional: 'Mensagem do banco motivacional',
+  rotina: 'Próxima ação da rotina',
+  personalizada: 'Mensagem personalizada',
+}
 const DEFAULTS = {
   motivacional: { id: 'motivacional', enabled: true, title_template: 'Bom dia, {{nome}}! 💛', body_template: 'Mensagem motivacional do banco.' },
   rotina: { id: 'rotina', enabled: true, title_template: 'Vamos começar a rotina de hoje? ✨', body_template: '{{nome}}, sua primeira ação de hoje é: {{acao}}. Abra o app e avance um passo de cada vez.' },
@@ -24,6 +39,7 @@ export default function AdminNotificacoes() {
   const fileInputRef = useRef(null)
   const [settings, setSettings] = useState(DEFAULTS)
   const [messages, setMessages] = useState([])
+  const [schedules, setSchedules] = useState([])
   const [bulkText, setBulkText] = useState('')
   const [activeDevices, setActiveDevices] = useState(0)
   const [myActiveDevices, setMyActiveDevices] = useState(0)
@@ -56,6 +72,7 @@ export default function AdminNotificacoes() {
   function applyPayload(result) {
     setSettings(Object.fromEntries((result.settings || []).map(item => [item.id, item])))
     setMessages(result.messages || [])
+    setSchedules(result.schedules || [])
     setActiveDevices(result.activeDevices || 0)
     setMyActiveDevices(result.myActiveDevices || 0)
     setTodayMessageId(result.todayMessageId || null)
@@ -191,6 +208,40 @@ export default function AdminNotificacoes() {
     })
   }
 
+  function addSchedule() {
+    setSchedules(current => [...current, {
+      id: crypto.randomUUID(),
+      label: 'Novo lembrete',
+      notification_type: 'personalizada',
+      send_time: '10:00',
+      weekdays: [1, 2, 3, 4, 5, 6],
+      title_template: 'Um lembrete para sua loja ✨',
+      body_template: '{{nome}}, abra o aplicativo e avance no próximo passo da sua loja.',
+      enabled: true,
+    }])
+    setNotice({ type: 'success', text: 'Novo horário criado. Configure abaixo e clique em Salvar alterações.' })
+  }
+
+  function updateSchedule(id, field, value) {
+    setSchedules(current => current.map(item => item.id === id ? { ...item, [field]: value } : item))
+    setNotice(null)
+  }
+
+  function toggleScheduleDay(id, day) {
+    setSchedules(current => current.map(item => {
+      if (item.id !== id) return item
+      const days = item.weekdays.includes(day) ? item.weekdays.filter(value => value !== day) : [...item.weekdays, day]
+      return { ...item, weekdays: days }
+    }))
+    setNotice(null)
+  }
+
+  function removeSchedule(id) {
+    if (!window.confirm('Excluir este horário de notificação?')) return
+    setSchedules(current => current.filter(item => item.id !== id))
+    setNotice(null)
+  }
+
   function moveMessage(index, direction) {
     const target = index + direction
     if (target < 0 || target >= messages.length) return
@@ -214,6 +265,7 @@ export default function AdminNotificacoes() {
       body: JSON.stringify({
         settings: TYPES.map(id => settings[id] || DEFAULTS[id]),
         messages,
+        schedules,
       }),
     })
     applyPayload(result)
@@ -269,9 +321,35 @@ export default function AdminNotificacoes() {
         {notice && <div className={`notice ${notice.type}`}>{notice.type === 'success' ? '✓' : '!'} {notice.text}</div>}
 
         {loading ? <div className="loading">Carregando notificações...</div> : <>
+          <article className="scheduleManager">
+            <div className="scheduleManagerHeader">
+              <div><span className="eyebrow">PROGRAMAÇÃO AUTOMÁTICA</span><h3>Horários de envio</h3><p>Escolha o horário, os dias e o conteúdo. O fuso usado é o de Brasília.</p></div>
+              <button type="button" onClick={addSchedule}>+ Novo horário</button>
+            </div>
+            <div className="scheduleList">
+              {!schedules.length ? <div className="empty">Nenhum horário cadastrado. Clique em Novo horário para começar.</div> : schedules.map((item, index) => (
+                <section className={`scheduleRow ${item.enabled ? '' : 'disabled'}`} key={item.id}>
+                  <div className="scheduleNumber">{index + 1}</div>
+                  <div className="scheduleFields">
+                    <label><span>Nome</span><input maxLength={80} value={item.label} onChange={event => updateSchedule(item.id, 'label', event.target.value)} /></label>
+                    <label><span>Horário</span><select value={String(item.send_time).slice(0, 5)} onChange={event => updateSchedule(item.id, 'send_time', event.target.value)}>{TIME_OPTIONS.map(time => <option value={time} key={time}>{time}</option>)}</select></label>
+                    <label><span>Conteúdo</span><select value={item.notification_type} onChange={event => updateSchedule(item.id, 'notification_type', event.target.value)}>{Object.entries(SCHEDULE_TYPE_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+                  </div>
+                  <div className="scheduleDays"><span>Dias do envio</span><div>{DAYS.map(day => <button className={item.weekdays.includes(day.value) ? 'selected' : ''} type="button" onClick={() => toggleScheduleDay(item.id, day.value)} key={day.value}>{day.label}</button>)}</div></div>
+                  {item.notification_type === 'personalizada' && <div className="customFields">
+                    <label><span>Título <i>{String(item.title_template || '').length}/80</i></span><input maxLength={80} value={item.title_template || ''} onChange={event => updateSchedule(item.id, 'title_template', event.target.value)} /></label>
+                    <label><span>Mensagem <i>{String(item.body_template || '').length}/240</i></span><textarea rows={3} maxLength={240} value={item.body_template || ''} onChange={event => updateSchedule(item.id, 'body_template', event.target.value)} /></label>
+                    <small>Você pode usar <code>{'{{nome}}'}</code> para chamar a lojista pelo primeiro nome.</small>
+                  </div>}
+                  <div className="scheduleActions"><Toggle checked={item.enabled} onChange={value => updateSchedule(item.id, 'enabled', value)} /><button type="button" onClick={() => removeSchedule(item.id)}>Excluir</button></div>
+                </section>
+              ))}
+            </div>
+          </article>
+
           <article className={`card ${motivational.enabled ? '' : 'paused'}`}>
             <div className="cardHeader">
-              <div className="time">8h</div>
+              <div className="time">💛</div>
               <div className="cardTitle"><h3>Banco de mensagens motivacionais</h3><p>O sistema percorre todas as mensagens ativas antes de voltar à primeira.</p></div>
               <Toggle checked={motivational.enabled} onChange={value => updateSetting('motivacional', 'enabled', value)} />
             </div>
@@ -335,7 +413,7 @@ export default function AdminNotificacoes() {
 
           <article className={`card ${routine.enabled ? '' : 'paused'}`}>
             <div className="cardHeader">
-              <div className="time">9h</div>
+              <div className="time">✓</div>
               <div className="cardTitle"><h3>Lembrete inteligente da rotina</h3><p>Busca a rotina semanal, o dia atual e a primeira tarefa que cada lojista ainda não concluiu.</p></div>
               <Toggle checked={routine.enabled} onChange={value => updateSetting('rotina', 'enabled', value)} />
             </div>
@@ -355,8 +433,8 @@ export default function AdminNotificacoes() {
       </main>
 
       <style jsx>{`
-        .page{min-height:100vh;background:#090909;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.header{min-height:68px;display:flex;align-items:center;gap:15px;padding:13px 20px;border-bottom:1px solid #292929;background:#111;position:sticky;top:0;z-index:5}.header small,.eyebrow{display:block;color:${GOLD};font-size:10px;font-weight:900;letter-spacing:.11em}.header h1{font-size:17px;margin:2px 0 0}.back{min-height:37px;padding:7px 12px;border:1px solid #353535;border-radius:8px;background:#171717;color:${GOLD};font-weight:800;cursor:pointer}main{max-width:1080px;margin:0 auto;padding:28px 18px 76px}.intro{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:18px}.intro h2{font-size:24px;margin:7px 0}.intro p{color:#929292;font-size:13px;line-height:1.55;margin:0;max-width:690px}.deviceStats{display:flex;gap:8px}.deviceStats div{min-width:115px;padding:13px;border:1px solid #3b3527;border-radius:12px;background:#15130e;text-align:center}.deviceStats strong{display:block;color:${GOLD};font-size:23px}.deviceStats span{color:#aaa;font-size:10px}.notice{margin:0 0 15px;padding:12px 14px;border-radius:9px;font-size:13px}.notice.success{border:1px solid #355e3e;background:#112317;color:#a9e5b5}.notice.error{border:1px solid #713434;background:#2a1212;color:#ffb4b4}.loading{padding:55px;text-align:center;border:1px solid #292929;border-radius:13px;color:#777}.card{margin-bottom:16px;border:1px solid #35312a;border-left:3px solid ${GOLD};border-radius:14px;background:#121212;overflow:hidden}.card.paused{border-left-color:#555}.cardHeader{display:flex;align-items:center;gap:14px;padding:17px 18px;border-bottom:1px solid #282828}.time{width:54px;height:54px;display:grid;place-items:center;flex:0 0 auto;border-radius:14px;background:rgba(212,175,55,.12);color:${GOLD};font-size:18px;font-weight:900}.cardTitle{flex:1}.cardTitle h3{font-size:16px;margin:0 0 4px}.cardTitle p{color:#777;font-size:11px;line-height:1.45;margin:0}.bankSummary{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#292929;border-bottom:1px solid #292929}.bankSummary div{padding:13px 18px;background:#151515}.bankSummary strong{display:block;color:${GOLD};font-size:19px}.bankSummary span{color:#777;font-size:10px}.bankGrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(290px,.85fr);gap:20px;padding:18px}.field{display:block;margin-bottom:13px}.field>span{display:flex;justify-content:space-between;color:#ddd;font-size:12px;font-weight:800;margin-bottom:7px}.field i{color:#666;font-size:10px;font-style:normal;font-weight:500}.field input,.field textarea,.bulkBox textarea,.messageRow textarea,.importRow textarea{box-sizing:border-box;width:100%;border:1px solid #343434;border-radius:9px;background:#0b0b0b;color:#fff;padding:11px 12px;outline:none;font:inherit;font-size:13px;line-height:1.5}.field input:focus,.field textarea:focus,.bulkBox textarea:focus,.messageRow textarea:focus,.importRow textarea:focus{border-color:${GOLD}}.field textarea,.bulkBox textarea,.messageRow textarea,.importRow textarea{resize:vertical}.bulkBox{padding:14px;border:1px solid #302e29;border-radius:11px;background:#0d0d0d}.bulkBox>div:first-child{display:flex;flex-direction:column;margin-bottom:9px}.bulkBox strong{font-size:12px}.bulkBox span{color:#777;font-size:10px;margin-top:3px}.bulkActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.secondary{width:100%;min-height:39px;margin-top:9px;border:1px solid #4b432f;border-radius:8px;background:#1a1813;color:${GOLD};font-weight:800;cursor:pointer}.secondary:disabled{opacity:.55;cursor:wait}.secondary.upload{background:#26200f}.fileInput{display:none}.fileHelp{display:block;color:#666;font-size:9px;margin-top:8px}.importPreview{margin:0 18px 18px;border:1px solid #4b432f;border-radius:12px;background:#0d0d0d;overflow:hidden}.importHeader{display:flex;justify-content:space-between;gap:14px;padding:14px 15px;border-bottom:1px solid #292929}.importHeader h4{font-size:14px;margin:4px 0}.importHeader p{color:#777;font-size:10px;margin:0}.cancelImport{align-self:center;border:1px solid #3a3a3a;border-radius:7px;background:#181818;color:#bbb;padding:8px 10px;cursor:pointer}.importList{max-height:430px;overflow:auto}.importRow{display:grid;grid-template-columns:20px 30px 1fr;gap:9px;align-items:start;padding:10px 14px;border-bottom:1px solid #222}.importRow>input{margin-top:14px;accent-color:${GOLD}}.importRow>span{margin-top:11px;color:${GOLD};font-size:11px;font-weight:900}.importRow small{display:block;color:#666;font-size:9px;margin-top:3px}.importRow.invalid textarea{border-color:#713434}.importRow.invalid small{color:#ff8c8c}.importFooter{display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:12px 14px}.importFooter span{color:#888;font-size:11px}.importFooter button{min-height:38px;border:0;border-radius:8px;background:${GOLD};color:#111;padding:0 14px;font-weight:900;cursor:pointer}.messageListHeader{display:flex;justify-content:space-between;padding:4px 18px 10px}.messageListHeader div{display:flex;flex-direction:column}.messageListHeader strong{font-size:13px}.messageListHeader span{color:#777;font-size:10px;margin-top:3px}.messageList{max-height:590px;overflow:auto;border-top:1px solid #282828}.empty{padding:30px;text-align:center;color:#777;font-size:12px}.messageRow{display:grid;grid-template-columns:36px minmax(240px,1fr) 52px 68px auto;gap:9px;align-items:center;padding:10px 14px;border-bottom:1px solid #222}.messageRow.disabled{opacity:.55}.number{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:#242014;color:${GOLD};font-size:11px;font-weight:900}.chars{color:#666;font-size:9px}.miniToggle{display:flex;align-items:center;gap:5px;color:#aaa;font-size:9px}.miniToggle input{accent-color:${GOLD}}.rowActions{display:flex;gap:5px}.rowActions button{min-width:31px;height:31px;border:1px solid #363636;border-radius:7px;background:#191919;color:#bbb;cursor:pointer}.rowActions button:disabled{opacity:.3}.rowActions .delete{padding:0 8px;color:#ff8c8c}.routineStatus{margin:14px 18px 0;padding:11px 13px;border:1px solid #302e29;border-radius:9px;background:#0d0d0d;color:#aaa;font-size:11px}.routineStatus span{display:inline-block;margin-right:12px;padding:4px 7px;border-radius:99px}.routineStatus .ok{background:#14311c;color:#9ce0aa}.routineStatus .fallback{background:#332b16;color:#e5c75e}.routineStatus strong{color:#ddd}.hint{color:#777;font-size:11px;margin:0}.hint code{padding:2px 5px;border-radius:4px;background:#272318;color:#e7c851}.actions{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:18px;padding:14px 0}.actions p{color:#777;font-size:11px;margin:0}.actions button{min-height:44px;padding:0 22px;border:0;border-radius:9px;background:linear-gradient(135deg,#d4af37,#f4d366);color:#111;font-weight:900;cursor:pointer}.actions button:disabled{opacity:.55;cursor:wait}
-        @media(max-width:760px){.header{padding:12px}.header small{font-size:8px}main{padding:22px 12px 65px}.intro{align-items:stretch;flex-direction:column}.deviceStats div{flex:1}.cardHeader{align-items:flex-start;flex-wrap:wrap;padding:14px}.cardTitle{min-width:calc(100% - 72px)}.bankGrid{grid-template-columns:1fr;padding:14px}.bulkActions{grid-template-columns:1fr}.importPreview{margin:0 14px 14px}.importHeader{align-items:flex-start;flex-direction:column}.importFooter{align-items:stretch;flex-direction:column}.importFooter button{width:100%}.messageRow{grid-template-columns:34px 1fr 48px}.messageRow .miniToggle{grid-column:2}.rowActions{grid-column:3;grid-row:2}.bankSummary div{padding:11px}.actions{align-items:stretch;flex-direction:column}.actions button{width:100%}.intro h2{font-size:21px}}
+        .page{min-height:100vh;background:#090909;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.header{min-height:68px;display:flex;align-items:center;gap:15px;padding:13px 20px;border-bottom:1px solid #292929;background:#111;position:sticky;top:0;z-index:5}.header small,.eyebrow{display:block;color:${GOLD};font-size:10px;font-weight:900;letter-spacing:.11em}.header h1{font-size:17px;margin:2px 0 0}.back{min-height:37px;padding:7px 12px;border:1px solid #353535;border-radius:8px;background:#171717;color:${GOLD};font-weight:800;cursor:pointer}main{max-width:1080px;margin:0 auto;padding:28px 18px 76px}.intro{display:flex;justify-content:space-between;align-items:center;gap:24px;margin-bottom:18px}.intro h2{font-size:24px;margin:7px 0}.intro p{color:#929292;font-size:13px;line-height:1.55;margin:0;max-width:690px}.deviceStats{display:flex;gap:8px}.deviceStats div{min-width:115px;padding:13px;border:1px solid #3b3527;border-radius:12px;background:#15130e;text-align:center}.deviceStats strong{display:block;color:${GOLD};font-size:23px}.deviceStats span{color:#aaa;font-size:10px}.notice{margin:0 0 15px;padding:12px 14px;border-radius:9px;font-size:13px}.notice.success{border:1px solid #355e3e;background:#112317;color:#a9e5b5}.notice.error{border:1px solid #713434;background:#2a1212;color:#ffb4b4}.loading{padding:55px;text-align:center;border:1px solid #292929;border-radius:13px;color:#777}.scheduleManager{margin-bottom:16px;border:1px solid #3b3527;border-radius:14px;background:#121212;overflow:hidden}.scheduleManagerHeader{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:17px 18px;border-bottom:1px solid #282828}.scheduleManagerHeader h3{font-size:18px;margin:5px 0 3px}.scheduleManagerHeader p{color:#777;font-size:11px;margin:0}.scheduleManagerHeader>button{min-height:40px;padding:0 15px;border:0;border-radius:8px;background:${GOLD};color:#111;font-weight:900;cursor:pointer}.scheduleRow{display:grid;grid-template-columns:34px 1fr auto;gap:12px;padding:15px 16px;border-bottom:1px solid #272727}.scheduleRow:last-child{border-bottom:0}.scheduleRow.disabled{opacity:.58}.scheduleNumber{width:32px;height:32px;display:grid;place-items:center;border-radius:9px;background:#26200f;color:${GOLD};font-size:12px;font-weight:900}.scheduleFields{display:grid;grid-template-columns:minmax(160px,1fr) 110px minmax(210px,1.2fr);gap:9px}.scheduleFields label,.customFields label{display:block}.scheduleFields label>span,.customFields label>span,.scheduleDays>span{display:flex;justify-content:space-between;color:#aaa;font-size:9px;font-weight:800;margin-bottom:5px}.scheduleFields input,.scheduleFields select,.customFields input,.customFields textarea{box-sizing:border-box;width:100%;border:1px solid #343434;border-radius:8px;background:#0b0b0b;color:#fff;padding:9px 10px;outline:none;font:inherit;font-size:12px}.scheduleFields input:focus,.scheduleFields select:focus,.customFields input:focus,.customFields textarea:focus{border-color:${GOLD}}.scheduleDays{grid-column:2}.scheduleDays>div{display:flex;gap:5px;flex-wrap:wrap}.scheduleDays button{width:39px;height:29px;border:1px solid #393939;border-radius:7px;background:#181818;color:#777;font-size:9px;font-weight:900;cursor:pointer}.scheduleDays button.selected{border-color:${GOLD};background:#2b230d;color:#f1cc50}.customFields{grid-column:2;display:grid;grid-template-columns:minmax(180px,.8fr) minmax(260px,1.2fr);gap:9px;padding:11px;border:1px solid #302e29;border-radius:9px;background:#0c0c0c}.customFields textarea{resize:vertical}.customFields i{color:#666;font-size:9px;font-style:normal}.customFields small{grid-column:1/-1;color:#666;font-size:9px}.customFields code{color:#e7c851}.scheduleActions{grid-column:3;grid-row:1/4;display:flex;align-items:flex-start;gap:9px}.scheduleActions>button{height:34px;border:1px solid #4a3030;border-radius:7px;background:#1c1313;color:#ff8c8c;padding:0 9px;cursor:pointer}.card{margin-bottom:16px;border:1px solid #35312a;border-left:3px solid ${GOLD};border-radius:14px;background:#121212;overflow:hidden}.card.paused{border-left-color:#555}.cardHeader{display:flex;align-items:center;gap:14px;padding:17px 18px;border-bottom:1px solid #282828}.time{width:54px;height:54px;display:grid;place-items:center;flex:0 0 auto;border-radius:14px;background:rgba(212,175,55,.12);color:${GOLD};font-size:18px;font-weight:900}.cardTitle{flex:1}.cardTitle h3{font-size:16px;margin:0 0 4px}.cardTitle p{color:#777;font-size:11px;line-height:1.45;margin:0}.bankSummary{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#292929;border-bottom:1px solid #292929}.bankSummary div{padding:13px 18px;background:#151515}.bankSummary strong{display:block;color:${GOLD};font-size:19px}.bankSummary span{color:#777;font-size:10px}.bankGrid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(290px,.85fr);gap:20px;padding:18px}.field{display:block;margin-bottom:13px}.field>span{display:flex;justify-content:space-between;color:#ddd;font-size:12px;font-weight:800;margin-bottom:7px}.field i{color:#666;font-size:10px;font-style:normal;font-weight:500}.field input,.field textarea,.bulkBox textarea,.messageRow textarea,.importRow textarea{box-sizing:border-box;width:100%;border:1px solid #343434;border-radius:9px;background:#0b0b0b;color:#fff;padding:11px 12px;outline:none;font:inherit;font-size:13px;line-height:1.5}.field input:focus,.field textarea:focus,.bulkBox textarea:focus,.messageRow textarea:focus,.importRow textarea:focus{border-color:${GOLD}}.field textarea,.bulkBox textarea,.messageRow textarea,.importRow textarea{resize:vertical}.bulkBox{padding:14px;border:1px solid #302e29;border-radius:11px;background:#0d0d0d}.bulkBox>div:first-child{display:flex;flex-direction:column;margin-bottom:9px}.bulkBox strong{font-size:12px}.bulkBox span{color:#777;font-size:10px;margin-top:3px}.bulkActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}.secondary{width:100%;min-height:39px;margin-top:9px;border:1px solid #4b432f;border-radius:8px;background:#1a1813;color:${GOLD};font-weight:800;cursor:pointer}.secondary:disabled{opacity:.55;cursor:wait}.secondary.upload{background:#26200f}.fileInput{display:none}.fileHelp{display:block;color:#666;font-size:9px;margin-top:8px}.importPreview{margin:0 18px 18px;border:1px solid #4b432f;border-radius:12px;background:#0d0d0d;overflow:hidden}.importHeader{display:flex;justify-content:space-between;gap:14px;padding:14px 15px;border-bottom:1px solid #292929}.importHeader h4{font-size:14px;margin:4px 0}.importHeader p{color:#777;font-size:10px;margin:0}.cancelImport{align-self:center;border:1px solid #3a3a3a;border-radius:7px;background:#181818;color:#bbb;padding:8px 10px;cursor:pointer}.importList{max-height:430px;overflow:auto}.importRow{display:grid;grid-template-columns:20px 30px 1fr;gap:9px;align-items:start;padding:10px 14px;border-bottom:1px solid #222}.importRow>input{margin-top:14px;accent-color:${GOLD}}.importRow>span{margin-top:11px;color:${GOLD};font-size:11px;font-weight:900}.importRow small{display:block;color:#666;font-size:9px;margin-top:3px}.importRow.invalid textarea{border-color:#713434}.importRow.invalid small{color:#ff8c8c}.importFooter{display:flex;justify-content:flex-end;align-items:center;gap:14px;padding:12px 14px}.importFooter span{color:#888;font-size:11px}.importFooter button{min-height:38px;border:0;border-radius:8px;background:${GOLD};color:#111;padding:0 14px;font-weight:900;cursor:pointer}.messageListHeader{display:flex;justify-content:space-between;padding:4px 18px 10px}.messageListHeader div{display:flex;flex-direction:column}.messageListHeader strong{font-size:13px}.messageListHeader span{color:#777;font-size:10px;margin-top:3px}.messageList{max-height:590px;overflow:auto;border-top:1px solid #282828}.empty{padding:30px;text-align:center;color:#777;font-size:12px}.messageRow{display:grid;grid-template-columns:36px minmax(240px,1fr) 52px 68px auto;gap:9px;align-items:center;padding:10px 14px;border-bottom:1px solid #222}.messageRow.disabled{opacity:.55}.number{width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:#242014;color:${GOLD};font-size:11px;font-weight:900}.chars{color:#666;font-size:9px}.miniToggle{display:flex;align-items:center;gap:5px;color:#aaa;font-size:9px}.miniToggle input{accent-color:${GOLD}}.rowActions{display:flex;gap:5px}.rowActions button{min-width:31px;height:31px;border:1px solid #363636;border-radius:7px;background:#191919;color:#bbb;cursor:pointer}.rowActions button:disabled{opacity:.3}.rowActions .delete{padding:0 8px;color:#ff8c8c}.routineStatus{margin:14px 18px 0;padding:11px 13px;border:1px solid #302e29;border-radius:9px;background:#0d0d0d;color:#aaa;font-size:11px}.routineStatus span{display:inline-block;margin-right:12px;padding:4px 7px;border-radius:99px}.routineStatus .ok{background:#14311c;color:#9ce0aa}.routineStatus .fallback{background:#332b16;color:#e5c75e}.routineStatus strong{color:#ddd}.hint{color:#777;font-size:11px;margin:0}.hint code{padding:2px 5px;border-radius:4px;background:#272318;color:#e7c851}.actions{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-top:18px;padding:14px 0}.actions p{color:#777;font-size:11px;margin:0}.actions button{min-height:44px;padding:0 22px;border:0;border-radius:9px;background:linear-gradient(135deg,#d4af37,#f4d366);color:#111;font-weight:900;cursor:pointer}.actions button:disabled{opacity:.55;cursor:wait}
+        @media(max-width:760px){.header{padding:12px}.header small{font-size:8px}main{padding:22px 12px 65px}.intro{align-items:stretch;flex-direction:column}.deviceStats div{flex:1}.scheduleManagerHeader{align-items:stretch;flex-direction:column}.scheduleManagerHeader>button{width:100%}.scheduleRow{grid-template-columns:32px 1fr}.scheduleFields{grid-template-columns:1fr 100px}.scheduleFields label:last-child{grid-column:1/-1}.scheduleDays,.customFields{grid-column:2}.customFields{grid-template-columns:1fr}.customFields small{grid-column:1}.scheduleActions{grid-column:2;grid-row:auto;justify-content:space-between}.cardHeader{align-items:flex-start;flex-wrap:wrap;padding:14px}.cardTitle{min-width:calc(100% - 72px)}.bankGrid{grid-template-columns:1fr;padding:14px}.bulkActions{grid-template-columns:1fr}.importPreview{margin:0 14px 14px}.importHeader{align-items:flex-start;flex-direction:column}.importFooter{align-items:stretch;flex-direction:column}.importFooter button{width:100%}.messageRow{grid-template-columns:34px 1fr 48px}.messageRow .miniToggle{grid-column:2}.rowActions{grid-column:3;grid-row:2}.bankSummary div{padding:11px}.actions{align-items:stretch;flex-direction:column}.actions button{width:100%}.intro h2{font-size:21px}}
       `}</style>
     </div>
   )
