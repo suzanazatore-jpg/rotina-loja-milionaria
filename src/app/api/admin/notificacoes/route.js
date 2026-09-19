@@ -12,6 +12,8 @@ import {
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const TYPES = ['motivacional', 'rotina']
 const SCHEDULE_TYPES = [...TYPES, 'personalizada']
+const SMART_RULE_IDS = ['inactive_3_days', 'routine_pending', 'below_goal', 'calendar_today', 'campaign_upcoming']
+const TARGET_SECTIONS = ['inicio', 'rotina', 'vendas', 'calendario', 'campanhas']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const SCHEDULE_TIME = /^(?:[01]\d|2[0-3]):(?:00|30)$/
 
@@ -57,7 +59,15 @@ function cleanMessage(value, index) {
   }
 }
 
-function cleanSchedule(value, index) {
+function cleanPlanIds(value, validPlanIds, label) {
+  const ids = [...new Set((Array.isArray(value) ? value : []).map(String))]
+  if (ids.length > 50 || ids.some(id => !UUID.test(id) || !validPlanIds.has(id))) {
+    throw new Error(`Existe um plano inválido em ${label}.`)
+  }
+  return ids
+}
+
+function cleanSchedule(value, index, validPlanIds) {
   const type = String(value?.notification_type || '')
   const label = String(value?.label || '').trim()
   const sendTime = String(value?.send_time || '').slice(0, 5)
@@ -81,7 +91,42 @@ function cleanSchedule(value, index) {
     weekdays,
     title_template: type === 'personalizada' ? title : null,
     body_template: type === 'personalizada' ? body : null,
+    plan_ids: cleanPlanIds(value?.plan_ids, validPlanIds, `horário ${index + 1}`),
     enabled: value.enabled !== false,
+    position: index + 1,
+    updated_at: new Date().toISOString(),
+  }
+}
+
+function cleanSmartRule(value, index, validPlanIds) {
+  const id = String(value?.id || '')
+  const label = String(value?.label || '').trim()
+  const description = String(value?.description || '').trim()
+  const sendTime = String(value?.send_time || '').slice(0, 5)
+  const weekdays = [...new Set((Array.isArray(value?.weekdays) ? value.weekdays : []).map(Number))].sort((a, b) => a - b)
+  const title = String(value?.title_template || '').trim()
+  const body = String(value?.body_template || '').trim()
+  const targetSection = String(value?.target_section || '')
+  const cooldownDays = Number(value?.cooldown_days || 1)
+  if (!SMART_RULE_IDS.includes(id)) throw new Error(`O gatilho ${index + 1} é inválido.`)
+  if (!label || label.length > 80 || !description || description.length > 240) throw new Error(`Revise o nome e a descrição do gatilho ${index + 1}.`)
+  if (!SCHEDULE_TIME.test(sendTime)) throw new Error(`Escolha um horário válido no gatilho ${index + 1}.`)
+  if (!weekdays.length || weekdays.some(day => !Number.isInteger(day) || day < 0 || day > 6)) throw new Error(`Escolha os dias do gatilho ${index + 1}.`)
+  if (!title || title.length > 80 || !body || body.length > 240) throw new Error(`Revise o título e a mensagem do gatilho ${index + 1}.`)
+  if (!TARGET_SECTIONS.includes(targetSection)) throw new Error(`O destino do gatilho ${index + 1} é inválido.`)
+  if (!Number.isInteger(cooldownDays) || cooldownDays < 1 || cooldownDays > 90) throw new Error(`O intervalo do gatilho ${index + 1} é inválido.`)
+  return {
+    id,
+    label,
+    description,
+    send_time: `${sendTime}:00`,
+    weekdays,
+    title_template: title,
+    body_template: body,
+    target_section: targetSection,
+    cooldown_days: cooldownDays,
+    plan_ids: cleanPlanIds(value?.plan_ids, validPlanIds, `gatilho ${index + 1}`),
+    enabled: value.enabled === true,
     position: index + 1,
     updated_at: new Date().toISOString(),
   }
@@ -111,11 +156,26 @@ async function loadMessages(supabase) {
 async function loadSchedules(supabase) {
   const { data, error } = await supabase
     .from('notification_schedules')
-    .select('id,label,notification_type,send_time,weekdays,title_template,body_template,enabled,position,updated_at')
+    .select('id,label,notification_type,send_time,weekdays,title_template,body_template,plan_ids,enabled,position,updated_at')
     .order('position')
     .order('send_time')
   if (error) throw error
   return (data || []).map(item => ({ ...item, send_time: String(item.send_time || '').slice(0, 5) }))
+}
+
+async function loadSmartRules(supabase) {
+  const { data, error } = await supabase
+    .from('notification_smart_rules')
+    .select('id,label,description,send_time,weekdays,title_template,body_template,target_section,cooldown_days,plan_ids,enabled,position,updated_at')
+    .order('position')
+  if (error) throw error
+  return (data || []).map(item => ({ ...item, send_time: String(item.send_time || '').slice(0, 5) }))
+}
+
+async function loadPlans(supabase) {
+  const { data, error } = await supabase.from('plans').select('id,name').not('offer_id', 'like', '__individual_%').order('name')
+  if (error) throw error
+  return data || []
 }
 
 async function saveMessages(supabase, messages) {
@@ -141,9 +201,9 @@ async function saveMessages(supabase, messages) {
   return cleaned
 }
 
-async function saveSchedules(supabase, schedules) {
+async function saveSchedules(supabase, schedules, validPlanIds) {
   if (schedules.length > 20) throw new Error('Você pode cadastrar até 20 horários de notificação.')
-  const cleaned = schedules.map(cleanSchedule)
+  const cleaned = schedules.map((item, index) => cleanSchedule(item, index, validPlanIds))
   if (new Set(cleaned.map(item => item.id)).size !== cleaned.length) throw new Error('Existem horários duplicados.')
 
   const { data: existing, error: existingError } = await supabase.from('notification_schedules').select('id')
@@ -161,12 +221,23 @@ async function saveSchedules(supabase, schedules) {
   return cleaned
 }
 
+async function saveSmartRules(supabase, rules, validPlanIds) {
+  if (rules.length !== SMART_RULE_IDS.length) throw new Error('Envie os cinco gatilhos inteligentes.')
+  const cleaned = rules.map((item, index) => cleanSmartRule(item, index, validPlanIds))
+  if (new Set(cleaned.map(item => item.id)).size !== SMART_RULE_IDS.length) throw new Error('Existem gatilhos duplicados.')
+  const { error } = await supabase.from('notification_smart_rules').upsert(cleaned, { onConflict: 'id' })
+  if (error) throw error
+  return cleaned
+}
+
 async function loadAdminPayload(supabase, admin) {
   const today = dateInSaoPaulo()
-  const [settings, messages, schedules, activeResult, mineResult] = await Promise.all([
+  const [settings, messages, schedules, smartRules, plans, activeResult, mineResult] = await Promise.all([
     loadSettings(supabase),
     loadMessages(supabase),
     loadSchedules(supabase),
+    loadSmartRules(supabase),
+    loadPlans(supabase),
     supabase.from('push_subscriptions').select('id', { count: 'exact', head: true }).eq('active', true),
     supabase.from('push_subscriptions').select('id', { count: 'exact', head: true }).eq('active', true).eq('user_id', admin.id),
   ])
@@ -179,6 +250,8 @@ async function loadAdminPayload(supabase, admin) {
     settings,
     messages,
     schedules,
+    smartRules,
+    plans,
     activeDevices: activeResult.count || 0,
     myActiveDevices: mineResult.count || 0,
     todayMessageId: motivational.message_id || null,
@@ -209,6 +282,7 @@ export async function PUT(request) {
     }
     if (!Array.isArray(body.messages)) throw new Error('Envie o banco de mensagens motivacionais.')
     if (!Array.isArray(body.schedules)) throw new Error('Envie os horários de notificação.')
+    if (!Array.isArray(body.smartRules)) throw new Error('Envie os gatilhos inteligentes.')
     const settings = body.settings.map(cleanSetting)
     if (new Set(settings.map(item => item.id)).size !== TYPES.length) throw new Error('As configurações estão duplicadas.')
     const motivational = settings.find(item => item.id === 'motivacional')
@@ -216,7 +290,13 @@ export async function PUT(request) {
       throw new Error('Mantenha pelo menos uma mensagem motivacional ativa ou pause o envio das 8h.')
     }
 
-    await Promise.all([saveMessages(supabase, body.messages), saveSchedules(supabase, body.schedules)])
+    const plans = await loadPlans(supabase)
+    const validPlanIds = new Set(plans.map(item => item.id))
+    await Promise.all([
+      saveMessages(supabase, body.messages),
+      saveSchedules(supabase, body.schedules, validPlanIds),
+      saveSmartRules(supabase, body.smartRules, validPlanIds),
+    ])
     const { error } = await supabase.from('notification_settings').upsert(settings, { onConflict: 'id' })
     if (error) throw error
     return response({ success: true, ...(await loadAdminPayload(supabase, admin)) })
@@ -297,6 +377,12 @@ export async function POST(request) {
       await supabase.from('user_notifications').delete().eq('id', historyId).eq('user_id', admin.id)
       throw new Error('Nenhum celular ativo recebeu o teste. Ative novamente as notificações no app.')
     }
+    const { error: deliveryError } = await supabase.from('user_notifications').update({
+      push_device_count: sent,
+      push_sent_at: new Date().toISOString(),
+      push_failed_count: 0,
+    }).eq('id', historyId).eq('user_id', admin.id)
+    if (deliveryError) throw deliveryError
     return response({ success: true, sent, inactive })
   } catch (error) {
     return response({ error: error.message || 'Não foi possível enviar o teste.' }, 400)

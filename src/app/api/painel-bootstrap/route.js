@@ -46,6 +46,7 @@ async function loadCritical(supabase, user) {
     isAdmin
       ? Promise.resolve({ data: null, error: null })
       : supabase.from('terms_of_use').select('id,version,content,is_required,published_at').eq('is_current', true).maybeSingle(),
+    supabase.from('app_user_activity').upsert({ user_id: user.id, last_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
   ])
 
   const legacyProfile = legacyProfileResult.data || null

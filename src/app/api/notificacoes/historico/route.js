@@ -75,7 +75,7 @@ export async function PATCH(request) {
   }
 
   const changes = payload.action === 'opened'
-    ? { read_at: now, opened_at: now }
+    ? { read_at: now, opened_at: now, opened_source: payload.source === 'push' ? 'push' : 'in_app' }
     : { read_at: now }
   const { error } = await supabase
     .from('user_notifications')

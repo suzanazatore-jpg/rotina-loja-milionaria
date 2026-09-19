@@ -80,7 +80,7 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
     const id = url.searchParams.get('notificacao')
     if (!id) return
     pushOpenedRef.current = true
-    void requestHistory('', { method: 'PATCH', body: JSON.stringify({ id, action: 'opened' }) })
+    void requestHistory('', { method: 'PATCH', body: JSON.stringify({ id, action: 'opened', source: 'push' }) })
       .then(() => {
         url.searchParams.delete('notificacao')
         window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
@@ -108,7 +108,7 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
       : currentItem))
     if (wasUnread) setUnread(current => Math.max(0, current - 1))
     setOpen(false)
-    void requestHistory('', { method: 'PATCH', body: JSON.stringify({ id: item.id, action: 'opened' }) }).catch(() => void load())
+    void requestHistory('', { method: 'PATCH', body: JSON.stringify({ id: item.id, action: 'opened', source: 'in_app' }) }).catch(() => void load())
 
     const target = new URL(item.target_url || '/painel', window.location.origin)
     const section = target.searchParams.get('secao') || 'inicio'

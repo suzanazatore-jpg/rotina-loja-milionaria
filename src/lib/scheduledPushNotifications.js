@@ -88,9 +88,15 @@ function firstName(value) {
 
 export function renderNotificationTemplate(template, values = {}) {
   const input = typeof values === 'string' ? { name: values } : values
-  const name = firstName(input.name) || 'lojista'
-  const action = String(input.action || 'começar pela primeira etapa da rotina').trim().slice(0, 120)
-  return String(template || '').replaceAll('{{nome}}', name).replaceAll('{{acao}}', action)
+  const replacements = {
+    nome: firstName(input.name) || 'lojista',
+    acao: String(input.action || 'começar pela primeira etapa da rotina').trim().slice(0, 120),
+    percentual: String(input.percentage || '').trim().slice(0, 20),
+  }
+  return Object.entries(replacements).reduce(
+    (text, [key, value]) => text.replaceAll(`{{${key}}}`, value),
+    String(template || ''),
+  )
 }
 
 async function loadNotificationSettings(supabase, type) {
@@ -182,6 +188,7 @@ export async function attachRoutineActions(supabase, rows, today = dateInSaoPaul
       ...row,
       routineAction: pending?.titulo || 'revisar o progresso da rotina de hoje',
       routineAvailable: true,
+      routinePending: Boolean(pending),
       routineTitle: context.routine?.titulo || null,
     }
   })
@@ -246,6 +253,46 @@ async function filterEligibleSubscriptions(supabase, subscriptions) {
   })
 }
 
+async function loadAllEligibleUsers(supabase, planIds = []) {
+  const [profilesResult, legacyResult] = await Promise.all([
+    supabase.from('profiles').select('id,name,email,status').order('id'),
+    supabase.from('perfis').select('id,nome,email,tipo_acesso,acesso_expira_em,status_assinatura').order('id'),
+  ])
+  if (profilesResult.error) throw profilesResult.error
+  if (legacyResult.error) throw legacyResult.error
+
+  let allowedByPlan = null
+  if (planIds.length) {
+    const { data, error } = await supabase.from('profile_plans').select('profile_id').in('plan_id', planIds)
+    if (error) throw error
+    allowedByPlan = new Set((data || []).map(item => item.profile_id))
+  }
+
+  const profiles = new Map((profilesResult.data || []).map(item => [item.id, item]))
+  const legacyProfiles = new Map((legacyResult.data || []).map(item => [item.id, item]))
+  const userIds = new Set([...profiles.keys(), ...legacyProfiles.keys()])
+  const now = new Date()
+  const users = []
+
+  for (const userId of userIds) {
+    if (allowedByPlan && !allowedByPlan.has(userId)) continue
+    const profile = profiles.get(userId)
+    const legacy = legacyProfiles.get(userId)
+    if (profile && profile.status !== 'active') continue
+    if (legacy?.status_assinatura === 'atrasado' || legacy?.status_assinatura === 'cancelado') continue
+    if (legacy && ['teste', 'avista'].includes(legacy.tipo_acesso) && legacy.acesso_expira_em) {
+      const expiresAt = new Date(`${legacy.acesso_expira_em}T23:59:59-03:00`)
+      if (expiresAt < now) continue
+    }
+    users.push({
+      user_id: userId,
+      firstName: firstName(profile?.name || legacy?.nome),
+      email: profile?.email || legacy?.email || '',
+    })
+  }
+  return users
+}
+
 async function markInactive(supabase, id) {
   await supabase.from('push_subscriptions').update({ active: false, updated_at: new Date().toISOString() }).eq('id', id)
 }
@@ -303,29 +350,27 @@ async function sendOneForSchedule(supabase, row, today, notification, schedule) 
       .eq('id', row.id)
       .eq('active', true)
     if (error) throw error
-    return 'sent'
+    return { status: 'sent', userId: row.user_id }
   } catch (error) {
     if (error?.statusCode === 404 || error?.statusCode === 410) {
       await markInactive(supabase, row.id)
-      return 'inactive'
+      return { status: 'inactive', userId: row.user_id }
     }
-    return 'failed'
+    return { status: 'failed', userId: row.user_id }
   }
 }
 
-function notificationTarget(type, id) {
+function notificationTarget(type, id, targetSection = null) {
   const params = new URLSearchParams()
-  if (type === 'rotina') params.set('secao', 'rotina')
+  const section = targetSection || (type === 'rotina' ? 'rotina' : null)
+  if (section && section !== 'inicio') params.set('secao', section)
   params.set('notificacao', id)
   return `/painel?${params.toString()}`
 }
 
-async function attachNotificationHistory(supabase, rows, today, notification, schedule) {
-  if (!rows.length) return rows
-  const uniqueUsers = new Map()
-  for (const row of rows) if (!uniqueUsers.has(row.user_id)) uniqueUsers.set(row.user_id, row)
-
-  const entries = [...uniqueUsers.values()].map(row => {
+async function attachNotificationHistory(supabase, users, today, notification, schedule) {
+  if (!users.length) return []
+  const entries = users.map(row => {
     const id = crypto.randomUUID()
     const values = { name: row.firstName, action: row.routineAction }
     return {
@@ -346,7 +391,7 @@ async function attachNotificationHistory(supabase, rows, today, notification, sc
   if (insertError) throw insertError
 
   const records = []
-  const userIds = [...uniqueUsers.keys()]
+  const userIds = users.map(item => item.user_id)
   for (let index = 0; index < userIds.length; index += 200) {
     const { data, error } = await supabase
       .from('user_notifications')
@@ -358,13 +403,34 @@ async function attachNotificationHistory(supabase, rows, today, notification, sc
     records.push(...(data || []))
   }
   const byUser = new Map(records.map(record => [record.user_id, record]))
-  return rows.map(row => ({ ...row, notificationRecord: byUser.get(row.user_id) || null }))
+  return users.map(row => ({ ...row, notificationRecord: byUser.get(row.user_id) || null }))
+}
+
+async function recordDeliveryResults(supabase, audience, results) {
+  const byUser = new Map(audience.map(item => [item.user_id, { sent: 0, failed: 0, record: item.notificationRecord }]))
+  for (const result of results) {
+    const current = byUser.get(result.userId)
+    if (!current) continue
+    if (result.status === 'sent') current.sent += 1
+    if (result.status === 'failed') current.failed += 1
+  }
+  const now = new Date().toISOString()
+  await Promise.all([...byUser.values()].map(async item => {
+    if (!item.record?.id || (!item.sent && !item.failed)) return
+    const { error } = await supabase.from('user_notifications').update({
+      push_device_count: item.sent,
+      push_failed_count: item.failed,
+      push_sent_at: item.sent ? now : null,
+    }).eq('id', item.record.id)
+    if (error) throw error
+  }))
+  return [...byUser.values()].filter(item => item.sent > 0).length
 }
 
 async function loadDueSchedules(supabase, context) {
   const { data, error } = await supabase
     .from('notification_schedules')
-    .select('id,label,notification_type,send_time,weekdays,title_template,body_template,enabled,position')
+    .select('id,label,notification_type,send_time,weekdays,title_template,body_template,enabled,position,plan_ids')
     .eq('enabled', true)
     .eq('send_time', `${context.time}:00`)
     .order('position')
@@ -406,28 +472,252 @@ async function runSchedule(supabase, schedule, context) {
     return { id: schedule.id, label: schedule.label, skipped: true, reason: 'Horário já processado.' }
   }
 
-  const totals = { sent: 0, inactive: 0, failed: 0 }
+  const totals = { audience: 0, sent: 0, in_app_only: 0, inactive: 0, failed: 0 }
   try {
     const notification = await notificationForSchedule(supabase, schedule, context.date)
     if (!notification.enabled) {
       await finishScheduleRun(supabase, schedule.id, context.date, 'completed', totals)
       return { id: schedule.id, label: schedule.label, skipped: true, reason: 'Conteúdo pausado no Escritório.', ...totals }
     }
-    const activeSubscriptions = await loadAllActiveSubscriptions(supabase)
-    let subscriptions = await filterEligibleSubscriptions(supabase, activeSubscriptions)
-    if (schedule.notification_type === 'rotina') subscriptions = await attachRoutineActions(supabase, subscriptions, context.date)
-    subscriptions = await attachNotificationHistory(supabase, subscriptions, context.date, notification, schedule)
+    let audience = await loadAllEligibleUsers(supabase, schedule.plan_ids || [])
+    if (schedule.notification_type === 'rotina') audience = await attachRoutineActions(supabase, audience, context.date)
+    audience = await attachNotificationHistory(supabase, audience, context.date, notification, schedule)
+    totals.audience = audience.length
+
+    const audienceByUser = new Map(audience.map(item => [item.user_id, item]))
+    const activeSubscriptions = context.pushConfigured ? await loadAllActiveSubscriptions(supabase) : []
+    const subscriptions = activeSubscriptions.flatMap(subscription => {
+      const user = audienceByUser.get(subscription.user_id)
+      return user ? [{ ...subscription, ...user }] : []
+    })
+    const deliveryResults = []
     for (let index = 0; index < subscriptions.length; index += BATCH_SIZE) {
       const results = await Promise.all(subscriptions.slice(index, index + BATCH_SIZE).map(row => (
         sendOneForSchedule(supabase, row, context.date, notification, schedule)
       )))
-      results.forEach(result => { totals[result] += 1 })
+      deliveryResults.push(...results)
+      results.forEach(result => { totals[result.status] += 1 })
     }
+    const usersWithPush = await recordDeliveryResults(supabase, audience, deliveryResults)
+    totals.in_app_only = Math.max(0, audience.length - usersWithPush)
     await finishScheduleRun(supabase, schedule.id, context.date, 'completed', totals)
-    return { id: schedule.id, label: schedule.label, total: subscriptions.length, ...totals }
+    return { id: schedule.id, label: schedule.label, devices: subscriptions.length, ...totals }
   } catch (error) {
     await finishScheduleRun(supabase, schedule.id, context.date, 'failed', totals, String(error.message || error).slice(0, 500))
     return { id: schedule.id, label: schedule.label, error: error.message || 'Falha no envio.', ...totals }
+  }
+}
+
+function subtractDays(date, days) {
+  const value = new Date(`${date}T12:00:00Z`)
+  value.setUTCDate(value.getUTCDate() - days)
+  return value.toISOString().slice(0, 10)
+}
+
+function monthKey(date) {
+  return date.slice(0, 7)
+}
+
+function nextMonthKey(date) {
+  const value = new Date(`${date.slice(0, 7)}-01T12:00:00Z`)
+  value.setUTCMonth(value.getUTCMonth() + 1)
+  return value.toISOString().slice(0, 7)
+}
+
+async function loadDueSmartRules(supabase, context) {
+  const { data, error } = await supabase
+    .from('notification_smart_rules')
+    .select('id,label,description,send_time,weekdays,title_template,body_template,target_section,cooldown_days,plan_ids,enabled,position')
+    .eq('enabled', true)
+    .eq('send_time', `${context.time}:00`)
+    .order('position')
+    .order('id')
+  if (error) throw error
+  return (data || []).filter(item => Array.isArray(item.weekdays) && item.weekdays.includes(context.weekday))
+}
+
+async function claimSmartRuleRun(supabase, ruleId, date) {
+  const { error } = await supabase.from('notification_smart_rule_runs').insert({ rule_id: ruleId, run_date: date })
+  if (error?.code === '23505') return false
+  if (error) throw error
+  return true
+}
+
+async function finishSmartRuleRun(supabase, ruleId, date, status, totals, errorMessage = null) {
+  const { error } = await supabase
+    .from('notification_smart_rule_runs')
+    .update({ status, ...totals, error_message: errorMessage, completed_at: new Date().toISOString() })
+    .eq('rule_id', ruleId)
+    .eq('run_date', date)
+  if (error) throw error
+}
+
+async function excludeSmartCooldown(supabase, users, rule, today) {
+  if (!users.length) return users
+  const cutoff = subtractDays(today, Math.max(0, Number(rule.cooldown_days || 1) - 1))
+  const recentlySent = new Set()
+  const userIds = users.map(item => item.user_id)
+  for (let index = 0; index < userIds.length; index += 200) {
+    const { data, error } = await supabase
+      .from('user_notifications')
+      .select('user_id')
+      .eq('rule_id', rule.id)
+      .gte('scheduled_for', cutoff)
+      .in('user_id', userIds.slice(index, index + 200))
+    if (error) throw error
+    for (const item of data || []) recentlySent.add(item.user_id)
+  }
+  return users.filter(item => !recentlySent.has(item.user_id))
+}
+
+async function loadAuthActivity(supabase) {
+  const activity = new Map()
+  let page = 1
+  while (page <= 20) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error) throw error
+    const users = data?.users || []
+    for (const user of users) activity.set(user.id, user.last_sign_in_at || user.created_at || null)
+    if (users.length < 1000) break
+    page += 1
+  }
+  return activity
+}
+
+async function smartAudienceForRule(supabase, rule, today) {
+  let users = await loadAllEligibleUsers(supabase, rule.plan_ids || [])
+  if (!users.length) return users
+
+  if (rule.id === 'inactive_3_days') {
+    const [activityResult, authActivity] = await Promise.all([
+      supabase.from('app_user_activity').select('user_id,last_seen_at').in('user_id', users.map(item => item.user_id)),
+      loadAuthActivity(supabase),
+    ])
+    if (activityResult.error) throw activityResult.error
+    const appActivity = new Map((activityResult.data || []).map(item => [item.user_id, item.last_seen_at]))
+    const threshold = Date.parse(`${subtractDays(today, 3)}T23:59:59-03:00`)
+    return users.filter(user => {
+      const lastSeen = appActivity.get(user.user_id) || authActivity.get(user.user_id)
+      return lastSeen && Date.parse(lastSeen) <= threshold
+    })
+  }
+
+  if (rule.id === 'routine_pending') {
+    users = await attachRoutineActions(supabase, users, today)
+    return users.filter(item => item.routineAvailable && item.routinePending)
+  }
+
+  if (rule.id === 'below_goal') {
+    const monthStart = `${monthKey(today)}-01`
+    const userIds = users.map(item => item.user_id)
+    const [goalsResult, salesResult] = await Promise.all([
+      supabase.from('sales_goals').select('owner_id,monthly_target').eq('month_start', monthStart).in('owner_id', userIds),
+      supabase.from('daily_sales').select('owner_id,amount').gte('sale_date', monthStart).lte('sale_date', today).in('owner_id', userIds),
+    ])
+    if (goalsResult.error) throw goalsResult.error
+    if (salesResult.error) throw salesResult.error
+    const goals = new Map((goalsResult.data || []).map(item => [item.owner_id, Number(item.monthly_target || 0)]))
+    const sales = new Map()
+    for (const item of salesResult.data || []) sales.set(item.owner_id, (sales.get(item.owner_id) || 0) + Number(item.amount || 0))
+    const [year, month, day] = today.split('-').map(Number)
+    const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    return users.flatMap(user => {
+      const target = goals.get(user.user_id) || 0
+      if (!target) return []
+      const expected = target * day / daysInMonth
+      const actual = sales.get(user.user_id) || 0
+      if (actual >= expected * 0.85) return []
+      const pace = expected ? Math.round(actual / expected * 100) : 0
+      return [{ ...user, percentage: `${pace}%`, routineAction: `${pace}% do ritmo esperado` }]
+    })
+  }
+
+  if (rule.id === 'calendar_today') {
+    const { data, error } = await supabase
+      .from('calendar_actions')
+      .select('title')
+      .eq('action_date', today)
+      .eq('is_published', true)
+      .order('sort_order')
+      .limit(1)
+    if (error) throw error
+    if (!data?.length) return []
+    return users.map(user => ({ ...user, routineAction: data[0].title }))
+  }
+
+  if (rule.id === 'campaign_upcoming') {
+    const day = Number(today.slice(8, 10))
+    const campaignMonth = day >= 25 ? nextMonthKey(today) : (day <= 3 ? monthKey(today) : null)
+    if (!campaignMonth) return []
+    const { data, error } = await supabase
+      .from('campanhas')
+      .select('titulo')
+      .eq('mes_ano', campaignMonth)
+      .order('ordem')
+      .limit(1)
+    if (error) throw error
+    if (!data?.length) return []
+    return users.map(user => ({ ...user, routineAction: data[0].titulo || 'campanha do mês' }))
+  }
+
+  return []
+}
+
+async function attachSmartHistory(supabase, users, today, rule) {
+  if (!users.length) return []
+  const entries = users.map(user => {
+    const id = crypto.randomUUID()
+    const values = { name: user.firstName, action: user.routineAction, percentage: user.percentage }
+    return {
+      id,
+      user_id: user.user_id,
+      rule_id: rule.id,
+      notification_type: 'inteligente',
+      title: renderNotificationTemplate(rule.title_template, values).slice(0, 80),
+      body: renderNotificationTemplate(rule.body_template, values).slice(0, 240),
+      target_url: notificationTarget('inteligente', id, rule.target_section),
+      scheduled_for: today,
+    }
+  })
+  const { error: insertError } = await supabase.from('user_notifications').insert(entries)
+  if (insertError) throw insertError
+  const records = new Map(entries.map(item => [item.user_id, item]))
+  return users.map(user => ({ ...user, notificationRecord: records.get(user.user_id) }))
+}
+
+async function runSmartRule(supabase, rule, context) {
+  if (!await claimSmartRuleRun(supabase, rule.id, context.date)) {
+    return { id: rule.id, label: rule.label, skipped: true, reason: 'Regra já processada.' }
+  }
+  const totals = { audience: 0, sent: 0, in_app_only: 0, inactive: 0, failed: 0 }
+  try {
+    let audience = await smartAudienceForRule(supabase, rule, context.date)
+    audience = await excludeSmartCooldown(supabase, audience, rule, context.date)
+    audience = await attachSmartHistory(supabase, audience, context.date, rule)
+    totals.audience = audience.length
+
+    const audienceByUser = new Map(audience.map(item => [item.user_id, item]))
+    const activeSubscriptions = context.pushConfigured ? await loadAllActiveSubscriptions(supabase) : []
+    const subscriptions = activeSubscriptions.flatMap(subscription => {
+      const user = audienceByUser.get(subscription.user_id)
+      return user ? [{ ...subscription, ...user }] : []
+    })
+    const notification = { tag: `rotina-inteligente-${rule.id}`, title_template: rule.title_template, body_template: rule.body_template }
+    const deliveryResults = []
+    for (let index = 0; index < subscriptions.length; index += BATCH_SIZE) {
+      const results = await Promise.all(subscriptions.slice(index, index + BATCH_SIZE).map(row => (
+        sendOneForSchedule(supabase, row, context.date, notification, rule)
+      )))
+      deliveryResults.push(...results)
+      results.forEach(result => { totals[result.status] += 1 })
+    }
+    const usersWithPush = await recordDeliveryResults(supabase, audience, deliveryResults)
+    totals.in_app_only = Math.max(0, audience.length - usersWithPush)
+    await finishSmartRuleRun(supabase, rule.id, context.date, 'completed', totals)
+    return { id: rule.id, label: rule.label, devices: subscriptions.length, ...totals }
+  } catch (error) {
+    await finishSmartRuleRun(supabase, rule.id, context.date, 'failed', totals, String(error.message || error).slice(0, 500))
+    return { id: rule.id, label: rule.label, error: error.message || 'Falha no gatilho inteligente.', ...totals }
   }
 }
 
@@ -439,16 +729,20 @@ export async function handleNotificationDispatcher(request) {
   }
 
   try {
-    if (!getVapidPublicKey() || !(process.env.PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY)) {
-      return Response.json({ error: 'Chaves de notificação não configuradas.' }, { status: 503 })
-    }
     const supabase = serverClient()
-    const context = dispatcherContext(request)
-    const schedules = await loadDueSchedules(supabase, context)
+    const context = {
+      ...dispatcherContext(request),
+      pushConfigured: Boolean(getVapidPublicKey() && (process.env.PUSH_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY)),
+    }
+    const [schedules, smartRules] = await Promise.all([
+      loadDueSchedules(supabase, context),
+      loadDueSmartRules(supabase, context),
+    ])
     const results = []
     for (const schedule of schedules) results.push(await runSchedule(supabase, schedule, context))
+    for (const rule of smartRules) results.push(await runSmartRule(supabase, rule, context))
     return Response.json(
-      { success: true, date: context.date, time: context.time, schedules: schedules.length, results },
+      { success: true, date: context.date, time: context.time, schedules: schedules.length, smartRules: smartRules.length, results },
       { headers: { 'Cache-Control': 'no-store' } },
     )
   } catch (error) {

@@ -167,7 +167,7 @@ export default function Painel() {
   useEffect(() => {
     const destino = new URLSearchParams(window.location.search).get('secao')
     const timer = window.setTimeout(() => {
-      if (['inicio', 'rotina', 'conteudos', 'calendario', 'campanhas'].includes(destino)) setSecao(destino)
+      if (['inicio', 'rotina', 'vendas', 'conteudos', 'calendario', 'campanhas'].includes(destino)) setSecao(destino)
     }, 0)
     return () => window.clearTimeout(timer)
   }, [])
