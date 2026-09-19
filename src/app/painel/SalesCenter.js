@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import AppIcon from '@/app/components/AppIcon'
+import { planoDoDia } from '@/lib/dailyPlan'
 import { supabase } from '@/lib/supabase'
 import './team-goals.css'
 
@@ -26,7 +28,7 @@ function Progress({ value, gradient }) {
   return <div className="tg-progress"><i style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: gradient }} /></div>
 }
 
-export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'painel' }) {
+export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'painel', rotinaSemanal, onOpenRoutine }) {
   const today = useMemo(() => new Date(), [])
   const currentMonth = monthStart(today)
   const [user, setUser] = useState(null)
@@ -86,6 +88,15 @@ export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'paine
   const dailyAverage = elapsedDates.length ? totalSold / elapsedDates.length : 0
   const projection = selectedMonth === currentMonth ? dailyAverage * openDates.length : totalSold
   const avgTicket = totalTickets ? totalSold / totalTickets : 0
+  const todayIso = dateIso(today)
+  const todaySold = sales.filter(item => item.sale_date === todayIso).reduce((sum, item) => sum + Number(item.amount || 0), 0)
+  const totalWeight = Object.values(weights).reduce((sum, value) => sum + Number(value || 0), 0) || 1
+  const todayOccurrences = openDates.filter(item => item.weekday === today.getDay()).length
+  const todayTarget = todayOccurrences ? target * Number(weights[today.getDay()] || 0) / totalWeight / todayOccurrences : 0
+  const todayMissing = Math.max(0, todayTarget - todaySold)
+  const todayAchievement = todayTarget ? todaySold / todayTarget * 100 : 0
+  const todayPlan = rotinaSemanal?.plano_dias ? planoDoDia(rotinaSemanal.plano_dias, today) : null
+  const todayStatus = !todayTarget ? 'Sem meta definida para hoje' : todaySold >= todayTarget ? 'Meta do dia batida' : todaySold > 0 ? 'Venda em andamento' : 'Hora de colocar a equipe em movimento'
 
   const ranking = useMemo(() => salespeople.map(person => {
     const personSales = selectedSales.filter(item => item.salesperson_id === person.id)
@@ -133,6 +144,25 @@ export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'paine
     <nav className="tg-tabs" style={{ background: cores.card2 }}>{[['painel', 'Visão geral'], ['lancar', 'Lançar vendas'], ['ranking', 'Ranking'], ['historico', 'Histórico'], ['equipe', 'Equipe']].map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={tab === id ? 'active' : ''} style={{ color: tab === id ? cores.tx : cores.tx2, background: tab === id ? cores.card : 'transparent' }}>{label}</button>)}</nav>
     {message && <div className="tg-message" style={cardStyle}>{message}</div>}
     {tab === 'painel' && <>
+      {selectedMonth === currentMonth && <section className="tg-today" style={cardStyle}>
+        <header>
+          <div><small>EXECUÇÃO DE HOJE</small><h3>Meta, rotina e resultado no mesmo lugar</h3><p>{todayStatus}</p></div>
+          <span className={todayTarget && todaySold >= todayTarget ? 'is-hit' : ''}>{todayAchievement.toFixed(0)}%</span>
+        </header>
+        <div className="tg-today-metrics">
+          <article><span>Meta de hoje</span><strong>{brl(todayTarget)}</strong></article>
+          <article><span>Vendido hoje</span><strong>{brl(todaySold)}</strong></article>
+          <article><span>{todayMissing > 0 ? 'Falta hoje' : 'Resultado do dia'}</span><strong>{todayMissing > 0 ? brl(todayMissing) : 'Meta alcançada'}</strong></article>
+        </div>
+        <div className="tg-today-mission">
+          <i><AppIcon name="routine" size={22} /></i>
+          <div><small>MISSÃO COMERCIAL DA SEMANA</small><strong>{rotinaSemanal?.titulo || 'A rotina da semana ainda não foi publicada'}</strong><span>{todayPlan?.foco_titulo || 'Assim que a rotina for liberada, o foco de hoje aparecerá aqui.'}</span></div>
+        </div>
+        <footer>
+          <button className="tg-secondary" type="button" onClick={() => { setSaleDate(todayIso); setTab('lancar') }}>＋ Lançar vendas</button>
+          <button className="tg-primary" type="button" onClick={onOpenRoutine} disabled={!rotinaSemanal}>Ver rotina de hoje →</button>
+        </footer>
+      </section>}
       <section className="tg-hero" style={cardStyle}><div><small>META DE {monthLabel(selectedMonth).toUpperCase()}</small><strong>{brl(totalSold)}</strong><span>de {brl(target)}</span></div><div className={`tg-status ${pace}`}><b>{achievement.toFixed(0)}%</b><span>{pace === 'batida' ? 'Meta batida' : pace === 'no-ritmo' ? 'No ritmo' : pace === 'atrasada' ? 'Abaixo do ritmo' : 'Defina a meta'}</span></div><Progress value={achievement} gradient={ouroGrad} /><button onClick={() => setEditingGoal(value => !value)}>Configurar meta</button></section>
       {editingGoal && <form className="tg-config" onSubmit={saveGoal} style={cardStyle}><div className="tg-config-title"><div><h3>Distribuição da meta</h3><p>Defina a meta e o peso de venda de cada dia. Zero significa que a loja não abre.</p></div><button type="button" onClick={() => setGoal(current => ({ ...current, weekday_weights: DEFAULT_WEIGHTS }))}>Restaurar sugestão</button></div><label className="tg-target">Meta mensal<input type="number" min="0" step="0.01" value={goal.monthly_target} onChange={event => setGoal({ ...goal, monthly_target: event.target.value })} style={inputStyle} /></label><div className="tg-weights">{WEEKDAYS.map(([day, label]) => <label key={day}>{label}<input type="number" min="0" max="100" value={weights[day] ?? 0} onChange={event => setWeight(day, event.target.value)} style={inputStyle} /><span>%</span></label>)}</div><p className="tg-weight-total">Soma dos pesos: <b>{Object.values(weights).reduce((sum, value) => sum + Number(value || 0), 0)}%</b> · {openDates.length} dias de venda no mês</p><button className="tg-primary" disabled={saving}>{saving ? 'Salvando...' : 'Salvar e distribuir entre a equipe'}</button></form>}
       <div className="tg-metrics">{[['Falta para a meta', brl(missing), 'Valor restante'], ['Necessário por dia', brl(requiredPerDay), `${remainingDates.length} dias restantes`], ['Projeção do mês', brl(projection), projection >= target && target ? 'Tendência de meta batida' : 'Ritmo atual'], ['Ticket médio', brl(avgTicket), totalTickets ? `${totalTickets} vendas registradas` : 'Informe o nº de vendas']].map(([label, value, detail]) => <article key={label} style={cardStyle}><span>{label}</span><strong>{value}</strong><small>{detail}</small></article>)}</div>
