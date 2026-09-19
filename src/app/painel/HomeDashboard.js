@@ -35,6 +35,9 @@ export default function HomeDashboard({
   irPara,
   tema,
   setTema,
+  mentoriaLiberada,
+  assistenteLiberado,
+  metasLiberadas,
   rotinaSemanal,
   calendarActions = [],
   campaign = null,
@@ -97,6 +100,15 @@ export default function HomeDashboard({
   const acaoDestaque = acoesHoje[0]
   const dataPorExtenso = capitalizar(new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(hoje))
   const mesAtual = capitalizar(new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(hoje))
+  const atalhosRapidos = [
+    ['quickCalendar', 'Calendário', 'Conteúdo e ações do mês', 'calendario'],
+    ['quickCampaigns', 'Campanhas', 'Estratégias de venda', 'campanhas'],
+    ['quickRoutine', 'Rotina', 'Plano prático da semana', 'rotina'],
+    ['quickCourses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
+    ...(metasLiberadas ? [['quickTeam', 'Vendas e Metas', 'Resultados da equipe', 'vendas']] : []),
+    ...(mentoriaLiberada ? [['quickCourses', 'Mentorias', 'Encontros e gravações', 'mentoria']] : []),
+    ...(assistenteLiberado ? [['quickAssistant', 'Assistente', 'Ajuda inteligente', 'assistente']] : []),
+  ]
 
   return <div className="premium-home premium-home-simple">
     <header className="premium-simple-mobile-header">
@@ -168,6 +180,21 @@ export default function HomeDashboard({
           <button type="button" onClick={() => irPara('calendario')}>Ver calendário</button>
         </article>
       </div>
+    </section>
+
+    <section className="premium-simple-section premium-simple-access" aria-labelledby="acessos-rapidos">
+      <div className="premium-simple-heading"><div><small>ATALHOS</small><h2 id="acessos-rapidos">Acessos rápidos</h2></div></div>
+      <div className="premium-shortcuts">
+        {atalhosRapidos.map(([icone, titulo, descricao, destino]) => <button key={destino} type="button" onClick={() => irPara(destino)}>
+          <i><AppIcon name={icone} size={30} strokeWidth={1.45} /></i>
+          <div><strong>{titulo}</strong><span>{descricao}</span></div>
+        </button>)}
+      </div>
+    </section>
+
+    <section className="premium-help-card premium-simple-support">
+      <div><small>SUPORTE</small><h2>Fale com o Suporte</h2><p>Envie sua dúvida e acompanhe a resposta da nossa equipe pelo aplicativo.</p></div>
+      <button type="button" onClick={() => irPara('suporte')}>Abrir suporte</button>
     </section>
   </div>
 }
