@@ -136,6 +136,6 @@ export default function WeeklyRoutineCard({ item, userId, cores, ouro, ouroGrad,
     {erro && <p className="routine-week-error" role="alert">{erro}</p>}
     <aside className="routine-week-tip"><AppIcon name="assistant" size={20} /><div><strong>Orientação da Suzana</strong><p>{planoAtivo?.orientacao}</p></div></aside>
 
-    {item.arquivo_url && <footer><a href={item.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF da rotina</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar PDF</button></footer>}
+    {item.arquivo_url && <footer><a href={item.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF completo do mês</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar PDF mensal</button></footer>}
   </article>
 }
