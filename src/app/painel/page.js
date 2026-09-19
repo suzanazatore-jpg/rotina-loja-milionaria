@@ -8,6 +8,7 @@ import CampaignJourney from './CampaignJourney'
 import InteractiveCalendar from './InteractiveCalendar'
 import WeeklyRoutineCard from './WeeklyRoutineCard'
 import AppIcon from '@/app/components/AppIcon'
+import NotificationCenter from '@/app/components/NotificationCenter'
 import './premium.css'
 
 const CursosArea = dynamic(() => import('./CursosArea'), {
@@ -165,7 +166,10 @@ export default function Painel() {
 
   useEffect(() => {
     const destino = new URLSearchParams(window.location.search).get('secao')
-    if (destino === 'conteudos') setSecao('conteudos')
+    const timer = window.setTimeout(() => {
+      if (['inicio', 'rotina', 'conteudos', 'calendario', 'campanhas'].includes(destino)) setSecao(destino)
+    }, 0)
+    return () => window.clearTimeout(timer)
   }, [])
 
   function alterarTema(novoTema) {
@@ -462,6 +466,8 @@ export default function Painel() {
 
   return (
     <div className={`premium-painel tema-${tema}`} style={{ display: 'flex', minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background .2s, color .2s' }}>
+
+      <NotificationCenter cores={cores} ouro={ouro} onNavigate={irPara} />
 
       {/* ═══════ SIDEBAR (desktop) ═══════ */}
       <aside className="sidebar-desktop" style={{ width: '230px', minWidth: '230px', background: cores.card, borderRight: `1px solid ${cores.borda}`, display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh' }}>

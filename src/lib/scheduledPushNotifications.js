@@ -283,15 +283,18 @@ async function sendOne(supabase, row, today, notification) {
 async function sendOneForSchedule(supabase, row, today, notification, schedule) {
   try {
     const values = { name: row.firstName, action: row.routineAction }
+    const title = row.notificationRecord?.title || renderNotificationTemplate(notification.title_template, values)
+    const body = row.notificationRecord?.body || renderNotificationTemplate(notification.body_template, values)
+    const targetUrl = row.notificationRecord?.target_url || '/painel'
     await sendPushNotification(
       { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
       {
-        title: renderNotificationTemplate(notification.title_template, values),
-        body: renderNotificationTemplate(notification.body_template, values),
+        title,
+        body,
         icon: '/pwa-icon-192.png',
         badge: '/pwa-icon-192.png',
         tag: `${notification.tag}-${schedule.id}-${today}`,
-        url: '/painel',
+        url: targetUrl,
       },
     )
     const { error } = await supabase
@@ -308,6 +311,54 @@ async function sendOneForSchedule(supabase, row, today, notification, schedule) 
     }
     return 'failed'
   }
+}
+
+function notificationTarget(type, id) {
+  const params = new URLSearchParams()
+  if (type === 'rotina') params.set('secao', 'rotina')
+  params.set('notificacao', id)
+  return `/painel?${params.toString()}`
+}
+
+async function attachNotificationHistory(supabase, rows, today, notification, schedule) {
+  if (!rows.length) return rows
+  const uniqueUsers = new Map()
+  for (const row of rows) if (!uniqueUsers.has(row.user_id)) uniqueUsers.set(row.user_id, row)
+
+  const entries = [...uniqueUsers.values()].map(row => {
+    const id = crypto.randomUUID()
+    const values = { name: row.firstName, action: row.routineAction }
+    return {
+      id,
+      user_id: row.user_id,
+      schedule_id: schedule.id,
+      notification_type: schedule.notification_type,
+      title: renderNotificationTemplate(notification.title_template, values).slice(0, 80),
+      body: renderNotificationTemplate(notification.body_template, values).slice(0, 240),
+      target_url: notificationTarget(schedule.notification_type, id),
+      scheduled_for: today,
+    }
+  })
+
+  const { error: insertError } = await supabase
+    .from('user_notifications')
+    .upsert(entries, { onConflict: 'schedule_id,user_id,scheduled_for', ignoreDuplicates: true })
+  if (insertError) throw insertError
+
+  const records = []
+  const userIds = [...uniqueUsers.keys()]
+  for (let index = 0; index < userIds.length; index += 200) {
+    const { data, error } = await supabase
+      .from('user_notifications')
+      .select('id,user_id,title,body,target_url')
+      .eq('schedule_id', schedule.id)
+      .eq('scheduled_for', today)
+      .in('user_id', userIds.slice(index, index + 200))
+    if (error) throw error
+    records.push(...(data || []))
+  }
+  const byUser = new Map(records.map(record => [record.user_id, record]))
+  return rows.map(row => ({ ...row, notificationRecord: byUser.get(row.user_id) || null }))
 }
 
 async function loadDueSchedules(supabase, context) {
@@ -365,6 +416,7 @@ async function runSchedule(supabase, schedule, context) {
     const activeSubscriptions = await loadAllActiveSubscriptions(supabase)
     let subscriptions = await filterEligibleSubscriptions(supabase, activeSubscriptions)
     if (schedule.notification_type === 'rotina') subscriptions = await attachRoutineActions(supabase, subscriptions, context.date)
+    subscriptions = await attachNotificationHistory(supabase, subscriptions, context.date, notification, schedule)
     for (let index = 0; index < subscriptions.length; index += BATCH_SIZE) {
       const results = await Promise.all(subscriptions.slice(index, index + BATCH_SIZE).map(row => (
         sendOneForSchedule(supabase, row, context.date, notification, schedule)
