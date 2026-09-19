@@ -705,7 +705,7 @@ export default function Painel() {
 
               {/* VENDAS E METAS */}
               {secao === 'vendas' && (
-                metasLiberadas ? <div style={{ maxWidth: '980px', margin: '0 auto' }}><VideoEmBreve cores={cores} ouro={ouro} titulo="Como bater a meta" /><SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} initialTab={vendasAbaInicial} /></div> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
+                metasLiberadas ? <div style={{ maxWidth: '980px', margin: '0 auto' }}><VideoEmBreve cores={cores} ouro={ouro} titulo="Como bater a meta" /><SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} initialTab={vendasAbaInicial} rotinaSemanal={rotinaSemanal} onOpenRoutine={() => irPara('rotina')} /></div> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
 
               {secao === 'metas-bloqueadas' && <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />}
