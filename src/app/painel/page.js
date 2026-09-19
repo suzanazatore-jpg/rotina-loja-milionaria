@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic'
 import HomeDashboard from './HomeDashboard'
 import CampaignJourney from './CampaignJourney'
 import InteractiveCalendar from './InteractiveCalendar'
+import WeeklyRoutineCard from './WeeklyRoutineCard'
 import AppIcon from '@/app/components/AppIcon'
 import './premium.css'
 
@@ -760,7 +761,7 @@ export default function Painel() {
                 </div>
               )}
 
-              {/* ROTINA SEMANAL (PDF da semana atual, sem abas) */}
+              {/* ROTINA SEMANAL INTERATIVA */}
               {secao === 'rotina' && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
@@ -778,24 +779,7 @@ export default function Painel() {
                       <div style={{ fontSize: '42px', marginBottom: '10px' }}>🔄</div>
                       <strong style={{ color: cores.tx2 }}>A rotina desta semana aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>O material ainda não foi publicado.</p>
                     </div>
-                  ) : (
-                    <article style={{ background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '18px', overflow: 'hidden' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '17px', padding: '22px', borderBottom: `1px solid ${cores.borda}` }}>
-                        <div style={{ width: '72px', height: '72px', borderRadius: '18px', background: ouroGrad, color: '#0A0A0A', display: 'grid', placeItems: 'center', fontSize: '29px', flexShrink: 0, boxShadow: '0 10px 28px rgba(212,175,55,.18)' }}>✓</div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: '11px', fontWeight: 800, color: ouro, margin: '0 0 4px', textTransform: 'uppercase', letterSpacing: '.06em' }}>{rotuloSemana(rotinaSemanal.semana_inicio)}</p>
-                          <h3 style={{ fontSize: '18px', fontWeight: 900, margin: 0, color: cores.tx }}>{rotinaSemanal.titulo}</h3>
-                          <p style={{ fontSize: '13px', color: cores.tx2, margin: '6px 0 0', lineHeight: 1.5 }}>{rotinaSemanal.descricao || 'Sua rotina prática está pronta para colocar em execução.'}</p>
-                        </div>
-                      </div>
-                      {rotinaSemanal.arquivo_url && (
-                        <div style={{ display: 'flex', gap: '10px', padding: '16px', flexWrap: 'wrap' }}>
-                          <a href={rotinaSemanal.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: cores.card2, border: `1px solid ${cores.borda}`, color: cores.tx, fontSize: '13px', fontWeight: 800, textDecoration: 'none' }}>👁 Visualizar rotina</a>
-                          <button onClick={() => baixarPdf(rotinaSemanal)} style={{ flex: '1 1 180px', textAlign: 'center', padding: '12px', borderRadius: '10px', background: ouroGrad, border: 'none', color: '#0A0A0A', fontSize: '13px', fontWeight: 900, cursor: 'pointer' }}>⬇ Baixar rotina</button>
-                        </div>
-                      )}
-                    </article>
-                  )}
+                  ) : <WeeklyRoutineCard item={rotinaSemanal} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => baixarPdf(rotinaSemanal)} />}
                 </div>
               )}
 

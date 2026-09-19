@@ -570,8 +570,12 @@
 .campaign-journey { overflow: hidden; background: var(--journey-card); border: 1px solid var(--journey-border); border-radius: 20px; }
 .campaign-journey-header { display: flex; align-items: center; gap: 15px; padding: 20px; border-bottom: 1px solid var(--journey-border); }
 .campaign-journey-mark { width: 58px; height: 58px; flex: 0 0 58px; display: grid; place-items: center; border-radius: 17px; color: #17130c; box-shadow: 0 10px 25px rgba(180,135,50,.18); }
+.campaign-journey-header small { display: block; margin-bottom: 3px; color: var(--journey-gold); font-size: 9px; font-weight: 900; letter-spacing: .1em; }
 .campaign-journey-header p { margin: 0 0 5px; color: var(--journey-text); font-size: 18px; font-weight: 900; }
 .campaign-journey-header span { display: block; color: var(--journey-muted); font-size: 12px; line-height: 1.5; }
+.campaign-journey-status { display: flex; gap: 8px; flex-wrap: wrap; padding: 11px 20px; border-bottom: 1px solid var(--journey-border); }
+.campaign-journey-status span { padding: 5px 8px; border: 1px solid var(--journey-border); border-radius: 99px; color: var(--journey-gold); font-size: 9px; font-weight: 900; }
+.campaign-journey-status .has-pdf { color: #58c98e; }
 .campaign-journey-progress { padding: 17px 20px; background: color-mix(in srgb, var(--journey-gold) 7%, var(--journey-card)); border-bottom: 1px solid var(--journey-border); }
 .campaign-journey-progress > div:first-child { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: var(--journey-text); font-size: 12px; }
 .campaign-journey-progress > div:first-child span { color: var(--journey-muted); }
@@ -603,6 +607,48 @@
 .campaign-journey footer a { border: 1px solid var(--journey-border); background: var(--journey-card-2); color: var(--journey-text); }
 .campaign-journey footer button { border: 0; color: #17130c; }
 
+.routine-week-card { overflow: hidden; background: var(--routine-card); border: 1px solid var(--routine-border); border-radius: 20px; }
+.routine-week-header { display: flex; align-items: center; gap: 15px; padding: 20px; border-bottom: 1px solid var(--routine-border); }
+.routine-week-mark { width: 58px; height: 58px; flex: 0 0 58px; display: grid; place-items: center; border-radius: 17px; color: #17130c; box-shadow: 0 10px 25px rgba(180,135,50,.18); }
+.routine-week-header small { display: block; margin-bottom: 3px; color: var(--routine-gold); font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.routine-week-header h3 { margin: 0 0 5px; color: var(--routine-text); font-size: 18px; font-weight: 900; }
+.routine-week-header p { margin: 0; color: var(--routine-muted); font-size: 12px; line-height: 1.5; }
+.routine-week-progress { padding: 16px 20px; background: color-mix(in srgb, var(--routine-gold) 7%, var(--routine-card)); border-bottom: 1px solid var(--routine-border); }
+.routine-week-progress > div:first-child { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 9px; color: var(--routine-text); font-size: 12px; }
+.routine-week-progress span { color: var(--routine-muted); }
+.routine-progress-track { height: 7px; overflow: hidden; border-radius: 99px; background: var(--routine-card-2); }
+.routine-progress-track i { display: block; height: 100%; border-radius: inherit; transition: width .25s ease; }
+.routine-week-days { display: grid; grid-template-columns: repeat(7, minmax(0,1fr)); gap: 6px; padding: 12px 14px; overflow-x: auto; border-bottom: 1px solid var(--routine-border); }
+.routine-week-days button { min-width: 62px; display: grid; gap: 2px; padding: 9px 5px; border: 1px solid var(--routine-border); border-radius: 11px; background: var(--routine-card-2); color: var(--routine-muted); font: inherit; text-align: center; cursor: pointer; }
+.routine-week-days button.is-active { border-color: var(--routine-gold); background: color-mix(in srgb, var(--routine-gold) 12%, var(--routine-card)); color: var(--routine-gold); }
+.routine-week-days strong { font-size: 10px; }
+.routine-week-days small { font-size: 9px; }
+.routine-week-days span { font-size: 8px; font-weight: 900; }
+.routine-day-focus { padding: 17px 20px 12px; }
+.routine-day-focus small { color: var(--routine-gold); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.routine-day-focus h4 { margin: 5px 0; color: var(--routine-text); font-size: 17px; }
+.routine-day-focus p { margin: 0; color: var(--routine-muted); font-size: 11px; line-height: 1.5; }
+.routine-week-tasks { display: grid; gap: 8px; padding: 6px 14px 14px; }
+.routine-week-tasks > button { width: 100%; min-height: 66px; display: grid; grid-template-columns: 29px 36px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--routine-border); border-radius: 13px; background: var(--routine-card); color: var(--routine-text); text-align: left; font: inherit; cursor: pointer; }
+.routine-week-tasks > button:disabled { cursor: wait; opacity: .78; }
+.routine-week-tasks > button.is-done { background: color-mix(in srgb, #3dbb79 10%, var(--routine-card)); border-color: color-mix(in srgb, #3dbb79 45%, var(--routine-border)); }
+.routine-task-check { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid var(--routine-border); border-radius: 8px; color: #082315; font-size: 13px; font-weight: 900; }
+.is-done .routine-task-check { border-color: #58c98e; background: #58c98e; }
+.routine-week-tasks button > i { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: color-mix(in srgb, var(--routine-gold) 11%, var(--routine-card)); color: var(--routine-gold); font-style: normal; }
+.routine-week-tasks button > span:nth-child(3) strong, .routine-week-tasks button > span:nth-child(3) small { display: block; }
+.routine-week-tasks button > span:nth-child(3) strong { color: var(--routine-text); font-size: 13px; }
+.routine-week-tasks button > span:nth-child(3) small { margin-top: 3px; color: var(--routine-muted); font-size: 11px; line-height: 1.35; }
+.routine-week-tasks button > b { color: var(--routine-gold); font-size: 10px; text-transform: uppercase; }
+.routine-week-tasks button.is-done > b { color: #58c98e; }
+.routine-week-error { margin: 0 14px 12px; color: #e27575; font-size: 11px; }
+.routine-week-tip { display: flex; align-items: flex-start; gap: 11px; margin: 0 14px 14px; padding: 14px; border: 1px solid color-mix(in srgb, var(--routine-gold) 32%, var(--routine-border)); border-radius: 13px; background: color-mix(in srgb, var(--routine-gold) 8%, var(--routine-card)); color: var(--routine-gold); }
+.routine-week-tip strong { color: var(--routine-text); font-size: 12px; }
+.routine-week-tip p { margin: 4px 0 0; color: var(--routine-muted); font-size: 11px; line-height: 1.45; }
+.routine-week-card footer { display: flex; gap: 9px; padding: 14px; border-top: 1px solid var(--routine-border); }
+.routine-week-card footer a, .routine-week-card footer button { flex: 1; box-sizing: border-box; min-height: 42px; display: grid; place-items: center; border-radius: 10px; font-size: 12px; font-weight: 900; text-decoration: none; cursor: pointer; }
+.routine-week-card footer a { border: 1px solid var(--routine-border); background: var(--routine-card-2); color: var(--routine-text); }
+.routine-week-card footer button { border: 0; color: #17130c; }
+
 @media (max-width: 560px) {
   .campaign-journey-header { align-items: flex-start; padding: 17px; }
   .campaign-journey-mark { width: 48px; height: 48px; flex-basis: 48px; }
@@ -610,6 +656,12 @@
   .campaign-journey-list button > i { display: none; }
   .campaign-step-action { max-width: 46px; text-align: right; }
   .campaign-journey footer { flex-direction: column; }
+  .routine-week-header { align-items: flex-start; padding: 17px; }
+  .routine-week-mark { width: 48px; height: 48px; flex-basis: 48px; }
+  .routine-week-days { grid-template-columns: repeat(7, 62px); }
+  .routine-week-tasks > button { grid-template-columns: 27px 1fr auto; }
+  .routine-week-tasks button > i { display: none; }
+  .routine-week-card footer { flex-direction: column; }
 }
 
 

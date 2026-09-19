@@ -57,15 +57,20 @@ export default function CampaignJourney({ item, userId, cores, ouro, ouroGrad, o
   const feitas = plano.etapas.filter(etapa => concluidas.has(etapa.id)).length
   const percentual = total ? Math.round((feitas / total) * 100) : 0
   const proximaEtapa = plano.etapas.find(etapa => !concluidas.has(etapa.id))
+  const [ano, mes] = String(item.mes_ano || '').split('-').map(Number)
+  const periodo = ano && mes ? new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(ano, mes - 1, 1)) : ''
 
   return <article className="campaign-journey" style={{ '--journey-card': cores.card, '--journey-card-2': cores.card2, '--journey-border': cores.borda, '--journey-text': cores.tx, '--journey-muted': cores.tx2, '--journey-gold': ouro }}>
     <header className="campaign-journey-header">
       <div className="campaign-journey-mark" style={{ background: ouroGrad }}><AppIcon name="campaigns" size={30} strokeWidth={1.7} /></div>
       <div>
+        <small>{periodo.toUpperCase()}</small>
         <p>{item.titulo}</p>
         <span>{plano.objetivo}</span>
       </div>
     </header>
+
+    <div className="campaign-journey-status"><span>{total} etapas interativas</span><span className={item.arquivo_url ? 'has-pdf' : ''}>{item.arquivo_url ? '✓ PDF disponível' : '○ Sem PDF complementar'}</span></div>
 
     <section className="campaign-journey-progress" aria-label={`${feitas} de ${total} etapas concluídas`}>
       <div><strong>{percentual}% concluída</strong><span>{feitas} de {total} etapas</span></div>
