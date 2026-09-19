@@ -105,6 +105,7 @@ export default function CalendarActionsAdmin({
   const [lote, setLote] = useState('')
   const [arquivoFonte, setArquivoFonte] = useState(null)
   const [acoesPreparadas, setAcoesPreparadas] = useState([])
+  const [acoesEmEdicao, setAcoesEmEdicao] = useState([])
   const [substituir, setSubstituir] = useState(true)
   const [edicaoId, setEdicaoId] = useState(null)
   const [form, setForm] = useState(() => formVazio(mesAtual()))
@@ -150,11 +151,51 @@ export default function CalendarActionsAdmin({
     setModo('manual')
   }
 
+  function abrirEdicaoAcoes() {
+    setMensagem('')
+    if (!acoes.length) {
+      setModo('lote')
+      setMensagem('Este mês ainda não tem ações para editar. Envie o PDF ou Word para preparar as ações interativas.')
+      return
+    }
+    setAcoesEmEdicao(acoes.map(acao => ({ ...acao })))
+    setModo('editar-acoes')
+  }
+
   function selecionarMes(valor) {
     setMesAno(valor)
+    setModo(null)
     setArquivoFonte(null)
     setAcoesPreparadas([])
+    setAcoesEmEdicao([])
     setLote('')
+  }
+
+  function atualizarAcaoEmEdicao(indice, campoNome, valor) {
+    setAcoesEmEdicao(atual => atual.map((acao, posicao) => posicao === indice ? { ...acao, [campoNome]: valor } : acao))
+  }
+
+  async function salvarTodasAcoes(evento) {
+    evento.preventDefault()
+    if (acoesEmEdicao.some(acao => !String(acao.action_date || '').startsWith(`${mesAno}-`))) {
+      setMensagem(`Todas as ações precisam permanecer em ${rotuloMes(mesAno)}.`)
+      return
+    }
+
+    setSalvando(true)
+    setMensagem('')
+    try {
+      for (const acao of acoesEmEdicao) {
+        await requisicao('PUT', { id: acao.id, acao })
+      }
+      setModo(null)
+      setAcoesEmEdicao([])
+      await carregar()
+      setMensagem(`✓ ${acoesEmEdicao.length} ${acoesEmEdicao.length === 1 ? 'ação atualizada' : 'ações atualizadas'} com sucesso.`)
+    } catch (error) {
+      setMensagem(error.message)
+    }
+    setSalvando(false)
   }
 
   async function salvarManual(evento) {
@@ -282,8 +323,9 @@ export default function CalendarActionsAdmin({
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '17px' }}>
           <button onClick={() => setModo(modo === 'lote' ? null : 'lote')} style={{ ...botao, background: ouroGrad, color: '#090909', border: 0, fontWeight: 900 }}>↑ Enviar PDF e preparar ações</button>
           <button onClick={() => abrirManual()} style={botao}>+ Ação pontual</button>
+          <button onClick={abrirEdicaoAcoes} disabled={carregando} style={{ ...botao, background: ouroGrad, color: '#090909', border: 0, fontWeight: 900, opacity: carregando ? .55 : 1 }}>Editar ações</button>
           {calendarioDoMes?.arquivo_url && <a href={calendarioDoMes.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ ...botao, textDecoration: 'none' }}>Visualizar PDF</a>}
-          {calendarioDoMes ? <><button onClick={() => onEditarCalendario?.(calendarioDoMes)} style={botao}>Editar dados</button><button onClick={() => onSubstituirCalendario?.(calendarioDoMes)} style={botao}>Substituir PDF</button><button onClick={() => onExcluirCalendario?.(calendarioDoMes)} style={{ ...botao, color: '#f99' }}>Excluir PDF</button></> : <button onClick={() => onNovoCalendario?.(mesAno)} style={botao}>Enviar somente o PDF</button>}
+          {calendarioDoMes ? <><button onClick={() => onEditarCalendario?.(calendarioDoMes)} style={botao}>Editar card</button><button onClick={() => onSubstituirCalendario?.(calendarioDoMes)} style={botao}>Substituir PDF</button><button onClick={() => onExcluirCalendario?.(calendarioDoMes)} style={{ ...botao, color: '#f99' }}>Excluir PDF</button></> : <button onClick={() => onNovoCalendario?.(mesAno)} style={botao}>Enviar somente o PDF</button>}
         </div>
       </div>
 
@@ -321,6 +363,23 @@ export default function CalendarActionsAdmin({
       <label style={{ display: 'block', marginTop: '12px' }}>Link do material<input type="url" value={form.material_url || ''} onChange={evento => setForm({ ...form, material_url: evento.target.value })} style={campo} placeholder="https://" /></label>
       <label style={{ display: 'flex', gap: '9px', alignItems: 'center', color: '#AAA', fontSize: '13px', marginTop: '12px' }}><input type="checkbox" checked={form.is_published !== false} onChange={evento => setForm({ ...form, is_published: evento.target.checked })} /> Publicar para as alunas</label>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}><button type="button" onClick={() => setModo(null)} style={botao}>Cancelar</button><button disabled={salvando} style={{ ...botao, background: ouroGrad, color: '#090909', fontWeight: 900 }}>{salvando ? 'Salvando...' : 'Salvar ação'}</button></div>
+      </form>}
+
+      {modo === 'editar-acoes' && <form onSubmit={salvarTodasAcoes} style={{ background: '#0D0D0D', padding: '20px', borderBottom: '1px solid #2A2A2A' }}>
+        <h3 style={{ margin: '0 0 5px', fontSize: '16px' }}>Editar ações de {rotuloMes(mesAno)}</h3>
+        <p style={{ color: '#888', fontSize: '12px', margin: '0 0 14px' }}>Abra cada ação, faça as correções e salve tudo de uma vez. O PDF não será alterado.</p>
+        <div style={{ display: 'grid', gap: '9px' }}>
+          {acoesEmEdicao.map((acao, indice) => <details key={acao.id} defaultOpen={indice === 0} style={{ background: '#0A0A0A', border: '1px solid #2F2F2F', borderRadius: '11px', padding: '11px 12px' }}>
+            <summary style={{ cursor: 'pointer', color: '#EEE', fontSize: '13px', fontWeight: 800 }}>{dataBr(acao.action_date)} — {acao.title}</summary>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '9px', marginTop: '12px' }}><label>Data *<input required type="date" value={acao.action_date} onChange={evento => atualizarAcaoEmEdicao(indice, 'action_date', evento.target.value)} style={campo} /></label><label>Tema ou oferta *<input required value={acao.title} onChange={evento => atualizarAcaoEmEdicao(indice, 'title', evento.target.value)} style={campo} /></label></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: '9px', marginTop: '9px' }}><label>Canal<input value={acao.channel || ''} onChange={evento => atualizarAcaoEmEdicao(indice, 'channel', evento.target.value)} style={campo} /></label><label>Formato<input value={acao.content_format || ''} onChange={evento => atualizarAcaoEmEdicao(indice, 'content_format', evento.target.value)} style={campo} /></label><label>CTA<input value={acao.product_cta || ''} onChange={evento => atualizarAcaoEmEdicao(indice, 'product_cta', evento.target.value)} style={campo} /></label></div>
+            <label style={{ display: 'block', marginTop: '9px' }}>Descrição<input value={acao.description || ''} onChange={evento => atualizarAcaoEmEdicao(indice, 'description', evento.target.value)} style={campo} /></label>
+            <label style={{ display: 'block', marginTop: '9px' }}>Texto, legenda ou orientação<textarea value={acao.content_text || ''} onChange={evento => atualizarAcaoEmEdicao(indice, 'content_text', evento.target.value)} rows={4} style={{ ...campo, resize: 'vertical' }} /></label>
+            <label style={{ display: 'block', marginTop: '9px' }}>Link do material<input type="url" value={acao.material_url || ''} onChange={evento => atualizarAcaoEmEdicao(indice, 'material_url', evento.target.value)} style={campo} placeholder="https://" /></label>
+            <label style={{ display: 'flex', gap: '9px', alignItems: 'center', color: '#AAA', fontSize: '13px', marginTop: '10px' }}><input type="checkbox" checked={acao.is_published !== false} onChange={evento => atualizarAcaoEmEdicao(indice, 'is_published', evento.target.checked)} /> Publicar para as alunas</label>
+          </details>)}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '14px' }}><button type="button" onClick={() => { setModo(null); setAcoesEmEdicao([]) }} style={botao}>Cancelar</button><button disabled={salvando} style={{ ...botao, background: ouroGrad, color: '#090909', border: 0, fontWeight: 900, opacity: salvando ? .55 : 1 }}>{salvando ? 'Salvando...' : 'Salvar todas as ações'}</button></div>
       </form>}
 
       <div style={{ padding: '20px' }}>
