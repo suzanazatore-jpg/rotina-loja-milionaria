@@ -139,13 +139,13 @@ export default function MorningNotificationPrompt() {
       <span className="morning-notification-icon" aria-hidden="true">🔔</span>
       <div className="morning-notification-copy">
         <small>LEMBRETE DIÁRIO</small>
-        <strong id="morning-notification-title">Comece o dia com sua rotina</strong>
-        <p>Receba uma única notificação pela manhã para conferir as tarefas do dia.</p>
+        <strong id="morning-notification-title">Comece o dia acompanhada</strong>
+        <p>Receba uma mensagem motivacional às 8h e sua rotina prática às 9h.</p>
         {message && <p className={`morning-notification-message ${status}`}>{message}</p>}
         {status !== 'success' && (
           <div className="morning-notification-actions">
             <button type="button" onClick={activate} disabled={status === 'loading'}>
-              {status === 'loading' ? 'Ativando...' : 'Ativar lembrete das 8h'}
+              {status === 'loading' ? 'Ativando...' : 'Ativar lembretes das 8h e 9h'}
             </button>
             <button type="button" onClick={dismiss}>Agora não</button>
           </div>
