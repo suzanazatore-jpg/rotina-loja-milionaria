@@ -126,12 +126,12 @@ export default function Mentoria() {
   }
 
   if (carregando) return <Estado texto="Carregando Mentoria..." />
-  if (erro) return <Estado texto={erro} botao={() => router.push('/painel')} />
+  if (erro) return <Estado texto={erro} botao={() => router.push('/painel?secao=conteudos')} />
 
   return (
     <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FFF', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <header style={{ minHeight: '64px', padding: '12px 20px', borderBottom: '1px solid #292929', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', position: 'sticky', top: 0, zIndex: 20, background: '#0A0A0A' }}>
-        <button onClick={() => programa ? (setPrograma(null), setAulaId(null), router.replace('/mentoria')) : router.push('/painel')} style={botaoSecundario}>← {programa ? 'Mentorias' : 'Voltar ao painel'}</button>
+        <button onClick={() => programa ? (setPrograma(null), setAulaId(null), router.replace('/mentoria')) : router.push('/painel?secao=conteudos')} style={botaoSecundario}>← {programa ? 'Mentorias' : 'Voltar aos conteúdos'}</button>
         <div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: '10px', color: OURO, fontWeight: 800, letterSpacing: '.1em' }}>ROTINA DA LOJA MILIONÁRIA</p><h1 style={{ margin: '2px 0 0', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{programa ? `Mentoria ${programa.toUpperCase()}` : 'Aulas da Mentoria'}</h1></div>
         {programa && <strong style={{ fontSize: '12px', color: OURO, whiteSpace: 'nowrap' }}>{percentual}% concluído</strong>}
       </header>
@@ -184,5 +184,5 @@ const botaoPrincipal = { background: GRADIENTE, color: '#0A0A0A', border: 0, bor
 const abaStyle = ativa => ({ background: 'transparent', color: ativa ? OURO : '#777', border: 0, borderBottom: ativa ? `2px solid ${OURO}` : '2px solid transparent', padding: '0 0 10px', fontWeight: 800, cursor: 'pointer' })
 
 function Estado({ texto, botao }) {
-  return <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#AAA', display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20 }}><div><p>{texto}</p>{botao && <button onClick={botao} style={botaoPrincipal}>Voltar ao painel</button>}</div></div>
+  return <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#AAA', display: 'grid', placeItems: 'center', textAlign: 'center', padding: 20 }}><div><p>{texto}</p>{botao && <button onClick={botao} style={botaoPrincipal}>Voltar aos conteúdos</button>}</div></div>
 }
