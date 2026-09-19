@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = null }) {
+export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = null, onBack = null }) {
   const router = useRouter()
   const [cursos, setCursos] = useState([])
   const [carrosseis, setCarrosseis] = useState([])
@@ -27,8 +27,8 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
       const agora = new Date().toISOString()
       const ehAdmin = user.email === 'suporte@suzanazatorre.com.br'
       const cursosQuery = ehAdmin
-        ? supabase.from('courses').select('id,slug,title,subtitle,description,cover_image_url,sort_order,is_published').eq('is_published', true)
-        : supabase.from('enrollments').select('course_id,expires_at,courses(id,slug,title,subtitle,description,cover_image_url,sort_order,is_published)').eq('profile_id', user.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${agora}`)
+        ? supabase.from('courses').select('id,slug,title,subtitle,description,cover_image_url,sort_order,is_published,is_mentorship').eq('is_published', true)
+        : supabase.from('enrollments').select('course_id,expires_at,courses(id,slug,title,subtitle,description,cover_image_url,sort_order,is_published,is_mentorship)').eq('profile_id', user.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${agora}`)
 
       const carrosseisPromise = fetch('/api/carrosseis', { headers: { Authorization: `Bearer ${session?.access_token}` } })
         .then(async resposta => ({ ok: resposta.ok, dados: await resposta.json() }))
@@ -38,7 +38,7 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
 
       const liberados = (matriculas || [])
         .map(item => ehAdmin ? item : item.courses)
-        .filter(curso => curso?.is_published)
+        .filter(curso => curso?.is_published && !curso?.is_mentorship)
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
       if (ativo && carrosseisResult.status === 'fulfilled' && carrosseisResult.value.ok) {
@@ -83,6 +83,7 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
 
   return (
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+      {onBack && <button onClick={onBack} style={{ background: 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '9px', color: cores.tx, padding: '9px 12px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', marginBottom: '16px' }}>← Voltar aos conteúdos</button>}
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 5px', color: cores.tx }}>🎓 Meus Cursos</h2>
         <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Escolha uma seção e continue avançando.</p>
