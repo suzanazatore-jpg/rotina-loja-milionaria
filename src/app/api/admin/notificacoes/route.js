@@ -249,20 +249,38 @@ export async function POST(request) {
     if (type === 'rotina') subscriptions = await attachRoutineActions(supabase, subscriptions, today)
 
     const name = profileResult.data?.name || legacyResult.data?.nome || 'lojista'
+    const historyId = crypto.randomUUID()
+    const values = { name, action: subscriptions[0]?.routineAction }
+    const title = renderNotificationTemplate(notification.title_template, values).slice(0, 80)
+    const body = renderNotificationTemplate(notification.body_template, values).slice(0, 240)
+    const targetParams = new URLSearchParams()
+    if (type === 'rotina') targetParams.set('secao', 'rotina')
+    targetParams.set('notificacao', historyId)
+    const targetUrl = `/painel?${targetParams.toString()}`
+    const { error: historyError } = await supabase.from('user_notifications').insert({
+      id: historyId,
+      user_id: admin.id,
+      notification_type: type,
+      title,
+      body,
+      target_url: targetUrl,
+      scheduled_for: today,
+    })
+    if (historyError) throw historyError
+
     let sent = 0
     let inactive = 0
     for (const item of subscriptions) {
       try {
-        const values = { name, action: item.routineAction }
         await sendPushNotification(
           { endpoint: item.endpoint, keys: { p256dh: item.p256dh, auth: item.auth } },
           {
-            title: renderNotificationTemplate(notification.title_template, values),
-            body: renderNotificationTemplate(notification.body_template, values),
+            title,
+            body,
             icon: '/pwa-icon-192.png',
             badge: '/pwa-icon-192.png',
             tag: `${notification.tag}-teste-${Date.now()}`,
-            url: '/painel',
+            url: targetUrl,
           },
         )
         sent += 1
@@ -275,7 +293,10 @@ export async function POST(request) {
         }
       }
     }
-    if (!sent) throw new Error('Nenhum celular ativo recebeu o teste. Ative novamente as notificações no app.')
+    if (!sent) {
+      await supabase.from('user_notifications').delete().eq('id', historyId).eq('user_id', admin.id)
+      throw new Error('Nenhum celular ativo recebeu o teste. Ative novamente as notificações no app.')
+    }
     return response({ success: true, sent, inactive })
   } catch (error) {
     return response({ error: error.message || 'Não foi possível enviar o teste.' }, 400)
