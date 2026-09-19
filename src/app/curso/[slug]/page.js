@@ -144,7 +144,7 @@ export default function Curso({ params }) {
   return (
     <div style={{ minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
       <header style={{ minHeight: '64px', padding: '12px 20px', borderBottom: `1px solid ${cores.borda}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '14px', position: 'sticky', top: 0, zIndex: 20, background: cores.bg }}>
-        <button onClick={() => router.push('/painel')} style={botaoSecundarioTema}>← Meus cursos</button>
+        <button onClick={() => router.push('/painel?secao=conteudos')} style={botaoSecundarioTema}>← Voltar aos conteúdos</button>
         <div style={{ flex: 1, minWidth: 0 }}><p style={{ margin: 0, fontSize: '10px', color: OURO, fontWeight: 800, letterSpacing: '.1em' }}>ROTINA DA LOJA MILIONÁRIA</p><h1 style={{ margin: '2px 0 0', fontSize: '16px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{curso.title}</h1></div>
         <strong style={{ fontSize: '12px', color: OURO }}>{percentual}% concluído</strong>
       </header>
