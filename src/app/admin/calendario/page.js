@@ -95,13 +95,9 @@ export default function AdminCalendario() {
     <main style={{ maxWidth: '920px', margin: '0 auto', padding: '26px 18px 60px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: '22px' }}>
         <div><p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>ADMINISTRAÇÃO</p><h1 style={{ fontSize: '24px', margin: '5px 0' }}>Calendário mensal</h1><p style={{ color: '#888', margin: 0 }}>Envie o PDF ou Word, organize as ações interativas e mantenha o arquivo completo disponível.</p></div>
-        {!formAberto && <button onClick={() => abrirPara()} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '11px 17px', fontWeight: 900, cursor: 'pointer' }}>+ Publicar calendário</button>}
+        {!formAberto && <button onClick={() => abrirPara()} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '11px 17px', fontWeight: 900, cursor: 'pointer' }}>+ Novo planejamento</button>}
       </div>
       {mensagem && <div style={{ background: '#18150b', border: '1px solid #5b4c17', color: '#F5D76E', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
-
-      <CalendarActionsAdmin token={token} />
-
-      <div style={{ margin: '4px 0 14px' }}><small style={{ color: ouro, fontWeight: 900, letterSpacing: '.1em' }}>MATERIAL COMPLEMENTAR</small><h2 style={{ fontSize: '19px', margin: '5px 0' }}>PDF ou Word mensal</h2><p style={{ color: '#777', fontSize: '13px', margin: 0 }}>O arquivo completo continua disponível para visualizar ou baixar.</p></div>
 
       {formAberto && <form onSubmit={enviar} style={{ background: '#111', border: '1px solid #34302A', borderRadius: '16px', padding: '20px', marginBottom: '22px' }}>
         <h2 style={{ fontSize: '17px', margin: '0 0 5px' }}>{modoForm === 'editar' ? 'Editar calendário' : modoForm === 'substituir' ? 'Substituir calendário' : 'Publicar calendário'}</h2><p style={{ color: '#777', fontSize: '12px', margin: '0 0 17px' }}>{modoForm === 'editar' ? 'Corrija as informações abaixo. O arquivo atual será mantido.' : 'Se já existir um material no mês escolhido, ele será substituído.'}</p>
@@ -111,14 +107,15 @@ export default function AdminCalendario() {
         <div style={{ display: 'flex', gap: '9px', justifyContent: 'flex-end', marginTop: '17px' }}><button type="button" onClick={limpar} style={botao}>Cancelar</button><button disabled={enviando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: '9px', padding: '10px 17px', fontWeight: 900, cursor: 'pointer' }}>{enviando ? 'Salvando...' : modoForm === 'editar' ? 'Salvar alterações' : modoForm === 'substituir' ? 'Substituir PDF' : 'Publicar PDF'}</button></div>
       </form>}
 
-      <section style={{ display: 'grid', gap: '12px' }}>
-        {itens.map(item => <article key={item.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderLeft: `3px solid ${ouro}`, borderRadius: '14px', padding: '16px', display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
-          <div style={{ width: '52px', height: '52px', borderRadius: '13px', background: 'rgba(212,175,55,.10)', display: 'grid', placeItems: 'center', fontSize: '24px' }}>📅</div>
-          <div style={{ flex: 1, minWidth: '190px' }}><small style={{ color: ouro, fontWeight: 800, textTransform: 'uppercase' }}>{rotuloMes(item.mes_ano)}</small><h3 style={{ fontSize: '15px', margin: '4px 0 3px' }}>{item.titulo}</h3><p style={{ color: '#777', fontSize: '12px', margin: 0 }}>{item.descricao || 'Material disponível para as alunas'}</p></div>
-          <div style={{ display: 'flex', gap: '7px', flexWrap: 'wrap' }}>{item.arquivo_url && <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer" style={{ ...botao, textDecoration: 'none' }}>Visualizar</a>}<button onClick={() => abrirPara(item, 'editar')} style={botao}>Editar</button><button onClick={() => abrirPara(item, 'substituir')} style={botao}>Substituir</button><button onClick={() => excluir(item)} style={{ ...botao, color: '#f99' }}>Excluir</button></div>
-        </article>)}
-        {!itens.length && <div style={{ textAlign: 'center', padding: '48px 20px', background: '#111', border: '1px solid #2A2A2A', borderRadius: '14px', color: '#777' }}><div style={{ fontSize: '38px' }}>📅</div><p style={{ marginBottom: 0 }}>Nenhum calendário publicado.</p></div>}
-      </section>
+      <CalendarActionsAdmin
+        token={token}
+        calendarios={itens}
+        onEditarCalendario={item => abrirPara(item, 'editar')}
+        onSubstituirCalendario={item => abrirPara(item, 'substituir')}
+        onExcluirCalendario={excluir}
+        onNovoCalendario={mes => abrirPara({ mes_ano: mes }, 'publicar')}
+        onCalendarioAtualizado={carregar}
+      />
     </main>
   </div>
 }

@@ -683,6 +683,15 @@
 .premium-calendar-today-card article small { margin-top: 3px; color: var(--premium-muted); font-size: 10px; }
 .premium-calendar-today-card > button { width: 100%; border: 0; border-top: 1px solid var(--premium-line); background: transparent; color: var(--premium-gold); padding: 12px 16px; font: inherit; font-size: 11px; font-weight: 900; text-align: right; cursor: pointer; }
 .interactive-calendar { display: grid; gap: 14px; }
+.interactive-calendar-package { border: 1px solid; border-radius: 20px; overflow: hidden; box-shadow: 0 14px 36px rgba(0,0,0,.08); }
+.interactive-calendar-package .interactive-calendar-package-header { border: 0; border-bottom: 1px solid; border-radius: 0; padding: 20px; }
+.interactive-calendar-package-side { display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; }
+.interactive-calendar-package-pdf { display: flex; gap: 8px; }
+.interactive-calendar-package-pdf a, .interactive-calendar-package-pdf button { border: 1px solid var(--premium-line); border-radius: 9px; padding: 10px 12px; background: var(--premium-paper); color: var(--premium-ink); font-size: 11px; font-weight: 900; text-decoration: none; cursor: pointer; }
+.interactive-calendar-package-pdf button { border: 0; color: #111; }
+.interactive-calendar-package-status { display: flex; gap: 8px; flex-wrap: wrap; padding: 12px 20px; border-bottom: 1px solid var(--premium-line); }
+.interactive-calendar-package-status span { border: 1px solid var(--premium-line); border-radius: 999px; padding: 6px 9px; font-size: 10px; font-weight: 900; }
+.interactive-calendar-package-body { display: grid; gap: 14px; padding: 18px; }
 .interactive-calendar-summary { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid; border-radius: 18px; padding: 18px; }
 .interactive-calendar-summary small, .interactive-calendar-pdf small, .interactive-calendar-day-heading small { display: block; font-size: 10px; font-weight: 900; letter-spacing: .12em; }
 .interactive-calendar-summary h3, .interactive-calendar-day-heading h3 { margin: 4px 0; font-size: 19px; }
@@ -691,6 +700,7 @@
 .interactive-calendar-progress strong { display: block; font-size: 20px; }
 .interactive-calendar-progress span { display: block; width: 118px; height: 6px; border-radius: 999px; overflow: hidden; margin-top: 6px; }
 .interactive-calendar-progress i { display: block; height: 100%; border-radius: inherit; }
+.interactive-calendar-progress small { display: block; margin-top: 5px; font-size: 9px; letter-spacing: 0; }
 .interactive-calendar-today { width: 100%; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 11px; border: 1px solid; border-radius: 14px; padding: 13px 15px; text-align: left; cursor: pointer; }
 .interactive-calendar-today strong, .interactive-calendar-today small { display: block; }
 .interactive-calendar-today strong { font-size: 13px; }
@@ -735,7 +745,11 @@
 .interactive-calendar-pdf button { border: 0; color: #111; }
 
 @media (max-width: 640px) {
-  .interactive-calendar-summary { align-items: flex-start; }
+  .interactive-calendar-summary { align-items: flex-start; flex-direction: column; }
+  .interactive-calendar-package-side { width: 100%; justify-content: space-between; align-items: flex-end; }
+  .interactive-calendar-package-pdf { width: 100%; }
+  .interactive-calendar-package-pdf a, .interactive-calendar-package-pdf button { flex: 1; text-align: center; }
+  .interactive-calendar-package-body { padding: 12px; }
   .interactive-calendar-grid { padding: 8px; }
   .interactive-calendar-grid > header, .interactive-calendar-grid > div { gap: 2px; }
   .interactive-calendar-grid > div > span, .interactive-calendar-grid > div > button { min-height: 46px; }

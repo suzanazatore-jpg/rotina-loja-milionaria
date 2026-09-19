@@ -87,12 +87,19 @@ export default function InteractiveCalendar({ mesAno, actions = [], pdfItem, use
   const concluidas = actions.filter(acao => progresso[acao.id] === 'concluido').length
   const percentual = actions.length ? Math.round(concluidas / actions.length * 100) : 0
 
-  return <div className="interactive-calendar">
-    {actions.length > 0 && <>
-      <section className="interactive-calendar-summary" style={{ background: cores.card, borderColor: cores.borda }}>
-        <div><small style={{ color: ouro }}>PLANO DO MÊS</small><h3 style={{ color: cores.tx }}>{MESES[mes - 1]} de {ano}</h3><p style={{ color: cores.tx2 }}>{concluidas} de {actions.length} ações concluídas</p></div>
-        <div className="interactive-calendar-progress"><strong style={{ color: ouro }}>{percentual}%</strong><span style={{ background: cores.card2 }}><i style={{ width: `${percentual}%`, background: ouroGrad }} /></span></div>
-      </section>
+  return <article className="interactive-calendar interactive-calendar-package" style={{ background: cores.card, borderColor: ouro }}>
+    <section className="interactive-calendar-summary interactive-calendar-package-header" style={{ borderColor: cores.borda }}>
+      <div><small style={{ color: ouro }}>PLANEJAMENTO COMPLETO DO MÊS</small><h3 style={{ color: cores.tx }}>{pdfItem?.titulo || `${MESES[mes - 1]} de ${ano}`}</h3><p style={{ color: cores.tx2 }}>{pdfItem?.descricao || 'PDF completo e estratégias organizadas para colocar em prática.'}</p></div>
+      <div className="interactive-calendar-package-side">
+        {actions.length > 0 && <div className="interactive-calendar-progress"><strong style={{ color: ouro }}>{percentual}%</strong><span style={{ background: cores.card2 }}><i style={{ width: `${percentual}%`, background: ouroGrad }} /></span><small style={{ color: cores.tx2 }}>{concluidas} de {actions.length} concluídas</small></div>}
+        {pdfItem?.arquivo_url && <div className="interactive-calendar-package-pdf"><a href={pdfItem.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar PDF</button></div>}
+      </div>
+    </section>
+
+    <div className="interactive-calendar-package-status"><span style={{ color: pdfItem?.arquivo_url ? '#55c99a' : cores.tx3 }}>{pdfItem?.arquivo_url ? '✓ PDF disponível' : '○ Sem PDF'}</span><span style={{ color: actions.length ? ouro : cores.tx3 }}>{actions.length} {actions.length === 1 ? 'ação interativa' : 'ações interativas'}</span></div>
+
+    <div className="interactive-calendar-package-body">
+      {actions.length > 0 && <>
 
       {porData[hoje]?.length > 0 && <button type="button" className="interactive-calendar-today" onClick={() => setDataSelecionada(hoje)} style={{ borderColor: ouro, background: cores.card, color: cores.tx }}><AppIcon name="calendar" size={18} /><span><strong>Você tem {porData[hoje].length} {porData[hoje].length === 1 ? 'ação' : 'ações'} para hoje</strong><small style={{ color: cores.tx2 }}>Toque para abrir o plano do dia</small></span><b style={{ color: ouro }}>→</b></button>}
 
@@ -126,8 +133,8 @@ export default function InteractiveCalendar({ mesAno, actions = [], pdfItem, use
         {!selecionadas.length && <div className="interactive-calendar-empty" style={{ background: cores.card, borderColor: cores.borda, color: cores.tx2 }}>Nenhuma ação programada para esta data.</div>}
       </section>
       {erro && <p className="interactive-calendar-error">{erro}</p>}
-    </>}
-
-    {pdfItem?.arquivo_url && <section className="interactive-calendar-pdf" style={{ background: cores.card, borderColor: cores.borda }}><div><small style={{ color: ouro }}>MATERIAL COMPLEMENTAR</small><strong style={{ color: cores.tx }}>{pdfItem.titulo}</strong><p style={{ color: cores.tx2 }}>{pdfItem.descricao || 'Consulte também o material completo.'}</p></div><div><a href={pdfItem.arquivo_url} target="_blank" rel="noopener noreferrer">Abrir material</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar material</button></div></section>}
-  </div>
+      </>}
+      {!actions.length && <div className="interactive-calendar-empty" style={{ background: cores.card2, borderColor: cores.borda, color: cores.tx2 }}>{pdfItem?.arquivo_url ? 'O PDF deste mês está disponível. As estratégias interativas serão adicionadas aqui.' : 'O planejamento deste mês ainda não foi publicado.'}</div>}
+    </div>
+  </article>
 }
