@@ -68,7 +68,7 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
 
   const temCursos = useMemo(() => cursos.length > 0, [cursos])
   const secoes = useMemo(() => {
-    if (!carrosseis.length) return [{ id: 'meus-cursos', title: 'Meus Cursos', subtitle: 'Conteúdos liberados para o seu acesso.', courses: cursos }]
+    if (!carrosseis.length) return [{ id: 'meus-cursos', title: '', subtitle: '', courses: cursos }]
     const porId = Object.fromEntries(cursos.map(curso => [curso.id, curso]))
     const configuradas = carrosseis.map(item => ({
       id: item.id,
@@ -76,7 +76,7 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
       subtitle: item.subtitle,
       courses: (item.course_ids || []).map(id => porId[id]).filter(Boolean),
     })).filter(item => item.courses.length)
-    return configuradas.length ? configuradas : [{ id: 'meus-cursos', title: 'Meus Cursos', subtitle: 'Conteúdos liberados para o seu acesso.', courses: cursos }]
+    return configuradas.length ? configuradas : [{ id: 'meus-cursos', title: '', subtitle: '', courses: cursos }]
   }, [carrosseis, cursos])
 
   if (carregando) return <p style={{ color: cores.tx2, textAlign: 'center', padding: '50px 0' }}>Carregando seus cursos...</p>
@@ -85,8 +85,7 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
     <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
       {onBack && <button onClick={onBack} style={{ background: 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '9px', color: cores.tx, padding: '9px 12px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', marginBottom: '16px' }}>← Voltar aos conteúdos</button>}
       <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 5px', color: cores.tx }}>🎓 Meus Cursos</h2>
-        <p style={{ fontSize: '13px', color: cores.tx2, margin: 0 }}>Escolha uma seção e continue avançando.</p>
+        <h2 style={{ fontSize: '22px', fontWeight: 900, margin: 0, color: cores.tx }}>🎓 Meus Cursos</h2>
       </div>
 
       {!temCursos ? (
@@ -98,7 +97,7 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
       ) : (
         <div style={{ display: 'grid', gap: '27px' }}>
           {secoes.map(secao => <section key={secao.id}>
-            <div style={{ marginBottom: '11px' }}><h3 style={{ fontSize: '18px', fontWeight: 900, color: cores.tx, margin: 0 }}>{secao.title}</h3>{secao.subtitle && <p style={{ fontSize: '12px', color: cores.tx2, margin: '4px 0 0' }}>{secao.subtitle}</p>}</div>
+            {(secao.title || secao.subtitle) && <div style={{ marginBottom: '11px' }}>{secao.title && <h3 style={{ fontSize: '18px', fontWeight: 900, color: cores.tx, margin: 0 }}>{secao.title}</h3>}{secao.subtitle && <p style={{ fontSize: '12px', color: cores.tx2, margin: '4px 0 0' }}>{secao.subtitle}</p>}</div>}
             <div style={{ display: 'flex', gap: '16px', overflowX: 'auto', padding: '2px 2px 10px', scrollSnapType: 'x proximity' }}>
           {secao.courses.map(curso => {
             const p = progresso[curso.id] || { total: 0, feitas: 0, percentual: 0 }
