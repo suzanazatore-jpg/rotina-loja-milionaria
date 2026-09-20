@@ -98,6 +98,17 @@ function rotuloSemana(semanaInicio) {
   return `Semana de ${fmt(inicio)} a ${fmt(fim)}`
 }
 
+function formatarDataConta(value, includeTime = false) {
+  if (!value) return 'Não informado'
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return 'Não informado'
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: includeTime ? 'short' : 'long',
+    ...(includeTime ? { timeStyle: 'short' } : {}),
+  }).format(date)
+}
+
 // ════════ HELPER: verifica se o acesso está liberado ════════
 // Retorna { liberado: bool, motivo: 'expirado' | 'atrasado' | 'cancelado' | null }
 function verificarAcesso(perfil) {
@@ -145,6 +156,7 @@ export default function Painel() {
   const [whatsapp, setWhatsapp] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [msgSalvo, setMsgSalvo] = useState('')
+  const [dadosConta, setDadosConta] = useState({ planos: [], inicio_em: null, ultimo_acesso_em: null, expira_em: null })
 
   // Controle de acesso (novo)
   const [tipoAcesso, setTipoAcesso] = useState('rotina')
@@ -272,6 +284,7 @@ export default function Painel() {
         setAssistenteLiberado(dados.acessos?.assistant === true)
         setMetasLiberadas(dados.acessos?.team_goals === true)
         setPrecificacaoLiberada(dados.acessos?.pricing === true)
+        setDadosConta(dados.conta || { planos: [], inicio_em: null, ultimo_acesso_em: null, expira_em: null })
 
         setCarregando(false)
         timerSecundario = window.setTimeout(() => {
@@ -637,6 +650,15 @@ export default function Painel() {
                     <Campo label="Nome" valor={nome || '—'} onChange={() => {}} placeholder="" cores={cores} ouro={ouro} disabled />
                     <Campo label="E-mail" valor={usuario?.email || ''} onChange={() => {}} placeholder="" cores={cores} ouro={ouro} disabled />
                     <Campo label="WhatsApp" valor={whatsapp || '—'} onChange={() => {}} placeholder="" cores={cores} ouro={ouro} disabled />
+                    <div style={{ borderTop: `1px solid ${cores.borda}`, marginTop: '18px', paddingTop: '18px' }}>
+                      <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.12em', margin: '0 0 12px' }}>INFORMAÇÕES DO ACESSO</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px' }}>
+                        <DadoAcesso label="Plano do aluno" value={dadosConta.planos?.length ? dadosConta.planos.join(' + ') : 'Não informado'} cores={cores} />
+                        <DadoAcesso label="Data de início" value={formatarDataConta(dadosConta.inicio_em)} cores={cores} />
+                        <DadoAcesso label="Último acesso" value={formatarDataConta(dadosConta.ultimo_acesso_em, true)} cores={cores} />
+                        <DadoAcesso label="Data que expira" value={dadosConta.expira_em ? formatarDataConta(dadosConta.expira_em) : 'Sem vencimento definido'} cores={cores} />
+                      </div>
+                    </div>
                     <p style={{ fontSize: '12px', color: cores.tx3, margin: '10px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
                       Esses dados são gerenciados pela administração. Para alterar, fale com o suporte. 💬
                     </p>
@@ -932,6 +954,15 @@ function Campo({ label, valor, onChange, placeholder, cores, ouro, disabled }) {
         width: '100%', padding: '11px 13px', background: disabled ? cores.card2 : cores.bg, border: `1px solid ${cores.borda}`, borderRadius: '9px',
         fontSize: '14px', color: disabled ? cores.tx3 : cores.tx, outline: 'none', boxSizing: 'border-box',
       }} />
+    </div>
+  )
+}
+
+function DadoAcesso({ label, value, cores }) {
+  return (
+    <div style={{ background: cores.card2, border: `1px solid ${cores.borda}`, borderRadius: '10px', padding: '12px 13px', minHeight: '68px' }}>
+      <span style={{ display: 'block', color: cores.tx2, fontSize: '11px', fontWeight: 700, marginBottom: '5px' }}>{label}</span>
+      <strong style={{ display: 'block', color: cores.tx, fontSize: '14px', lineHeight: 1.35 }}>{value}</strong>
     </div>
   )
 }

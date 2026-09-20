@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { loadStudentAccount } from '@/lib/studentAccountServer'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 
@@ -31,6 +32,7 @@ async function authenticatedUser(request, supabase) {
 
 async function loadCritical(supabase, user) {
   const isAdmin = user.email === ADMIN_EMAIL
+  const accessedAt = new Date().toISOString()
   const [legacyProfileResult, profileResult, plansResult, termsResult] = await Promise.all([
     supabase
       .from('perfis')
@@ -46,14 +48,14 @@ async function loadCritical(supabase, user) {
     isAdmin
       ? Promise.resolve({ data: null, error: null })
       : supabase.from('terms_of_use').select('id,version,content,is_required,published_at').eq('is_current', true).maybeSingle(),
-    supabase.from('app_user_activity').upsert({ user_id: user.id, last_seen_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+    supabase.from('app_user_activity').upsert({ user_id: user.id, last_seen_at: accessedAt, updated_at: accessedAt }),
   ])
 
   const legacyProfile = legacyProfileResult.data || null
   const profile = profileResult.data || null
   const planIds = (plansResult.data || []).map(item => item.plan_id)
 
-  const [termAcceptanceResult, appContentsResult, mentorshipTypesResult] = await Promise.all([
+  const [termAcceptanceResult, appContentsResult, mentorshipTypesResult, accountResult] = await Promise.all([
     termsResult.data
       ? supabase.from('term_acceptances').select('accepted_at').eq('terms_id', termsResult.data.id).eq('user_id', user.id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -63,6 +65,7 @@ async function loadCritical(supabase, user) {
     !isAdmin && profile?.status === 'active' && profile?.mentoria_aplicada === true && planIds.length
       ? supabase.from('plan_mentorships').select('mentorship_type').in('plan_id', planIds)
       : Promise.resolve({ data: [], error: null }),
+    loadStudentAccount(supabase, user.id, { lastAccessAt: accessedAt }),
   ])
 
   let programas = []
@@ -106,6 +109,7 @@ async function loadCritical(supabase, user) {
       pricing: active && (isAdmin || contents.includes('pricing')),
       contents,
     },
+    conta: accountResult,
   }
 }
 
