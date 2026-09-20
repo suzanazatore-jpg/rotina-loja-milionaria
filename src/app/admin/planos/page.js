@@ -33,6 +33,7 @@ export default function AdminPlanos() {
   const [formAberto, setFormAberto] = useState(false)
   const [editando, setEditando] = useState(null)
   const [nome, setNome] = useState('')
+  const [nomeInterno, setNomeInterno] = useState('')
   const [ofertaId, setOfertaId] = useState('')
   const [periodoDias, setPeriodoDias] = useState('')
   const [preco, setPreco] = useState('')
@@ -75,20 +76,21 @@ export default function AdminPlanos() {
   }
 
   function limpar() {
-    setEditando(null); setNome(''); setOfertaId(''); setPeriodoDias('')
+    setEditando(null); setNome(''); setNomeInterno(''); setOfertaId(''); setPeriodoDias('')
     setPreco(''); setUrlVenda(''); setCursoIds([]); setConteudoIds([]); setMentoriaTipos([])
     setFormAberto(false)
   }
 
   function cadastrar() {
-    setEditando(null); setNome(''); setOfertaId(''); setPeriodoDias('')
+    setEditando(null); setNome(''); setNomeInterno(''); setOfertaId(''); setPeriodoDias('')
     setPreco(''); setUrlVenda(''); setCursoIds([]); setConteudoIds([]); setMentoriaTipos([])
     setMensagem(''); setFormAberto(true)
   }
 
   function editar(plano) {
     setEditando(plano.id)
-    setNome(plano.name || '')
+    setNome(plano.commercial_name || '')
+    setNomeInterno(plano.name || '')
     setOfertaId(plano.offer_id || '')
     setPeriodoDias(plano.period_days || '')
     setPreco(plano.price ?? '')
@@ -114,10 +116,11 @@ export default function AdminPlanos() {
 
   async function salvar(e) {
     e.preventDefault()
-    if (!nome.trim()) { setMensagem('Informe o nome do plano.'); return }
+    if (!nome.trim()) { setMensagem('Informe o nome comercial.'); return }
+    if (!nomeInterno.trim()) { setMensagem('Informe o nome interno.'); return }
     setSalvando(true); setMensagem('')
     const payload = {
-      name: nome.trim(), offer_id: ofertaId.trim() || null,
+      name: nomeInterno.trim(), commercial_name: nome.trim(), offer_id: ofertaId.trim() || null,
       period_days: periodoDias ? Number(periodoDias) : 365,
       price: preco === '' ? null : Number(String(preco).replace(',', '.')),
       sale_url: urlVenda.trim() || null, updated_at: new Date().toISOString(),
@@ -174,7 +177,7 @@ export default function AdminPlanos() {
             const total = vinculos.filter(v => v.plan_id === plano.id).length
             const totalConteudos = conteudosPlanos.filter(v => v.plan_id === plano.id && v.content_key !== 'mentorship').length
             return <div key={plano.id} style={{ padding: '16px', display: 'flex', justifyContent: 'space-between', gap: '12px', alignItems: 'center', borderBottom: '1px solid #282428' }}>
-              <div><strong>{plano.name}</strong><p style={{ color: '#888', fontSize: '12px', margin: '4px 0 0' }}>ID da oferta: {plano.offer_id || 'não informado'} · {plano.period_days ? `${plano.period_days} dias` : 'Sem validade'} · {total} curso{total === 1 ? '' : 's'} · {totalConteudos} conteúdo{totalConteudos === 1 ? '' : 's'} do app</p></div>
+              <div><strong>{plano.name}</strong><p style={{ color: '#D4AF37', fontSize: '12px', margin: '4px 0 0' }}>Nome comercial: {plano.commercial_name || 'Ainda não definido'}</p><p style={{ color: '#888', fontSize: '12px', margin: '3px 0 0' }}>ID da oferta: {plano.offer_id || 'não informado'} · {plano.period_days ? `${plano.period_days} dias` : 'Sem validade'} · {total} curso{total === 1 ? '' : 's'} · {totalConteudos} conteúdo{totalConteudos === 1 ? '' : 's'} do app</p></div>
               <div style={{ display: 'flex', gap: '8px' }}><button onClick={() => editar(plano)} style={botaoSecundario}>Editar</button><button onClick={() => excluir(plano)} style={{ ...botaoSecundario, color: '#f99' }}>Excluir</button></div>
             </div>
           })}
@@ -186,7 +189,7 @@ export default function AdminPlanos() {
         <form onSubmit={salvar} style={{ width: 'min(820px,100%)', maxHeight: '92vh', overflowY: 'auto', background: '#141214', border: '1px solid #373238', borderRadius: '18px', boxShadow: '0 28px 90px #000' }}>
           <header style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '18px 20px', background: '#171417', borderBottom: '1px solid #302b30' }}><div><h2 style={{ fontSize: 18, margin: 0 }}>{editando ? 'Editar plano' : 'Cadastrar plano'}</h2><p style={{ color: '#777', fontSize: 12, margin: '4px 0 0' }}>Defina a oferta do Guru e tudo o que este plano libera.</p></div><button type="button" onClick={limpar} disabled={salvando} aria-label="Fechar" style={{ width: 34, height: 34, background: '#242024', color: '#aaa', border: '1px solid #3c373c', borderRadius: 9, fontSize: 20, cursor: 'pointer' }}>×</button></header>
           <div style={{ padding: 20 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}><label>Nome<input value={nome} onChange={e => setNome(e.target.value)} style={campo} placeholder="Ex.: Plano anual" /></label><label>ID da oferta do Guru<input value={ofertaId} onChange={e => setOfertaId(e.target.value)} style={campo} placeholder="Código da oferta" /></label><label>Validade em dias<input type="number" min="1" value={periodoDias} onChange={e => setPeriodoDias(e.target.value)} style={campo} placeholder="Ex.: 365" /></label><label>Preço<input value={preco} onChange={e => setPreco(e.target.value)} style={campo} placeholder="Ex.: 997,00" /></label></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: 12 }}><label>Nome interno<input value={nomeInterno} onChange={e => setNomeInterno(e.target.value)} style={campo} placeholder="Ex.: App Rotina — 6 meses" /><small style={{ display: 'block', color: '#777', marginTop: 5 }}>O nome atual permanece aqui e só aparece no administrativo.</small></label><label>Nome comercial<input value={nome} onChange={e => setNome(e.target.value)} style={campo} placeholder="Ex.: Rotina da Loja Milionária" /><small style={{ display: 'block', color: '#777', marginTop: 5 }}>A aluna verá este nome no aplicativo.</small></label><label>ID da oferta do Guru<input value={ofertaId} onChange={e => setOfertaId(e.target.value)} style={campo} placeholder="Código da oferta" /></label><label>Validade em dias<input type="number" min="1" value={periodoDias} onChange={e => setPeriodoDias(e.target.value)} style={campo} placeholder="Ex.: 365" /></label><label>Preço<input value={preco} onChange={e => setPreco(e.target.value)} style={campo} placeholder="Ex.: 997,00" /></label></div>
             <label style={{ display: 'block', marginTop: 12 }}>Link de venda<input value={urlVenda} onChange={e => setUrlVenda(e.target.value)} style={campo} placeholder="https://" /></label>
             <section style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #302b30' }}><p style={{ margin: '0 0 9px', fontWeight: 800, fontSize: 14 }}>Cursos liberados</p><div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{cursos.map(curso => <button key={curso.id} type="button" onClick={() => alternarCurso(curso.id)} style={{ border: cursoIds.includes(curso.id) ? `1px solid ${ouro}` : '1px solid #333', background: cursoIds.includes(curso.id) ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: '999px', padding: '8px 11px', cursor: 'pointer' }}>{cursoIds.includes(curso.id) ? '✓ ' : ''}{curso.title}</button>)}{!cursos.length && <span style={{ color: '#777', fontSize: 13 }}>Nenhum curso cadastrado.</span>}</div></section>
             <section style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid #302b30' }}><p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 14 }}>Quais mentorias este plano libera?</p><p style={{ margin: '0 0 11px', color: '#777', fontSize: 12 }}>Selecione uma, as duas ou nenhuma mentoria.</p><div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(190px,1fr))', gap: 9 }}>{[['evs', 'Mentoria EVS'], ['cvm', 'Mentoria CVM']].map(([tipo, label]) => <button key={tipo} type="button" onClick={() => alternarMentoria(tipo)} aria-pressed={mentoriaTipos.includes(tipo)} style={{ textAlign: 'left', border: mentoriaTipos.includes(tipo) ? `1px solid ${ouro}` : '1px solid #333', background: mentoriaTipos.includes(tipo) ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: 10, padding: 12, cursor: 'pointer' }}><strong>{mentoriaTipos.includes(tipo) ? '✓ ' : ''}{label}</strong><small style={{ display: 'block', color: '#888', marginTop: 4 }}>Aulas, materiais e comentários</small></button>)}</div></section>

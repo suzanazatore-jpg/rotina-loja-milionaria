@@ -39,10 +39,10 @@ export async function loadStudentAccount(supabase, userId, options = {}) {
   const profilePlans = profilePlansResult.data || []
   const planIds = [...new Set(profilePlans.map(item => item.plan_id).filter(Boolean))]
   const plansResult = planIds.length
-    ? await supabase.from('plans').select('id,name,offer_id').in('id', planIds)
+    ? await supabase.from('plans').select('id,name,commercial_name,offer_id').in('id', planIds)
     : { data: [] }
   const visiblePlans = (plansResult.data || []).filter(plan => !String(plan.offer_id || '').startsWith('__individual_'))
-  const planNames = [...new Set(visiblePlans.map(plan => plan.name).filter(Boolean))]
+  const planNames = [...new Set(visiblePlans.map(plan => plan.commercial_name || plan.name).filter(Boolean))]
   const enrollments = enrollmentsResult.data || []
   const legacyProfile = legacyProfileResult.data || null
 
