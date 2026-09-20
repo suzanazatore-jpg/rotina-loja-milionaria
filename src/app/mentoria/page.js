@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { registerContentAccess } from '@/lib/contentAccess'
 
 const OURO = '#D4AF37'
 const GRADIENTE = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
@@ -37,6 +38,7 @@ export default function Mentoria() {
   const [concluidas, setConcluidas] = useState(new Set())
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+  const [usuarioId, setUsuarioId] = useState('')
   const [tema] = useState(() => {
     if (typeof window === 'undefined') return 'claro'
     return window.localStorage.getItem('rotina-tema') === 'escuro' ? 'escuro' : 'claro'
@@ -51,6 +53,7 @@ export default function Mentoria() {
     async function carregar() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.replace('/login'); return }
+      setUsuarioId(user.id)
       const { data: { session } } = await supabase.auth.getSession()
       const resposta = await fetch('/api/mentoria', { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
       const dados = await resposta.json()
@@ -84,6 +87,19 @@ export default function Mentoria() {
   const concluidasPrograma = aulasPrograma.filter(a => concluidas.has(String(a.id))).length
   const materiaisAula = materiais.filter(m => m.aula_id === aulaAtual?.id)
   const percentual = aulasPrograma.length ? Math.round((concluidasPrograma / aulasPrograma.length) * 100) : 0
+
+  useEffect(() => {
+    if (!usuarioId || !programa) return
+    void registerContentAccess({ event_type: 'course_open', content_type: 'mentorship', content_id: programa, content_title: `Mentoria ${programa.toUpperCase()}` })
+  }, [programa, usuarioId])
+
+  useEffect(() => {
+    if (!usuarioId || !aulaAtual?.id) return
+    void registerContentAccess({
+      event_type: 'lesson_open', content_type: 'mentorship_lesson', content_id: String(aulaAtual.id), content_title: aulaAtual.titulo,
+      metadata: { mentorship_type: programa },
+    })
+  }, [aulaAtual?.id, aulaAtual?.titulo, programa, usuarioId])
 
   function abrirPrograma(tipo) {
     const curso = cursosMentoria.find(item => item.mentorship_type === tipo)

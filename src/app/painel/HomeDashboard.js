@@ -9,6 +9,8 @@ import { supabase } from '@/lib/supabase'
 const DEFAULT_WEIGHTS = { 0: 0, 1: 10, 2: 10, 3: 12, 4: 15, 5: 23, 6: 30 }
 const brl = valor => Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const dataLocal = data => `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`
+const homeSummaryCache = new Map()
+const homeProgressCache = new Map()
 
 function capitalizar(valor) {
   return valor ? valor.charAt(0).toUpperCase() + valor.slice(1) : ''
@@ -42,9 +44,12 @@ export default function HomeDashboard({
   rotinaSemanal,
   calendarActions = [],
   campaign = null,
+  banners = [],
+  bannerAtual = 0,
+  setBannerAtual = () => {},
 }) {
-  const [resumo, setResumo] = useState({ meta: 0, mes: 0, hoje: 0, pesos: DEFAULT_WEIGHTS, datasFechadas: [] })
-  const [concluidas, setConcluidas] = useState(() => new Set())
+  const [resumo, setResumo] = useState(() => homeSummaryCache.get(userId) || { meta: 0, mes: 0, hoje: 0, pesos: DEFAULT_WEIGHTS, datasFechadas: [] })
+  const [concluidas, setConcluidas] = useState(() => new Set(homeProgressCache.get(userId) || []))
   const hoje = useMemo(() => new Date(), [])
   const dataHoje = useMemo(() => dataLocal(hoje), [hoje])
   const planoHoje = useMemo(() => planoDoDia(rotinaSemanal?.plano_dias, hoje), [hoje, rotinaSemanal?.plano_dias])
@@ -63,13 +68,15 @@ export default function HomeDashboard({
       if (!ativo) return
 
       const lista = sales || []
-      setResumo({
+      const nextSummary = {
         meta: Number(goal?.monthly_target || 0),
         mes: lista.reduce((soma, item) => soma + Number(item.amount || 0), 0),
         hoje: lista.filter(item => item.sale_date === dataHoje).reduce((soma, item) => soma + Number(item.amount || 0), 0),
         pesos: goal?.weekday_weights || DEFAULT_WEIGHTS,
         datasFechadas: goal?.closed_dates || [],
-      })
+      }
+      homeSummaryCache.set(userId, nextSummary)
+      setResumo(nextSummary)
     }
 
     void carregarResumo()
@@ -82,7 +89,11 @@ export default function HomeDashboard({
     async function carregarProgresso() {
       if (!userId) return
       const { data } = await supabase.from('daily_task_progress').select('task_id').eq('owner_id', userId).eq('task_date', dataHoje)
-      if (ativo) setConcluidas(new Set((data || []).map(item => item.task_id)))
+      if (ativo) {
+        const ids = (data || []).map(item => item.task_id)
+        homeProgressCache.set(userId, ids)
+        setConcluidas(new Set(ids))
+      }
     }
 
     void carregarProgresso()
@@ -193,6 +204,17 @@ export default function HomeDashboard({
         </button>)}
       </div>
     </section>
+
+    {banners.length > 0 && <section className="premium-banner premium-mobile-home-carousel" aria-label="Novidades e avisos">
+      <div className="premium-banner-track" style={{ transform: `translateX(-${(bannerAtual % banners.length) * 100}%)` }}>
+        {banners.map((banner, index) => <article key={banner.id || `${banner.titulo}-${index}`} aria-hidden={index !== bannerAtual % banners.length}>
+          {banner.imagem ? (
+            banner.link ? <a href={banner.link} target="_blank" rel="noopener noreferrer" aria-label={banner.titulo || 'Abrir aviso'}><img src={banner.imagem} alt={banner.titulo || 'Aviso'} loading="lazy" /></a> : <img src={banner.imagem} alt={banner.titulo || 'Aviso'} loading="lazy" />
+          ) : <div className="premium-banner-copy"><small>{banner.tag || 'NOVIDADE'}</small><h2>{banner.titulo}</h2><p>{banner.texto}</p>{banner.link && <a href={banner.link} target="_blank" rel="noopener noreferrer">Saiba mais</a>}</div>}
+        </article>)}
+      </div>
+      {banners.length > 1 && <div className="premium-banner-dots">{banners.map((banner, index) => <button key={banner.id || index} type="button" className={index === bannerAtual % banners.length ? 'on' : ''} onClick={() => setBannerAtual(index)} aria-label={`Mostrar aviso ${index + 1}`} />)}</div>}
+    </section>}
 
     <section className="premium-help-card premium-simple-support">
       <div><small>SUPORTE</small><h2>Fale com o Suporte</h2><p>Envie sua dúvida e acompanhe a resposta da nossa equipe pelo aplicativo.</p></div>

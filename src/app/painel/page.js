@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import HomeDashboard from './HomeDashboard'
+import { registerContentAccess } from '@/lib/contentAccess'
 import CampaignJourney from './CampaignJourney'
 import InteractiveCalendar from './InteractiveCalendar'
 import WeeklyRoutineCard from './WeeklyRoutineCard'
@@ -313,6 +314,7 @@ export default function Painel() {
         import('./SalesCenter'),
         import('./SupportCenter'),
         import('./PricingCenter'),
+        import('./VirtualAssistant'),
       ])
     }
 
@@ -324,6 +326,21 @@ export default function Painel() {
     const timer = window.setTimeout(preload, 600)
     return () => window.clearTimeout(timer)
   }, [carregando])
+
+  useEffect(() => {
+    if (carregando || !usuario?.id) return
+    const titles = {
+      inicio: 'Hoje', rotina: 'Rotina', vendas: 'Vendas e Metas', conteudos: 'Conteúdos',
+      calendario: 'Calendário de Postagens', campanhas: 'Campanhas', precificacao: 'Precificação e Lucro',
+      cursos: 'Meus Cursos', mentoria: 'Mentorias', dados: 'Meus Dados', ajuda: 'Suporte', assistente: 'Assistente',
+    }
+    void registerContentAccess({
+      event_type: secao === 'inicio' ? 'app_open' : 'section_open',
+      content_type: secao === 'inicio' ? 'app' : 'section',
+      content_id: secao,
+      content_title: titles[secao] || secao,
+    })
+  }, [carregando, secao, usuario?.id])
 
   // Carrossel automático
   useEffect(() => {

@@ -73,6 +73,20 @@ export default function ConteudoCurso() {
     setMaterials(mt.data || [])
   }
 
+  async function sincronizarAssistente(cid = courseId) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token || !cid) return
+      await fetch('/api/admin/assistente/cursos', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ course_id: cid }),
+      })
+    } catch {
+      // O curso continua salvo; a tela da Base permite repetir a sincronização.
+    }
+  }
+
   // ---------- Módulos ----------
   function novoModulo() { setMForm({ id: null, title: '', description: '', sort_order: modules.length, is_published: true }); setModal('module') }
   function editarModulo(m) { setMForm({ id: m.id, title: m.title || '', description: m.description || '', sort_order: m.sort_order || 0, is_published: !!m.is_published }); setModal('module') }
@@ -131,6 +145,7 @@ export default function ConteudoCurso() {
         try { await gravarMaterialDaAula(material, lessonId) } catch { falhas.push(material.title) }
       }
       setModal(null); await carregar(courseId)
+      void sincronizarAssistente(courseId)
       if (falhas.length) setErro(`A aula foi salva, mas não foi possível adicionar: ${falhas.join(', ')}.`)
     } catch (e) { setErro(e?.message || 'Não foi possível salvar a aula.') }
     finally { setSalvando(false) }
@@ -168,6 +183,7 @@ export default function ConteudoCurso() {
     const { error } = await supabase.from('lessons').delete().eq('id', l.id)
     if (error) { setErro(error.message); return }
     await carregar(courseId)
+    void sincronizarAssistente(courseId)
   }
 
   function aulasDo(moduleId) { return lessons.filter(l => (l.module_id || '') === (moduleId || '')) }
@@ -219,6 +235,7 @@ export default function ConteudoCurso() {
       if (error) throw error
       setModal(null)
       await carregar(courseId)
+      void sincronizarAssistente(courseId)
     } catch (e) {
       setErro(e?.message || 'Não foi possível salvar o material.')
     } finally { setSalvando(false) }
@@ -234,6 +251,7 @@ export default function ConteudoCurso() {
     const { error } = await supabase.from('materials').delete().eq('id', material.id)
     if (error) { setErro(error.message); return }
     await carregar(courseId)
+    void sincronizarAssistente(courseId)
   }
 
   function editarCurso() {
@@ -259,6 +277,7 @@ export default function ConteudoCurso() {
       const { error } = await supabase.from('courses').update({ title: courseForm.title.trim(), subtitle: courseForm.subtitle.trim() || null, description: courseForm.description.trim() || null, sort_order: Number(courseForm.sort_order) || 0, is_published: courseForm.is_published, cover_image_url: coverUrl }).eq('id', courseId)
       if (error) throw error
       setModal(null); await carregar(courseId)
+      void sincronizarAssistente(courseId)
     } catch (e) { setErro(e?.message || 'Não foi possível salvar o curso.') }
     finally { setSalvando(false) }
   }

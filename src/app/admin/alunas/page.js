@@ -28,6 +28,16 @@ function formatarData(iso) {
   }
 }
 
+function formatarDataHora(iso) {
+  if (!iso) return '—'
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    }).format(new Date(iso))
+  } catch { return '—' }
+}
+
 function formatarWhatsapp(num) {
   const d = String(num || '').replace(/\D/g, '')
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
@@ -144,6 +154,8 @@ export default function AdminAlunas() {
   const [acaoSenha, setAcaoSenha] = useState('')
   const [msgSenha, setMsgSenha] = useState('')
   const [excluindo, setExcluindo] = useState(false)
+  const [atividade, setAtividade] = useState({ events: [], contents: [] })
+  const [carregandoAtividade, setCarregandoAtividade] = useState(false)
 
   // Modal Nova aluna
   const [novaAberto, setNovaAberto] = useState(false)
@@ -221,6 +233,20 @@ export default function AdminAlunas() {
     setEdEmail(aluna.email || '')
     setMsg('')
     setModoSenha('automatica'); setNovaSenha(''); setSenhaDefinida(false); setMsgSenha('')
+    setAtividade({ events: [], contents: [] })
+    void carregarAtividade(aluna.id)
+  }
+
+  async function carregarAtividade(userId) {
+    setCarregandoAtividade(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resposta = await fetch(`/api/admin/alunas/atividade?user_id=${encodeURIComponent(userId)}`, {
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      const dados = await resposta.json()
+      if (resposta.ok) setAtividade({ events: dados.events || [], contents: dados.contents || [] })
+    } finally { setCarregandoAtividade(false) }
   }
 
   function gerarSenhaAcesso() {
@@ -607,6 +633,21 @@ export default function AdminAlunas() {
                 ['Último acesso', acessos[gerAluna.id] ? formatarData(acessos[gerAluna.id]) : 'Nunca acessou'],
               ].map(([rotulo, valor]) => <div key={rotulo} style={{ background: '#181818', border: '1px solid #2A2A2A', borderRadius: 9, padding: 10 }}><small style={{ display: 'block', color: '#777', marginBottom: 4 }}>{rotulo}</small><strong style={{ display: 'block', color: rotulo === 'Situação financeira' ? situacaoFinanceira(gerAluna).cor : '#eee', fontSize: 12, lineHeight: 1.35 }}>{valor}</strong></div>)}
             </div>
+
+            <section style={{ margin: '0 18px 18px', border: '1px solid #2A2A2A', borderRadius: 12, background: '#121212', padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', marginBottom: 11 }}>
+                <div><strong style={{ display: 'block', fontSize: 13 }}>Histórico de acesso e conteúdos</strong><span style={{ color: '#777', fontSize: 10 }}>Registros feitos a partir da ativação deste recurso.</span></div>
+                <button type="button" onClick={() => carregarAtividade(gerAluna.id)} disabled={carregandoAtividade} style={{ background: 'transparent', color: ouro, border: '1px solid #4b401d', borderRadius: 7, padding: '7px 9px', fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>{carregandoAtividade ? 'Atualizando...' : 'Atualizar'}</button>
+              </div>
+              {carregandoAtividade && !atividade.events.length ? <p style={{ color: '#777', fontSize: 11 }}>Carregando histórico...</p> : atividade.events.length ? <>
+                <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 8 }}>
+                  {atividade.contents.slice(0, 12).map(item => <div key={`${item.content_type}:${item.content_id || item.content_title}`} style={{ minWidth: 168, border: '1px solid #2d2d2d', borderRadius: 9, padding: 9, background: '#181818' }}><small style={{ color: ouro, fontWeight: 800, textTransform: 'uppercase' }}>{item.content_type === 'course' ? 'Curso' : item.content_type === 'mentorship' ? 'Mentoria' : item.content_type.includes('lesson') ? 'Aula' : 'Material'}</small><strong style={{ display: 'block', marginTop: 4, fontSize: 11, lineHeight: 1.35 }}>{item.content_title}</strong><span style={{ display: 'block', color: '#777', fontSize: 9, marginTop: 5 }}>{item.access_count} acesso(s) · {formatarDataHora(item.last_accessed_at)}</span></div>)}
+                </div>
+                <div style={{ maxHeight: 150, overflowY: 'auto', borderTop: '1px solid #252525', marginTop: 3 }}>
+                  {atividade.events.slice(0, 40).map(evento => <div key={evento.id} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, padding: '8px 2px', borderBottom: '1px solid #222' }}><div><strong style={{ display: 'block', fontSize: 10 }}>{evento.content_title || (evento.event_type === 'app_open' ? 'Abriu o aplicativo' : 'Acessou uma área')}</strong><span style={{ color: '#777', fontSize: 9 }}>{evento.event_type === 'app_open' ? 'Aplicativo' : evento.event_type === 'section_open' ? 'Área do aplicativo' : evento.event_type === 'course_open' ? 'Curso' : evento.event_type === 'lesson_open' ? 'Aula' : 'Material'}</span></div><time style={{ color: '#888', fontSize: 9, whiteSpace: 'nowrap' }}>{formatarDataHora(evento.created_at)}</time></div>)}
+                </div>
+              </> : <p style={{ color: '#777', fontSize: 11, margin: 0 }}>Nenhum acesso novo registrado ainda.</p>}
+            </section>
 
             <div className="aluna-manager-grid">
               <section className="aluna-manager-card">

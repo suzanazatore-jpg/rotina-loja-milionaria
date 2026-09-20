@@ -17,7 +17,7 @@ export async function GET(request) {
     const { data: { user } } = await supabase.auth.getUser(token)
     if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
 
-    const { data: material } = await supabase.from('materials').select('id,course_id,file_url,is_published').eq('id', materialId).maybeSingle()
+    const { data: material } = await supabase.from('materials').select('id,course_id,lesson_id,title,file_url,is_published').eq('id', materialId).maybeSingle()
     if (!material?.is_published) return NextResponse.json({ error: 'Material não encontrado.' }, { status: 404 })
 
     const { data: perfil } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
@@ -26,6 +26,15 @@ export async function GET(request) {
       if(curso?.is_mentorship){const{data:pp}=await supabase.from('profile_plans').select('plan_id').eq('profile_id',user.id);const ids=(pp||[]).map(x=>x.plan_id);const{data:pm}=ids.length?await supabase.from('plan_mentorships').select('mentorship_type').in('plan_id',ids).eq('mentorship_type',curso.mentorship_type):{data:[]};if(!pm?.length)return NextResponse.json({error:'Mentoria não liberada para este acesso.'},{status:403})}
       else {const { data: matricula } = await supabase.from('enrollments').select('id').eq('profile_id', user.id).eq('course_id', material.course_id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`).maybeSingle();if (!matricula) return NextResponse.json({ error: 'Curso não liberado para este acesso.' }, { status: 403 })}
     }
+
+    await supabase.from('app_content_access_events').insert({
+      user_id: user.id,
+      event_type: 'material_open',
+      content_type: 'material',
+      content_id: material.id,
+      content_title: material.title,
+      metadata: { course_id: material.course_id, lesson_id: material.lesson_id },
+    })
 
     if (/^https?:\/\//i.test(material.file_url)) return NextResponse.json({ url: material.file_url })
     const caminho = material.file_url.replace(/^storage:\/\/course-materials\//, '')

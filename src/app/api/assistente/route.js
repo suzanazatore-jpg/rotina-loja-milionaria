@@ -58,7 +58,7 @@ async function authenticatedUser(request, supabase) {
 }
 
 async function assistantAccess(supabase, user) {
-  if (user.email === ADMIN_EMAIL) return { allowed: true, contents: ALL_CONTENTS }
+  if (user.email === ADMIN_EMAIL) return { allowed: true, contents: ALL_CONTENTS, planIds: [], isAdmin: true }
   const [profileResult, plansResult] = await Promise.all([
     supabase.from('profiles').select('status,assistant_enabled').eq('id', user.id).maybeSingle(),
     supabase.from('profile_plans').select('plan_id').eq('profile_id', user.id),
@@ -72,9 +72,51 @@ async function assistantAccess(supabase, user) {
   return {
     allowed: active && (profileResult.data?.assistant_enabled === true || contents.includes('assistant')),
     contents,
+    planIds,
+    isAdmin: false,
   }
 }
 
+async function loadAccessibleCourseKnowledge(supabase, user, access) {
+  let courseIds = []
+  if (access.isAdmin) {
+    const { data } = await supabase.from('courses').select('id').eq('is_published', true)
+    courseIds = (data || []).map(item => item.id)
+  } else {
+    const now = new Date().toISOString()
+    const [enrollmentsResult, mentorshipsResult] = await Promise.all([
+      supabase.from('enrollments').select('course_id').eq('profile_id', user.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${now}`),
+      access.planIds.length ? supabase.from('plan_mentorships').select('mentorship_type').in('plan_id', access.planIds) : Promise.resolve({ data: [] }),
+    ])
+    courseIds = (enrollmentsResult.data || []).map(item => item.course_id)
+    const types = [...new Set((mentorshipsResult.data || []).map(item => item.mentorship_type))]
+    if (types.length) {
+      const { data } = await supabase.from('courses').select('id').eq('is_published', true).eq('is_mentorship', true).in('mentorship_type', types)
+      courseIds.push(...(data || []).map(item => item.id))
+    }
+    courseIds = [...new Set(courseIds)]
+  }
+  if (!courseIds.length) return { courseIds: [], catalog: 'Nenhum curso ou mentoria liberado.' }
+
+  const [coursesResult, lessonsResult, materialsResult] = await Promise.all([
+    supabase.from('courses').select('id,title').in('id', courseIds).eq('is_published', true),
+    supabase.from('lessons').select('id,course_id,title,description').in('course_id', courseIds).eq('is_published', true).order('sort_order'),
+    supabase.from('materials').select('id,course_id,lesson_id,title').in('course_id', courseIds).eq('is_published', true).order('sort_order'),
+  ])
+  const courseNames = Object.fromEntries((coursesResult.data || []).map(item => [item.id, item.title]))
+  const materialByLesson = (materialsResult.data || []).reduce((grouped, item) => {
+    const key = item.lesson_id || 'extras'
+    grouped[key] = [...(grouped[key] || []), item]
+    return grouped
+  }, {})
+  const catalog = (lessonsResult.data || []).map(lesson => ({
+    course: courseNames[lesson.course_id],
+    lesson: lesson.title,
+    summary: lesson.description || 'Sem resumo cadastrado.',
+    materials: (materialByLesson[lesson.id] || []).map(item => item.title),
+  }))
+  return { courseIds, catalog: compact(catalog, 11000) }
+}
 function brazilDateParts() {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -111,7 +153,6 @@ function formatBrazilDate(value, includeTime = false) {
     ...(includeTime ? { timeStyle: 'short' } : {}),
   }).format(date)
 }
-
 async function loadLiveContext(supabase, user, contents) {
   const dates = brazilDateParts()
   const canGoals = user.email === ADMIN_EMAIL || contents.includes('team_goals')
@@ -229,23 +270,37 @@ export async function POST(request) {
     if (!process.env.OPENAI_API_KEY) return privateJson({ error: 'A Assistente ainda não foi configurada. Abra um chamado no Suporte.' }, 503)
 
     const categories = allowedKnowledgeCategories(access.contents)
+    const courseKnowledge = await loadAccessibleCourseKnowledge(supabase, user, access)
     const [embedding] = await createEmbeddings([latestQuestion])
-    const [matchesResult, liveContext] = await Promise.all([
+    const [matchesResult, courseMatchesResult, liveContext] = await Promise.all([
       supabase.rpc('match_assistant_knowledge', {
         query_embedding: embedding,
         allowed_categories: categories,
         match_count: 6,
         match_threshold: 0.28,
       }),
+      courseKnowledge.courseIds.length ? supabase.rpc('match_assistant_course_knowledge', {
+        query_embedding: embedding,
+        allowed_course_ids: courseKnowledge.courseIds,
+        match_count: 6,
+        match_threshold: 0.24,
+      }) : Promise.resolve({ data: [], error: null }),
       loadLiveContext(supabase, user, access.contents),
     ])
     if (matchesResult.error) throw matchesResult.error
+    if (courseMatchesResult.error) throw courseMatchesResult.error
 
     const matches = matchesResult.data || []
-    const sources = [...new Map(matches.map(item => [item.document_id, { id: item.document_id, title: item.title, category: item.category }])).values()]
-    const knowledge = matches.length
-      ? matches.map((item, index) => `[FONTE ${index + 1}: ${item.title}]\n${item.content}`).join('\n\n')
-      : 'Nenhum trecho específico da base foi encontrado para esta pergunta.'
+    const courseMatches = courseMatchesResult.data || []
+    const sources = [...new Map([
+      ...matches.map(item => [item.document_id, { id: item.document_id, title: item.title, category: item.category }]),
+      ...courseMatches.map(item => [`course:${item.course_id}:${item.lesson_id || item.material_id}`, { id: `course:${item.course_id}`, title: item.title, category: 'aulas' }]),
+    ]).values()]
+    const knowledgeParts = [
+      ...matches.map((item, index) => `[FONTE ${index + 1}: ${item.title}]\n${item.content}`),
+      ...courseMatches.map((item, index) => `[AULA/PDF ${index + 1}: ${item.title}]\n${item.content}`),
+    ]
+    const knowledge = knowledgeParts.length ? knowledgeParts.join('\n\n') : 'Nenhum trecho específico da base foi encontrado para esta pergunta.'
 
     const instructions = `Você é a Assistente da Rotina da Loja Milionária, treinada no método da Suzana para apoiar donas de lojas de moda.
 Responda sempre e exclusivamente em português do Brasil, de forma acolhedora, simples e prática. Comece pela resposta, depois dê no máximo 3 passos claros.
@@ -263,7 +318,10 @@ DADOS ATUAIS DA LOJA:
 ${liveContext.text}
 
 BASE DA SUZANA:
-${knowledge}`
+${knowledge}
+
+AULAS E RESUMOS LIBERADOS NESTE PLANO:
+${courseKnowledge.catalog}`
 
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -286,7 +344,7 @@ ${knowledge}`
       question: latestQuestion,
       answer,
       sources,
-      used_knowledge: matches.length > 0 || liveContext.hasRelevantData,
+      used_knowledge: matches.length > 0 || courseMatches.length > 0 || courseKnowledge.courseIds.length > 0 || liveContext.hasRelevantData,
     })
 
     return privateJson({ answer, sources, actions })

@@ -4,6 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
+const coursesCache = new Map()
+const CACHE_MS = 3 * 60 * 1000
+
 export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = null, onBack = null }) {
   const router = useRouter()
   const [cursos, setCursos] = useState([])
@@ -24,6 +27,17 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
         return
       }
 
+      const cached = coursesCache.get(user.id)
+      if (cached && Date.now() - cached.savedAt < CACHE_MS) {
+        if (ativo) {
+          setCursos(cached.cursos)
+          setCarrosseis(cached.carrosseis)
+          setProgresso(cached.progresso)
+          setCarregando(false)
+        }
+        return
+      }
+
       const agora = new Date().toISOString()
       const ehAdmin = user.email === 'suporte@suzanazatorre.com.br'
       const cursosQuery = ehAdmin
@@ -41,10 +55,12 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
         .filter(curso => curso?.is_published && !curso?.is_mentorship)
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
-      if (ativo && carrosseisResult.status === 'fulfilled' && carrosseisResult.value.ok) {
-        setCarrosseis(carrosseisResult.value.dados.carrosseis || [])
-      }
+      const carouselData = carrosseisResult.status === 'fulfilled' && carrosseisResult.value.ok
+        ? carrosseisResult.value.dados.carrosseis || []
+        : []
+      if (ativo) setCarrosseis(carouselData)
 
+      let progressMap = {}
       if (liberados.length) {
         const ids = liberados.map(curso => curso.id)
         const [{ data: aulas }, { data: concluidas }] = await Promise.all([
@@ -58,8 +74,10 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
           const feitas = lista.filter(aula => concluidasIds.has(aula.id)).length
           mapa[id] = { total: lista.length, feitas, percentual: lista.length ? Math.round((feitas / lista.length) * 100) : 0 }
         })
-        if (ativo) setProgresso(mapa)
+        progressMap = mapa
+        if (ativo) setProgresso(progressMap)
       }
+      coursesCache.set(user.id, { cursos: liberados, carrosseis: carouselData, progresso: progressMap, savedAt: Date.now() })
       if (ativo) { setCursos(liberados); setCarregando(false) }
     }
     carregar()
@@ -102,9 +120,9 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
           {secao.courses.map(curso => {
             const p = progresso[curso.id] || { total: 0, feitas: 0, percentual: 0 }
             return (
-              <article key={curso.id} onClick={() => router.push(`/curso/${curso.slug}`)} style={{ width: '220px', flex: '0 0 220px', scrollSnapAlign: 'start', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
+              <article key={curso.id} onPointerEnter={() => router.prefetch(`/curso/${curso.slug}`)} onFocus={() => router.prefetch(`/curso/${curso.slug}`)} onClick={() => router.push(`/curso/${curso.slug}`)} style={{ width: '220px', flex: '0 0 220px', scrollSnapAlign: 'start', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', overflow: 'hidden', cursor: 'pointer' }}>
                 <div style={{ position: 'relative', aspectRatio: '2/3', background: cores.card2, overflow: 'hidden' }}>
-                  {curso.cover_image_url ? <img src={curso.cover_image_url} alt={`Capa do curso ${curso.title}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: '38px' }}>🎓</div>}
+                  {curso.cover_image_url ? <img src={curso.cover_image_url} alt={`Capa do curso ${curso.title}`} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', fontSize: '38px' }}>🎓</div>}
                   <span aria-hidden="true" style={{ position: 'absolute', top: 16, right: 16, width: 38, height: 38, display: 'grid', placeItems: 'center', borderRadius: '50%', color: '#fff', background: 'rgba(20,20,20,.78)', border: '1px solid rgba(255,255,255,.24)', backdropFilter: 'blur(6px)', fontSize: 15 }}>▷</span>
                 </div>
                 <div style={{ padding: '16px' }}>

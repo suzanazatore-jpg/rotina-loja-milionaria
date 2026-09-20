@@ -3,6 +3,7 @@
 import { use, useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { registerContentAccess } from '@/lib/contentAccess'
 
 const OURO = '#D4AF37'
 const GRADIENTE = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
@@ -91,6 +92,22 @@ export default function Curso({ params }) {
   const indiceAtual = aulas.findIndex(aula => aula.id === aulaAtual?.id)
   const materiaisAula = materiais.filter(item => item.lesson_id === aulaAtual?.id)
   const percentual = aulas.length ? Math.round((concluidas.size / aulas.length) * 100) : 0
+
+  useEffect(() => {
+    if (!curso?.id || !usuario?.id) return
+    void registerContentAccess({ event_type: 'course_open', content_type: 'course', content_id: curso.id, content_title: curso.title })
+  }, [curso?.id, curso?.title, usuario?.id])
+
+  useEffect(() => {
+    if (!aulaAtual?.id || !usuario?.id) return
+    void registerContentAccess({
+      event_type: 'lesson_open',
+      content_type: 'lesson',
+      content_id: aulaAtual.id,
+      content_title: aulaAtual.title,
+      metadata: { course_id: curso?.id, course_title: curso?.title },
+    })
+  }, [aulaAtual?.id, aulaAtual?.title, curso?.id, curso?.title, usuario?.id])
 
   function escolherAula(id) {
     setAulaId(id)

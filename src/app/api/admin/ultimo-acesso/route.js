@@ -3,22 +3,20 @@ import { NextResponse } from 'next/server'
 
 // ⚠️ Esta rota roda SOMENTE no servidor.
 // A service_role key NUNCA deve ser exposta ao navegador.
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-)
+function serverClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false } },
+  )
+}
 
 // ════════ E-MAIL DO ADMIN ════════
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 
 export async function POST(request) {
   try {
+    const supabaseAdmin = serverClient()
     // 1. Verificar se quem está chamando é o admin autenticado
     const authHeader = request.headers.get('authorization')
     const token = authHeader?.replace('Bearer ', '')
@@ -58,6 +56,16 @@ export async function POST(request) {
       if (usuarios.length < porPagina) break
       pagina += 1
       if (pagina > 20) break // rede de segurança contra loop infinito
+    }
+
+    const { data: atividades } = await supabaseAdmin
+      .from('app_content_access_events')
+      .select('user_id,created_at')
+      .order('created_at', { ascending: false })
+
+    for (const atividade of atividades || []) {
+      const atual = acessos[atividade.user_id]
+      if (!atual || new Date(atividade.created_at) > new Date(atual)) acessos[atividade.user_id] = atividade.created_at
     }
 
     return NextResponse.json({ acessos, cadastros })
