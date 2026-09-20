@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { getVapidPublicKey, sendPushNotification } from '@/lib/pushNotifications'
+import { planoDoDia } from '@/lib/dailyPlan'
 
 const PAGE_SIZE = 500
 const BATCH_SIZE = 20
@@ -153,7 +154,7 @@ async function loadTodayRoutine(supabase, today) {
     .eq('semana_inicio', context.monday)
     .maybeSingle()
   if (error) throw error
-  const plan = data?.plano_dias?.[context.dayKey]
+  const plan = data?.plano_dias ? planoDoDia(data.plano_dias, new Date(`${context.taskDate}T12:00:00Z`)) : null
   const tasks = Array.isArray(plan?.tarefas)
     ? plan.tarefas.filter(task => task?.id && String(task.titulo || '').trim())
     : []

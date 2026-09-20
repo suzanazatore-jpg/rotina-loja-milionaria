@@ -15,6 +15,22 @@ function intervaloMes(mes) {
   const ultimoDia = new Date(Date.UTC(ano, numeroMes, 0)).getUTCDate()
   return { inicio: `${mes}-01`, fim: `${mes}-${String(ultimoDia).padStart(2, '0')}` }
 }
+function semanasDoMes(mes) {
+  const { inicio, fim } = intervaloMes(mes)
+  const primeira = new Date(`${inicio}T12:00:00Z`)
+  const dia = primeira.getUTCDay()
+  primeira.setUTCDate(primeira.getUTCDate() - (dia === 0 ? 6 : dia - 1))
+  const semanas = []
+  while (primeira.toISOString().slice(0, 10) <= fim) {
+    semanas.push(primeira.toISOString().slice(0, 10))
+    primeira.setUTCDate(primeira.getUTCDate() + 7)
+  }
+  return semanas
+}
+function intervaloRotinasDoMes(mes) {
+  const semanas = semanasDoMes(mes)
+  return { inicio: semanas[0], fim: semanas[semanas.length - 1], semanas }
+}
 async function comLinks(supabase, itens) { return Promise.all((itens || []).map(async item => { if (item.storage_bucket === BUCKET && item.arquivo_nome) { const { data } = await supabase.storage.from(BUCKET).createSignedUrl(item.arquivo_nome, 3600); return { ...item, arquivo_url: data?.signedUrl || null } } return item })) }
 async function removerArquivoSemReferencia(supabase, bucket, caminho) {
   if (!caminho || !bucket) return
@@ -37,6 +53,37 @@ export async function GET(request) {
 export async function POST(request) {
   const supabase = adminClient(); if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
   try {
+    if (request.headers.get('content-type')?.includes('application/json')) {
+      const corpo = await request.json()
+      if (corpo.operacao !== 'publicar_mes') throw new Error('Operação inválida.')
+      const mes = String(corpo.mes_ano || '')
+      if (!mesValido(mes)) throw new Error('Escolha um mês válido.')
+      const titulo = String(corpo.titulo || '').trim() || 'Rotina comercial do mês'
+      const descricao = String(corpo.descricao || '').trim() || null
+      const planoDias = lerPlanoDias(corpo.plano_dias)
+      planoDias._modelo = { ...(planoDias._modelo || {}), versao: 2, mes_ano: mes }
+      const { inicio, fim, semanas } = intervaloRotinasDoMes(mes)
+      const { data: existentes, error: buscaError } = await supabase.from('rotinas').select('*').gte('semana_inicio', inicio).lte('semana_inicio', fim).order('id')
+      if (buscaError) throw buscaError
+      const porSemana = new Map((existentes || []).map(item => [item.semana_inicio, item]))
+      const referencia = (existentes || []).find(item => item.arquivo_nome)
+      let criadas = 0; let atualizadas = 0
+      for (const semanaInicio of semanas) {
+        const existente = porSemana.get(semanaInicio)
+        const registro = {
+          ordem: 1, semana_inicio: semanaInicio, titulo, descricao, plano_dias: planoDias,
+          arquivo_url: null,
+          arquivo_nome: existente?.arquivo_nome || referencia?.arquivo_nome || null,
+          storage_bucket: existente?.storage_bucket || referencia?.storage_bucket || BUCKET,
+        }
+        const resultado = existente
+          ? await supabase.from('rotinas').update(registro).eq('id', existente.id)
+          : await supabase.from('rotinas').insert(registro)
+        if (resultado.error) throw resultado.error
+        if (existente) atualizadas += 1; else criadas += 1
+      }
+      return NextResponse.json({ success: true, mes_ano: mes, total: semanas.length, criadas, atualizadas }, { status: 201 })
+    }
     const form = await request.formData(); const arquivo = form.get('arquivo'); const semanaInicio = String(form.get('semana_inicio') || ''); const titulo = String(form.get('titulo') || '').trim() || 'Rotina da semana'; const descricao = String(form.get('descricao') || '').trim() || null; const planoDias = lerPlanoDias(form.get('plano_dias'))
     if (!semanaValida(semanaInicio)) throw new Error('Escolha uma segunda-feira válida.')
     const temArquivo = Boolean(arquivo && typeof arquivo.arrayBuffer === 'function' && arquivo.size > 0)
@@ -44,7 +91,7 @@ export async function POST(request) {
     if (temArquivo && arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
     const { data: existente } = await supabase.from('rotinas').select('*').eq('semana_inicio', semanaInicio).maybeSingle()
     const mes = semanaInicio.slice(0, 7)
-    const { inicio, fim } = intervaloMes(mes)
+    const { inicio, fim } = intervaloRotinasDoMes(mes)
     let referenciaMensal = null
     if (!temArquivo && !existente?.arquivo_nome) {
       const { data } = await supabase.from('rotinas').select('arquivo_nome,storage_bucket').gte('semana_inicio', inicio).lte('semana_inicio', fim).not('arquivo_nome', 'is', null).limit(1).maybeSingle()
@@ -77,7 +124,7 @@ export async function PATCH(request) {
     if (arquivo.type !== 'application/pdf') throw new Error('Envie somente arquivo PDF.')
     if (arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
 
-    const { inicio, fim } = intervaloMes(mes)
+    const { inicio, fim } = intervaloRotinasDoMes(mes)
     const { data: rotinas, error: buscaError } = await supabase.from('rotinas').select('id,arquivo_nome,storage_bucket').gte('semana_inicio', inicio).lte('semana_inicio', fim)
     if (buscaError) throw buscaError
     if (!rotinas?.length) throw new Error('Crie pelo menos uma rotina semanal neste mês antes de enviar o PDF mensal.')
@@ -115,7 +162,7 @@ export async function PUT(request) {
 
     const atualizacao = { semana_inicio: semanaInicio, titulo, descricao }
     if (itemAtual.semana_inicio?.slice(0, 7) !== semanaInicio.slice(0, 7)) {
-      const { inicio, fim } = intervaloMes(semanaInicio.slice(0, 7))
+      const { inicio, fim } = intervaloRotinasDoMes(semanaInicio.slice(0, 7))
       const { data: referenciaMensal } = await supabase.from('rotinas').select('arquivo_nome,storage_bucket').neq('id', id).gte('semana_inicio', inicio).lte('semana_inicio', fim).not('arquivo_nome', 'is', null).limit(1).maybeSingle()
       atualizacao.arquivo_url = null
       atualizacao.arquivo_nome = referenciaMensal?.arquivo_nome || null

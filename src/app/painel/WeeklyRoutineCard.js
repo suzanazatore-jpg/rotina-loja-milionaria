@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AppIcon from '@/app/components/AppIcon'
-import { DIAS_PLANO, normalizarPlanoDias } from '@/lib/dailyPlan'
+import { DIAS_PLANO, modeloDaRotina, normalizarPlanoDias } from '@/lib/dailyPlan'
 import { supabase } from '@/lib/supabase'
 
 function dataLocal(data) {
@@ -34,7 +34,12 @@ function chaveInicial(inicio) {
 
 export default function WeeklyRoutineCard({ item, userId, cores, ouro, ouroGrad, onDownload }) {
   const plano = useMemo(() => normalizarPlanoDias(item?.plano_dias), [item?.plano_dias])
-  const [diaAtivo, setDiaAtivo] = useState(() => chaveInicial(item.semana_inicio))
+  const modelo = useMemo(() => modeloDaRotina(plano), [plano])
+  const diasAtivos = useMemo(() => modelo ? DIAS_PLANO.filter(dia => modelo.dias_ativos.includes(dia.key)) : DIAS_PLANO, [modelo])
+  const [diaAtivo, setDiaAtivo] = useState(() => {
+    const inicial = chaveInicial(item.semana_inicio)
+    return modelo?.dias_ativos?.includes(inicial) ? inicial : (modelo?.dias_ativos?.[0] || inicial)
+  })
   const [concluidas, setConcluidas] = useState(() => new Set())
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState('')
@@ -86,13 +91,41 @@ export default function WeeklyRoutineCard({ item, userId, cores, ouro, ouroGrad,
     setSalvando('')
   }
 
-  const todasTarefas = DIAS_PLANO.flatMap(dia => (plano[dia.key]?.tarefas || []).filter(tarefa => tarefa.titulo).map(tarefa => ({ ...tarefa, dia: dia.key })))
+  function tarefasDoDia(chave) {
+    const especificas = (plano[chave]?.tarefas || []).filter(tarefa => tarefa.titulo)
+    if (!modelo) return especificas
+    return [
+      ...modelo.tarefas_diarias,
+      ...modelo.tarefas_semanais.filter(tarefa => tarefa.dia === chave),
+      ...especificas,
+      ...(plano[chave]?.destaque ? [plano[chave].destaque] : []),
+    ]
+  }
+
+  const todasTarefas = diasAtivos.flatMap(dia => tarefasDoDia(dia.key).map(tarefa => ({ ...tarefa, dia: dia.key })))
   const totalConcluidas = todasTarefas.filter(tarefa => concluidas.has(`${dataDaSemana(item.semana_inicio, tarefa.dia)}|${tarefa.id}`)).length
   const percentual = todasTarefas.length ? Math.round(totalConcluidas / todasTarefas.length * 100) : 0
-  const dia = DIAS_PLANO.find(opcao => opcao.key === diaAtivo) || DIAS_PLANO[0]
+  const dia = DIAS_PLANO.find(opcao => opcao.key === diaAtivo) || diasAtivos[0] || DIAS_PLANO[0]
   const planoAtivo = plano[diaAtivo]
   const dataAtiva = dataDaSemana(item.semana_inicio, diaAtivo)
+  const tarefasDiarias = modelo?.tarefas_diarias || []
+  const tarefasSemanais = modelo?.tarefas_semanais?.filter(tarefa => tarefa.dia === diaAtivo) || []
   const tarefasAtivas = (planoAtivo?.tarefas || []).filter(tarefa => tarefa.titulo)
+  const destaque = modelo ? planoAtivo?.destaque : null
+
+  function renderListaTarefas(tarefas) {
+    return <div className="routine-week-tasks" aria-busy={carregando}>{tarefas.map(tarefa => {
+      const chave = `${dataAtiva}|${tarefa.id}`
+      const concluida = concluidas.has(chave)
+      const descricao = String(tarefa.descricao || '').replace('{meta_diaria}', 'consulte sua meta de hoje')
+      return <button key={tarefa.id} type="button" className={concluida ? 'is-done' : ''} onClick={() => alternar(tarefa)} disabled={carregando || Boolean(salvando)} aria-pressed={concluida}>
+        <span className="routine-task-check">{concluida ? '✓' : ''}</span>
+        <i><AppIcon name={tarefa.icone} size={19} /></i>
+        <span><strong>{tarefa.titulo}</strong><small>{descricao}</small></span>
+        <b>{salvando === chave ? '...' : concluida ? 'Feita' : 'Marcar'}</b>
+      </button>
+    })}</div>
+  }
 
   return <article className="routine-week-card" style={{ '--routine-card': cores.card, '--routine-card-2': cores.card2, '--routine-border': cores.borda, '--routine-text': cores.tx, '--routine-muted': cores.tx2, '--routine-gold': ouro }}>
     <header className="routine-week-header">
@@ -106,8 +139,8 @@ export default function WeeklyRoutineCard({ item, userId, cores, ouro, ouroGrad,
     </section>
 
     <nav className="routine-week-days" aria-label="Dias da rotina">
-      {DIAS_PLANO.map(opcao => {
-        const tarefas = (plano[opcao.key]?.tarefas || []).filter(tarefa => tarefa.titulo)
+      {diasAtivos.map(opcao => {
+        const tarefas = tarefasDoDia(opcao.key)
         const feitas = tarefas.filter(tarefa => concluidas.has(`${dataDaSemana(item.semana_inicio, opcao.key)}|${tarefa.id}`)).length
         return <button key={opcao.key} type="button" className={diaAtivo === opcao.key ? 'is-active' : ''} onClick={() => setDiaAtivo(opcao.key)}><strong>{opcao.curto}</strong><small>{dataCurta(dataDaSemana(item.semana_inicio, opcao.key))}</small><span>{feitas}/{tarefas.length}</span></button>
       })}
@@ -119,22 +152,16 @@ export default function WeeklyRoutineCard({ item, userId, cores, ouro, ouroGrad,
       <p>{planoAtivo?.foco_descricao}</p>
     </section>
 
-    <div className="routine-week-tasks" aria-busy={carregando}>
-      {tarefasAtivas.map(tarefa => {
-        const chave = `${dataAtiva}|${tarefa.id}`
-        const concluida = concluidas.has(chave)
-        const descricao = String(tarefa.descricao || '').replace('{meta_diaria}', 'consulte sua meta de hoje')
-        return <button key={tarefa.id} type="button" className={concluida ? 'is-done' : ''} onClick={() => alternar(tarefa)} disabled={carregando || Boolean(salvando)} aria-pressed={concluida}>
-          <span className="routine-task-check">{concluida ? '✓' : ''}</span>
-          <i><AppIcon name={tarefa.icone} size={19} /></i>
-          <span><strong>{tarefa.titulo}</strong><small>{descricao}</small></span>
-          <b>{salvando === chave ? '...' : concluida ? 'Feita' : 'Marcar'}</b>
-        </button>
-      })}
-    </div>
+    {destaque && <section className="routine-special-mission"><div><small>MISSÃO ESPECIAL DA SUZANA</small><h4>{destaque.titulo}</h4><p>{destaque.descricao}</p></div>{renderListaTarefas([destaque])}</section>}
+
+    {modelo && tarefasDiarias.length > 0 && <section className="routine-task-section"><div className="routine-task-section-title"><strong>Todos os dias</strong><small>Ações essenciais para manter a loja em movimento.</small></div>{renderListaTarefas(tarefasDiarias)}</section>}
+    {modelo && tarefasSemanais.length > 0 && <section className="routine-task-section"><div className="routine-task-section-title"><strong>Ação da semana</strong><small>Faça uma vez no dia indicado.</small></div>{renderListaTarefas(tarefasSemanais)}</section>}
+    {tarefasAtivas.length > 0 && <section className="routine-task-section"><div className="routine-task-section-title"><strong>{modelo ? `Foco de ${dia.nome.toLowerCase()}` : 'Ações do dia'}</strong><small>{modelo ? 'Tarefas próprias deste dia.' : 'Marque cada ação conforme executar.'}</small></div>{renderListaTarefas(tarefasAtivas)}</section>}
+
+    {modelo?.padrao_atendimento?.length > 0 && <details className="routine-service-standard"><summary>A cada atendimento <span>{modelo.padrao_atendimento.length} orientações</span></summary><p>Use este padrão sempre que atender uma cliente. Estas orientações não entram na contagem diária.</p><ul>{modelo.padrao_atendimento.map(item => <li key={item.id}><AppIcon name={item.icone} size={18} /><span><strong>{item.titulo}</strong>{item.descricao && <small>{item.descricao}</small>}</span></li>)}</ul></details>}
 
     {erro && <p className="routine-week-error" role="alert">{erro}</p>}
-    <aside className="routine-week-tip"><AppIcon name="assistant" size={20} /><div><strong>Orientação da Suzana</strong><p>{planoAtivo?.orientacao}</p></div></aside>
+    {planoAtivo?.orientacao && <aside className="routine-week-tip"><AppIcon name="assistant" size={20} /><div><strong>Orientação da Suzana</strong><p>{planoAtivo.orientacao}</p></div></aside>}
 
     {item.arquivo_url && <footer><a href={item.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF completo do mês</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar PDF mensal</button></footer>}
   </article>

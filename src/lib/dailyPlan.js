@@ -43,6 +43,41 @@ function texto(valor, limite) {
   return String(valor || '').trim().slice(0, limite)
 }
 
+function normalizarTarefa(tarefa, id, fallback = {}) {
+  const recebida = tarefa && typeof tarefa === 'object' ? tarefa : {}
+  return {
+    id: texto(recebida.id, 80) || id,
+    icone: ICONES_PERMITIDOS.has(recebida.icone) ? recebida.icone : (fallback.icone || 'routine'),
+    titulo: texto(recebida.titulo, 120) || fallback.titulo || '',
+    descricao: texto(recebida.descricao, 220) || fallback.descricao || '',
+  }
+}
+
+function normalizarLista(lista, prefixo, limite = 20) {
+  if (!Array.isArray(lista)) return []
+  return lista.slice(0, limite).map((tarefa, indice) => normalizarTarefa(tarefa, `${prefixo}-${indice + 1}`)).filter(tarefa => tarefa.titulo)
+}
+
+export function modeloDaRotina(valor) {
+  const recebido = valor && typeof valor === 'object' && !Array.isArray(valor) ? valor : {}
+  const modelo = recebido._modelo
+  if (!modelo || typeof modelo !== 'object' || Number(modelo.versao || 0) < 2) return null
+  const diasAtivos = Array.isArray(modelo.dias_ativos)
+    ? modelo.dias_ativos.map(String).filter(chave => DIAS_PLANO.some(dia => dia.key === chave))
+    : ['1', '2', '3', '4', '5']
+  return {
+    versao: 2,
+    mes_ano: /^\d{4}-\d{2}$/.test(String(modelo.mes_ano || '')) ? modelo.mes_ano : '',
+    dias_ativos: diasAtivos.length ? [...new Set(diasAtivos)] : ['1', '2', '3', '4', '5'],
+    tarefas_diarias: normalizarLista(modelo.tarefas_diarias, 'diaria', 20),
+    padrao_atendimento: normalizarLista(modelo.padrao_atendimento, 'atendimento', 20),
+    tarefas_semanais: normalizarLista(modelo.tarefas_semanais, 'semanal', 12).map((tarefa, indice) => ({
+      ...tarefa,
+      dia: DIAS_PLANO.some(dia => dia.key === String(modelo.tarefas_semanais?.[indice]?.dia)) ? String(modelo.tarefas_semanais[indice].dia) : '1',
+    })),
+  }
+}
+
 function planoPadraoDoDia(chave) {
   const foco = FOCOS_PADRAO[chave] || FOCOS_PADRAO['1']
   return {
@@ -62,31 +97,38 @@ export function criarPlanoDiarioPadrao() {
 
 export function normalizarPlanoDias(valor, { preencherPadrao = true } = {}) {
   const recebido = valor && typeof valor === 'object' && !Array.isArray(valor) ? valor : {}
+  const modelo = modeloDaRotina(recebido)
   const base = preencherPadrao ? criarPlanoDiarioPadrao() : {}
+
+  if (modelo) base._modelo = modelo
 
   for (const dia of DIAS_PLANO) {
     const atual = recebido[dia.key]
     if (!atual || typeof atual !== 'object' || Array.isArray(atual)) continue
 
     const padrao = planoPadraoDoDia(dia.key)
-    const tarefasRecebidas = Array.isArray(atual.tarefas) ? atual.tarefas.slice(0, 7) : []
-    const tarefas = Array.from({ length: 7 }, (_, indice) => {
+    const tarefasRecebidas = Array.isArray(atual.tarefas) ? atual.tarefas.slice(0, modelo ? 20 : 7) : []
+    const quantidade = modelo ? tarefasRecebidas.length : 7
+    const tarefas = Array.from({ length: quantidade }, (_, indice) => {
       const tarefa = tarefasRecebidas[indice] || {}
-      const fallback = padrao.tarefas[indice]
-      const icone = ICONES_PERMITIDOS.has(tarefa.icone) ? tarefa.icone : fallback.icone
-      return {
-        id: `${dia.key}-${indice + 1}`,
-        icone,
-        titulo: texto(tarefa.titulo, 100) || (preencherPadrao ? fallback.titulo : ''),
-        descricao: texto(tarefa.descricao, 160) || (preencherPadrao ? fallback.descricao : ''),
-      }
+      const fallback = padrao.tarefas[indice] || {}
+      return normalizarTarefa(tarefa, `${dia.key}-${indice + 1}`, preencherPadrao && !modelo ? fallback : {})
     })
 
+    const destaqueRecebido = atual.destaque && typeof atual.destaque === 'object' ? atual.destaque : null
+    const destaque = destaqueRecebido && texto(destaqueRecebido.titulo, 120) ? {
+      id: texto(destaqueRecebido.id, 80) || `especial-${dia.key}`,
+      icone: ICONES_PERMITIDOS.has(destaqueRecebido.icone) ? destaqueRecebido.icone : 'campaigns',
+      titulo: texto(destaqueRecebido.titulo, 120),
+      descricao: texto(destaqueRecebido.descricao, 320),
+    } : null
+
     base[dia.key] = {
-      foco_titulo: texto(atual.foco_titulo, 120) || (preencherPadrao ? padrao.foco_titulo : ''),
-      foco_descricao: texto(atual.foco_descricao, 280) || (preencherPadrao ? padrao.foco_descricao : ''),
-      orientacao: texto(atual.orientacao, 280) || (preencherPadrao ? padrao.orientacao : ''),
+      foco_titulo: texto(atual.foco_titulo, 120) || (preencherPadrao && !modelo ? padrao.foco_titulo : ''),
+      foco_descricao: texto(atual.foco_descricao, 280) || (preencherPadrao && !modelo ? padrao.foco_descricao : ''),
+      orientacao: texto(atual.orientacao, 280) || (preencherPadrao && !modelo ? padrao.orientacao : ''),
       tarefas,
+      destaque,
     }
   }
 
@@ -95,5 +137,17 @@ export function normalizarPlanoDias(valor, { preencherPadrao = true } = {}) {
 
 export function planoDoDia(valor, data = new Date()) {
   const chave = String(data.getDay())
-  return normalizarPlanoDias(valor)[chave] || planoPadraoDoDia(chave)
+  const plano = normalizarPlanoDias(valor)
+  const dia = plano[chave] || planoPadraoDoDia(chave)
+  const modelo = plano._modelo
+  if (!modelo) return dia
+  return {
+    ...dia,
+    tarefas: [
+      ...modelo.tarefas_diarias,
+      ...modelo.tarefas_semanais.filter(tarefa => tarefa.dia === chave),
+      ...(dia.tarefas || []),
+      ...(dia.destaque ? [dia.destaque] : []),
+    ],
+  }
 }
