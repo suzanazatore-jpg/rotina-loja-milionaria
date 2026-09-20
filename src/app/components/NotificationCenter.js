@@ -159,7 +159,7 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
       )}
 
       <style>{`
-        .notification-center-anchor { position: fixed; top: 13px; right: 96px; z-index: 120; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+        .notification-center-anchor { position: absolute; top: 13px; right: 100px; z-index: 120; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
         .notification-bell { width: 36px; height: 36px; display: grid; place-items: center; position: relative; border: 1px solid; border-radius: 9px; cursor: pointer; }
         .notification-bell > span { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; display: grid; place-items: center; border-radius: 10px; background: #D4AF37; color: #17120A; border: 2px solid ${cores.card}; font-size: 9px; font-weight: 900; box-sizing: border-box; }
         .notification-panel { position: absolute; top: 44px; right: -82px; width: min(390px, calc(100vw - 24px)); max-height: min(620px, calc(100vh - 92px)); overflow: hidden; border: 1px solid; border-radius: 16px; box-shadow: 0 22px 60px rgba(0,0,0,.24); }
@@ -179,7 +179,7 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
         .notification-item > span small { font-size: 9px; }
         .notification-item > b { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; }
         @media (max-width: 720px) {
-          .notification-center-anchor { top: 12px; right: 94px; }
+          .notification-center-anchor { top: 17px; right: 116px; }
           .notification-panel { position: fixed; top: 58px; right: 12px; left: 12px; width: auto; }
         }
       `}</style>
