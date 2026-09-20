@@ -48,6 +48,7 @@ export default function AdminAssistantKnowledge() {
 
   async function enviar(event) {
     event.preventDefault()
+    const formElement = event.currentTarget
     if (!file && !content.trim()) {
       setErro(true)
       setMensagem('Escolha um arquivo ou cole um texto para ensinar a Assistente.')
@@ -73,7 +74,7 @@ export default function AdminAssistantKnowledge() {
       setTitle('')
       setContent('')
       setFile(null)
-      event.currentTarget.reset()
+      formElement.reset()
       setMensagem('✓ Material preparado. A Assistente já pode usar esse conteúdo.')
     } catch (error) {
       setErro(true)
