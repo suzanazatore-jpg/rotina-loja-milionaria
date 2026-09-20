@@ -818,7 +818,7 @@ export default function Painel() {
 
       {/* ═══════ MENU MOBILE (drawer) com MEUS DADOS ═══════ */}
       {menuMobile && (
-        <div onClick={() => setMenuMobile(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 100 }}>
+        <div onClick={() => setMenuMobile(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 200 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '280px', height: '100%', background: cores.card, padding: '0', overflowY: 'auto' }}>
             {/* Cabeçalho do menu com dados */}
             <div style={{ background: ouroGrad, padding: '20px 18px', color: '#0A0A0A' }}>
