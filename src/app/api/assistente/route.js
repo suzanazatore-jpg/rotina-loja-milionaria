@@ -152,13 +152,18 @@ async function loadLiveContext(supabase, user, contents) {
 }
 
 function actionForQuestion(question, contents) {
-  const normalized = question.toLocaleLowerCase('pt-BR')
-  if (/aulas? ao vivo|mentoria|mentorias|encontros? ao vivo|gravaç/.test(normalized) && contents.includes('mentorship')) return [{ label: 'Abrir Mentorias', section: 'mentoria' }]
-  if (/preç|precific|margem|lucro|markup/.test(normalized) && contents.includes('pricing')) return [{ label: 'Abrir Precificação', section: 'precificacao' }]
-  if (/meta|venda|fatur|ranking|equipe/.test(normalized) && contents.includes('team_goals')) return [{ label: 'Abrir Vendas e Metas', section: 'vendas' }]
-  if (/rotina|tarefa|hoje|agora/.test(normalized) && contents.includes('routine')) return [{ label: 'Abrir minha Rotina', section: 'rotina' }]
-  if (/campanha|oferta/.test(normalized) && contents.includes('campaigns')) return [{ label: 'Abrir Campanha', section: 'campanhas' }]
-  if (/calend|post|conteúdo|instagram/.test(normalized) && contents.includes('calendar')) return [{ label: 'Abrir Calendário', section: 'calendario' }]
+  const normalized = question
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('pt-BR')
+  const hasAccess = module => contents.includes(module)
+
+  if (/aulas? ao vivo|mentorias?|encontros? ao vivo|gravacoes?/.test(normalized) && hasAccess('mentorship')) return [{ label: 'Abrir Mentorias', section: 'mentoria' }]
+  if (/calendario|postagens?|planejamento de conteudo|conteudo do mes|instagram/.test(normalized) && hasAccess('calendar')) return [{ label: 'Abrir Calendário de Postagens', section: 'calendario' }]
+  if (/campanhas?|ofertas?|promocoes?|acoes? de vendas?/.test(normalized) && hasAccess('campaigns')) return [{ label: 'Abrir Campanhas', section: 'campanhas' }]
+  if (/preco|precificacao|precificar|margem|lucro|markup|custos?|descontos?/.test(normalized) && hasAccess('pricing')) return [{ label: 'Abrir Precificação', section: 'precificacao' }]
+  if (/metas?|vendas?|faturamento|ranking|equipe|lancar venda|resultados?/.test(normalized) && hasAccess('team_goals')) return [{ label: 'Abrir Vendas e Metas', section: 'vendas' }]
+  if (/rotina|tarefas?|hoje|agora/.test(normalized) && hasAccess('routine')) return [{ label: 'Abrir minha Rotina', section: 'rotina' }]
   return []
 }
 
