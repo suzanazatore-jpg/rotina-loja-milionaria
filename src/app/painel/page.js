@@ -662,6 +662,13 @@ export default function Painel() {
                     <p style={{ fontSize: '12px', color: cores.tx3, margin: '10px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
                       Esses dados são gerenciados pela administração. Para alterar, fale com o suporte. 💬
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => irPara('suporte')}
+                      style={{ width: '100%', marginTop: '14px', padding: '12px 16px', background: ouroGrad, color: '#0A0A0A', border: 0, borderRadius: '10px', fontSize: '13px', fontWeight: 900, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                    >
+                      <AppIcon name="support" size={18} /> Abrir Suporte
+                    </button>
                   </div>
                 </div>
               )}
