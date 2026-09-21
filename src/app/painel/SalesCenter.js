@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import AppIcon from '@/app/components/AppIcon'
 import { planoDoDia } from '@/lib/dailyPlan'
 import { supabase } from '@/lib/supabase'
@@ -43,6 +43,8 @@ export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'paine
   const [saleValues, setSaleValues] = useState({}); const [ticketValues, setTicketValues] = useState({}); const [noteValues, setNoteValues] = useState({})
   const [newSalesperson, setNewSalesperson] = useState('')
   const [message, setMessage] = useState('')
+  const tabsRef = useRef(null)
+  const [tabsTemMais, setTabsTemMais] = useState(false)
   const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false)
   const inputStyle = { background: cores.card2, color: cores.tx, borderColor: cores.borda }
   const cardStyle = { background: cores.card, borderColor: cores.borda }
@@ -66,6 +68,23 @@ export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'paine
 
   useEffect(() => { load() }, [])
   useEffect(() => { setTab(initialTab) }, [initialTab])
+  useEffect(() => {
+    const element = tabsRef.current
+    if (!element) return undefined
+
+    const atualizar = () => {
+      const sobra = element.scrollWidth - element.clientWidth - element.scrollLeft
+      setTabsTemMais(sobra > 6)
+    }
+
+    atualizar()
+    element.addEventListener('scroll', atualizar, { passive: true })
+    window.addEventListener('resize', atualizar)
+    return () => {
+      element.removeEventListener('scroll', atualizar)
+      window.removeEventListener('resize', atualizar)
+    }
+  }, [])
   useEffect(() => { setGoal(goals.find(item => item.month_start === selectedMonth) || { monthly_target: 0, open_days: 26, weekday_weights: DEFAULT_WEIGHTS, closed_dates: [] }) }, [goals, selectedMonth])
   useEffect(() => {
     const amounts = {}; const tickets = {}; const notes = {}
@@ -140,7 +159,12 @@ export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'paine
   if (loading) return <p style={{ color: cores.tx2, textAlign: 'center', padding: 50 }}>Carregando metas e resultados...</p>
   return <div className="team-goals" style={{ '--tg-gold': ouro, '--tg-text': cores.tx, '--tg-muted': cores.tx2, '--tg-border': cores.borda, '--tg-card': cores.card, '--tg-card2': cores.card2 }}>
     <header className="tg-heading"><div><p>GESTÃO DE PERFORMANCE</p><h2>Calculadora de Metas</h2><span>Transforme a meta mensal em direção diária para toda a equipe.</span></div><label className="tg-month"><span>Período</span><input type="month" value={selectedMonth.slice(0, 7)} onChange={event => setSelectedMonth(`${event.target.value}-01`)} style={inputStyle} /></label></header>
-    <nav className="tg-tabs" style={{ background: cores.card2 }}>{[['painel', 'Visão geral'], ['meta', 'Configurar meta'], ['lancar', 'Lançar vendas'], ['ranking', 'Ranking'], ['historico', 'Histórico'], ['equipe', 'Equipe']].map(([id, label]) => <button key={id} onClick={() => setTab(id)} className={tab === id ? 'active' : ''} style={{ color: tab === id ? cores.tx : cores.tx2, background: tab === id ? cores.card : 'transparent' }}>{label}</button>)}</nav>
+    <div className="tg-tabs-shell">
+      <nav ref={tabsRef} className="tg-tabs" style={{ background: cores.card2 }}>
+        {[['painel', 'Visão geral'], ['meta', 'Configurar meta'], ['lancar', 'Lançar vendas'], ['ranking', 'Ranking'], ['historico', 'Histórico'], ['equipe', 'Equipe']].map(([id, label]) => <button key={id} onClick={event => { setTab(id); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }) }} className={tab === id ? 'active' : ''} style={{ color: tab === id ? cores.tx : cores.tx2, background: tab === id ? cores.card : 'transparent' }}>{label}</button>)}
+      </nav>
+      {tabsTemMais && <button type="button" className="tg-tabs-more" aria-label="Ver mais opções" onClick={() => tabsRef.current?.scrollBy({ left: 170, behavior: 'smooth' })}>›</button>}
+    </div>
     {message && <div className="tg-message" style={cardStyle}>{message}</div>}
     {tab === 'painel' && <>
       {selectedMonth === currentMonth && <section className="tg-today" style={cardStyle}>
