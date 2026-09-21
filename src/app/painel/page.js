@@ -810,13 +810,6 @@ export default function Painel() {
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
                   <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.routine?.title || 'Como executar a rotina da loja'} videoUrl={videosExplicativos.routine?.video_url} />
-                  <div style={{ position: 'relative', overflow: 'hidden', background: tema === 'escuro' ? 'linear-gradient(135deg,#17150d,#111 70%)' : 'linear-gradient(135deg,#fff7d5,#fff 70%)', border: `1px solid ${tema === 'escuro' ? '#554717' : '#ddc779'}`, borderRadius: '18px', padding: '23px', marginBottom: '18px' }}>
-                    <div style={{ position: 'absolute', right: '-15px', top: '-24px', fontSize: '105px', opacity: .055 }}>🔄</div>
-                    <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>EXECUÇÃO DA SEMANA</p>
-                    <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 6px', color: cores.tx }}>Rotina da Loja</h2>
-                    <p style={{ fontSize: '13px', color: cores.tx2, margin: 0, lineHeight: 1.55, maxWidth: '520px' }}>Ações objetivas para sua loja não depender do improviso e manter o time em movimento.</p>
-                    <div style={{ display: 'flex', gap: '7px', marginTop: '16px', flexWrap: 'wrap' }}>{['SEG','TER','QUA','QUI','SEX','SÁB','DOM'].map(dia => <span key={dia} style={{ border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, background: cores.card, color: ouro, borderRadius: '7px', padding: '6px 10px', fontSize: '10px', fontWeight: 900 }}>{dia}</span>)}</div>
-                  </div>
 
                   {conteudosCarregando ? <SectionLoading label="Carregando rotina da semana..." /> : !rotinaSemanal ? (
                     <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}>
