@@ -786,6 +786,17 @@
 .interactive-calendar-grid > div > button small { position: absolute; right: 4px; bottom: 4px; min-width: 17px; height: 17px; box-sizing: border-box; display: grid; place-items: center; border-radius: 999px; padding: 0 4px; font-size: 9px; font-weight: 900; }
 .interactive-calendar-grid > div > button.today b { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .interactive-calendar-grid > div > button.done { opacity: .78; }
+.interactive-calendar-continuation { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid; border-radius: 16px; padding: 14px; }
+.interactive-calendar-continuation > div:first-child small, .interactive-calendar-continuation > div:first-child strong, .interactive-calendar-continuation > div:first-child span { display: block; }
+.interactive-calendar-continuation > div:first-child small { font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.interactive-calendar-continuation > div:first-child strong { margin-top: 4px; font-size: 13px; }
+.interactive-calendar-continuation > div:first-child span { margin-top: 3px; font-size: 10px; }
+.interactive-calendar-continuation > div:last-child { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+.interactive-calendar-continuation button { min-width: 72px; border: 1px solid; border-radius: 11px; padding: 9px 10px; cursor: pointer; }
+.interactive-calendar-continuation button b, .interactive-calendar-continuation button small { display: block; }
+.interactive-calendar-continuation button b { font-size: 12px; }
+.interactive-calendar-continuation button small { margin-top: 3px; font-size: 9px; font-weight: 800; }
+.interactive-calendar-continuation button.done { opacity: .78; }
 .interactive-calendar-day-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding: 4px 2px 0; }
 .interactive-calendar-day-heading span { font-size: 12px; }
 .interactive-calendar-day { display: grid; gap: 10px; }
@@ -825,6 +836,9 @@
   .interactive-calendar-grid { padding: 8px; }
   .interactive-calendar-grid > header, .interactive-calendar-grid > div { gap: 2px; }
   .interactive-calendar-grid > div > span, .interactive-calendar-grid > div > button { min-height: 46px; }
+  .interactive-calendar-continuation { align-items: flex-start; flex-direction: column; }
+  .interactive-calendar-continuation > div:last-child { width: 100%; justify-content: flex-start; }
+  .interactive-calendar-continuation button { flex: 1; min-width: 88px; }
   .interactive-calendar-action > header, .interactive-calendar-action > footer, .interactive-calendar-pdf { align-items: flex-start; flex-direction: column; }
   .interactive-calendar-action > footer > div, .interactive-calendar-pdf > div:last-child { width: 100%; margin-left: 0; flex-wrap: wrap; }
   .interactive-calendar-action > footer button, .interactive-calendar-pdf a, .interactive-calendar-pdf button { flex: 1; text-align: center; }
