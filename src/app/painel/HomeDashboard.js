@@ -113,14 +113,9 @@ export default function HomeDashboard({
   const dataPorExtenso = capitalizar(new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(hoje))
   const mesAtual = capitalizar(new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(hoje))
   const atalhosRapidos = [
-    ['quickCalendar', 'Calendário', 'Conteúdo e ações do mês', 'calendario'],
-    ['quickCampaigns', 'Campanhas', 'Estratégias de venda', 'campanhas'],
-    ['quickRoutine', 'Rotina', 'Plano prático da semana', 'rotina'],
     ['quickCourses', 'Meus Cursos', 'Aulas liberadas', 'cursos'],
-    ...(metasLiberadas ? [['quickTeam', 'Vendas e Metas', 'Resultados da equipe', 'vendas']] : []),
-    ...(precificacaoLiberada ? [['content', 'Precificação e Lucro', 'Preço, margem e descontos', 'precificacao']] : []),
     ...(mentoriaLiberada ? [['quickCourses', 'Mentorias', 'Encontros e gravações', 'mentoria']] : []),
-    ...(assistenteLiberado ? [['quickAssistant', 'Assistente', 'Ajuda inteligente', 'assistente']] : []),
+    ...(precificacaoLiberada ? [['content', 'Precificação e Lucro', 'Preço, margem e descontos', 'precificacao']] : []),
   ]
 
   return <div className="premium-home premium-home-simple">
@@ -217,8 +212,11 @@ export default function HomeDashboard({
     </section>}
 
     <section className="premium-help-card premium-simple-support">
-      <div><small>SUPORTE</small><h2>Fale com o Suporte</h2><p>Envie sua dúvida e acompanhe a resposta da nossa equipe pelo aplicativo.</p></div>
-      <button type="button" onClick={() => irPara('suporte')}>Abrir suporte</button>
+      <div><small>SUPORTE</small><h2>Suporte e Assistente AI</h2><p>Envie sua dúvida para nossa equipe ou use o Assistente AI para uma orientação rápida dentro do aplicativo.</p></div>
+      <div className="premium-simple-support-actions">
+        <button type="button" onClick={() => irPara('suporte')}>Abrir suporte</button>
+        {assistenteLiberado && <button type="button" onClick={() => irPara('assistente')}>Assistente AI</button>}
+      </div>
     </section>
   </div>
 }
