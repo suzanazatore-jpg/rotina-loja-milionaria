@@ -583,6 +583,22 @@
 .campaign-progress-track i { display: block; height: 100%; border-radius: inherit; transition: width .25s ease; }
 .campaign-journey-progress p { margin: 9px 0 0; color: var(--journey-muted); font-size: 11px; }
 .campaign-journey-progress b { color: var(--journey-gold); }
+.campaign-journey-phases { display: grid; gap: 12px; padding: 14px; }
+.campaign-phase { overflow: hidden; border: 1px solid var(--journey-border); border-radius: 15px; background: var(--journey-card); }
+.campaign-phase.is-done { border-color: color-mix(in srgb, #3dbb79 45%, var(--journey-border)); }
+.campaign-phase-header { display: grid; grid-template-columns: 34px minmax(0,1fr) auto; align-items: start; gap: 11px; padding: 14px; background: color-mix(in srgb, var(--journey-gold) 5%, var(--journey-card)); border-bottom: 1px solid var(--journey-border); }
+.campaign-phase-number { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in srgb, var(--journey-gold) 15%, var(--journey-card)); color: var(--journey-gold); font-size: 12px; font-weight: 900; }
+.campaign-phase.is-done .campaign-phase-number { background: #58c98e; color: #082315; }
+.campaign-phase-header small { display: block; color: var(--journey-gold); font-size: 9px; font-weight: 900; letter-spacing: .08em; }
+.campaign-phase-header h4 { margin: 4px 0 3px; color: var(--journey-text); font-size: 15px; }
+.campaign-phase-header p { margin: 0; color: var(--journey-muted); font-size: 10px; line-height: 1.45; }
+.campaign-phase-header > b { color: var(--journey-gold); font-size: 10px; }
+.campaign-phase .campaign-journey-list { padding: 12px; }
+.campaign-phase-tip { display: flex; align-items: flex-start; gap: 9px; margin: 0 12px 12px; padding: 12px; border: 1px solid color-mix(in srgb, var(--journey-gold) 26%, var(--journey-border)); border-radius: 11px; background: color-mix(in srgb, var(--journey-gold) 7%, var(--journey-card)); color: var(--journey-gold); }
+.campaign-phase-tip p { margin: 0; }
+.campaign-phase-tip strong, .campaign-phase-tip span { display: block; }
+.campaign-phase-tip strong { color: var(--journey-text); font-size: 11px; }
+.campaign-phase-tip span { margin-top: 3px; color: var(--journey-muted); font-size: 10px; line-height: 1.45; }
 .campaign-journey-list { display: grid; gap: 8px; padding: 14px; }
 .campaign-journey-list > button { width: 100%; min-height: 66px; display: grid; grid-template-columns: 29px 36px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--journey-border); border-radius: 13px; background: var(--journey-card); color: var(--journey-text); text-align: left; font: inherit; cursor: pointer; transition: border-color .18s, background .18s, transform .18s; }
 .campaign-journey-list > button:hover { border-color: var(--journey-gold); transform: translateY(-1px); }
@@ -672,6 +688,8 @@
 @media (max-width: 560px) {
   .campaign-journey-header { align-items: flex-start; padding: 17px; }
   .campaign-journey-mark { width: 48px; height: 48px; flex-basis: 48px; }
+  .campaign-phase-header { grid-template-columns: 31px minmax(0,1fr) auto; padding: 12px; }
+  .campaign-journey-phases { padding: 11px; }
   .campaign-journey-list > button { grid-template-columns: 27px 1fr auto; }
   .campaign-journey-list button > i { display: none; }
   .campaign-step-action { max-width: 46px; text-align: right; }
