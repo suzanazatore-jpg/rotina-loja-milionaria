@@ -82,6 +82,7 @@ export default function InteractiveCalendar({ mesAno, actions = [], pdfItem, use
   const totalDias = new Date(ano, mes, 0).getDate()
   const dias = [...Array(primeiroDia).fill(null), ...Array.from({ length: totalDias }, (_, indice) => indice + 1)]
   const datasComAcoes = Object.keys(porData).sort()
+  const datasExtras = datasComAcoes.filter(data => !data.startsWith(`${mesAno}-`))
   const dataAtiva = porData[dataSelecionada] ? dataSelecionada : (porData[hoje] ? hoje : datasComAcoes[0] || `${mesAno}-01`)
   const selecionadas = porData[dataAtiva] || []
   const concluidas = actions.filter(acao => progresso[acao.id] === 'concluido').length
@@ -114,6 +115,16 @@ export default function InteractiveCalendar({ mesAno, actions = [], pdfItem, use
           return <button key={data} type="button" onClick={() => setDataSelecionada(data)} className={`${selecionado ? 'selected ' : ''}${data === hoje ? 'today ' : ''}${todasConcluidas ? 'done' : ''}`} style={{ color: cores.tx, borderColor: selecionado ? ouro : 'transparent', background: selecionado ? cores.card2 : 'transparent' }}><b>{dia}</b>{acoesDia.length > 0 && <small style={{ background: todasConcluidas ? '#55c99a' : ouro, color: '#101010' }}>{acoesDia.length}</small>}</button>
         })}</div>
       </section>
+
+      {datasExtras.length > 0 && <section className="interactive-calendar-continuation" style={{ borderColor: cores.borda, background: cores.card }}>
+        <div><small style={{ color: ouro }}>CONTINUAÇÃO DO PLANEJAMENTO</small><strong style={{ color: cores.tx }}>Primeiros dias do mês seguinte</strong><span style={{ color: cores.tx2 }}>Essas ações fazem parte deste mesmo calendário mensal.</span></div>
+        <div>{datasExtras.map(data => {
+          const acoesDia = porData[data] || []
+          const todasConcluidas = acoesDia.length > 0 && acoesDia.every(acao => progresso[acao.id] === 'concluido')
+          const selecionado = dataAtiva === data
+          return <button key={data} type="button" onClick={() => setDataSelecionada(data)} className={`${selecionado ? 'selected ' : ''}${todasConcluidas ? 'done' : ''}`} style={{ borderColor: selecionado ? ouro : cores.borda, background: selecionado ? cores.card2 : 'transparent', color: cores.tx }}><b>{dataBr(data).slice(0, 5)}</b><small style={{ color: todasConcluidas ? '#55c99a' : ouro }}>{acoesDia.length} {acoesDia.length === 1 ? 'ação' : 'ações'}</small></button>
+        })}</div>
+      </section>}
 
       <section className="interactive-calendar-day">
         <div className="interactive-calendar-day-heading"><div><small style={{ color: ouro }}>PLANO DO DIA</small><h3 style={{ color: cores.tx }}>{dataBr(dataAtiva)}</h3></div><span style={{ color: cores.tx2 }}>{selecionadas.length} {selecionadas.length === 1 ? 'ação' : 'ações'}</span></div>
