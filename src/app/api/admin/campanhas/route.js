@@ -34,6 +34,7 @@ export async function POST(request) {
   try {
     const form = await request.formData(); const arquivo = form.get('arquivo'); const mesAno = String(form.get('mes_ano') || ''); const titulo = String(form.get('titulo') || '').trim() || tituloPadrao(mesAno); const descricao = String(form.get('descricao') || '').trim() || null; const planoInterativo = normalizarPlanoCampanha(JSON.parse(String(form.get('plano_interativo') || '{}')))
     if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mesAno)) throw new Error('Selecione um mês válido.')
+    if (!planoInterativo.etapas?.length) throw new Error('Inclua pelo menos uma ação na jornada da campanha.')
     const temArquivo = arquivo && typeof arquivo.arrayBuffer === 'function' && arquivo.size > 0
     if (temArquivo && arquivo.type !== 'application/pdf') throw new Error('Envie somente arquivo PDF.')
     if (temArquivo && arquivo.size > MAX_FILE_SIZE) throw new Error('O PDF deve ter no máximo 20 MB.')
@@ -112,7 +113,9 @@ export async function PUT(request) {
     const { data: conflito } = await supabase.from('campanhas').select('id').eq('mes_ano', mesAno).neq('id', id).maybeSingle()
     if (conflito) throw new Error('Já existe uma campanha publicada para esse mês.')
 
-    const { data, error } = await supabase.from('campanhas').update({ mes_ano: mesAno, titulo, descricao, plano_interativo: normalizarPlanoCampanha(planoInformado) }).eq('id', id).select().single()
+    const planoInterativo = normalizarPlanoCampanha(planoInformado)
+    if (!planoInterativo.etapas?.length) throw new Error('Inclua pelo menos uma ação na jornada da campanha.')
+    const { data, error } = await supabase.from('campanhas').update({ mes_ano: mesAno, titulo, descricao, plano_interativo: planoInterativo }).eq('id', id).select().single()
     if (error) throw error
     return NextResponse.json({ campanha: data })
   } catch (error) { return NextResponse.json({ error: error.message }, { status: 400 }) }
