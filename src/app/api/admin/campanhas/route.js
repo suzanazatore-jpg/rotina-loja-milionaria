@@ -8,7 +8,17 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024
 const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 function adminClient() { return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } }) }
-async function autorizar(request, supabase) { const token = request.headers.get('authorization')?.replace('Bearer ', ''); if (!token) return false; const { data: { user } } = await supabase.auth.getUser(token); return user?.email === ADMIN_EMAIL }
+async function autorizar(request, supabase) {
+  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim()
+  if (!token) return false
+
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token)
+  const claimEmail = String(claimsData?.claims?.email || '').toLowerCase()
+  if (!claimsError && claimEmail === ADMIN_EMAIL) return true
+
+  const { data: { user } } = await supabase.auth.getUser(token)
+  return String(user?.email || '').toLowerCase() === ADMIN_EMAIL
+}
 function tituloPadrao(mesAno) { const [ano, mes] = String(mesAno).split('-'); return `Campanha de ${MESES[Number(mes) - 1] || ''} ${ano}`.trim() }
 async function comLinks(supabase, itens) { return Promise.all((itens || []).map(async item => { if (item.storage_bucket === BUCKET && item.arquivo_nome) { const { data } = await supabase.storage.from(BUCKET).createSignedUrl(item.arquivo_nome, 3600); return { ...item, arquivo_url: data?.signedUrl || null } } return item })) }
 
