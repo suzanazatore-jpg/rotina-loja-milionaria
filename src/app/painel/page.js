@@ -10,6 +10,7 @@ import InteractiveCalendar from './InteractiveCalendar'
 import WeeklyRoutineCard from './WeeklyRoutineCard'
 import AppIcon from '@/app/components/AppIcon'
 import NotificationCenter from '@/app/components/NotificationCenter'
+import NotificationPreference from './NotificationPreference'
 import { toEmbedUrl } from '@/lib/tutorialVideos'
 import './premium.css'
 
@@ -628,8 +629,8 @@ export default function Painel() {
                   <div className="premium-hub-grid">
                     <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
                     <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
-                    <CardAcesso cores={cores} icone="quickCourses" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
                     {precificacaoLiberada && <CardAcesso cores={cores} icone="content" titulo="Precificação e Lucro" sub="Preço, margem e descontos" onClick={() => irPara('precificacao')} />}
+                    <CardAcesso cores={cores} icone="quickCourses" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
                     {mentoriaLiberada && <CardAcesso cores={cores} icone="quickCourses" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
                   </div>
                 </div>
@@ -676,8 +677,9 @@ export default function Painel() {
                         <DadoAcesso label="Data que expira" value={dadosConta.expira_em ? formatarDataConta(dadosConta.expira_em) : 'Sem vencimento definido'} cores={cores} />
                       </div>
                     </div>
+                    <NotificationPreference cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
                     <p style={{ fontSize: '12px', color: cores.tx3, margin: '10px 0 0', textAlign: 'center', lineHeight: 1.5 }}>
-                      Esses dados são gerenciados pela administração. Para alterar, fale com o suporte. 💬
+                      Seus dados cadastrais são gerenciados pela administração. Para alterá-los, fale com o suporte. 💬
                     </p>
                   </div>
                 </div>
