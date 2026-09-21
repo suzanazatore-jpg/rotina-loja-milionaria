@@ -127,20 +127,44 @@ export async function DELETE(request) {
     if (!user) return privateJson({ error: 'Não autorizado.' }, { status: 401 })
 
     const body = await request.json()
+    const deactivateAll = body?.all === true
     const endpoint = typeof body?.endpoint === 'string' ? body.endpoint : ''
-    if (!endpoint || endpoint.length > 2048) {
+    if (!deactivateAll && (!endpoint || endpoint.length > 2048)) {
       return privateJson({ error: 'Inscrição inválida.' }, { status: 400 })
     }
 
-    const { error } = await supabase
+    let query = supabase
       .from('push_subscriptions')
       .update({ active: false, updated_at: new Date().toISOString() })
-      .eq('endpoint', endpoint)
       .eq('user_id', user.id)
+
+    if (!deactivateAll) query = query.eq('endpoint', endpoint)
+
+    const { error } = await query
     if (error) throw error
 
     return privateJson({ success: true })
   } catch {
     return privateJson({ error: 'Não foi possível desativar o lembrete agora.' }, { status: 500 })
+  }
+}
+
+
+export async function GET(request) {
+  try {
+    const supabase = serverClient()
+    const user = await authenticatedUser(request, supabase)
+    if (!user) return privateJson({ error: 'Não autorizado.' }, { status: 401 })
+
+    const { count, error } = await supabase
+      .from('push_subscriptions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('active', true)
+    if (error) throw error
+
+    return privateJson({ enabled: (count || 0) > 0, active_devices: count || 0 })
+  } catch {
+    return privateJson({ error: 'Não foi possível consultar suas notificações agora.' }, { status: 500 })
   }
 }
