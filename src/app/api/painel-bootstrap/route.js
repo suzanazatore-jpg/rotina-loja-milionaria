@@ -124,7 +124,7 @@ async function loadContent(supabase, weekStart) {
     supabase.from('calendario').select('*').order('mes_ano', { ascending: false }),
     supabase
       .from('calendar_actions')
-      .select('id,action_date,title,description,channel,content_format,product_cta,content_text,material_url,sort_order')
+      .select('id,planning_month,action_date,title,description,channel,content_format,product_cta,content_text,material_url,sort_order')
       .eq('is_published', true)
       .order('action_date', { ascending: true })
       .order('sort_order', { ascending: true }),
