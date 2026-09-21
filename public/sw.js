@@ -1,9 +1,10 @@
-const SHELL_CACHE = 'rotina-shell-v3'
+const SHELL_CACHE = 'rotina-shell-v4'
 const APP_SHELL = [
   '/painel',
   '/manifest.webmanifest',
   '/pwa-icon-192.png',
   '/pwa-icon-512.png',
+  '/notification-badge.png',
 ]
 
 self.addEventListener('install', event => {
@@ -83,7 +84,7 @@ self.addEventListener('push', event => {
   const options = {
     body: payload.body || 'Sua rotina de hoje já está disponível.',
     icon: payload.icon || '/pwa-icon-192.png',
-    badge: payload.badge || '/pwa-icon-192.png',
+    badge: payload.badge && payload.badge !== '/pwa-icon-192.png' ? payload.badge : '/notification-badge.png',
     tag: payload.tag || 'rotina-matinal',
     renotify: false,
     data: {

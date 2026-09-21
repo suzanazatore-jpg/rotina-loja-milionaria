@@ -358,7 +358,7 @@ export async function POST(request) {
             title,
             body,
             icon: '/pwa-icon-192.png',
-            badge: '/pwa-icon-192.png',
+            badge: '/notification-badge.png',
             tag: `${notification.tag}-teste-${Date.now()}`,
             url: targetUrl,
           },
