@@ -1,47 +1,127 @@
-export const ETAPAS_CAMPANHA = [
-  { id: 'escolher-produtos', icone: 'content', titulo: 'Escolher os produtos', descricao: 'Selecione os itens que serão o centro da campanha.' },
-  { id: 'validar-margem', icone: 'goals', titulo: 'Validar preço e margem', descricao: 'Confirme custo, margem e limite seguro de desconto.' },
-  { id: 'definir-oferta', icone: 'campaigns', titulo: 'Definir a oferta', descricao: 'Monte uma condição clara, atrativa e fácil de explicar.' },
-  { id: 'lista-vip', icone: 'users', titulo: 'Preparar a lista VIP', descricao: 'Separe as clientes com maior chance de comprar.' },
-  { id: 'preparar-equipe', icone: 'routine', titulo: 'Preparar a equipe', descricao: 'Alinhe argumento, meta e forma de atendimento.' },
-  { id: 'criar-artes', icone: 'content', titulo: 'Preparar artes e textos', descricao: 'Deixe imagens, chamadas e respostas prontas.' },
-  { id: 'publicar-campanha', icone: 'campaigns', titulo: 'Publicar a campanha', descricao: 'Divulgue nos canais escolhidos no horário planejado.' },
-  { id: 'contatar-clientes', icone: 'comments', titulo: 'Chamar as clientes', descricao: 'Envie convites pessoais e conduza cada conversa.' },
-  { id: 'registrar-resultados', icone: 'goals', titulo: 'Registrar os resultados', descricao: 'Anote contatos, respostas, pedidos e valor vendido.' },
-  { id: 'avaliar-campanha', icone: 'assistant', titulo: 'Avaliar e melhorar', descricao: 'Identifique o que funcionou e o próximo ajuste.' },
-]
+export const ICONES_CAMPANHA = ['content', 'goals', 'campaigns', 'users', 'routine', 'comments', 'assistant']
 
-const ICONES = new Set(['content', 'goals', 'campaigns', 'users', 'routine', 'comments', 'assistant'])
+const ICONES = new Set(ICONES_CAMPANHA)
 
 function texto(valor, limite) {
   return String(valor || '').trim().slice(0, limite)
 }
 
-export function criarPlanoCampanhaPadrao() {
+function idSeguro(valor, fallback) {
+  const limpo = String(valor || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 72)
+  return limpo || fallback
+}
+
+function normalizarEtapa(etapa, faseIndex, etapaIndex) {
+  const fallback = `fase-${faseIndex + 1}-acao-${etapaIndex + 1}`
   return {
-    objetivo: 'Executar a campanha do início ao fim, sem pular as etapas que protegem a margem e aumentam as vendas.',
-    orientacao: 'Comece pela primeira etapa pendente. Marque cada ação concluída para acompanhar o avanço da campanha.',
-    etapas: ETAPAS_CAMPANHA.map(etapa => ({ ...etapa })),
+    id: idSeguro(etapa?.id, fallback),
+    icone: ICONES.has(etapa?.icone) ? etapa.icone : 'campaigns',
+    titulo: texto(etapa?.titulo, 120),
+    descricao: texto(etapa?.descricao, 320),
   }
 }
 
-export function normalizarPlanoCampanha(valor) {
-  const recebido = valor && typeof valor === 'object' && !Array.isArray(valor) ? valor : {}
-  const padrao = criarPlanoCampanhaPadrao()
-  const recebidas = Array.isArray(recebido.etapas) ? recebido.etapas : []
-  const porId = new Map(recebidas.map(etapa => [String(etapa?.id || ''), etapa]))
+function normalizarFase(fase, indice) {
+  const id = idSeguro(fase?.id, `fase-${indice + 1}`)
+  const etapas = (Array.isArray(fase?.etapas) ? fase.etapas : [])
+    .slice(0, 30)
+    .map((etapa, etapaIndex) => normalizarEtapa(etapa, indice, etapaIndex))
+    .filter(etapa => etapa.titulo)
 
   return {
-    objetivo: texto(recebido.objetivo, 280) || padrao.objetivo,
-    orientacao: texto(recebido.orientacao, 280) || padrao.orientacao,
-    etapas: ETAPAS_CAMPANHA.map((etapa, indice) => {
-      const atual = porId.get(etapa.id) || recebidas[indice] || {}
-      return {
-        id: etapa.id,
-        icone: ICONES.has(atual.icone) ? atual.icone : etapa.icone,
-        titulo: texto(atual.titulo, 100) || etapa.titulo,
-        descricao: texto(atual.descricao, 180) || etapa.descricao,
-      }
-    }),
+    id,
+    titulo: texto(fase?.titulo, 120) || `Fase ${indice + 1}`,
+    periodo: texto(fase?.periodo, 80),
+    descricao: texto(fase?.descricao, 360),
+    orientacao: texto(fase?.orientacao, 360),
+    etapas,
+  }
+}
+
+function planoVazio() {
+  return {
+    versao: 2,
+    objetivo: '',
+    orientacao: '',
+    fases: [],
+    etapas: [],
+  }
+}
+
+export function criarPlanoCampanhaPadrao() {
+  return {
+    versao: 2,
+    objetivo: '',
+    orientacao: '',
+    fases: [{
+      id: 'fase-1',
+      titulo: 'Primeira fase',
+      periodo: '',
+      descricao: '',
+      orientacao: '',
+      etapas: [{
+        id: 'fase-1-acao-1',
+        icone: 'campaigns',
+        titulo: '',
+        descricao: '',
+      }],
+    }],
+  }
+}
+
+export function normalizarPlanoCampanha(valor, { preencherPadrao = true } = {}) {
+  const recebido = valor && typeof valor === 'object' && !Array.isArray(valor) ? valor : {}
+
+  let fases = []
+  if (Array.isArray(recebido.fases) && recebido.fases.length) {
+    fases = recebido.fases
+      .slice(0, 12)
+      .map(normalizarFase)
+      .filter(fase => fase.titulo || fase.etapas.length)
+  } else if (Array.isArray(recebido.etapas) && recebido.etapas.length) {
+    const etapasLegadas = recebido.etapas
+      .slice(0, 60)
+      .map((etapa, indice) => ({
+        id: idSeguro(etapa?.id, `acao-${indice + 1}`),
+        icone: ICONES.has(etapa?.icone) ? etapa.icone : 'campaigns',
+        titulo: texto(etapa?.titulo, 120),
+        descricao: texto(etapa?.descricao, 320),
+      }))
+      .filter(etapa => etapa.titulo)
+
+    if (etapasLegadas.length) {
+      fases = [{
+        id: 'jornada-campanha',
+        titulo: 'Jornada da campanha',
+        periodo: '',
+        descricao: '',
+        orientacao: '',
+        etapas: etapasLegadas,
+      }]
+    }
+  }
+
+  if (!fases.length && preencherPadrao) {
+    fases = criarPlanoCampanhaPadrao().fases
+  }
+
+  const objetivo = texto(recebido.objetivo, 420)
+  const orientacao = texto(recebido.orientacao, 420)
+  const etapas = fases.flatMap(fase => fase.etapas.map(etapa => ({ ...etapa, fase_id: fase.id })))
+
+  return {
+    ...planoVazio(),
+    versao: 2,
+    objetivo,
+    orientacao,
+    fases,
+    etapas,
   }
 }
