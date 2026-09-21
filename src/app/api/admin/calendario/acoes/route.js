@@ -73,6 +73,14 @@ function intervaloDoMes(mesAno) {
   return { inicio: `${mesAno}-01`, fim: `${mesAno}-${String(ultimoDia).padStart(2, '0')}` }
 }
 
+function intervaloDaImportacao(mesAno) {
+  const { inicio } = intervaloDoMes(mesAno)
+  const [ano, mes] = mesAno.split('-').map(Number)
+  const limite = new Date(Date.UTC(ano, mes, 7))
+  const fim = `${limite.getUTCFullYear()}-${String(limite.getUTCMonth() + 1).padStart(2, '0')}-${String(limite.getUTCDate()).padStart(2, '0')}`
+  return { inicio, fim }
+}
+
 export async function GET(request) {
   const supabase = adminClient()
   if (!await autorizar(request, supabase)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
@@ -110,14 +118,14 @@ export async function POST(request) {
     }
 
     const mesAno = String(corpo.mes_ano || '')
-    const { inicio, fim } = intervaloDoMes(mesAno)
+    const { inicio, fim } = intervaloDaImportacao(mesAno)
     const recebidas = Array.isArray(corpo.acoes) ? corpo.acoes : []
     if (!recebidas.length) throw new Error('Inclua pelo menos uma ação para importar.')
     if (recebidas.length > 100) throw new Error('Importe no máximo 100 ações por vez.')
 
     const registros = recebidas.map((acao, indice) => normalizarAcao(acao, indice, batchId))
-    if (registros.some(acao => !acao.action_date.startsWith(`${mesAno}-`))) {
-      throw new Error('Todas as ações precisam pertencer ao mês selecionado.')
+    if (registros.some(acao => acao.action_date < inicio || acao.action_date > fim)) {
+      throw new Error('As ações devem estar no mês selecionado ou, quando constarem no arquivo, nos primeiros 7 dias do mês seguinte.')
     }
 
     const { data, error } = await supabase.from('calendar_actions').insert(registros).select(ACTION_FIELDS)

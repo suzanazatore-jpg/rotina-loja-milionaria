@@ -86,6 +86,11 @@ function rotuloMes(valor) {
   return `${NOMES[Number(mes) - 1] || ''} ${ano}`.trim()
 }
 
+function resumoPreparadas(acoes, mesAno) {
+  const noMes = acoes.filter(acao => String(acao.action_date || '').startsWith(`${mesAno}-`)).length
+  return { noMes, proximoMes: acoes.length - noMes }
+}
+
 export default function CalendarActionsAdmin({
   token,
   calendarios = [],
@@ -115,6 +120,7 @@ export default function CalendarActionsAdmin({
     return [...opcoes.values()].sort((a, b) => b.valor.localeCompare(a.valor))
   }, [calendarios])
   const calendarioDoMes = calendarios.find(item => item.mes_ano === mesAno)
+  const resumoDaPrevia = useMemo(() => resumoPreparadas(acoesPreparadas, mesAno), [acoesPreparadas, mesAno])
 
   const requisicao = useCallback(async (method = 'GET', body = null, mes = mesAno) => {
     const resposta = await fetch(`/api/admin/calendario/acoes${method === 'GET' ? `?mes_ano=${mes}` : ''}`, {
@@ -268,7 +274,10 @@ export default function CalendarActionsAdmin({
       const dados = await resposta.json()
       if (!resposta.ok) throw new Error(dados.error || 'Não foi possível ler o arquivo.')
       setAcoesPreparadas(dados.acoes || [])
-      setMensagem(`✓ ${dados.total} ${dados.total === 1 ? 'ação preparada' : 'ações preparadas'}. Revise antes de publicar.`)
+      const proximoMes = (dados.acoes || []).filter(acao => !String(acao.action_date || '').startsWith(`${mesAno}-`)).length
+      setMensagem(proximoMes
+        ? `✓ ${dados.total} ações preparadas: ${dados.total - proximoMes} neste mês e ${proximoMes} no início do mês seguinte. Revise antes de publicar.`
+        : `✓ ${dados.total} ${dados.total === 1 ? 'ação preparada' : 'ações preparadas'}. Revise antes de publicar.`)
     } catch (error) {
       setMensagem(error.message)
     }
@@ -339,6 +348,7 @@ export default function CalendarActionsAdmin({
 
       {acoesPreparadas.length > 0 && <div style={{ display: 'grid', gap: '9px', marginTop: '14px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}><strong style={{ fontSize: '14px' }}>Prévia para revisão</strong><span style={{ color: '#888', fontSize: '12px' }}>{acoesPreparadas.length} {acoesPreparadas.length === 1 ? 'ação encontrada' : 'ações encontradas'}</span></div>
+        {resumoDaPrevia.proximoMes > 0 && <div style={{ background: '#18150b', border: '1px solid #5b4c17', color: '#F5D76E', borderRadius: '10px', padding: '10px 12px', fontSize: '12px', lineHeight: 1.5 }}>O arquivo também contém {resumoDaPrevia.proximoMes} {resumoDaPrevia.proximoMes === 1 ? 'ação' : 'ações'} para o início do mês seguinte. Elas serão publicadas nas datas corretas e aparecerão automaticamente no calendário daquele mês.</div>}
         {acoesPreparadas.map((acao, indice) => <details key={`${acao.action_date}-${indice}`} style={{ background: '#0A0A0A', border: '1px solid #2F2F2F', borderRadius: '11px', padding: '11px 12px' }}>
           <summary style={{ cursor: 'pointer', color: '#EEE', fontSize: '13px', fontWeight: 800 }}>{dataBr(acao.action_date)} — {acao.title}</summary>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(190px,1fr))', gap: '9px', marginTop: '12px' }}><label>Data<input type="date" value={acao.action_date} onChange={evento => atualizarPreparada(indice, 'action_date', evento.target.value)} style={campo} /></label><label>Tema<input value={acao.title} onChange={evento => atualizarPreparada(indice, 'title', evento.target.value)} style={campo} /></label></div>
