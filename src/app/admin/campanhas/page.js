@@ -40,18 +40,42 @@ export default function AdminCampanhas() {
 
   useEffect(() => {
     async function iniciar() {
-      const { data: { session } } = await supabase.auth.getSession()
+      let { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
-      if (session.user.email !== ADMIN_EMAIL) { setCarregando(false); return }
-      setAutorizado(true); setToken(session.access_token)
-      await carregar(session.access_token); setCarregando(false)
+      if (String(session.user.email || '').toLowerCase() !== ADMIN_EMAIL) { setCarregando(false); return }
+
+      const { data: refreshData } = await supabase.auth.refreshSession()
+      session = refreshData?.session || session
+
+      setAutorizado(true)
+      setToken(session.access_token)
+      await carregar(session.access_token)
+      setCarregando(false)
     }
     iniciar()
   }, [router])
 
-  async function requisicao(method, body, accessToken = token) {
+  async function requisicao(method, body, accessToken = token, tentouRenovar = false) {
     const form = body instanceof FormData
-    const resposta = await fetch('/api/admin/campanhas', { method, headers: { Authorization: `Bearer ${accessToken}`, ...(!form && body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: form ? body : JSON.stringify(body) } : {}) })
+    const resposta = await fetch('/api/admin/campanhas', {
+      method,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(!form && body ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body ? { body: form ? body : JSON.stringify(body) } : {}),
+      cache: 'no-store',
+    })
+
+    if ((resposta.status === 401 || resposta.status === 403) && !tentouRenovar) {
+      const { data: refreshData } = await supabase.auth.refreshSession()
+      const novoToken = refreshData?.session?.access_token
+      if (novoToken) {
+        setToken(novoToken)
+        return requisicao(method, body, novoToken, true)
+      }
+    }
+
     const dados = await resposta.json()
     if (!resposta.ok) throw new Error(dados.error || 'Não foi possível concluir.')
     return dados
