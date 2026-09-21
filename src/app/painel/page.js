@@ -226,12 +226,12 @@ export default function Painel() {
         if (cancelado || !ok) return
 
         const calData = (dados.calendarios || []).filter(item => !mesOculto(item.mes_ano))
-        const actionData = (dados.acoes_calendario || []).filter(item => !mesOculto(String(item.action_date).slice(0, 7)))
+        const actionData = (dados.acoes_calendario || []).filter(item => !mesOculto(item.planning_month || String(item.action_date).slice(0, 7)))
         setCalendario(calData)
         setAcoesCalendario(actionData)
         const mesesCalendario = [...new Set([
           ...calData.map(item => item.mes_ano),
-          ...actionData.map(item => String(item.action_date).slice(0, 7)),
+          ...actionData.map(item => item.planning_month || String(item.action_date).slice(0, 7)),
         ])].filter(Boolean).sort().reverse()
         setMesSelecionado(atual => mesesCalendario.includes(atual) ? atual : (mesesCalendario.includes(mesAtualValor()) ? mesAtualValor() : mesesCalendario[0] || mesAtualValor()))
 
@@ -791,12 +791,12 @@ export default function Painel() {
                   {conteudosCarregando ? <SectionLoading label="Carregando calendário..." /> : (() => {
                     const meses = [...new Set([
                       ...calendario.map(item => item.mes_ano),
-                      ...acoesCalendario.map(item => String(item.action_date).slice(0, 7)),
+                      ...acoesCalendario.map(item => item.planning_month || String(item.action_date).slice(0, 7)),
                     ])].filter(Boolean).sort().reverse()
                     if (!meses.length) return <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}><div style={{ fontSize: '42px', marginBottom: '10px' }}>📅</div><strong style={{ color: cores.tx2 }}>O próximo calendário aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>Ainda não há ações disponíveis.</p></div>
                     const mesAtivo = meses.includes(mesSelecionado) ? mesSelecionado : meses[0]
                     const itemPdf = calendario.find(item => item.mes_ano === mesAtivo)
-                    const acoesDoMes = acoesCalendario.filter(item => String(item.action_date).startsWith(`${mesAtivo}-`))
+                    const acoesDoMes = acoesCalendario.filter(item => (item.planning_month || String(item.action_date).slice(0, 7)) === mesAtivo)
                     return <>
                       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{meses.map(mes => <button key={mes} onClick={() => setMesSelecionado(mes)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesAtivo === mes ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesAtivo === mes ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesAtivo === mes ? ouro : cores.tx2 }}>{rotuloMesCurto(mes)}</button>)}</div>
                       <InteractiveCalendar mesAno={mesAtivo} actions={acoesDoMes} pdfItem={itemPdf} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => itemPdf && baixarPdf(itemPdf)} />
