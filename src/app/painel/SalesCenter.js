@@ -163,7 +163,7 @@ export default function SalesCenter({ cores, ouro, ouroGrad, initialTab = 'paine
       <nav ref={tabsRef} className="tg-tabs" style={{ background: cores.card2 }}>
         {[['painel', 'Visão geral'], ['meta', 'Configurar meta'], ['lancar', 'Lançar vendas'], ['ranking', 'Ranking'], ['historico', 'Histórico'], ['equipe', 'Equipe']].map(([id, label]) => <button key={id} onClick={event => { setTab(id); event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }) }} className={tab === id ? 'active' : ''} style={{ color: tab === id ? cores.tx : cores.tx2, background: tab === id ? cores.card : 'transparent' }}>{label}</button>)}
       </nav>
-      <button type="button" className={`tg-tabs-more${tabsTemMais ? '' : ' is-end'}`} aria-label="Ver mais opções" onClick={() => tabsRef.current?.scrollBy({ left: 170, behavior: 'smooth' })}>›</button>
+      <button type="button" className={`tg-tabs-more${tabsTemMais ? '' : ' is-end'}`} aria-label="Ver mais opções" onClick={() => tabsRef.current?.scrollBy({ left: 170, behavior: 'smooth' })}>→</button>
     </div>
     {message && <div className="tg-message" style={cardStyle}>{message}</div>}
     {tab === 'painel' && <>
