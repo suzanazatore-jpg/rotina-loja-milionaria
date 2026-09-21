@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
-const ACTION_FIELDS = 'id,action_date,title,description,channel,content_format,product_cta,content_text,material_url,sort_order,is_published,created_at,updated_at'
+const ACTION_FIELDS = 'id,planning_month,action_date,title,description,channel,content_format,product_cta,content_text,material_url,sort_order,is_published,created_at,updated_at'
 
 function adminClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
@@ -49,8 +49,10 @@ function normalizarAcao(acao, indice = 0, batchId = crypto.randomUUID()) {
   const actionDate = validarData(acao.action_date)
   const title = texto(acao.title, 160)
   if (!title || title.length < 2) throw new Error(`Preencha o tema da ação ${indice + 1}.`)
+  const planningMonth = /^\d{4}-(0[1-9]|1[0-2])$/.test(String(acao.planning_month || '')) ? String(acao.planning_month) : actionDate.slice(0, 7)
 
   return {
+    planning_month: planningMonth,
     action_date: actionDate,
     title,
     description: texto(acao.description, 1000),
@@ -89,8 +91,8 @@ export async function GET(request) {
   let consulta = supabase.from('calendar_actions').select(ACTION_FIELDS).order('action_date').order('sort_order')
   if (mesAno) {
     try {
-      const { inicio, fim } = intervaloDoMes(mesAno)
-      consulta = consulta.gte('action_date', inicio).lte('action_date', fim)
+      intervaloDoMes(mesAno)
+      consulta = consulta.eq('planning_month', mesAno)
     } catch (error) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
@@ -123,7 +125,7 @@ export async function POST(request) {
     if (!recebidas.length) throw new Error('Inclua pelo menos uma ação para importar.')
     if (recebidas.length > 100) throw new Error('Importe no máximo 100 ações por vez.')
 
-    const registros = recebidas.map((acao, indice) => normalizarAcao(acao, indice, batchId))
+    const registros = recebidas.map((acao, indice) => ({ ...normalizarAcao(acao, indice, batchId), planning_month: mesAno }))
     if (registros.some(acao => acao.action_date < inicio || acao.action_date > fim)) {
       throw new Error('As ações devem estar no mês selecionado ou, quando constarem no arquivo, nos primeiros 7 dias do mês seguinte.')
     }
@@ -132,7 +134,7 @@ export async function POST(request) {
     if (error) throw error
 
     if (corpo.substituir !== false) {
-      const exclusao = await supabase.from('calendar_actions').delete().gte('action_date', inicio).lte('action_date', fim).neq('batch_id', batchId)
+      const exclusao = await supabase.from('calendar_actions').delete().eq('planning_month', mesAno).neq('batch_id', batchId)
       if (exclusao.error) {
         await supabase.from('calendar_actions').delete().eq('batch_id', batchId)
         throw new Error(`A importação foi desfeita: ${exclusao.error.message}`)
