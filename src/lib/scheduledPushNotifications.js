@@ -245,7 +245,7 @@ async function filterEligibleSubscriptions(supabase, subscriptions) {
     const profile = profiles.get(subscription.user_id)
     const legacy = legacyProfiles.get(subscription.user_id)
     if (profile && profile.status !== 'active') return []
-    if (legacy?.status_assinatura === 'atrasado' || legacy?.status_assinatura === 'cancelado') return []
+    if (['atrasado', 'cancelado', 'reembolsado', 'reembolsada', 'refunded'].includes(legacy?.status_assinatura)) return []
     if (legacy && ['teste', 'avista'].includes(legacy.tipo_acesso) && legacy.acesso_expira_em) {
       const expiresAt = new Date(`${legacy.acesso_expira_em}T23:59:59-03:00`)
       if (expiresAt < new Date()) return []
@@ -280,7 +280,7 @@ async function loadAllEligibleUsers(supabase, planIds = []) {
     const profile = profiles.get(userId)
     const legacy = legacyProfiles.get(userId)
     if (profile && profile.status !== 'active') continue
-    if (legacy?.status_assinatura === 'atrasado' || legacy?.status_assinatura === 'cancelado') continue
+    if (['atrasado', 'cancelado', 'reembolsado', 'reembolsada', 'refunded'].includes(legacy?.status_assinatura)) continue
     if (legacy && ['teste', 'avista'].includes(legacy.tipo_acesso) && legacy.acesso_expira_em) {
       const expiresAt = new Date(`${legacy.acesso_expira_em}T23:59:59-03:00`)
       if (expiresAt < now) continue
