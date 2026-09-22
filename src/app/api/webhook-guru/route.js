@@ -33,6 +33,21 @@ function identificarAcessoPorProduto(nomeProduto) {
   }
 }
 
+function acessoDoPlano(plano, nomeProduto) {
+  const acessoPeloNome = identificarAcessoPorProduto(nomeProduto)
+  const diasDoPlano = Number(plano?.period_days)
+  const dias = Number.isFinite(diasDoPlano) && diasDoPlano > 0
+    ? diasDoPlano
+    : acessoPeloNome.dias
+  const expira = new Date()
+  expira.setDate(expira.getDate() + dias)
+  return {
+    tipo_acesso: acessoPeloNome.tipo_acesso,
+    acesso_expira_em: expira.toISOString(),
+    dias,
+  }
+}
+
 function normalizarTexto(valor) {
   return String(valor || '')
     .normalize('NFD')
@@ -261,7 +276,7 @@ export async function POST(request) {
 
       const plano = await localizarPlano(payload, nomeProduto)
 
-      const { tipo_acesso, acesso_expira_em } = identificarAcessoPorProduto(nomeProduto)
+      const { tipo_acesso, acesso_expira_em } = acessoDoPlano(plano, nomeProduto)
 
       const { data: perfilExistente, error: erroBusca } = await supabaseAdmin
         .from('perfis').select('id, tipo_acesso').eq('email', email).maybeSingle()
