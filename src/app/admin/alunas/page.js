@@ -78,13 +78,14 @@ function estaAtiva(aluna) {
   if (aluna.status_acesso && aluna.status_acesso !== 'active') return false
   if (estaDesativada(aluna)) return false
   const s = String(aluna.status_assinatura || '').toLowerCase()
-  if (s === 'cancelado' || s === 'cancelada' || s === 'inativo' || s === 'inativa') return false
+  if (['cancelado', 'cancelada', 'inativo', 'inativa', 'reembolsado', 'reembolsada', 'refunded'].includes(s)) return false
   return true
 }
 
 function situacaoFinanceira(aluna) {
   const status = String(aluna.status_assinatura || '').toLowerCase()
   if (['atrasado', 'inadimplente', 'past_due', 'unpaid'].includes(status)) return { label: 'Em atraso', cor: '#ff8d8d', fundo: '#2a1010' }
+  if (['reembolsado', 'reembolsada', 'refunded'].includes(status)) return { label: 'Reembolsada', cor: '#ff8d8d', fundo: '#2a1010' }
   if (['cancelado', 'cancelada'].includes(status)) return { label: 'Cancelada', cor: '#aaa', fundo: '#242424' }
   if (estaDesativada(aluna)) return { label: 'Vencida', cor: '#ff8d8d', fundo: '#2a1010' }
   if (!estaAtiva(aluna)) return { label: 'Suspensa', cor: '#e0b84a', fundo: '#2a2515' }
