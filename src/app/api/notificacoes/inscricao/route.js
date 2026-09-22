@@ -62,7 +62,7 @@ async function hasActiveAccess(supabase, userId) {
   const profile = profileResult.data
   const legacy = legacyResult.data
   if (profile && profile.status !== 'active') return false
-  if (legacy?.status_assinatura === 'atrasado' || legacy?.status_assinatura === 'cancelado') return false
+  if (['atrasado', 'cancelado', 'reembolsado', 'reembolsada', 'refunded'].includes(legacy?.status_assinatura)) return false
 
   if (legacy && ['teste', 'avista'].includes(legacy.tipo_acesso) && legacy.acesso_expira_em) {
     const expiresAt = new Date(`${legacy.acesso_expira_em}T23:59:59-03:00`)
