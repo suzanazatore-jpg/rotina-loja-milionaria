@@ -123,6 +123,28 @@ async function vincularPlanoAoPerfil({ perfilId, plano, nome, email, whatsapp })
   if (planoError) throw new Error(`Erro ao vincular plano: ${planoError.message}`)
 }
 
+async function suspenderAcessoReembolsado(perfilId) {
+  const expira = new Date()
+  expira.setDate(expira.getDate() - 1)
+  const agora = new Date().toISOString()
+  const [perfilLegado, perfil, matriculas] = await Promise.all([
+    supabaseAdmin.from('perfis').update({
+      status_assinatura: 'reembolsado',
+      acesso_expira_em: expira.toISOString().slice(0, 10),
+    }).eq('id', perfilId),
+    supabaseAdmin.from('profiles').update({
+      status: 'blocked',
+      updated_at: agora,
+    }).eq('id', perfilId),
+    supabaseAdmin.from('enrollments').update({
+      status: 'blocked',
+      updated_at: agora,
+    }).eq('profile_id', perfilId),
+  ])
+  const erro = perfilLegado.error || perfil.error || matriculas.error
+  if (erro) throw new Error(`Erro ao suspender acesso reembolsado: ${erro.message}`)
+}
+
 function formatarValorEmReais(valorEmCentavos) {
   const valorEmReais = (valorEmCentavos || 0) / 100
   return valorEmReais.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -260,14 +282,29 @@ export async function POST(request) {
     }
 
     if (webhookType === 'transaction') {
-      if (payload?.status !== 'approved') {
-        return NextResponse.json({ success: true, ignorado: true, motivo: 'Venda nao aprovada.' }, { status: 200 })
-      }
-
+      const statusVenda = String(payload?.status || '').toLowerCase()
       const nome = payload?.contact?.name?.trim()
       const email = payload?.contact?.email?.trim().toLowerCase()
       const whatsapp = payload?.contact?.phone_number || null
       const nomeProduto = payload?.product?.name || ''
+
+      if (statusVenda === 'refunded') {
+        if (!email) {
+          return NextResponse.json({ error: 'Payload de reembolso sem e-mail.' }, { status: 400 })
+        }
+        const { data: perfilExistente, error: erroBusca } = await supabaseAdmin
+          .from('perfis').select('id').eq('email', email).maybeSingle()
+        if (erroBusca) throw new Error(`Erro ao localizar acesso reembolsado: ${erroBusca.message}`)
+        if (!perfilExistente) {
+          return NextResponse.json({ success: true, ignorado: true, motivo: 'Aluna do reembolso não encontrada.', email }, { status: 200 })
+        }
+        await suspenderAcessoReembolsado(perfilExistente.id)
+        return NextResponse.json({ success: true, tipo: 'acesso_reembolsado', email }, { status: 200 })
+      }
+
+      if (statusVenda !== 'approved') {
+        return NextResponse.json({ success: true, ignorado: true, motivo: 'Venda nao aprovada.' }, { status: 200 })
+      }
 
       if (!nome || !email) {
         return NextResponse.json({ error: 'Payload sem nome ou e-mail.' }, { status: 400 })
