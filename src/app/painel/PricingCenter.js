@@ -26,6 +26,7 @@ function desenharResumo(dados) {
   const gold = '#E4BA36'
   const white = '#FFFFFF'
   const muted = '#AAA79F'
+  const margemPerigosa = Number(dados.margem) < MARGEM_MINIMA
 
   ctx.fillStyle = '#090909'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -46,7 +47,7 @@ function desenharResumo(dados) {
   ctx.fillText('Resumo da Precificação', 72, 220)
   ctx.fillStyle = muted
   ctx.font = '400 27px Arial, sans-serif'
-  ctx.fillText('Preço calculado para vender com margem e segurança.', 72, 268)
+  ctx.fillText(margemPerigosa ? 'ATENÇÃO: MARGEM PERIGOSA — ABAIXO DE 20%.' : 'Preço calculado com os custos e a margem informados.', 72, 268)
 
   ctx.fillStyle = '#151515'
   ctx.strokeStyle = '#363126'
@@ -74,7 +75,7 @@ function desenharResumo(dados) {
   ctx.stroke()
   ctx.fillStyle = gold
   ctx.font = '800 24px Arial, sans-serif'
-  ctx.fillText('PREÇO IDEAL DE VENDA', 112, 640)
+  ctx.fillText('PREÇO DE VENDA CALCULADO', 112, 640)
   ctx.fillStyle = white
   ctx.font = '900 86px Arial, sans-serif'
   ctx.fillText(brl(dados.preco), 112, 746)
@@ -105,13 +106,14 @@ function desenharResumo(dados) {
 
   ctx.fillStyle = gold
   ctx.font = '800 23px Arial, sans-serif'
-  ctx.fillText('Lembrete da Suzana', 72, 1122)
+  if (margemPerigosa) ctx.fillStyle = '#FF8C92'
+  ctx.fillText(margemPerigosa ? 'MARGEM PERIGOSA — ABAIXO DE 20%' : 'Lembrete da Suzana', 72, 1122)
   ctx.fillStyle = white
   ctx.font = '600 27px Arial, sans-serif'
-  ctx.fillText('Preço baixo sem margem não é venda. É prejuízo.', 72, 1172)
+  ctx.fillText(margemPerigosa ? 'Pouco lucro: gastos extras podem gerar prejuízo.' : 'Preço baixo sem margem não é venda. É prejuízo.', 72, 1172)
   ctx.fillStyle = muted
   ctx.font = '400 21px Arial, sans-serif'
-  ctx.fillText('Use este valor como direção e proteja o lucro da sua loja.', 72, 1212)
+  ctx.fillText(margemPerigosa ? 'Cálculo aceito. Avalie o risco antes de vender.' : 'Use este valor como direção e proteja o lucro da sua loja.', 72, 1212)
 
   ctx.fillStyle = '#2B271C'
   ctx.fillRect(72, 1280, 936, 2)
@@ -171,7 +173,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
   const calculo = useMemo(() => {
     const custoTotal = numero(custo) + numero(taxas) + numero(extras)
     const margemDesejada = numero(margem)
-    const valido = custoTotal > 0 && margemDesejada > MARGEM_MINIMA && margemDesejada <= 90
+    const valido = custoTotal > 0 && String(margem).trim() !== '' && margemDesejada >= 0 && margemDesejada <= 90
     const preco = valido ? custoTotal / (1 - margemDesejada / 100) : 0
     const lucro = Math.max(0, preco - custoTotal)
     const markup = custoTotal ? preco / custoTotal : 0
@@ -215,7 +217,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
       return
     }
     if (!calculo.valido) {
-      setMensagem({ tipo: 'erro', texto: 'Informe o custo e uma margem entre 21% e 90%.' })
+      setMensagem({ tipo: 'erro', texto: 'Informe o custo e uma margem entre 0% e 90%.' })
       return
     }
 
@@ -249,7 +251,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
     setCusto(String(item.item_cost || ''))
     setTaxas(String(item.fees || ''))
     setExtras(String(item.extra_costs || ''))
-    setMargem(String(item.desired_margin || '50'))
+    setMargem(String(item.desired_margin ?? '50'))
     setMensagem({ tipo: 'sucesso', texto: 'Valores carregados. Você já pode ajustar e salvar um novo cálculo.' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -318,7 +320,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
     }
   }
 
-  const larguraSegura = calculo.valido ? Math.max(0, Math.min(100, (calculo.margemPromocional / calculo.margemDesejada) * 100)) : 0
+  const larguraSegura = calculo.valido && calculo.margemDesejada > 0 ? Math.max(0, Math.min(100, (calculo.margemPromocional / calculo.margemDesejada) * 100)) : 0
 
   return <div className="pricing-center" style={{ '--pricing-gold': ouro, '--pricing-card': cores.card, '--pricing-card-2': cores.card2, '--pricing-border': cores.borda, '--pricing-text': cores.tx, '--pricing-muted': cores.tx2, '--pricing-muted-2': cores.tx3 }}>
     <header className="pricing-hero">
@@ -348,20 +350,25 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
           <CampoNumero label="Quanto você pagou na peça?" value={custo} onChange={setCusto} placeholder="Ex.: 45,00" hint="Digite o custo de compra de uma unidade." />
           <CampoNumero label="Quanto paga de taxas na venda?" value={taxas} onChange={setTaxas} placeholder="Ex.: 5,00" hint="Cartão, marketplace ou imposto. Se não tiver, digite 0." />
           <CampoNumero label="Tem embalagem, frete ou outro gasto?" value={extras} onChange={setExtras} placeholder="Ex.: 3,50" hint="Some os outros gastos de uma peça. Se não tiver, digite 0." />
-          <CampoNumero label="Qual margem de lucro você deseja?" value={margem} onChange={setMargem} prefix="" suffix="%" min={21} max={90} step="1" placeholder="Ex.: 50" hint="Exemplo: para uma margem de 50%, digite 50." />
+          <CampoNumero label="Qual margem de lucro você deseja?" value={margem} onChange={setMargem} prefix="" suffix="%" min={0} max={90} step="1" placeholder="Ex.: 50" hint="Exemplo: para uma margem de 50%, digite 50." />
         </div>
 
         <div className="pricing-cost-total"><span>Custo total do produto</span><strong>{brl(calculo.custoTotal)}</strong></div>
       </div>
 
       <div className="pricing-panel pricing-result-panel">
-        <div className="pricing-title"><span>2</span><div><h2>Preço recomendado</h2><p>Resultado baseado na margem desejada.</p></div></div>
+        <div className="pricing-title"><span>2</span><div><h2>Preço calculado</h2><p>Resultado baseado na margem desejada.</p></div></div>
 
         <div className="pricing-price-main">
-          <small>PREÇO IDEAL DE VENDA</small>
+          <small>PREÇO DE VENDA CALCULADO</small>
           <strong>{brl(calculo.preco)}</strong>
           <span>{calculo.valido ? `${calculo.margemDesejada.toFixed(0)}% de margem` : 'Preencha os dados ao lado'}</span>
         </div>
+
+        {calculo.valido && calculo.margemDesejada < MARGEM_MINIMA && <div role="status" className="pricing-status danger" style={{ gridTemplateColumns: 'auto 1fr', margin: '0 0 12px' }}>
+          <span aria-hidden="true">!</span>
+          <div><strong>MARGEM PERIGOSA — ABAIXO DE 20%</strong><small>{calculo.margemDesejada === 0 ? 'Você está vendendo SEM LUCRO sobre os custos informados. Qualquer gasto adicional gera prejuízo.' : `A margem de ${calculo.margemDesejada}% é aceita, mas deixa pouco lucro. Gastos não informados podem gerar prejuízo. Use com muita cautela.`}</small></div>
+        </div>}
 
         <div className="pricing-indicators">
           <Indicador label="Lucro por peça" value={brl(calculo.lucro)} />
@@ -420,7 +427,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
 
       {carregandoHistorico ? <div className="pricing-empty">Carregando histórico...</div> : historico.length === 0 ? <div className="pricing-empty"><strong>Seu histórico começa aqui</strong><span>Salve o primeiro cálculo para consultar depois.</span></div> : <div className="pricing-history-list">
         {historico.map(item => <article key={item.id}>
-          <div className="pricing-history-product"><span>📦</span><div><strong>{item.product_name}</strong><small>{dataHora(item.created_at)} · custo {brl(item.total_cost)}</small></div></div>
+          <div className="pricing-history-product"><span>📦</span><div><strong>{item.product_name}</strong><small>{dataHora(item.created_at)} · custo {brl(item.total_cost)}</small>{Number(item.desired_margin) < MARGEM_MINIMA && <small style={{ color: '#be3f45', fontWeight: 900 }}>MARGEM PERIGOSA: {Number(item.desired_margin)}%</small>}</div></div>
           <div className="pricing-history-number"><small>Preço ideal</small><strong>{brl(item.suggested_price)}</strong></div>
           <div className="pricing-history-number"><small>Lucro</small><strong>{brl(item.profit)}</strong></div>
           <div className="pricing-history-actions"><button type="button" className="share" onClick={() => compartilharResumo(item)}>Compartilhar</button><button type="button" onClick={() => reutilizar(item)}>Reutilizar</button><button type="button" className="delete" onClick={() => excluir(item)} aria-label={`Excluir ${item.product_name}`}>Excluir</button></div>
