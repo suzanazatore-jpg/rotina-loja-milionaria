@@ -120,7 +120,7 @@ function verificarAcesso(perfil) {
 
   if (tipo === 'assinatura') {
     if (perfil.status_assinatura === 'atrasado') return { liberado: false, motivo: 'atrasado' }
-    if (perfil.status_assinatura === 'cancelado') return { liberado: false, motivo: 'cancelado' }
+    if (['cancelado', 'reembolsado', 'reembolsada', 'refunded'].includes(perfil.status_assinatura)) return { liberado: false, motivo: 'cancelado' }
     return { liberado: true, motivo: null } // 'ativo' ou nulo (não bloqueia por padrão)
   }
 
