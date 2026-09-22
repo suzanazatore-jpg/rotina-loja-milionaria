@@ -32,7 +32,7 @@ async function api(method, body) {
   return data
 }
 
-export default function NotificationPreference({ cores, ouro = '#D4AF37', ouroGrad }) {
+export default function NotificationPreference({ cores, ouro = '#D4AF37' }) {
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -110,20 +110,21 @@ export default function NotificationPreference({ cores, ouro = '#D4AF37', ouroGr
             onClick={toggle}
             disabled={loading || saving}
             aria-pressed={enabled}
+            aria-label={enabled ? 'Desativar notificações' : 'Ativar notificações'}
             style={{
               flex: '0 0 auto',
               minWidth: 92,
-              border: `1px solid ${enabled ? ouro : cores.borda}`,
+              border: `1px solid ${loading ? cores.borda : enabled ? '#15803D' : '#B91C1C'}`,
               borderRadius: 999,
               padding: '9px 12px',
-              background: enabled ? ouroGrad : cores.card,
-              color: enabled ? '#17120A' : cores.tx2,
+              background: loading ? cores.card : enabled ? '#15803D' : '#B91C1C',
+              color: loading ? cores.tx2 : '#FFFFFF',
               fontWeight: 900,
               fontSize: 11,
               cursor: loading || saving ? 'wait' : 'pointer',
             }}
           >
-            {loading ? 'Carregando...' : saving ? 'Salvando...' : enabled ? 'Ativadas' : 'Desativadas'}
+            {loading ? 'Carregando...' : saving ? 'Salvando...' : enabled ? '✓ Ativadas' : '✕ Desativadas'}
           </button>
         </div>
         {message && <p style={{ color: message.startsWith('Notificações ativadas') ? ouro : cores.tx2, fontSize: 11, lineHeight: 1.45, margin: '10px 0 0' }}>{message}</p>}

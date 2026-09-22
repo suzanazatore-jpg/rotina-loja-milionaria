@@ -327,7 +327,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
         <h1>Precificação e Lucro</h1>
         <p>Descubra o preço certo, proteja sua margem e simule descontos antes de vender.</p>
       </div>
-      <div className="pricing-safety"><span>Margem mínima</span><strong>{MARGEM_MINIMA}%</strong><small>proteção automática</small></div>
+      <div className="pricing-safety"><span>Margem de referência</span><strong>{MARGEM_MINIMA}%</strong><small>abaixo disso: perigo</small></div>
     </header>
 
     {mensagem && <div role="status" className={`pricing-message ${mensagem.tipo}`}>{mensagem.tipo === 'sucesso' ? '✓' : '!'} {mensagem.texto}</div>}
@@ -366,7 +366,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
         <div className="pricing-indicators">
           <Indicador label="Lucro por peça" value={brl(calculo.lucro)} />
           <Indicador label="Markup" value={calculo.markup ? `${calculo.markup.toFixed(2)}x` : '0,00x'} />
-          <Indicador label="Preço mínimo" value={brl(calculo.precoMinimo)} hint="mantém 20% de margem" />
+          <Indicador label="Preço com margem de 20%" value={brl(calculo.precoMinimo)} hint="mantém 20% de margem" />
         </div>
 
         <div className="pricing-result-actions">
@@ -381,7 +381,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
     </section>
 
     <section className="pricing-panel pricing-discount">
-      <div className="pricing-title"><span>3</span><div><h2>Simulador de desconto</h2><p>Veja até onde você pode negociar sem perder a margem mínima.</p></div></div>
+      <div className="pricing-title"><span>3</span><div><h2>Simulador de desconto</h2><p>Simule seu desconto. Margens abaixo de 20% são aceitas, mas recebem um alerta de perigo.</p></div></div>
 
       <div className="pricing-discount-grid">
         <div className="pricing-range">
@@ -397,9 +397,20 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
         </div>
       </div>
 
-      <div className={`pricing-status ${calculo.seguro ? 'safe' : 'danger'}`}>
-        <span>{calculo.seguro ? '✓' : '!'}</span>
-        <div><strong>{calculo.seguro ? 'Desconto seguro' : 'Atenção à sua margem'}</strong><small>{calculo.seguro ? 'Este desconto mantém a margem mínima de 20%.' : 'Com esse desconto, sua margem fica abaixo de 20%. Reduza o desconto para proteger o lucro.'}</small></div>
+      <div role="status" aria-live="polite" className={`pricing-status ${!calculo.valido ? 'neutral' : calculo.seguro ? 'safe' : 'danger'}`}>
+        <span aria-hidden="true">{!calculo.valido ? 'i' : calculo.seguro ? '✓' : '!'}</span>
+        <div>
+          <strong>{!calculo.valido ? 'Preencha os dados para simular' : calculo.seguro ? 'Desconto dentro da margem de referência' : 'MARGEM PERIGOSA — ABAIXO DE 20%'}</strong>
+          <small>{!calculo.valido
+            ? 'Informe o custo e a margem desejada para calcular o efeito do desconto.'
+            : calculo.seguro
+              ? 'Este desconto mantém uma margem de pelo menos 20%, considerando os custos informados.'
+              : calculo.lucroPromocional < 0
+                ? `Desconto aceito na simulação, mas o preço fica abaixo do custo informado. PREJUÍZO DE ${brl(Math.abs(calculo.lucroPromocional))} POR PEÇA. Reveja antes de vender.`
+                : calculo.lucroPromocional === 0
+                  ? 'Desconto aceito na simulação, mas você fica SEM LUCRO por peça. Qualquer gasto não informado pode gerar prejuízo.'
+                  : `Desconto aceito na simulação, mas a margem final de ${calculo.margemPromocional.toFixed(1)}% É PERIGOSA. Sobra pouco lucro e gastos não informados podem gerar prejuízo. Use com muita cautela.`}</small>
+        </div>
         <i><em style={{ width: `${larguraSegura}%` }} /></i>
       </div>
     </section>
@@ -440,7 +451,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
       .pricing-result-panel{background:linear-gradient(145deg,var(--pricing-card),var(--pricing-card-2))}.pricing-price-main{text-align:center;border:1px solid color-mix(in srgb,var(--pricing-gold) 45%,var(--pricing-border));background:color-mix(in srgb,var(--pricing-gold) 7%,var(--pricing-card));border-radius:14px;padding:20px 12px;margin-bottom:11px}.pricing-price-main small{display:block;color:var(--pricing-gold);font-size:9px;font-weight:900;letter-spacing:.1em}.pricing-price-main strong{display:block;font-size:31px;line-height:1.1;margin:7px 0 4px}.pricing-price-main span{font-size:10px;color:var(--pricing-muted)}
       .pricing-indicators{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.pricing-indicator{min-width:0;background:var(--pricing-card);border:1px solid var(--pricing-border);border-radius:10px;padding:10px}.pricing-indicator span,.pricing-indicator small{display:block;color:var(--pricing-muted);font-size:9px}.pricing-indicator strong{display:block;font-size:13px;margin-top:4px;overflow-wrap:anywhere}.pricing-indicator small{font-size:8px;margin-top:2px}.pricing-indicator-main strong{color:var(--pricing-gold);font-size:18px}.pricing-result-actions{display:grid;gap:8px;margin-top:13px}.pricing-save,.pricing-share{width:100%;border-radius:10px;padding:12px 16px;font-size:12px;font-weight:900;cursor:pointer}.pricing-save{border:0;color:#090909}.pricing-share{border:1px solid var(--pricing-gold);background:transparent;color:var(--pricing-gold)}.pricing-save:disabled,.pricing-share:disabled{opacity:.45;cursor:not-allowed}
       .pricing-discount{margin-bottom:14px}.pricing-discount-grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:18px;align-items:end}.pricing-range>div:first-child{display:flex;justify-content:space-between;align-items:center;font-size:11px}.pricing-range>div:first-child strong{color:var(--pricing-gold);font-size:22px}.pricing-range input{width:100%;accent-color:var(--pricing-gold);margin:14px 0 4px}.pricing-range-labels{display:flex;justify-content:space-between;color:var(--pricing-muted-2);font-size:9px}.pricing-promo-result{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px}
-      .pricing-status{display:grid;grid-template-columns:auto 1fr 150px;gap:11px;align-items:center;border-radius:11px;padding:11px 13px;margin-top:15px}.pricing-status>span{width:25px;height:25px;display:grid;place-items:center;border-radius:50%;font-weight:900}.pricing-status strong,.pricing-status small{display:block}.pricing-status strong{font-size:11px}.pricing-status small{font-size:9px;margin-top:2px}.pricing-status i{display:block;height:5px;border-radius:8px;background:rgba(0,0,0,.12);overflow:hidden}.pricing-status em{display:block;height:100%;border-radius:inherit}.pricing-status.safe{background:#e9f8ee;color:#237341}.pricing-status.safe>span{background:#c8edd5}.pricing-status.safe em{background:#3faf68}.pricing-status.danger{background:#fff0f0;color:#aa3038}.pricing-status.danger>span{background:#f8d1d3}.pricing-status.danger em{background:#dc555c}:global(.tema-escuro) .pricing-status.safe{background:#10291a;color:#78d697}:global(.tema-escuro) .pricing-status.danger{background:#311517;color:#ff8c92}
+      .pricing-status{display:grid;grid-template-columns:auto 1fr 150px;gap:11px;align-items:center;border-radius:11px;padding:11px 13px;margin-top:15px}.pricing-status>span{width:25px;height:25px;display:grid;place-items:center;border-radius:50%;font-weight:900}.pricing-status strong,.pricing-status small{display:block}.pricing-status strong{font-size:11px}.pricing-status small{font-size:9px;margin-top:2px}.pricing-status i{display:block;height:5px;border-radius:8px;background:rgba(0,0,0,.12);overflow:hidden}.pricing-status em{display:block;height:100%;border-radius:inherit}.pricing-status.safe{background:#e9f8ee;color:#237341}.pricing-status.safe>span{background:#c8edd5}.pricing-status.safe em{background:#3faf68}.pricing-status.neutral{background:var(--pricing-card-2);color:var(--pricing-muted)}.pricing-status.danger{background:#fff0f0;color:#aa3038;border:2px solid #dc555c;padding:16px}.pricing-status.danger strong{font-size:15px;font-weight:900;line-height:1.4}.pricing-status.danger small{font-size:12px;line-height:1.6;margin-top:6px;font-weight:700}.pricing-status.danger>span{background:#f8d1d3}.pricing-status.danger em{background:#dc555c}:global(.tema-escuro) .pricing-status.safe{background:#10291a;color:#78d697}:global(.tema-escuro) .pricing-status.danger{background:#311517;color:#ff8c92}
       .pricing-history-list{display:grid;gap:8px}.pricing-history-list article{display:grid;grid-template-columns:minmax(190px,1fr) 120px 110px auto;gap:12px;align-items:center;background:var(--pricing-card-2);border:1px solid var(--pricing-border);border-radius:11px;padding:11px 12px}.pricing-history-product{display:flex;align-items:center;gap:10px;min-width:0}.pricing-history-product>span{width:35px;height:35px;display:grid;place-items:center;background:var(--pricing-card);border-radius:9px}.pricing-history-product div{min-width:0}.pricing-history-product strong,.pricing-history-product small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pricing-history-product strong{font-size:12px}.pricing-history-product small,.pricing-history-number small{font-size:9px;color:var(--pricing-muted);margin-top:3px}.pricing-history-number strong{display:block;font-size:12px;margin-top:3px}.pricing-history-actions{display:flex;gap:5px}.pricing-history-actions button{border:1px solid var(--pricing-border);background:var(--pricing-card);color:var(--pricing-text);border-radius:8px;padding:8px 9px;font-size:10px;font-weight:750;cursor:pointer}.pricing-history-actions .share{color:var(--pricing-gold);border-color:color-mix(in srgb,var(--pricing-gold) 45%,var(--pricing-border))}.pricing-history-actions .delete{color:#cf4f56}.pricing-empty{display:flex;flex-direction:column;align-items:center;text-align:center;color:var(--pricing-muted);font-size:11px;padding:26px}.pricing-empty strong{color:var(--pricing-text);font-size:13px;margin-bottom:4px}
       @media(max-width:820px){.pricing-main-grid{grid-template-columns:1fr}.pricing-discount-grid{grid-template-columns:1fr}.pricing-history-list article{grid-template-columns:1fr 1fr}.pricing-history-product{grid-column:1/-1}.pricing-history-actions{justify-content:flex-end}}
       @media(max-width:560px){.pricing-center{margin:-4px}.pricing-hero{align-items:flex-start}.pricing-hero h1{font-size:23px}.pricing-hero p{font-size:12px}.pricing-safety{min-width:92px;padding:10px}.pricing-safety strong{font-size:20px}.pricing-panel{padding:16px;border-radius:15px}.pricing-fields-grid{grid-template-columns:1fr;gap:18px}.pricing-field>span{font-size:13px}.pricing-field>small{font-size:10px}.pricing-input-wrap{min-height:56px}.pricing-input-wrap input{height:56px!important}.pricing-indicators,.pricing-promo-result{grid-template-columns:1fr 1fr}.pricing-indicators .pricing-indicator:last-child,.pricing-promo-result .pricing-indicator:first-child{grid-column:1/-1}.pricing-status{grid-template-columns:auto 1fr}.pricing-status i{grid-column:1/-1}.pricing-history-list article{grid-template-columns:1fr 1fr;gap:9px}.pricing-history-actions{grid-column:1/-1}.pricing-history-actions button{flex:1}.pricing-title{margin-bottom:15px}.pricing-form-help{font-size:11px;margin-bottom:18px}}
