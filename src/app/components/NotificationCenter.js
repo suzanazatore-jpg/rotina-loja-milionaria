@@ -16,6 +16,21 @@ function timeLabel(value) {
   return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(date)
 }
 
+function notificationDestination(item) {
+  const target = new URL(item?.target_url || '/painel', window.location.origin)
+  const section = target.searchParams.get('destino') || target.searchParams.get('secao') || 'inicio'
+  const labels = {
+    rotina: 'Abrir Rotina',
+    campanhas: 'Abrir Campanhas',
+    calendario: 'Abrir Calendário',
+    metas: 'Abrir Metas',
+    team_goals: 'Abrir Metas',
+    precificacao: 'Abrir Precificação',
+    pricing: 'Abrir Precificação',
+  }
+  return { target, section, label: labels[section] || 'Abrir no aplicativo' }
+}
+
 async function requestHistory(path = '', options = {}) {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) throw new Error('Sessão encerrada.')
@@ -38,6 +53,7 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
   const [unread, setUnread] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [selected, setSelected] = useState(null)
   const rootRef = useRef(null)
   const pushOpenedRef = useRef(false)
 
@@ -75,19 +91,30 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
   }, [open])
 
   useEffect(() => {
-    if (pushOpenedRef.current) return
+    if (pushOpenedRef.current || loading) return
     const url = new URL(window.location.href)
     const id = url.searchParams.get('notificacao')
     if (!id) return
     pushOpenedRef.current = true
+    const item = items.find(notification => notification.id === id)
+    if (item) window.setTimeout(() => setSelected(item), 0)
     void requestHistory('', { method: 'PATCH', body: JSON.stringify({ id, action: 'opened', source: 'push' }) })
       .then(() => {
         url.searchParams.delete('notificacao')
+        url.searchParams.delete('secao')
+        url.searchParams.delete('destino')
         window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
         void load()
       })
       .catch(() => {})
-  }, [load])
+  }, [items, load, loading])
+
+  useEffect(() => {
+    if (!selected) return undefined
+    const onKeyDown = event => { if (event.key === 'Escape') setSelected(null) }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [selected])
 
   async function markAllRead() {
     if (!unread) return
@@ -108,12 +135,16 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
       : currentItem))
     if (wasUnread) setUnread(current => Math.max(0, current - 1))
     setOpen(false)
+    setSelected({ ...item, read_at: item.read_at || now, opened_at: now })
     void requestHistory('', { method: 'PATCH', body: JSON.stringify({ id: item.id, action: 'opened', source: 'in_app' }) }).catch(() => void load())
+  }
 
-    const target = new URL(item.target_url || '/painel', window.location.origin)
-    const section = target.searchParams.get('secao') || 'inicio'
+  function navigateFromNotification(item) {
+    const { target, section } = notificationDestination(item)
     target.searchParams.delete('notificacao')
+    target.searchParams.delete('destino')
     window.history.pushState({}, '', `${target.pathname}${target.search}${target.hash}`)
+    setSelected(null)
     onNavigate?.(section)
   }
 
@@ -158,6 +189,30 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
         </section>
       )}
 
+      {selected && (
+        <div className="notification-detail-backdrop" onClick={() => setSelected(null)}>
+          <section
+            className="notification-detail"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="notification-detail-title"
+            onClick={event => event.stopPropagation()}
+            style={{ color: cores.tx, background: cores.card, borderColor: cores.borda }}
+          >
+            <header style={{ borderColor: cores.borda }}>
+              <i style={{ color: ouro, background: `${ouro}1A` }}><AppIcon name={selected.notification_type === 'rotina' ? 'routine' : 'notifications'} size={22} /></i>
+              <div><strong id="notification-detail-title">{selected.title}</strong><small style={{ color: cores.tx3 }}>{timeLabel(selected.sent_at)}</small></div>
+              <button type="button" aria-label="Fechar notificação" onClick={() => setSelected(null)} style={{ color: cores.tx2 }}><AppIcon name="close" size={18} /></button>
+            </header>
+            <p style={{ color: cores.tx2 }}>{selected.body}</p>
+            <footer style={{ borderColor: cores.borda }}>
+              <button type="button" className="notification-detail-close" onClick={() => setSelected(null)} style={{ color: cores.tx, borderColor: cores.borda }}>Fechar</button>
+              <button type="button" className="notification-detail-action" onClick={() => navigateFromNotification(selected)} style={{ color: '#17120A', background: ouro }}>{notificationDestination(selected).label}</button>
+            </footer>
+          </section>
+        </div>
+      )}
+
       <style>{`
         .notification-center-anchor { position: absolute; top: 13px; right: 100px; z-index: 120; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
         .notification-bell { width: 36px; height: 36px; display: grid; place-items: center; position: relative; border: 1px solid; border-radius: 9px; cursor: pointer; }
@@ -178,9 +233,25 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
         .notification-item > span em { font-size: 11px; line-height: 1.4; font-style: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .notification-item > span small { font-size: 9px; }
         .notification-item > b { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; }
+        .notification-detail-backdrop { position: fixed; inset: 0; z-index: 400; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.66); }
+        .notification-detail { width: min(480px, 100%); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid; border-radius: 18px; box-shadow: 0 24px 80px rgba(0,0,0,.4); }
+        .notification-detail > header { display: grid; grid-template-columns: 44px minmax(0,1fr) 32px; gap: 12px; align-items: center; padding: 18px; border-bottom: 1px solid; }
+        .notification-detail > header > i { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 13px; font-style: normal; }
+        .notification-detail > header > div { display: grid; gap: 5px; }
+        .notification-detail > header strong { font-size: 16px; line-height: 1.35; }
+        .notification-detail > header small { font-size: 10px; }
+        .notification-detail > header button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+        .notification-detail > p { margin: 0; padding: 22px 20px 26px; font-size: 14px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .notification-detail > footer { display: flex; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid; }
+        .notification-detail > footer button { min-height: 40px; padding: 0 17px; border-radius: 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+        .notification-detail-close { border: 1px solid; background: transparent; }
+        .notification-detail-action { border: 0; }
         @media (max-width: 720px) {
           .notification-center-anchor { top: 17px; right: 116px; }
           .notification-panel { position: fixed; top: 58px; right: 12px; left: 12px; width: auto; }
+          .notification-detail-backdrop { padding: 12px; align-items: end; }
+          .notification-detail { width: 100%; max-height: calc(100vh - 24px); border-radius: 18px 18px 12px 12px; }
+          .notification-detail > footer { display: grid; grid-template-columns: 1fr 1.35fr; }
         }
       `}</style>
     </div>
