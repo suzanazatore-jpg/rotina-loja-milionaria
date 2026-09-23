@@ -341,7 +341,9 @@ async function sendOneForSchedule(supabase, row, today, notification, schedule) 
         body,
         icon: '/pwa-icon-192.png',
         badge: '/notification-badge.png',
-        tag: `${notification.tag}-${schedule.id}-${today}`,
+        tag: row.notificationRecord?.id
+          ? `notificacao-${row.notificationRecord.id}`
+          : `${notification.tag}-${schedule.id}-${today}`,
         url: targetUrl,
       },
     )
@@ -364,7 +366,7 @@ async function sendOneForSchedule(supabase, row, today, notification, schedule) 
 function notificationTarget(type, id, targetSection = null) {
   const params = new URLSearchParams()
   const section = targetSection || (type === 'rotina' ? 'rotina' : null)
-  if (section && section !== 'inicio') params.set('secao', section)
+  if (section && section !== 'inicio') params.set('destino', section)
   params.set('notificacao', id)
   return `/painel?${params.toString()}`
 }
