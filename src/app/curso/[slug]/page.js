@@ -72,6 +72,8 @@ export default function Curso({ params }) {
         }
       }
 
+      if (cursoData.protocol_enabled) { router.replace(`/protocolo/${slug}`); return }
+
       const [mods, lessons, mats, progress] = await Promise.all([
         supabase.from('modules').select('*').eq('course_id', cursoData.id).eq('is_published', true).order('sort_order'),
         supabase.from('lessons').select('*').eq('course_id', cursoData.id).eq('is_published', true).order('sort_order'),

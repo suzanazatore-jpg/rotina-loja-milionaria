@@ -38,7 +38,8 @@ export async function GET(request) {
 
     if (/^https?:\/\//i.test(material.file_url)) return NextResponse.json({ url: material.file_url })
     const caminho = material.file_url.replace(/^storage:\/\/course-materials\//, '')
-    const { data, error } = await supabase.storage.from('course-materials').createSignedUrl(caminho, 300)
+    const download = new URL(request.url).searchParams.get('download') === '1'
+    const { data, error } = await supabase.storage.from('course-materials').createSignedUrl(caminho, 300, download ? { download: true } : {})
     if (error) throw error
     return NextResponse.json({ url: data.signedUrl })
   } catch (error) {
