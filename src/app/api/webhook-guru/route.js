@@ -123,6 +123,62 @@ async function vincularPlanoAoPerfil({ perfilId, plano, nome, email, whatsapp })
   if (planoError) throw new Error(`Erro ao vincular plano: ${planoError.message}`)
 }
 
+async function cursosProtocoloDoPlano(planoId) {
+  const { data: vinculos, error: vinculosError } = await supabaseAdmin.from('plan_courses')
+    .select('course_id').eq('plan_id', planoId)
+  if (vinculosError) throw new Error(`Erro ao consultar cursos do plano: ${vinculosError.message}`)
+  const ids = [...new Set((vinculos || []).map(item => item.course_id))]
+  if (!ids.length) return []
+  const { data: cursos, error: cursosError } = await supabaseAdmin.from('courses')
+    .select('id').in('id', ids).eq('protocol_enabled', true)
+  if (cursosError) throw new Error(`Erro ao consultar o Protocolo: ${cursosError.message}`)
+  return (cursos || []).map(curso => curso.id)
+}
+
+async function garantirMatriculaProtocolo(perfilId, plano, nomeProduto) {
+  const cursoIds = await cursosProtocoloDoPlano(plano.id)
+  if (!cursoIds.length) return
+  const { data: matriculas, error: buscaError } = await supabaseAdmin.from('enrollments')
+    .select('id,course_id,expires_at').eq('profile_id', perfilId).in('course_id', cursoIds)
+  if (buscaError) throw new Error(`Erro ao consultar matrícula: ${buscaError.message}`)
+  const agora = new Date().toISOString()
+  const expira = acessoDoPlano(plano, nomeProduto).acesso_expira_em
+  for (const courseId of cursoIds) {
+    const existentes = (matriculas || []).filter(item => item.course_id === courseId)
+    if (existentes.length) {
+      const expiracao = existentes.some(item => item.expires_at === null)
+        ? null
+        : new Date(Math.max(new Date(expira).getTime(), ...existentes.map(item => new Date(item.expires_at).getTime()))).toISOString()
+      const { error } = await supabaseAdmin.from('enrollments')
+        .update({ status: 'active', expires_at: expiracao, updated_at: agora })
+        .in('id', existentes.map(item => item.id))
+      if (error) throw new Error(`Erro ao reativar matrícula: ${error.message}`)
+    } else {
+      const { error } = await supabaseAdmin.from('enrollments').insert({
+        profile_id: perfilId, course_id: courseId, status: 'active', source: 'guru',
+        purchased_at: agora, expires_at: expira,
+      })
+      if (error) throw new Error(`Erro ao criar matrícula: ${error.message}`)
+    }
+  }
+}
+
+async function reembolsarMatriculaProtocolo(perfilId, payload, nomeProduto) {
+  let plano
+  try { plano = await localizarPlano(payload, nomeProduto) } catch { return false }
+  const cursoIds = await cursosProtocoloDoPlano(plano.id)
+  if (!cursoIds.length) return false
+  const agora = new Date().toISOString()
+  const { error: matriculasError } = await supabaseAdmin.from('enrollments')
+    .update({ status: 'refunded', updated_at: agora })
+    .eq('profile_id', perfilId).in('course_id', cursoIds)
+  if (matriculasError) throw new Error(`Erro ao bloquear matrícula reembolsada: ${matriculasError.message}`)
+  const { error: planoError } = await supabaseAdmin.from('profile_plans')
+    .delete().eq('profile_id', perfilId).eq('plan_id', plano.id)
+  if (planoError) throw new Error(`Erro ao desvincular plano reembolsado: ${planoError.message}`)
+  return true
+}
+
 async function suspenderAcessoReembolsado(perfilId) {
   const expira = new Date()
   expira.setDate(expira.getDate() - 1)
@@ -238,6 +294,7 @@ export async function POST(request) {
         }).eq('id', perfilExistente.id)
         if (updateError) throw new Error(`Erro ao atualizar assinatura: ${updateError.message}`)
         await vincularPlanoAoPerfil({ perfilId: perfilExistente.id, plano, nome, email, whatsapp })
+        await garantirMatriculaProtocolo(perfilExistente.id, plano, nomeProduto)
         try {
           await enviarEmailRenovacao({ nome, email, valor: valorFormatado, proximaCobranca: proximaCobrancaFormatada })
         } catch (e) { console.error('Erro e-mail renovacao:', e) }
@@ -267,6 +324,7 @@ export async function POST(request) {
 
       try {
         await vincularPlanoAoPerfil({ perfilId: novoUserId, plano, nome, email, whatsapp })
+        await garantirMatriculaProtocolo(novoUserId, plano, nomeProduto)
       } catch (error) {
         await supabaseAdmin.from('perfis').delete().eq('id', novoUserId)
         await supabaseAdmin.auth.admin.deleteUser(novoUserId)
@@ -298,8 +356,9 @@ export async function POST(request) {
         if (!perfilExistente) {
           return NextResponse.json({ success: true, ignorado: true, motivo: 'Aluna do reembolso não encontrada.', email }, { status: 200 })
         }
-        await suspenderAcessoReembolsado(perfilExistente.id)
-        return NextResponse.json({ success: true, tipo: 'acesso_reembolsado', email }, { status: 200 })
+        const apenasProtocolo = await reembolsarMatriculaProtocolo(perfilExistente.id, payload, nomeProduto)
+        if (!apenasProtocolo) await suspenderAcessoReembolsado(perfilExistente.id)
+        return NextResponse.json({ success: true, tipo: apenasProtocolo ? 'protocolo_reembolsado' : 'acesso_reembolsado', email }, { status: 200 })
       }
 
       if (statusVenda !== 'approved') {
@@ -327,6 +386,7 @@ export async function POST(request) {
         }).eq('id', perfilExistente.id)
         if (updateError) throw new Error(`Erro ao atualizar acesso: ${updateError.message}`)
         await vincularPlanoAoPerfil({ perfilId: perfilExistente.id, plano, nome, email, whatsapp })
+        await garantirMatriculaProtocolo(perfilExistente.id, plano, nomeProduto)
         return NextResponse.json({ success: true, tipo: 'acesso_atualizado', email, tipo_acesso, plano: plano.name }, { status: 200 })
       }
 
@@ -350,6 +410,7 @@ export async function POST(request) {
 
       try {
         await vincularPlanoAoPerfil({ perfilId: novoUserId, plano, nome, email, whatsapp })
+        await garantirMatriculaProtocolo(novoUserId, plano, nomeProduto)
       } catch (error) {
         await supabaseAdmin.from('perfis').delete().eq('id', novoUserId)
         await supabaseAdmin.auth.admin.deleteUser(novoUserId)
