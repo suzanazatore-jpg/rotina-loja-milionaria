@@ -4,10 +4,13 @@ import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { protocolDay, protocolGuidance } from '@/lib/protocolGuidance'
+import { PROTOCOL_DAYS } from '@/lib/protocolContent'
 import NotificationPreference from '@/app/painel/NotificationPreference'
 import './protocolo.css'
 
 const money = cents => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format((cents || 0) / 100)
+const DEMO_SLUG = 'protocolo-desencalhando-estoque-7-dias'
+const DEMO_COURSE_ID = '9276bff2-8bbe-4ff9-83f1-c3ba8323bc7d'
 const digits = raw => {
   const value = String(raw || '').trim().replace(/\s/g, '').replace(/^R\$/i, '')
   if (/^\d+\.\d{1,2}$/.test(value)) return Math.round(Number(value) * 100)
@@ -57,6 +60,7 @@ export default function Protocolo({ params }) {
   const [revenueBand, setRevenueBand] = useState('')
   const [teamSize, setTeamSize] = useState('')
   const [preview, setPreview] = useState(false)
+  const [demo, setDemo] = useState(false)
   function loadDraft(item, entries) {
     const saved = entries.find(row => row.lesson_id === item?.id)
     const items = Array.isArray(item?.protocol_checklist) ? item.protocol_checklist.filter(value => typeof value === 'string' && value.trim()) : []
@@ -80,6 +84,17 @@ export default function Protocolo({ params }) {
     let active = true
     async function load() {
       try {
+        if (slug === DEMO_SLUG && new URLSearchParams(window.location.search).get('demo') === '1') {
+          const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+          const sampleLessons = PROTOCOL_DAYS.map((item, index) => ({ id: `demo-dia-${index + 1}`, title: item.title, description: item.description, protocol_checklist: item.checks, video_url: null }))
+          if (!active) return
+          setDemo(true);setPreview(true)
+          setCourse({ id: DEMO_COURSE_ID, title: 'Protocolo Desencalhando Estoque em 7 Dias', slug: DEMO_SLUG })
+          setLessons(sampleLessons);setMaterials([])
+          setData({ run: { lot_name: 'Exemplo: coleção anterior', starting_pieces: 30, goal_cents: 300000, started_on: today }, entries: [], sales: [], today })
+          setSelected(0);loadDraft(sampleLessons[0], [])
+          return
+        }
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) { router.replace(`/login?next=${encodeURIComponent(`/protocolo/${slug}${window.location.search}`)}`); return }
         const previewRequested = new URLSearchParams(window.location.search).get('preview') === '1'
@@ -171,7 +186,7 @@ export default function Protocolo({ params }) {
   }
   function selectDay(index) {
     if (index >= day) return
-    setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
+    setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${demo?'demo=1&':preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   if (loading) return <div className="pro-page pro-center">Abrindo seu Protocolo...</div>
@@ -180,7 +195,7 @@ export default function Protocolo({ params }) {
   return <div className="pro-page">
     <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div><button className="pro-quiet" onClick={async()=>{if(preview){router.push(`/admin/cursos/conteudo?id=${course.id}`);return}await supabase.auth.signOut();router.replace('/login')}}>{preview?'← Voltar ao ADM':'Sair'}</button></header>
     <main className="pro-main">
-      {preview&&<div className="pro-preview" role="status"><strong>Prévia do ADM</strong> · dados fictícios. Você pode navegar e testar os registros; nada aqui é salvo na conta da aluna.</div>}
+      {preview&&<div className="pro-preview" role="status"><strong>{demo?'Demonstração do aplicativo':'Prévia do ADM'}</strong> · dados fictícios. Você pode navegar e testar os registros; nada aqui é salvo na conta da aluna.</div>}
       {error && <div role="alert" className="pro-error">{error}</div>}
       {!data.run ? <section className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Escolha um lote para trabalhar por 7 dias</h2><p>Separe as peças paradas que você quer vender nesta campanha. Use uma meta que faça sentido para esse lote.</p>
         <label>Nome do lote<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: vestidos da coleção anterior" /></label>
