@@ -18,6 +18,9 @@ export default function Calculadora() {
     async function verificar() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
+      const access = await fetch('/api/acessos-app', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      const permissions = access.ok ? await access.json() : null
+      if (permissions?.protocol_only_slug) { router.replace(`/protocolo/${permissions.protocol_only_slug}`); return }
       setCarregando(false)
     }
     verificar()

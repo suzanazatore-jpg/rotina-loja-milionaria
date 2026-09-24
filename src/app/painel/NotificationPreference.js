@@ -32,7 +32,7 @@ async function api(method, body) {
   return data
 }
 
-export default function NotificationPreference({ cores, ouro = '#D4AF37' }) {
+export default function NotificationPreference({ cores, ouro = '#D4AF37', description = 'Recomendamos manter ativado. As notificações lembram você das ações certas, no momento certo, e ajudam a manter rotina, metas e campanhas em movimento.' }) {
   const [enabled, setEnabled] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -102,7 +102,7 @@ export default function NotificationPreference({ cores, ouro = '#D4AF37' }) {
           <div>
             <strong style={{ display: 'block', color: cores.tx, fontSize: 13 }}>Receber notificações</strong>
             <span style={{ display: 'block', color: cores.tx2, fontSize: 11, lineHeight: 1.5, marginTop: 4 }}>
-              Recomendamos manter ativado. As notificações lembram você das ações certas, no momento certo, e ajudam a manter rotina, metas e campanhas em movimento.
+              {description}
             </span>
           </div>
           <button

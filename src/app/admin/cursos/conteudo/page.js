@@ -331,7 +331,7 @@ export default function ConteudoCurso() {
       <section className="conteudo-hero">
         <div className="conteudo-cover" style={course?.cover_image_url ? { backgroundImage: `url(${course.cover_image_url})` } : {}}>{!course?.cover_image_url && <span>{course?.title}</span>}</div>
         <div className="conteudo-info"><h1>{course?.title}</h1><p>{course?.description || course?.subtitle || 'Curso sem descrição.'}</p></div>
-        <div className="conteudo-actions"><button onClick={() => router.push('/painel')}>◉ Visualizar como aluna</button><button onClick={editarCurso}>✎ Editar curso</button><button onClick={excluirCurso}>♲ Apagar</button></div>
+        <div className="conteudo-actions"><button onClick={() => router.push(course?.protocol_enabled ? `/protocolo/${course.slug}` : `/curso/${course?.slug}`)}>◉ Visualizar como aluna</button><button onClick={() => router.push(`/admin/cursos/protocolo?id=${courseId}`)}>✦ Configurar Protocolo</button><button onClick={editarCurso}>✎ Editar curso</button><button onClick={excluirCurso}>♲ Apagar</button></div>
       </section>
       <div className="conteudo-title"><h2>Módulos e Aulas</h2><button onClick={novoModulo}>＋ Adicionar módulo</button></div>
 

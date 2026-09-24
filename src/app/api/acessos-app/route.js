@@ -30,5 +30,11 @@ export async function GET(request) {
   const contents = [...new Set((liberacoes || []).map(item => item.content_key))]
   const active = perfil?.status === 'active'
   const assistant = active && (perfil?.assistant_enabled === true || contents.includes('assistant'))
-  return NextResponse.json({ assistant, team_goals: active && contents.includes('team_goals'), contents })
+  let protocolOnlySlug = null
+  if (active && !contents.length) {
+    const { data: enrollments } = await supabase.from('enrollments').select('courses(slug,is_published,protocol_enabled)')
+      .eq('profile_id', user.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    if (enrollments?.length === 1 && enrollments[0].courses?.is_published && enrollments[0].courses?.protocol_enabled) protocolOnlySlug = enrollments[0].courses.slug
+  }
+  return NextResponse.json({ assistant, team_goals: active && contents.includes('team_goals'), contents, protocol_only_slug: protocolOnlySlug })
 }

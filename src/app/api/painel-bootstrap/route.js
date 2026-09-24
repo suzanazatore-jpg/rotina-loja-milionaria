@@ -89,6 +89,17 @@ async function loadCritical(supabase, user) {
     : [...new Set((appContentsResult.data || []).map(item => item.content_key))]
   const active = isAdmin || profile?.status === 'active'
 
+  let protocolOnlySlug = null
+  if (!isAdmin && active && !contents.length && !programas.length) {
+    const { data: enrollments } = await supabase.from('enrollments')
+      .select('courses(slug,is_published,protocol_enabled)')
+      .eq('profile_id', user.id).eq('status', 'active')
+      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    if (enrollments?.length === 1 && enrollments[0].courses?.is_published && enrollments[0].courses?.protocol_enabled) {
+      protocolOnlySlug = enrollments[0].courses.slug
+    }
+  }
+
   return {
     perfil: legacyProfile,
     termos: termsResult.data
@@ -108,6 +119,7 @@ async function loadCritical(supabase, user) {
       team_goals: active && (isAdmin || contents.includes('team_goals')),
       pricing: active && (isAdmin || contents.includes('pricing')),
       contents,
+      protocol_only_slug: protocolOnlySlug,
     },
     conta: accountResult,
   }
