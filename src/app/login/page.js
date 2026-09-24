@@ -47,7 +47,8 @@ export default function Login() {
     if (error) { setErro('E-mail ou senha incorretos.'); setCarregando(false) }
     else {
       storeLoginEmail(emailNormalizado, manterConectada)
-      router.push('/painel')
+      const next = new URLSearchParams(window.location.search).get('next')
+      router.push(next && /^\/protocolo\/[a-z0-9-]+(?:\?(?:preview=1(?:&aula=[0-9a-f-]+)?|aula=[0-9a-f-]+))?$/.test(next) ? next : '/painel')
     }
   }
 

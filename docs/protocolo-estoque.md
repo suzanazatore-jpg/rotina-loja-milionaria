@@ -7,6 +7,7 @@
 3. Em **Configurar Protocolo**, criar as sete aulas em rascunho. O editor traz um checklist e um texto de lembrete inicial para cada dia.
 4. No editor normal do curso, gravar e cadastrar os sete vídeos, anexar o PDF de cada aula, revisar preços/margens dos exercícios e publicar as sete aulas.
 5. Definir no Protocolo um link HTTPS para a oferta seguinte, ativar a experiência interativa e publicar o curso.
+   O botão **Visualizar como aluna** no editor abre uma prévia exclusiva do ADM com as sete aulas, inclusive rascunhos. Ela usa dados fictícios; navegar, marcar tarefas e registrar vendas na prévia não altera os dados reais. Se a sessão expirou, o login retorna à prévia.
 6. Associar o curso ao plano da oferta do Guru em `plan_courses` e não liberar outros conteúdos do aplicativo nesse plano. O webhook do Guru cria ou reativa a matrícula do Protocolo após uma compra aprovada; uma aluna com apenas essa matrícula entra diretamente na jornada. Também é possível matricular manualmente no ADM.
 7. Conferir as chaves de push já usadas pelo aplicativo. A nova rotina envia um lembrete às 9h de Brasília, durante os sete dias, apenas se a aluna ativou notificações, mantém matrícula ativa e ainda não concluiu a missão do dia.
 

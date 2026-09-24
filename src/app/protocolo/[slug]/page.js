@@ -3,7 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { protocolDay } from '@/lib/protocolGuidance'
+import { protocolDay, protocolGuidance } from '@/lib/protocolGuidance'
 import NotificationPreference from '@/app/painel/NotificationPreference'
 import './protocolo.css'
 
@@ -56,6 +56,7 @@ export default function Protocolo({ params }) {
   const [showSales, setShowSales] = useState(false)
   const [revenueBand, setRevenueBand] = useState('')
   const [teamSize, setTeamSize] = useState('')
+  const [preview, setPreview] = useState(false)
   function loadDraft(item, entries) {
     const saved = entries.find(row => row.lesson_id === item?.id)
     const items = Array.isArray(item?.protocol_checklist) ? item.protocol_checklist.filter(value => typeof value === 'string' && value.trim()) : []
@@ -69,7 +70,7 @@ export default function Protocolo({ params }) {
 
   const call = useCallback(async (action) => {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { router.replace('/login'); throw new Error('Entre na sua conta para continuar.') }
+    if (!session) { router.replace(`/login?next=${encodeURIComponent(`/protocolo/${slug}${window.location.search}`)}`); throw new Error('Entre na sua conta para continuar.') }
     const response = await fetch('/api/protocolo', { method: action ? 'POST' : 'GET', headers: { Authorization: `Bearer ${session.access_token}`, ...(action ? { 'Content-Type': 'application/json' } : {}) }, body: action ? JSON.stringify({ slug, ...action }) : undefined })
     const result = await response.json()
     if (!response.ok) throw new Error(result.error || 'Não foi possível continuar.')
@@ -80,7 +81,22 @@ export default function Protocolo({ params }) {
     async function load() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.replace('/login'); return }
+        if (!user) { router.replace(`/login?next=${encodeURIComponent(`/protocolo/${slug}${window.location.search}`)}`); return }
+        const previewRequested = new URLSearchParams(window.location.search).get('preview') === '1'
+        if (previewRequested) {
+          const { data: { session } } = await supabase.auth.getSession()
+          const response = await fetch(`/api/admin/protocolo?preview=1&slug=${encodeURIComponent(slug)}`, {
+            headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+          })
+          const result = await response.json()
+          if (!response.ok) throw new Error(result.error || 'Não foi possível abrir a prévia.')
+          if (!active) return
+          const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+          setPreview(true);setCourse(result.course);setLessons(result.lessons.slice(0, 7));setMaterials(result.materials)
+          setData({ run: { lot_name: 'Exemplo: coleção anterior', starting_pieces: 30, goal_cents: 300000, started_on: today }, entries: [], sales: [], today })
+          setSelected(0);loadDraft(result.lessons[0],[])
+          return
+        }
         const { data: c, error: ce } = await supabase.from('courses').select('id,slug,title,subtitle,protocol_enabled,protocol_offer_url,is_published').eq('slug', slug).eq('is_published', true).maybeSingle()
         if (ce || !c?.protocol_enabled) throw new Error('Este protocolo não está disponível.')
         const state = await call()
@@ -105,7 +121,7 @@ export default function Protocolo({ params }) {
     return () => { active = false }
   }, [slug, router, call])
 
-  const day = data?.run ? protocolDay(data.run.started_on, data.today) : 0
+  const day = preview ? 7 : data?.run ? protocolDay(data.run.started_on, data.today) : 0
   const lesson = lessons[selected]
   const entry = data?.entries.find(item => item.lesson_id === lesson?.id)
   const checklist = Array.isArray(lesson?.protocol_checklist) ? lesson.protocol_checklist.filter(item => typeof item === 'string' && item.trim()) : []
@@ -116,7 +132,20 @@ export default function Protocolo({ params }) {
 
   async function submit(action, after) {
     setBusy(true);setError('')
-    try { const next = await call(action);setData(next);after?.(next) }
+    try {
+      if (preview) {
+        const next = { ...data }
+        if (action.action === 'sale') next.sales = [{ id: `preview-${Date.now()}`, amount_cents: action.amount_cents, pieces: action.pieces, created_at: new Date().toISOString() }, ...data.sales]
+        if (action.action === 'undo_sale') next.sales = data.sales.filter(item => item.id !== action.sale_id)
+        if (action.action === 'entry') {
+          const entry = { lesson_id: action.lesson_id, checklist: action.checklist, pieces_posted: action.pieces_posted, invited_count: action.invited_count, conversations_count: action.conversations_count, note: action.note, completed_at: action.complete ? new Date().toISOString() : null }
+          next.entries = [...data.entries.filter(item => item.lesson_id !== action.lesson_id), entry]
+          next.guidance = protocolGuidance({ checks: action.checklist, pieces: Number(action.pieces_posted || 0), invites: Number(action.invited_count || 0), conversations: Number(action.conversations_count || 0) })
+        }
+        if (action.action === 'qualify') next.run = { ...data.run, monthly_revenue_band: action.monthly_revenue_band, team_size: action.team_size }
+        setData(next);after?.(next)
+      } else { const next = await call(action);setData(next);after?.(next) }
+    }
     catch (e) { setError(e.message) }
     finally { setBusy(false) }
   }
@@ -142,15 +171,16 @@ export default function Protocolo({ params }) {
   }
   function selectDay(index) {
     if (index >= day) return
-    setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?aula=${lessons[index].id}`, { scroll: false })
+    setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   if (loading) return <div className="pro-page pro-center">Abrindo seu Protocolo...</div>
   if (!course || !data) return <div className="pro-page pro-center"><p>{error || 'Protocolo não disponível.'}</p><button onClick={() => router.push('/painel?secao=conteudos')}>Voltar</button></div>
 
   return <div className="pro-page">
-    <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div><button className="pro-quiet" onClick={async()=>{await supabase.auth.signOut();router.replace('/login')}}>Sair</button></header>
+    <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div><button className="pro-quiet" onClick={async()=>{if(preview){router.push(`/admin/cursos/conteudo?id=${course.id}`);return}await supabase.auth.signOut();router.replace('/login')}}>{preview?'← Voltar ao ADM':'Sair'}</button></header>
     <main className="pro-main">
+      {preview&&<div className="pro-preview" role="status"><strong>Prévia do ADM</strong> · dados fictícios. Você pode navegar e testar os registros; nada aqui é salvo na conta da aluna.</div>}
       {error && <div role="alert" className="pro-error">{error}</div>}
       {!data.run ? <section className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Escolha um lote para trabalhar por 7 dias</h2><p>Separe as peças paradas que você quer vender nesta campanha. Use uma meta que faça sentido para esse lote.</p>
         <label>Nome do lote<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: vestidos da coleção anterior" /></label>
@@ -158,7 +188,7 @@ export default function Protocolo({ params }) {
         {lessons.length!==7||lessons.some(item=>!Array.isArray(item.protocol_checklist)||!item.protocol_checklist.length)?<p>As sete missões ainda estão sendo preparadas pela Suzana.</p>:<button className="pro-primary" disabled={busy} onClick={()=>submit({action:'start',lot_name:lot,starting_pieces:Number(stock),goal_cents:digits(goal)})}>{busy?'Preparando...':'Começar meu Protocolo'}</button>}
       </section> : <>
         <section className="pro-hero"><div><span className="pro-overline">Sua campanha · {data.run.lot_name}</span><h2>{money(totalCents)} <small>em vendas registradas</small></h2><p>{soldPieces} de {data.run.starting_pieces} peças vendidas · {completedCount} de {lessons.length} missões concluídas</p></div><div className="pro-goal"><strong>{percent}% da meta</strong><span>{money(data.run.goal_cents)}</span><div className="pro-bar"><span style={{width:`${percent}%`}} /></div></div></section>
-        <section className="pro-card"><NotificationPreference cores={{borda:'#e2e0d8',card:'#fff',card2:'#f7f6f2',tx:'#1a1a18',tx2:'#686860'}} description="Ative as notificações do aplicativo para receber a missão de cada dia. O aviso abre a aula correspondente." /></section>
+        {!preview&&<section className="pro-card"><NotificationPreference cores={{borda:'#e2e0d8',card:'#fff',card2:'#f7f6f2',tx:'#1a1a18',tx2:'#686860'}} description="Ative as notificações do aplicativo para receber a missão de cada dia. O aviso abre a aula correspondente." /></section>}
         <section className="pro-card pro-sale"><div className="pro-headline"><div><span className="pro-overline">Resultado em tempo real</span><h2>Registrar uma venda</h2></div><button className="pro-quiet" onClick={()=>setShowSales(!showSales)}>{showSales?'Ocultar':'Ver'} lançamentos</button></div>
           <div className="pro-fields"><label>Valor da venda (R$)<input inputMode="decimal" value={saleValue} onChange={e=>setSaleValue(e.target.value)} placeholder="Ex.: 199,90" /></label><label>Peças vendidas<input type="number" min="1" value={salePieces} onChange={e=>setSalePieces(e.target.value)} /></label></div>
           <label className="pro-check"><input type="checkbox" checked={sound} onChange={e=>setSound(e.target.checked)} /> Tocar som ao confirmar</label>
@@ -169,7 +199,8 @@ export default function Protocolo({ params }) {
         {lesson ? <>
           <section className="pro-card"><span className="pro-overline">Dia {selected+1} de 7 · aula</span><h2>{lesson.title}</h2><p>{lesson.description}</p><div className="pro-video">{embed(lesson.video_url)?<iframe src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />:<div>▶ Vídeo em breve. A missão já pode ser feita.</div>}</div></section>
           <section className="pro-card"><span className="pro-overline">A tarefa de hoje</span><h2>Faça e marque cada passo</h2>{checklist.length?<div className="pro-checklist">{checklist.map((item,index)=><label key={`${lesson.id}-${index}`} className="pro-check"><input type="checkbox" checked={!!checks[index]} onChange={e=>setChecks(old=>old.map((v,i)=>i===index?e.target.checked:v))} />{item}</label>)}</div>:<p>A tarefa deste dia será publicada pela Suzana.</p>}
-            {materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>↓ {item.title} <span>Baixar material</span></button>)}
+            {materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" disabled={preview&&item.is_published===false} onClick={()=>downloadMaterial(item)}>↓ {item.title} <span>{preview&&item.is_published===false?'Em rascunho':'Baixar material'}</span></button>)}
+            {preview&&!materials.some(item=>item.lesson_id===lesson.id)&&<p className="pro-material pro-placeholder">↓ PDF da tarefa será exibido aqui quando você anexar o material à aula.</p>}
           </section>
           <section className="pro-card"><span className="pro-overline">Seu registro</span><h2>O que você fez?</h2><p>Esses dados ajudam a orientar sua próxima ação.</p><div className="pro-fields pro-three"><label>Peças postadas<input type="number" min="0" value={piecesPosted} onChange={e=>setPiecesPosted(e.target.value)} placeholder="0" /></label><label>Clientes convidadas<input type="number" min="0" value={invites} onChange={e=>setInvites(e.target.value)} placeholder="0" /></label><label>Conversas<input type="number" min="0" value={conversations} onChange={e=>setConversations(e.target.value)} placeholder="0" /></label></div>
             <label>Me conte como foi<textarea maxLength={2000} value={note} onChange={e=>setNote(e.target.value)} placeholder="Ex.: mostrei 8 vestidos nos stories e convidei 20 clientes..." /></label>
