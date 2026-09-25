@@ -90,13 +90,20 @@ async function loadCritical(supabase, user) {
   const active = isAdmin || profile?.status === 'active'
 
   let protocolOnlySlug = null
-  if (!isAdmin && active && !contents.length && !programas.length) {
-    const { data: enrollments } = await supabase.from('enrollments')
-      .select('courses(slug,is_published,protocol_enabled)')
-      .eq('profile_id', user.id).eq('status', 'active')
-      .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
-    if (enrollments?.length === 1 && enrollments[0].courses?.is_published && enrollments[0].courses?.protocol_enabled) {
-      protocolOnlySlug = enrollments[0].courses.slug
+  let protocols = []
+  if (active) {
+    const result = isAdmin
+      ? await supabase.from('courses').select('id,slug,title,is_published,protocol_enabled').eq('is_published', true).eq('protocol_enabled', true)
+      : await supabase.from('enrollments')
+        .select('courses(id,slug,title,is_published,protocol_enabled)')
+        .eq('profile_id', user.id).eq('status', 'active')
+        .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+    if (result.error) throw result.error
+    const courses = (result.data || []).map(item => isAdmin ? item : item.courses).filter(Boolean)
+    protocols = [...new Map(courses.filter(course => course.is_published && course.protocol_enabled)
+      .map(course => [course.id, { id: course.id, slug: course.slug, title: course.title }])).values()]
+    if (!isAdmin && !contents.length && !programas.length && courses.length === 1 && protocols.length === 1) {
+      protocolOnlySlug = protocols[0].slug
     }
   }
 
@@ -120,6 +127,7 @@ async function loadCritical(supabase, user) {
       pricing: active && (isAdmin || contents.includes('pricing')),
       contents,
       protocol_only_slug: protocolOnlySlug,
+      protocols,
     },
     conta: accountResult,
   }

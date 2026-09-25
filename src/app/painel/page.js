@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import HomeDashboard from './HomeDashboard'
+import ProtocolAccess from './ProtocolAccess'
 import { registerContentAccess } from '@/lib/contentAccess'
 import CampaignJourney from './CampaignJourney'
 import InteractiveCalendar from './InteractiveCalendar'
@@ -170,6 +171,7 @@ export default function Painel() {
   const [assistenteLiberado, setAssistenteLiberado] = useState(false)
   const [metasLiberadas, setMetasLiberadas] = useState(false)
   const [precificacaoLiberada, setPrecificacaoLiberada] = useState(false)
+  const [protocolos, setProtocolos] = useState([])
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
   const [acoesCalendario, setAcoesCalendario] = useState([])
@@ -291,6 +293,7 @@ export default function Painel() {
         setAssistenteLiberado(dados.acessos?.assistant === true)
         setMetasLiberadas(dados.acessos?.team_goals === true)
         setPrecificacaoLiberada(dados.acessos?.pricing === true)
+        setProtocolos(dados.acessos?.protocols || [])
         setDadosConta(dados.conta || { planos: [], inicio_em: null, ultimo_acesso_em: null, expira_em: null })
 
         setCarregando(false)
@@ -565,6 +568,7 @@ export default function Painel() {
           {/* ─── INÍCIO ─── */}
           {secao === 'inicio' && (
             <HomeDashboard
+              protocols={protocolos}
               userId={usuario?.id}
               nome={nomeExibe}
               saudacao={saudacao}
@@ -630,6 +634,7 @@ export default function Painel() {
               {/* CONTEÚDOS */}
               {secao === 'conteudos' && (
                 <div className="premium-hub">
+                  <ProtocolAccess protocols={protocolos} cores={cores} />
                   <div className="premium-hub-heading"><p>CONTEÚDOS LIBERADOS</p><h2>Acesse seus materiais</h2><span>Cursos, campanhas, calendários e mentorias em um só lugar.</span></div>
                   <div className="premium-hub-grid">
                     <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />

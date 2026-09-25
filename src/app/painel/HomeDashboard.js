@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
+import ProtocolAccess from './ProtocolAccess'
 import AppIcon from '@/app/components/AppIcon'
 import { planoDoDia } from '@/lib/dailyPlan'
 import { supabase } from '@/lib/supabase'
@@ -32,6 +33,8 @@ function datasAbertasNoMes(data, pesos, datasFechadas = []) {
 
 export default function HomeDashboard({
   userId,
+  cores,
+  protocols = [],
   nome,
   saudacao,
   irPara,
@@ -141,6 +144,8 @@ export default function HomeDashboard({
       </div>
       <div className="premium-simple-photo"><Image src="/suzana-autoridade.jpg" alt="Suzana Zatorre" fill sizes="(max-width: 899px) 58vw, 55vw" priority /></div>
     </section>
+
+    <ProtocolAccess protocols={protocols} cores={cores} />
 
     <section className="premium-simple-section" aria-labelledby="fazer-agora">
       <div className="premium-simple-heading">

@@ -94,7 +94,10 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
       subtitle: item.subtitle,
       courses: (item.course_ids || []).map(id => porId[id]).filter(Boolean),
     })).filter(item => item.courses.length)
-    return configuradas.length ? configuradas : [{ id: 'meus-cursos', title: '', subtitle: '', courses: cursos }]
+    const exibidos = new Set(configuradas.flatMap(secao => secao.courses.map(curso => curso.id)))
+    const restantes = cursos.filter(curso => !exibidos.has(curso.id))
+    if (restantes.length) configuradas.push({ id: 'outros-cursos', title: '', subtitle: '', courses: restantes })
+    return configuradas
   }, [carrosseis, cursos])
 
   if (carregando) return <p style={{ color: cores.tx2, textAlign: 'center', padding: '50px 0' }}>Carregando seus cursos...</p>
