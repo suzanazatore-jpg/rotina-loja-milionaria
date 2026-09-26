@@ -646,7 +646,7 @@ export default function Painel() {
                     {campanhasLiberadas && <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />}
                     {calendarioLiberado && <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />}
                     {precificacaoLiberada && <CardAcesso cores={cores} icone="content" titulo="Precificação e Lucro" sub="Preço, margem e descontos" onClick={() => irPara('precificacao')} />}
-                    <CardAcesso cores={cores} icone="quickCourses" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
+                    <CardAcesso cores={cores} icone="content" titulo="Bônus" sub="Seus PDFs de bônus" onClick={() => irPara('bonus')} />
                     {mentoriaLiberada && <CardAcesso cores={cores} icone="quickCourses" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
                   </div>
                 </div>
