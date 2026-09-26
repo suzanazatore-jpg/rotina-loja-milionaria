@@ -1,3 +1,4 @@
+import { appContentKeys } from '@/lib/appContentAccessServer'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
@@ -8,6 +9,7 @@ export async function GET(request) {
   const supabase = adminClient(); const token = request.headers.get('authorization')?.replace('Bearer ', '')
   if (!token) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
   const { data: { user } } = await supabase.auth.getUser(token); if (!user) return NextResponse.json({ error: 'Sessão inválida.' }, { status: 401 })
+  if (!(await appContentKeys(supabase, user)).includes('routine')) return NextResponse.json({ error: 'Conteúdo não incluído no seu acesso.' }, { status: 403 })
   const semanaInicio = new URL(request.url).searchParams.get('semana_inicio')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(semanaInicio || '')) return NextResponse.json({ error: 'Semana inválida.' }, { status: 400 })
   const { data: item, error } = await supabase.from('rotinas').select('*').eq('semana_inicio', semanaInicio).maybeSingle()

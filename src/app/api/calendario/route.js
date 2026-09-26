@@ -1,3 +1,4 @@
+import { appContentKeys } from '@/lib/appContentAccessServer'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
@@ -10,6 +11,7 @@ export async function GET(request) {
   const token = request.headers.get('authorization')?.replace('Bearer ', '')
   const { data: { user } } = token ? await supabase.auth.getUser(token) : { data: { user: null } }
   if (!user) return NextResponse.json({ error: 'Não autorizado.' }, { status: 403 })
+  if (!(await appContentKeys(supabase, user)).includes('calendar')) return NextResponse.json({ error: 'Conteúdo não incluído no seu acesso.' }, { status: 403 })
   const [{ data, error }, { data: acoes, error: actionsError }] = await Promise.all([
     supabase.from('calendario').select('*').order('mes_ano', { ascending: false }),
     supabase

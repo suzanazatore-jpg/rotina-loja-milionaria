@@ -172,6 +172,7 @@ export default function Painel() {
   const [metasLiberadas, setMetasLiberadas] = useState(false)
   const [precificacaoLiberada, setPrecificacaoLiberada] = useState(false)
   const [protocolos, setProtocolos] = useState([])
+  const [conteudosLiberados, setConteudosLiberados] = useState([])
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
   const [acoesCalendario, setAcoesCalendario] = useState([])
@@ -294,6 +295,7 @@ export default function Painel() {
         setMetasLiberadas(dados.acessos?.team_goals === true)
         setPrecificacaoLiberada(dados.acessos?.pricing === true)
         setProtocolos(dados.acessos?.protocols || [])
+        setConteudosLiberados(dados.acessos?.contents || [])
         setDadosConta(dados.conta || { planos: [], inicio_em: null, ultimo_acesso_em: null, expira_em: null })
 
         setCarregando(false)
@@ -423,10 +425,14 @@ export default function Painel() {
   // É admin? (mostra o botão de escritório só pra ela)
   const isAdmin = usuario?.email === ADMIN_EMAIL
 
+  const rotinaLiberada = conteudosLiberados.includes('routine')
+  const campanhasLiberadas = conteudosLiberados.includes('campaigns')
+  const calendarioLiberado = conteudosLiberados.includes('calendar')
+
   const menu = [
     { id: 'inicio', icone: 'home', label: 'Hoje' },
-    { id: 'vendas', icone: 'goals', label: 'Vendas e Metas' },
-    { id: 'rotina', icone: 'routine', label: 'Rotina' },
+    ...(metasLiberadas ? [{ id: 'vendas', icone: 'goals', label: 'Vendas e Metas' }] : []),
+    ...(rotinaLiberada ? [{ id: 'rotina', icone: 'routine', label: 'Rotina' }] : []),
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
     { id: 'ajuda', icone: 'support', label: 'Suporte' },
@@ -437,13 +443,13 @@ export default function Painel() {
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     { id: 'ajuda', icone: 'support', label: 'Suporte' },
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
-    { id: 'assistente', icone: 'quickAssistant', label: 'Assistente' },
+    ...(assistenteLiberado ? [{ id: 'assistente', icone: 'quickAssistant', label: 'Assistente' }] : []),
   ]
 
   const menuMobileDrawer = [
     { id: 'inicio', icone: 'home', label: 'Hoje' },
-    { id: 'vendas', icone: 'goals', label: 'Vendas e Metas' },
-    { id: 'rotina', icone: 'routine', label: 'Rotina' },
+    ...(metasLiberadas ? [{ id: 'vendas', icone: 'goals', label: 'Vendas e Metas' }] : []),
+    ...(rotinaLiberada ? [{ id: 'rotina', icone: 'routine', label: 'Rotina' }] : []),
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
     { id: 'mais', icone: 'more', label: 'Mais' },
@@ -499,6 +505,7 @@ export default function Painel() {
   }
 
   function irPara(id) {
+    if ((id === 'rotina' && !rotinaLiberada) || (id === 'campanhas' && !campanhasLiberadas) || (id === 'calendario' && !calendarioLiberado)) { setSecao('conteudos'); setMenuMobile(false); return }
     if (id === 'calculadora') { router.push('/calculadora'); return }
     if (id === 'markup') { router.push('/markup'); return }
     if (id === 'mentoria') { router.push('/mentoria'); return }
@@ -568,6 +575,9 @@ export default function Painel() {
           {/* ─── INÍCIO ─── */}
           {secao === 'inicio' && (
             <HomeDashboard
+              rotinaLiberada={rotinaLiberada}
+              campanhasLiberadas={campanhasLiberadas}
+              calendarioLiberado={calendarioLiberado}
               protocols={protocolos}
               userId={usuario?.id}
               nome={nomeExibe}
@@ -637,8 +647,8 @@ export default function Painel() {
                   <ProtocolAccess protocols={protocolos} cores={cores} />
                   <div className="premium-hub-heading"><p>CONTEÚDOS LIBERADOS</p><h2>Acesse seus materiais</h2><span>Cursos, campanhas, calendários e mentorias em um só lugar.</span></div>
                   <div className="premium-hub-grid">
-                    <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />
-                    <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />
+                    {campanhasLiberadas && <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />}
+                    {calendarioLiberado && <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />}
                     {precificacaoLiberada && <CardAcesso cores={cores} icone="content" titulo="Precificação e Lucro" sub="Preço, margem e descontos" onClick={() => irPara('precificacao')} />}
                     <CardAcesso cores={cores} icone="quickCourses" titulo="Meus Cursos" sub="Cursos liberados" onClick={() => irPara('cursos')} />
                     {mentoriaLiberada && <CardAcesso cores={cores} icone="quickCourses" titulo="Mentorias" sub="Aulas gravadas" onClick={() => irPara('mentoria')} />}
@@ -766,8 +776,10 @@ export default function Painel() {
 
               {secao === 'metas-bloqueadas' && <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />}
 
+              {((secao === 'rotina' && !rotinaLiberada) || (secao === 'campanhas' && !campanhasLiberadas) || (secao === 'calendario' && !calendarioLiberado)) && <div style={{ padding: 24 }}><p>Este conteúdo não está incluído no seu acesso.</p><VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} /></div>}
+
               {/* CAMPANHAS DE VENDA (PDFs por mês) */}
-              {secao === 'campanhas' && (
+              {secao === 'campanhas' && campanhasLiberadas && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
                   <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.campaigns?.title || 'Como usar a campanha do mês'} videoUrl={videosExplicativos.campaigns?.video_url} />
@@ -790,7 +802,7 @@ export default function Painel() {
               )}
 
               {/* CALENDÁRIO DE CONTEÚDO INTERATIVO */}
-              {secao === 'calendario' && (
+              {secao === 'calendario' && calendarioLiberado && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
                   <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.calendar?.title || 'Como usar o calendário de postagens'} videoUrl={videosExplicativos.calendar?.video_url} />
@@ -818,7 +830,7 @@ export default function Painel() {
               )}
 
               {/* ROTINA SEMANAL INTERATIVA */}
-              {secao === 'rotina' && (
+              {secao === 'rotina' && rotinaLiberada && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
                   <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.routine?.title || 'Como executar a rotina da loja'} videoUrl={videosExplicativos.routine?.video_url} />

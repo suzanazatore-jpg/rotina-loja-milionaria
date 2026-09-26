@@ -35,6 +35,9 @@ export default function HomeDashboard({
   userId,
   cores,
   protocols = [],
+  rotinaLiberada = false,
+  campanhasLiberadas = false,
+  calendarioLiberado = false,
   nome,
   saudacao,
   irPara,
@@ -62,7 +65,7 @@ export default function HomeDashboard({
     let ativo = true
 
     async function carregarResumo() {
-      if (!userId) return
+      if (!userId || !metasLiberadas) return
       const inicioMes = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-01`
       const [{ data: goal }, { data: sales }] = await Promise.all([
         supabase.from('sales_goals').select('monthly_target,weekday_weights,closed_dates').eq('owner_id', userId).eq('month_start', inicioMes).maybeSingle(),
@@ -84,13 +87,13 @@ export default function HomeDashboard({
 
     void carregarResumo()
     return () => { ativo = false }
-  }, [dataHoje, hoje, userId])
+  }, [dataHoje, hoje, userId, metasLiberadas])
 
   useEffect(() => {
     let ativo = true
 
     async function carregarProgresso() {
-      if (!userId) return
+      if (!userId || !rotinaLiberada) return
       const { data } = await supabase.from('daily_task_progress').select('task_id').eq('owner_id', userId).eq('task_date', dataHoje)
       if (ativo) {
         const ids = (data || []).map(item => item.task_id)
@@ -101,7 +104,7 @@ export default function HomeDashboard({
 
     void carregarProgresso()
     return () => { ativo = false }
-  }, [dataHoje, userId])
+  }, [dataHoje, userId, rotinaLiberada])
 
   const pct = resumo.meta ? Math.round(resumo.mes / resumo.meta * 100) : 0
   const diasAbertos = datasAbertasNoMes(hoje, resumo.pesos, resumo.datasFechadas)
@@ -136,31 +139,31 @@ export default function HomeDashboard({
         <p>{saudacao},</p>
         <h1>{nome}!</h1>
         <span>Vamos colocar sua loja em movimento?</span>
-        <div className="premium-simple-month-progress">
+        {metasLiberadas && <div className="premium-simple-month-progress">
           <div><span>Meta de {mesAtual}</span><b>{pct}%</b></div>
           <i><em style={{ width: `${Math.min(100, pct)}%` }} /></i>
           <small>{brl(resumo.mes)} de {brl(resumo.meta)}</small>
-        </div>
+        </div>}
       </div>
       <div className="premium-simple-photo"><Image src="/suzana-autoridade.jpg" alt="Suzana Zatorre" fill sizes="(max-width: 899px) 58vw, 55vw" priority /></div>
     </section>
 
     <ProtocolAccess protocols={protocols} cores={cores} />
 
-    <section className="premium-simple-section" aria-labelledby="fazer-agora">
+    {(metasLiberadas || rotinaLiberada) && <section className="premium-simple-section" aria-labelledby="fazer-agora">
       <div className="premium-simple-heading">
         <div><small>PRIORIDADE DO DIA</small><h2 id="fazer-agora">O que fazer agora</h2></div>
         <span>{dataPorExtenso}</span>
       </div>
 
       <article className="premium-simple-priority">
-        <div className="premium-simple-number">
+        {metasLiberadas && <div className="premium-simple-number">
           <small>{faltaHoje > 0 ? 'FALTA VENDER HOJE' : metaHoje ? 'RESULTADO DE HOJE' : 'META DE HOJE'}</small>
           <strong>{metaHoje ? (faltaHoje > 0 ? brl(faltaHoje) : 'Meta batida!') : 'Defina sua meta'}</strong>
           <span>Vendido hoje: <b>{brl(resumo.hoje)}</b></span>
-        </div>
+        </div>}
 
-        <div className="premium-simple-next">
+        {rotinaLiberada && <div className="premium-simple-next">
           <i><AppIcon name="routine" size={24} /></i>
           <div>
             <small>PRÓXIMA AÇÃO DA ROTINA</small>
@@ -168,32 +171,32 @@ export default function HomeDashboard({
             <span>{proximaTarefa?.descricao?.replace('{meta_diaria}', brl(metaHoje)) || planoHoje.orientacao}</span>
             {tarefasHoje.length > 0 && <em>{totalConcluidas} de {tarefasHoje.length} ações concluídas</em>}
           </div>
-        </div>
+        </div>}
 
         <div className="premium-simple-buttons">
-          <button className="primary" type="button" onClick={() => irPara('lancar-venda')}>＋ Lançar venda</button>
-          <button type="button" onClick={() => irPara('rotina')}>Abrir rotina →</button>
+          {metasLiberadas && <button className="primary" type="button" onClick={() => irPara('lancar-venda')}>＋ Lançar venda</button>}
+          {rotinaLiberada && <button type="button" onClick={() => irPara('rotina')}>Abrir rotina →</button>}
         </div>
       </article>
-    </section>
+    </section>}
 
-    <section className="premium-simple-section premium-simple-other" aria-labelledby="outras-acoes">
+    {(campanhasLiberadas || calendarioLiberado) && <section className="premium-simple-section premium-simple-other" aria-labelledby="outras-acoes">
       <div className="premium-simple-heading"><div><small>DEPOIS DA PRIORIDADE</small><h2 id="outras-acoes">Outras ações de hoje</h2></div></div>
 
       <div className="premium-simple-action-list">
-        <article>
+        {campanhasLiberadas && <article>
           <i><AppIcon name="campaigns" size={22} /></i>
           <div><small>CAMPANHA DO MÊS</small><strong>{campaign?.titulo || 'Campanha mensal'}</strong><span>{campaign?.descricao || 'Abra para acompanhar a estratégia e as etapas da campanha.'}</span></div>
           <button type="button" onClick={() => irPara('campanhas')}>Abrir campanha</button>
-        </article>
+        </article>}
 
-        <article>
+        {calendarioLiberado && <article>
           <i><AppIcon name="calendar" size={22} /></i>
           <div><small>CALENDÁRIO DE CONTEÚDO</small><strong>{acaoDestaque?.title || 'Calendário de hoje'}</strong><span>{acaoDestaque ? [acaoDestaque.channel, acaoDestaque.content_format].filter(Boolean).join(' • ') || `${acoesHoje.length} ação programada` : 'Nenhuma ação programada para hoje. Consulte os próximos dias.'}</span></div>
           <button type="button" onClick={() => irPara('calendario')}>Ver calendário</button>
-        </article>
+        </article>}
       </div>
-    </section>
+    </section>}
 
     <section className="premium-simple-section premium-simple-access" aria-labelledby="acessos-rapidos">
       <div className="premium-simple-heading"><div><small>ATALHOS</small><h2 id="acessos-rapidos">Acessos rápidos</h2></div></div>

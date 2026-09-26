@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
+import { appContentKeys } from '@/lib/appContentAccessServer'
 import { loadStudentAccount } from '@/lib/studentAccountServer'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
@@ -139,17 +140,19 @@ async function signFile(supabase, item, bucket) {
   return { ...item, arquivo_url: data?.signedUrl || null }
 }
 
-async function loadContent(supabase, weekStart) {
+async function loadContent(supabase, weekStart, user) {
+  const keys = await appContentKeys(supabase, user)
+  const empty = Promise.resolve({ data: [], error: null })
   const [calendarResult, calendarActionsResult, campaignsResult, routineResult, bannersResult, tutorialVideosResult] = await Promise.allSettled([
-    supabase.from('calendario').select('*').order('mes_ano', { ascending: false }),
-    supabase
+    keys.includes('calendar') ? supabase.from('calendario').select('*').order('mes_ano', { ascending: false }) : empty,
+    keys.includes('calendar') ? supabase
       .from('calendar_actions')
       .select('id,planning_month,action_date,title,description,channel,content_format,product_cta,content_text,material_url,sort_order')
       .eq('is_published', true)
       .order('action_date', { ascending: true })
-      .order('sort_order', { ascending: true }),
-    supabase.from('campanhas').select('*').order('mes_ano', { ascending: false }),
-    supabase.from('rotinas').select('*').eq('semana_inicio', weekStart).maybeSingle(),
+      .order('sort_order', { ascending: true }) : empty,
+    keys.includes('campaigns') ? supabase.from('campanhas').select('*').order('mes_ano', { ascending: false }) : empty,
+    keys.includes('routine') ? supabase.from('rotinas').select('*').eq('semana_inicio', weekStart).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase
       .from('panel_banners')
       .select('id,tag,title,body,image_url,link_url,sort_order')
@@ -207,7 +210,7 @@ export async function GET(request) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart || '')) {
         return privateJson({ error: 'Semana inválida.' }, { status: 400 })
       }
-      return privateJson(await loadContent(supabase, weekStart))
+      return privateJson(await loadContent(supabase, weekStart, user))
     }
 
     return privateJson({ error: 'Carga inválida.' }, { status: 400 })
