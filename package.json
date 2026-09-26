@@ -15,7 +15,8 @@
     "pdf-parse": "2.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "web-push": "3.6.7"
+    "web-push": "3.6.7",
+    "pdfjs-dist": "5.4.296"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
