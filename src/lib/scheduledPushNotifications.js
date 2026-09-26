@@ -1,3 +1,4 @@
+import { withoutProtocolStudents } from '@/lib/protocolNotificationAudience'
 import { createClient } from '@supabase/supabase-js'
 import { getVapidPublicKey, sendPushNotification } from '@/lib/pushNotifications'
 import { planoDoDia } from '@/lib/dailyPlan'
@@ -241,7 +242,7 @@ async function filterEligibleSubscriptions(supabase, subscriptions) {
   if (legacyResult.error) throw legacyResult.error
   const profiles = new Map((profilesResult.data || []).map(item => [item.id, item]))
   const legacyProfiles = new Map((legacyResult.data || []).map(item => [item.id, item]))
-  return subscriptions.flatMap(subscription => {
+  return withoutProtocolStudents(supabase, subscriptions.flatMap(subscription => {
     const profile = profiles.get(subscription.user_id)
     const legacy = legacyProfiles.get(subscription.user_id)
     if (profile && profile.status !== 'active') return []
@@ -251,7 +252,7 @@ async function filterEligibleSubscriptions(supabase, subscriptions) {
       if (expiresAt < new Date()) return []
     }
     return [{ ...subscription, firstName: firstName(profile?.name || legacy?.nome) }]
-  })
+  }))
 }
 
 async function loadAllEligibleUsers(supabase, planIds = []) {
@@ -291,7 +292,7 @@ async function loadAllEligibleUsers(supabase, planIds = []) {
       email: profile?.email || legacy?.email || '',
     })
   }
-  return users
+  return withoutProtocolStudents(supabase, users)
 }
 
 async function markInactive(supabase, id) {

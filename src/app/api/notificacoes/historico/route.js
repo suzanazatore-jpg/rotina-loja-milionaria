@@ -1,3 +1,4 @@
+import { protocolNotificationUserIds } from '@/lib/protocolNotificationAudience'
 import { createClient } from '@supabase/supabase-js'
 
 export const runtime = 'nodejs'
@@ -24,18 +25,22 @@ export async function GET(request) {
   const user = await authenticatedUser(request, supabase)
   if (!user) return Response.json({ error: 'Não autorizado.' }, { status: 401, headers: noStore })
 
+  let protocolOnly
+  try { protocolOnly = (await protocolNotificationUserIds(supabase, [user.id])).has(user.id) }
+  catch { return Response.json({ error: 'Não foi possível verificar suas notificações.' }, { status: 503, headers: noStore }) }
+  const scoped = query => protocolOnly ? query.like('target_url', '/protocolo/%') : query
   const [historyResult, unreadResult] = await Promise.all([
-    supabase
+    scoped(supabase
       .from('user_notifications')
       .select('id,notification_type,title,body,target_url,scheduled_for,sent_at,read_at,opened_at')
       .eq('user_id', user.id)
       .order('sent_at', { ascending: false })
-      .limit(50),
-    supabase
+      .limit(50)),
+    scoped(supabase
       .from('user_notifications')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
-      .is('read_at', null),
+      .is('read_at', null)),
   ])
 
   if (historyResult.error || unreadResult.error) {

@@ -3,7 +3,7 @@
 import { normalizeProtocolProducts } from '@/lib/protocolProducts'
 import ProductEditor from './ProductEditor'
 
-import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { protocolDay, protocolGuidance } from '@/lib/protocolGuidance'
@@ -59,7 +59,10 @@ export default function Protocolo({ params }) {
   const [goal, setGoal] = useState('')
   const [saleValue, setSaleValue] = useState('')
   const [salePieces, setSalePieces] = useState('1')
-  const [sound, setSound] = useState(true)
+  const audioContext = useRef(null)
+  const pdfRequest = useRef(0)
+  const [pdfLoading, setPdfLoading] = useState(false)
+  const [pdfError, setPdfError] = useState('')
   const [checks, setChecks] = useState([])
   const [piecesPosted, setPiecesPosted] = useState('')
   const [invites, setInvites] = useState('')
@@ -187,26 +190,61 @@ export default function Protocolo({ params }) {
       void submit(action,()=>setEditingProducts(false))
     }catch(e){setError(e.message)}
   }
-  function playSound() {
-    if (!sound) return
+  function prepareSound() {
     try {
-      const Ctx = window.AudioContext || window.webkitAudioContext
-      if (!Ctx) return
-      const ctx = new Ctx(), start = ctx.currentTime
-      ;[784,1046,1318].forEach((hz,i) => { const o=ctx.createOscillator(),g=ctx.createGain(),at=start+i*.09;o.frequency.value=hz;g.gain.setValueAtTime(.05,at);g.gain.exponentialRampToValueAtTime(.001,at+.28);o.connect(g);g.connect(ctx.destination);o.start(at);o.stop(at+.3) })
-      setTimeout(() => ctx.close(), 1000)
-    } catch {}
+      const Ctx=window.AudioContext||window.webkitAudioContext
+      if(!Ctx)return
+      if(!audioContext.current||audioContext.current.state==='closed')audioContext.current=new Ctx()
+      // Resume during the actual tap, before the request, for mobile autoplay rules.
+      void audioContext.current.resume().catch(()=>{})
+    }catch{}
   }
-  async function downloadMaterial(item) {
-    setError('')
+  function playSound() {
+    const ctx=audioContext.current
+    if(!ctx||ctx.state!=='running')return
+    try {
+      const start=ctx.currentTime
+      // Short drawer clicks followed by the metallic cash-register bell.
+      for(const delay of [0,.07,.14]){
+        const buffer=ctx.createBuffer(1,Math.ceil(ctx.sampleRate*.055),ctx.sampleRate)
+        const samples=buffer.getChannelData(0)
+        for(let i=0;i<samples.length;i++)samples[i]=(Math.random()*2-1)*(1-i/samples.length)
+        const noise=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),gain=ctx.createGain()
+        noise.buffer=buffer;filter.type='highpass';filter.frequency.value=1800;gain.gain.value=.12
+        noise.connect(filter);filter.connect(gain);gain.connect(ctx.destination);noise.start(start+delay)
+      }
+      for(const [hz,volume] of [[1550,.14],[2325,.07],[3875,.025]]){
+        const tone=ctx.createOscillator(),gain=ctx.createGain(),at=start+.18
+        tone.type='sine';tone.frequency.value=hz;gain.gain.setValueAtTime(.0001,at)
+        gain.gain.exponentialRampToValueAtTime(volume,at+.008);gain.gain.exponentialRampToValueAtTime(.0001,at+1.1)
+        tone.connect(gain);gain.connect(ctx.destination);tone.start(at);tone.stop(at+1.15)
+      }
+    }catch{}
+  }
+  const downloadMaterial = useCallback(async (item) => {
+    const request=++pdfRequest.current
+    setPdfLoading(true);setPdfError('');setPdfUrl('')
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const response = await fetch(`/api/material-curso?id=${encodeURIComponent(item.id)}`, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
       const result = await response.json()
       if (!response.ok || !result.url) throw new Error(result.error || 'Material indisponível.')
-      setPdfUrl(result.url)
-    } catch (e) { setError(e.message) }
-  }
+      if(request===pdfRequest.current)setPdfUrl(`${result.url.split('#')[0]}#view=Fit&toolbar=1`)
+    } catch (e) { if(request===pdfRequest.current)setPdfError(e.message) }
+    finally { if(request===pdfRequest.current)setPdfLoading(false) }
+  }, [])
+  useEffect(()=>{
+    const material=materials.find(item=>item.lesson_id===lesson?.id)
+    let active=true
+    const requests=pdfRequest
+    Promise.resolve().then(()=>{
+      if(!active)return
+      if(material)void downloadMaterial(material)
+      else {setPdfUrl('');setPdfError('');setPdfLoading(false)}
+    })
+    return ()=>{active=false;requests.current++}
+  },[lesson?.id,materials,downloadMaterial])
+  useEffect(()=>()=>{if(audioContext.current)void audioContext.current.close().catch(()=>{})},[])
   function selectDay(index) {
     if (index >= day) return
     setPdfUrl('');setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${demo?'demo=1&':preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
@@ -223,7 +261,7 @@ export default function Protocolo({ params }) {
       {error && <div role="alert" className="pro-error">{error}</div>}
       {lesson && <section className="pro-card pro-lesson-first"><div className="pro-video">{embed(lesson.video_url) ? <iframe key={lesson.id} src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <p>Vídeo ainda não disponível.</p>}</div><span className="pro-overline">Dia {selected+1} de 7 · aula + missão</span><h2>{lesson.title}</h2><p>{lesson.description}</p></section>}
       <nav className="pro-days" aria-label="Dias do Protocolo">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
-      {lesson && <section className="pro-card"><span className="pro-overline">Tarefa do dia</span>{materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>Abrir {item.title} <span>Ler PDF no aplicativo</span></button>)}{pdfUrl && <iframe className="pro-pdf" src={pdfUrl} title="PDF da tarefa do dia" />}</section>}
+      {lesson && <section className="pro-card"><span className="pro-overline">Tarefa do dia</span>{materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>Abrir {item.title} <span>Ler PDF no aplicativo</span></button>)}{pdfLoading&&<p role="status">Abrindo a tarefa em PDF…</p>}{pdfError&&<p role="alert">{pdfError} Toque no arquivo acima para tentar novamente.</p>}{pdfUrl && <iframe className="pro-pdf" src={pdfUrl} title="PDF da tarefa do dia" />}</section>}
       {!data.run ? <section className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Quais produtos você vai vender?</h2><p>Monte a lista de produtos da sua campanha de 7 dias. O total de peças será somado automaticamente.</p>
         <label>Nome da campanha (opcional)<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: estoque da coleção anterior" /></label>
         <ProductEditor products={products} setProducts={setProducts} busy={busy} />
@@ -248,8 +286,7 @@ export default function Protocolo({ params }) {
         {!preview&&<section className="pro-card"><NotificationPreference cores={{borda:'#e2e0d8',card:'#fff',card2:'#f7f6f2',tx:'#1a1a18',tx2:'#686860'}} description="Ative as notificações do aplicativo para receber a missão de cada dia. O aviso abre a aula correspondente." /></section>}
         <section className="pro-card pro-sale"><div className="pro-headline"><div><span className="pro-overline">Resultado em tempo real</span><h2>Registrar uma venda</h2></div><button className="pro-quiet" onClick={()=>setShowSales(!showSales)}>{showSales?'Ocultar':'Ver'} lançamentos</button></div>
           <div className="pro-fields"><label>Valor da venda (R$)<input inputMode="decimal" value={saleValue} onChange={e=>setSaleValue(e.target.value)} placeholder="Ex.: 199,90" /></label><label>Peças vendidas<input type="number" min="1" value={salePieces} onChange={e=>setSalePieces(e.target.value)} /></label></div>
-          <label className="pro-check"><input type="checkbox" checked={sound} onChange={e=>setSound(e.target.checked)} /> Tocar som ao confirmar</label>
-          <button className="pro-primary" disabled={busy} onClick={()=>submit({action:'sale',amount_cents:digits(saleValue),pieces:Number(salePieces)},()=>{setSaleValue('');setSalePieces('1');playSound()})}>{busy?'Salvando...':'Confirmar venda'}</button>
+          <button className="pro-primary" disabled={busy} onClick={()=>{prepareSound();void submit({action:'sale',amount_cents:digits(saleValue),pieces:Number(salePieces)},()=>{setSaleValue('');setSalePieces('1');playSound()})}}>{busy?'Salvando...':'Confirmar venda'}</button>
           {showSales && <ul className="pro-sales-list">{data.sales.length ? data.sales.map((sale,i)=><li key={sale.id}><span>{sale.pieces} {sale.pieces===1?'peça':'peças'} · {new Date(sale.created_at).toLocaleDateString('pt-BR')}</span><strong>{money(sale.amount_cents)}</strong>{i===0&&<button disabled={busy} onClick={()=>submit({action:'undo_sale',sale_id:sale.id})}>Desfazer</button>}</li>):<li>Nenhuma venda lançada ainda.</li>}</ul>}
         </section>
           <section className="pro-card"><button className="pro-help-toggle" onClick={()=>setHelp(help?'':'options')}>Ainda não vendi. O que faço? {help?'−':'+'}</button>{help&&<div className="pro-help">{['Poucas clientes viram','Viram, mas não perguntaram','Perguntaram, mas não compraram'].map((title,i)=><button key={title} onClick={()=>setHelp(String(i))}>{title}</button>)}{help!=='options'&&<p>{['Priorize clientes que já conhecem a loja e confira se o convite explica quando e como comprar.','Mostre foto real, tamanho, preço e uma combinação. Peça uma resposta simples à cliente.','Retome cada conversa com a peça de interesse e descubra qual informação falta para decidir.'][Number(help)]}</p>}</div>}</section>
