@@ -1,3 +1,4 @@
+import { normalizeProtocolProducts } from '@/lib/protocolProducts'
 import { PROTOCOL_EDITING_OPEN } from '@/lib/protocolEditing'
 import { createClient } from '@supabase/supabase-js'
 import { protocolDay, protocolGuidance } from '@/lib/protocolGuidance'
@@ -77,11 +78,27 @@ export async function POST(request) {
         return json({ error: 'As sete missões ainda estão sendo preparadas.' }, 409)
       }
       const lot = String(body.lot_name || '').trim()
-      const pieces = Number(body.starting_pieces), goal = Number(body.goal_cents)
+      let productList = [], pieces = Number(body.starting_pieces)
+      if (body.products !== undefined) {
+        try { const parsed = normalizeProtocolProducts(body.products); productList = parsed.products; pieces = parsed.total } catch (error) { return json({ error: error.message }, 400) }
+      }
+      const goal = Number(body.goal_cents)
       if (!lot || lot.length > 120 || !Number.isInteger(pieces) || pieces < 1 || pieces > 100000 || !Number.isSafeInteger(goal) || goal < 100 || goal > 100000000000) return json({ error: 'Confira o lote, a quantidade e a meta.' }, 400)
       const { data: existing } = await supabase.from('protocol_runs').select('owner_id').match(base).maybeSingle()
       if (existing) return json({ error: 'Sua campanha já começou.' }, 409)
-      const { error } = await supabase.from('protocol_runs').insert({ ...base, lot_name: lot, starting_pieces: pieces, goal_cents: goal, started_on: todayInBrazil() })
+      const { error } = await supabase.from('protocol_runs').insert({ ...base, lot_name: lot, products: productList, starting_pieces: pieces, goal_cents: goal, started_on: todayInBrazil() })
+      if (error) throw error
+    } else if (body.action === 'products') {
+      let parsed
+      try { parsed = normalizeProtocolProducts(body.products) } catch (error) { return json({ error: error.message }, 400) }
+      const { data: run, error: runError } = await supabase.from('protocol_runs').select('owner_id').match(base).maybeSingle()
+      if (runError) throw runError
+      if (!run) return json({ error: 'Comece a campanha primeiro.' }, 409)
+      const { data: sales, error: salesError } = await supabase.from('protocol_sales').select('pieces').match(base)
+      if (salesError) throw salesError
+      const sold = (sales || []).reduce((sum, sale) => sum + Number(sale.pieces), 0)
+      if (parsed.total < sold) return json({ error: `O total não pode ser menor que as ${sold} peças já vendidas. Informe as quantidades iniciais, incluindo o que já vendeu.` }, 400)
+      const { error } = await supabase.from('protocol_runs').update({ products: parsed.products, starting_pieces: parsed.total }).match(base)
       if (error) throw error
     } else if (body.action === 'entry') {
       const { data: run } = await supabase.from('protocol_runs').select('started_on').match(base).maybeSingle()

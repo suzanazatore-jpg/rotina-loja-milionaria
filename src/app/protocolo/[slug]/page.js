@@ -1,5 +1,8 @@
 'use client'
 
+import { normalizeProtocolProducts } from '@/lib/protocolProducts'
+import ProductEditor from './ProductEditor'
+
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -51,7 +54,8 @@ export default function Protocolo({ params }) {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState(null)
   const [lot, setLot] = useState('')
-  const [stock, setStock] = useState('')
+  const [products, setProducts] = useState([{ name: '', quantity: '' }])
+  const [editingProducts, setEditingProducts] = useState(false)
   const [goal, setGoal] = useState('')
   const [saleValue, setSaleValue] = useState('')
   const [salePieces, setSalePieces] = useState('1')
@@ -95,7 +99,7 @@ export default function Protocolo({ params }) {
           const sampleLessons = PROTOCOL_DAYS.map((item, index) => ({ id: `demo-dia-${index + 1}`, title: item.title, description: item.description, protocol_checklist: item.checks, video_url: null }))
           if (!active) return
           setDemo(true);setPreview(true)
-          setCourse({ id: DEMO_COURSE_ID, title: 'Protocolo Desencalhando Estoque em 7 Dias', slug: DEMO_SLUG })
+          setCourse({ id: DEMO_COURSE_ID, title: 'Protocolo Zerando o Estoque em 7 dias', slug: DEMO_SLUG })
           setLessons(sampleLessons);setMaterials([])
           setData({ run: { lot_name: 'Exemplo: coleção anterior', starting_pieces: 30, goal_cents: 300000, started_on: today }, entries: [], sales: [], today })
           setSelected(0);loadDraft(sampleLessons[0], [])
@@ -156,6 +160,7 @@ export default function Protocolo({ params }) {
     try {
       if (preview) {
         const next = { ...data }
+        if (action.action === 'products') { const parsed = normalizeProtocolProducts(action.products); next.run = { ...data.run, products: parsed.products, starting_pieces: parsed.total } }
         if (action.action === 'sale') next.sales = [{ id: `preview-${Date.now()}`, amount_cents: action.amount_cents, pieces: action.pieces, created_at: new Date().toISOString() }, ...data.sales]
         if (action.action === 'undo_sale') next.sales = data.sales.filter(item => item.id !== action.sale_id)
         if (action.action === 'entry') {
@@ -169,6 +174,18 @@ export default function Protocolo({ params }) {
     }
     catch (e) { setError(e.message) }
     finally { setBusy(false) }
+  }
+  function editProducts() {
+    setProducts(data.run.products?.length ? data.run.products.map(item=>({...item,quantity:String(item.quantity)})) : [{name:'',quantity:''}])
+    setEditingProducts(true)
+  }
+  function saveProducts(start=false) {
+    try {
+      const parsed=normalizeProtocolProducts(products)
+      if(!start && parsed.total<soldPieces)throw new Error(`O total não pode ser menor que as ${soldPieces} peças já vendidas.`)
+      const action=start?{action:'start',lot_name:lot.trim()||'Minha campanha',products:parsed.products,goal_cents:digits(goal)}:{action:'products',products:parsed.products}
+      void submit(action,()=>setEditingProducts(false))
+    }catch(e){setError(e.message)}
   }
   function playSound() {
     if (!sound) return
@@ -207,12 +224,19 @@ export default function Protocolo({ params }) {
       {lesson && <section className="pro-card pro-lesson-first"><div className="pro-video">{embed(lesson.video_url) ? <iframe key={lesson.id} src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <p>Vídeo ainda não disponível.</p>}</div><span className="pro-overline">Dia {selected+1} de 7 · aula + missão</span><h2>{lesson.title}</h2><p>{lesson.description}</p></section>}
       <nav className="pro-days" aria-label="Dias do Protocolo">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
       {lesson && <section className="pro-card"><span className="pro-overline">Tarefa do dia</span>{materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>Abrir {item.title} <span>Ler PDF no aplicativo</span></button>)}{pdfUrl && <iframe className="pro-pdf" src={pdfUrl} title="PDF da tarefa do dia" />}</section>}
-      {!data.run ? <section className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Escolha um lote para trabalhar por 7 dias</h2><p>Separe as peças paradas que você quer vender nesta campanha. Use uma meta que faça sentido para esse lote.</p>
-        <label>Nome do lote<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: vestidos da coleção anterior" /></label>
-        <div className="pro-fields"><label>Peças no lote<input type="number" min="1" value={stock} onChange={e=>setStock(e.target.value)} placeholder="Ex.: 30" /></label><label>Meta de vendas (R$)<input inputMode="decimal" value={goal} onChange={e=>setGoal(e.target.value)} placeholder="Ex.: 3000,00" /></label></div>
-        {lessons.length!==7||lessons.some(item=>!Array.isArray(item.protocol_checklist)||!item.protocol_checklist.length)?<p>As sete missões ainda estão sendo preparadas pela Suzana.</p>:<button className="pro-primary" disabled={busy} onClick={()=>submit({action:'start',lot_name:lot,starting_pieces:Number(stock),goal_cents:digits(goal)})}>{busy?'Preparando...':'Começar meu Protocolo'}</button>}
+      {!data.run ? <section className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Quais produtos você vai vender?</h2><p>Monte a lista de produtos da sua campanha de 7 dias. O total de peças será somado automaticamente.</p>
+        <label>Nome da campanha (opcional)<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: estoque da coleção anterior" /></label>
+        <ProductEditor products={products} setProducts={setProducts} busy={busy} />
+        <label>Meta de vendas da campanha (R$)<input inputMode="decimal" value={goal} onChange={e=>setGoal(e.target.value)} placeholder="Ex.: 3000,00" /></label>
+        {lessons.length!==7||lessons.some(item=>!Array.isArray(item.protocol_checklist)||!item.protocol_checklist.length)?<p>As sete missões ainda estão sendo preparadas pela Suzana.</p>:<button className="pro-primary" disabled={busy} onClick={()=>saveProducts(true)}>{busy?'Preparando...':'Começar meu Protocolo'}</button>}
       </section> : <>
         <section className="pro-hero"><div><span className="pro-overline">Sua campanha · {data.run.lot_name}</span><h2>{money(totalCents)} <small>em vendas registradas</small></h2><p>{soldPieces} de {data.run.starting_pieces} peças vendidas · {completedCount} de {lessons.length} missões concluídas</p></div><div className="pro-goal"><strong>{percent}% da meta</strong><span>{money(data.run.goal_cents)}</span><div className="pro-bar"><span style={{width:`${percent}%`}} /></div></div></section>
+        {selected===0&&<section className="pro-card"><span className="pro-overline">Dia 1 · Seu estoque</span><h2>Produtos da campanha</h2>
+          {editingProducts?<><p>Informe as quantidades iniciais, incluindo as peças que já vendeu. O total da campanha será atualizado.</p><ProductEditor products={products} setProducts={setProducts} busy={busy} /><button className="pro-primary" disabled={busy} onClick={()=>saveProducts()}>{busy?'Salvando...':'Salvar produtos'}</button> <button className="pro-quiet" disabled={busy} onClick={()=>setEditingProducts(false)}>Cancelar</button></>:<>
+            {data.run.products?.length?<ul className="pro-products-list">{data.run.products.map((item,index)=><li key={index}><span>{item.name}</span><strong>{item.quantity} {item.quantity===1?'peça':'peças'}</strong></li>)}</ul>:<p>Você já informou {data.run.starting_pieces} peças. Agora pode detalhar os produtos dessa campanha.</p>}
+            <button className="pro-primary" onClick={editProducts}>Adicionar ou editar produtos</button>
+          </>}
+        </section>}
         {lesson ? <>
           <section className="pro-card"><span className="pro-overline">A tarefa de hoje</span><h2>Faça e marque cada passo</h2>{checklist.length?<div className="pro-checklist">{checklist.map((item,index)=><label key={`${lesson.id}-${index}`} className="pro-check"><input type="checkbox" checked={!!checks[index]} onChange={e=>setChecks(old=>old.map((v,i)=>i===index?e.target.checked:v))} />{item}</label>)}</div>:<p>A tarefa deste dia será publicada pela Suzana.</p>}
           </section>
