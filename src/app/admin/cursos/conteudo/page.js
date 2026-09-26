@@ -206,8 +206,8 @@ export default function ConteudoCurso() {
     await carregar(courseId)
   }
 
-  function novoMaterial(lessonId = '') {
-    setMatForm({ lesson_id: lessonId, title: '', mode: 'pdf', link: '', file: null })
+  function novoMaterial(lessonId = '', isBonus = false) {
+    setMatForm({ is_bonus: isBonus, lesson_id: lessonId, title: '', mode: 'pdf', link: '', file: null })
     setModal('material')
   }
 
@@ -229,7 +229,7 @@ export default function ConteudoCurso() {
       }
       const { error } = await supabase.from('materials').insert({
         course_id: courseId, lesson_id: matForm.lesson_id || null, title: matForm.title.trim(),
-        file_url: fileUrl, sort_order: materials.filter(m => (m.lesson_id || '') === (matForm.lesson_id || '')).length,
+        is_bonus: !!matForm.is_bonus, file_url: fileUrl, sort_order: materials.filter(m => (m.lesson_id || '') === (matForm.lesson_id || '')).length,
         is_published: true,
       })
       if (error) throw error
@@ -301,7 +301,8 @@ export default function ConteudoCurso() {
   )
 
   const semModulo = aulasDo('')
-  const extras = materials.filter(m => !m.lesson_id)
+  const extras = materials.filter(m => !m.lesson_id && !m.is_bonus)
+  const bonuses = materials.filter(m => m.is_bonus)
 
   function renderAula(l, lista) {
     const indice = lista.findIndex(item => item.id === l.id)
@@ -370,6 +371,13 @@ export default function ConteudoCurso() {
 
         <button onClick={() => novaAula('')} style={{ background: 'transparent', border: '1px dashed #333', color: '#AAA', borderRadius: '10px', padding: '11px', fontSize: '13px', width: '100%', cursor: 'pointer' }}>＋ Aula avulsa (sem módulo)</button>
 
+        <section style={{ marginTop: 28 }}>
+          <h2 style={{ fontSize: 17 }}>Bônus do aplicativo</h2>
+          <p style={{ color: '#999', fontSize: 13 }}>Estes PDFs aparecem em Hoje → Bônus para as alunas com acesso a este curso.</p>
+          <button onClick={() => novoMaterial('', true)} style={{ ...botaoOpcao, color: ouro }}>＋ Adicionar PDF de bônus</button>
+          {!bonuses.length && <p style={{ color: '#888' }}>Nenhum bônus cadastrado.</p>}
+          {bonuses.map(m => <div key={m.id} style={{ display: 'flex', gap: 12, padding: 12 }}><span style={{ flex: 1 }}>📎 {m.title}</span><button onClick={() => excluirMaterial(m)} style={botaoTexto}>Excluir</button></div>)}
+        </section>
         <section style={{ marginTop: 28 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
             <div><h2 style={{ margin: 0, fontSize: 17 }}>Material extra do curso</h2><p style={{ margin: '3px 0 0', color: '#777', fontSize: 12 }}>PDFs e links que não pertencem a uma aula específica.</p></div>
@@ -444,11 +452,11 @@ export default function ConteudoCurso() {
             {modal === 'material' && (
               <>
                 <h2 style={{ fontSize: '17px', fontWeight: 800, margin: '0 0 5px' }}>Novo material</h2>
-                <p style={{ color: '#777', fontSize: 12, margin: '0 0 16px' }}>{matForm.lesson_id ? 'Vinculado à aula selecionada.' : 'Material extra do curso.'}</p>
+                <p style={{ color: '#777', fontSize: 12, margin: '0 0 16px' }}>{matForm.is_bonus ? 'PDF de bônus: disponível em Hoje → Bônus.' : matForm.lesson_id ? 'Vinculado à aula selecionada.' : 'Material extra do curso.'}</p>
                 <div style={grupo}><label style={label}>Nome *</label><input style={campo} value={matForm.title} onChange={e => setMatForm(f => ({ ...f, title: e.target.value }))} placeholder="Ex.: Checklist da aula" /></div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
                   <button onClick={() => setMatForm(f => ({ ...f, mode: 'pdf' }))} style={{ ...botaoOpcao, borderColor: matForm.mode === 'pdf' ? ouro : '#333', color: matForm.mode === 'pdf' ? ouro : '#888' }}>PDF</button>
-                  <button onClick={() => setMatForm(f => ({ ...f, mode: 'link' }))} style={{ ...botaoOpcao, borderColor: matForm.mode === 'link' ? ouro : '#333', color: matForm.mode === 'link' ? ouro : '#888' }}>Link externo</button>
+                  <button hidden={matForm.is_bonus} onClick={() => setMatForm(f => ({ ...f, mode: 'link' }))} style={{ ...botaoOpcao, borderColor: matForm.mode === 'link' ? ouro : '#333', color: matForm.mode === 'link' ? ouro : '#888' }}>Link externo</button>
                 </div>
                 {matForm.mode === 'pdf' ? <div style={grupo}><label style={label}>Arquivo PDF *</label><input type="file" accept="application/pdf,.pdf" onChange={e => setMatForm(f => ({ ...f, file: e.target.files?.[0] || null }))} style={{ color: '#AAA', fontSize: 13 }} /><p style={{ color: '#666', fontSize: 11 }}>Máximo de 20 MB.</p></div> : <div style={grupo}><label style={label}>Endereço do link *</label><input style={campo} value={matForm.link} onChange={e => setMatForm(f => ({ ...f, link: e.target.value }))} placeholder="https://..." /></div>}
                 <button onClick={salvarMaterial} disabled={salvando} style={{ width: '100%', background: ouroGrad, color: '#0A0A0A', border: 'none', borderRadius: '10px', padding: '13px', fontSize: '15px', fontWeight: 800, cursor: 'pointer', opacity: salvando ? .6 : 1 }}>{salvando ? 'Salvando...' : 'Salvar material'}</button>

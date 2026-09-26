@@ -15,6 +15,7 @@ import NotificationPreference from './NotificationPreference'
 import { toEmbedUrl } from '@/lib/tutorialVideos'
 import './premium.css'
 
+const BonusArea = dynamic(() => import('./BonusArea'))
 const CursosArea = dynamic(() => import('./CursosArea'), {
   loading: () => <SectionLoading label="Abrindo seus cursos..." />,
 })
@@ -190,7 +191,7 @@ export default function Painel() {
   useEffect(() => {
     const destino = new URLSearchParams(window.location.search).get('secao')
     const timer = window.setTimeout(() => {
-      if (['inicio', 'rotina', 'vendas', 'conteudos', 'calendario', 'campanhas', 'precificacao'].includes(destino)) setSecao(destino)
+      if (['inicio', 'rotina', 'vendas', 'conteudos', 'calendario', 'campanhas', 'precificacao', 'bonus'].includes(destino)) setSecao(destino)
     }, 0)
     return () => window.clearTimeout(timer)
   }, [])
@@ -513,7 +514,7 @@ export default function Painel() {
     setMenuMobile(false)
   }
 
-  const tituloSecao = [...menu, ...menuMobileDrawer].find(m => m.id === secao)?.label || (secao === 'dados' ? 'Meus Dados' : secao === 'precificacao' ? 'Precificação e Lucro' : '')
+  const tituloSecao = [...menu, ...menuMobileDrawer].find(m => m.id === secao)?.label || (secao === 'bonus' ? 'Bônus' : secao === 'dados' ? 'Meus Dados' : secao === 'precificacao' ? 'Precificação e Lucro' : '')
 
   return (
     <div className={`premium-painel tema-${tema}`} style={{ display: 'flex', minHeight: '100vh', background: cores.bg, color: cores.tx, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', transition: 'background .2s, color .2s' }}>
@@ -701,6 +702,7 @@ export default function Painel() {
               )}
 
               {/* MENTORIA / AULAS */}
+              {secao === 'bonus' && <BonusArea cores={cores} ouro={ouro} onBack={() => setSecao('inicio')} />}
               {secao === 'cursos' && <CursosArea cores={cores} ouro={ouro} ouroGrad={ouroGrad} authenticatedUser={usuario} onBack={() => setSecao('conteudos')} />}
 
               {secao === 'mentoria' && (

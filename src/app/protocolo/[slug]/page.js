@@ -222,28 +222,18 @@ export default function Protocolo({ params }) {
     } catch (e) { if(request===pdfRequest.current)setPdfError(e.message) }
     finally { if(request===pdfRequest.current)setPdfLoading(false) }
   }, [])
-  useEffect(()=>{
-    const material=materials.find(item=>item.lesson_id===lesson?.id)
-    let active=true
-    const requests=pdfRequest
-    Promise.resolve().then(()=>{
-      if(!active)return
-      if(material)void downloadMaterial(material)
-      else {setPdfUrl('');setPdfError('');setPdfLoading(false)}
-    })
-    return ()=>{active=false;requests.current++}
-  },[lesson?.id,materials,downloadMaterial])
+  useEffect(()=>{const requests=pdfRequest;return ()=>{requests.current++}},[])
   useEffect(()=>()=>{saleAudio.current?.pause()},[])
   function selectDay(index) {
     if (index >= day) return
-    setSavedMessage('');setPdfUrl('');setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${demo?'demo=1&':preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
+    pdfRequest.current++;setPdfLoading(false);setPdfError('');setSavedMessage('');setPdfUrl('');setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${demo?'demo=1&':preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   if (loading) return <div className="pro-page pro-center">Abrindo seu Protocolo...</div>
   if (!course || !data) return <div className="pro-page pro-center"><p>{error || 'Protocolo não disponível.'}</p><button onClick={() => router.push('/painel?secao=conteudos')}>Voltar</button></div>
 
   return <div className={`pro-page pro-theme-${theme}`}>
-    <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div><button className="pro-quiet" onClick={async()=>{if(preview){router.push(`/admin/cursos/conteudo?id=${course.id}`);return}await supabase.auth.signOut();router.replace('/login')}}>{preview?'← Voltar ao ADM':'Sair'}</button></header>
+    <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div>{preview && <button className="pro-quiet" onClick={()=>router.push(`/admin/cursos/conteudo?id=${course.id}`)}>← Voltar ao ADM</button>}</header>
     <nav className="pro-section-nav" aria-label="Conteúdo deste dia"><a href="#pro-aula">Aula</a><a href="#pro-tarefa">PDF</a>{data.run?<><a href="#pro-acoes">Tarefas</a><a href="#pro-registro">Registro</a><a href="#pro-vendas">Vendas</a></>:<a href="#pro-produtos">Produtos</a>}</nav>
     <main className="pro-main">
       {!preview && <button className="pro-quiet" onClick={() => router.push('/painel?secao=conteudos')}>← Voltar ao painel</button>}
@@ -251,7 +241,7 @@ export default function Protocolo({ params }) {
       {error && <div role="alert" className="pro-error">{error}</div>}
       {lesson && <section id="pro-aula" className="pro-card pro-lesson-first"><div className="pro-video">{embed(lesson.video_url) ? <iframe key={lesson.id} src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <p>Vídeo ainda não disponível.</p>}</div><div className="pro-continue"><a href="#pro-tarefa">Continue abaixo: PDF, tarefas e vendas ↓</a></div><span className="pro-overline">Dia {selected+1} de 7 · aula + missão</span><h2>{lesson.title}</h2><details className="pro-lesson-description"><summary>Ver orientação completa do dia</summary><p>{lesson.description}</p></details></section>}
       <nav className="pro-days" aria-label="Dias do Protocolo">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
-      {lesson && <section id="pro-tarefa" className="pro-card"><span className="pro-overline">Tarefa do dia</span>{materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>Abrir {item.title} <span>Ler PDF no aplicativo</span></button>)}{pdfLoading&&<p role="status">Abrindo a tarefa em PDF…</p>}{pdfError&&<p role="alert">{pdfError} Toque no arquivo acima para tentar novamente.</p>}{pdfUrl && <ProtocolPdf key={pdfUrl} url={pdfUrl} />}</section>}
+      {lesson && <section id="pro-tarefa" className="pro-card"><span className="pro-overline">Tarefa do dia</span>{materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>Ler PDF no app <span>{item.title}</span></button>)}{pdfLoading&&<p role="status">Abrindo a tarefa em PDF…</p>}{pdfError&&<p role="alert">{pdfError} Toque no arquivo acima para tentar novamente.</p>}{pdfUrl && <ProtocolPdf key={pdfUrl} url={pdfUrl} />}</section>}
       {!data.run ? <section id="pro-produtos" className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Quais produtos você vai vender?</h2><p>Monte a lista de produtos da sua campanha de 7 dias. O total de peças será somado automaticamente.</p>
         <label>Nome da campanha (opcional)<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: estoque da coleção anterior" /></label>
         <ProductEditor products={products} setProducts={setProducts} busy={busy} />
