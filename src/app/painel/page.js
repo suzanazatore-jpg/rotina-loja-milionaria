@@ -284,11 +284,6 @@ export default function Painel() {
           if (session.user.email !== ADMIN_EMAIL) setAcesso(verificarAcesso(perfil))
         }
 
-        if (dados.acessos?.protocol_only_slug) {
-          router.replace(`/protocolo/${dados.acessos.protocol_only_slug}`)
-          return
-        }
-
         setMentoriaLiberada(dados.mentoria?.liberado === true)
         setAulas(dados.mentoria?.aulas || [])
         setAssistenteLiberado(dados.acessos?.assistant === true)

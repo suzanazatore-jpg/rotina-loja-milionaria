@@ -14,18 +14,21 @@ export default function ProtocoloAdmin() {
   const [id,setId]=useState('')
   const [course,setCourse]=useState(null)
   const [lessons,setLessons]=useState([])
+  const [materials,setMaterials]=useState([])
+  const [uploading,setUploading]=useState('')
   const [report,setReport]=useState(null)
   const [busy,setBusy]=useState(false)
   const [message,setMessage]=useState('')
   const [error,setError]=useState('')
   const [loading,setLoading]=useState(true)
   async function load(courseId) {
-    const [c,l]=await Promise.all([
+    const [c,l,m]=await Promise.all([
       supabase.from('courses').select('*').eq('id',courseId).single(),
       supabase.from('lessons').select('id,title,video_url,is_published,protocol_checklist,protocol_notification,sort_order').eq('course_id',courseId).order('sort_order').order('created_at'),
+      supabase.from('materials').select('id,title,lesson_id').eq('course_id',courseId).order('sort_order'),
     ])
-    if(c.error||l.error)throw new Error(c.error?.message||l.error?.message)
-    setCourse(c.data);setLessons(l.data||[])
+    if(c.error||l.error||m.error)throw new Error(c.error?.message||l.error?.message||m.error?.message)
+    setCourse(c.data);setLessons(l.data||[]);setMaterials(m.data||[])
     const {data:{session}}=await supabase.auth.getSession()
     if(session?.access_token){
       const response=await fetch(`/api/admin/protocolo?course_id=${courseId}`,{headers:{Authorization:`Bearer ${session.access_token}`}})
@@ -45,6 +48,22 @@ export default function ProtocoloAdmin() {
     }
     init();return()=>{live=false}
   },[router])
+  async function uploadTask(lesson,index,file){
+    if(!file)return
+    setUploading(lesson.id);setError('');setMessage('')
+    try{
+      if(file.type!=='application/pdf'||file.size>20*1024*1024)throw new Error('Envie um PDF de até 20 MB.')
+      const safe=file.name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'-')
+      const path=`${id}/${lesson.id}/${crypto.randomUUID()}-${safe}`
+      const uploaded=await supabase.storage.from('course-materials').upload(path,file,{contentType:'application/pdf',upsert:false})
+      if(uploaded.error)throw uploaded.error
+      const saved=await supabase.from('materials').insert({course_id:id,lesson_id:lesson.id,title:`Dia ${index+1} — ${file.name.replace(/\.pdf$/i,'')}`,file_url:`storage://course-materials/${path}`,sort_order:materials.filter(m=>m.lesson_id===lesson.id).length,is_published:true})
+      if(saved.error){await supabase.storage.from('course-materials').remove([path]);throw saved.error}
+      const result=await supabase.from('materials').select('id,title,lesson_id').eq('course_id',id).order('sort_order')
+      if(result.error)throw result.error
+      setMaterials(result.data||[]);setMessage(`PDF do Dia ${index+1} disponível na área da tarefa da aluna.`)
+    }catch(e){setError(e.message)}finally{setUploading('')}
+  }
   async function seed(){
     setBusy(true);setError('');setMessage('')
     try{
@@ -79,7 +98,7 @@ export default function ProtocoloAdmin() {
   return <AdminCursosShell><div style={{maxWidth:800,margin:'0 auto',color:'#fff'}}>
     <button style={{...button,background:'#222',color:'#e6c45c',marginBottom:18}} onClick={()=>router.push(`/admin/cursos/conteudo?id=${id}`)}>← Voltar ao curso</button>
     <p style={{color:'#d4af37',fontSize:12,letterSpacing:1,textTransform:'uppercase'}}>Produto de 7 dias</p><h1 style={{fontSize:25,margin:'4px 0'}}>{course?.title||'Configurar Protocolo'}</h1>
-    <p style={{color:'#aaa',lineHeight:1.55}}>Configure o checklist e o lembrete de cada dia. Os vídeos e PDFs continuam no editor de aulas do curso.</p>
+    <p style={{color:'#aaa',lineHeight:1.55}}>Envie o PDF da tarefa no dia correspondente e configure o checklist e o lembrete abaixo. Os vídeos ficam no editor de aulas.</p>
     {loading?<p>Carregando...</p>:<>
       {error&&<p role="alert" style={{background:'#351a1a',padding:12,borderRadius:9,color:'#ffc5c5'}}>{error}</p>}
       {message&&<p role="status" style={{background:'#183322',padding:12,borderRadius:9,color:'#bff4ce'}}>{message}</p>}
@@ -91,6 +110,7 @@ export default function ProtocoloAdmin() {
       {!lessons.length&&course&&<button style={button} disabled={busy} onClick={seed}>{busy?'Criando...':'Criar as sete aulas em rascunho'}</button>}
       {lessons.map((lesson,index)=><section key={lesson.id} style={{background:'#151515',border:'1px solid #333',borderRadius:14,padding:18,margin:'13px 0'}}>
         <p style={{color:'#d4af37',fontSize:12,margin:0}}>DIA {index+1} · {lesson.is_published?'PUBLICADA':'RASCUNHO'} · {lesson.video_url?'VÍDEO PRONTO':'SEM VÍDEO'}</p><h2 style={{fontSize:18,margin:'5px 0 13px'}}>{lesson.title}</h2>
+        <div style={{border:'1px solid #39342b',padding:14,borderRadius:10,marginBottom:14}}><strong>PDF da tarefa — Dia {index+1}</strong><p style={{fontSize:12,color:'#bbb'}}>A aluna abre este PDF dentro do aplicativo. O checklist abaixo é salvo separadamente.</p>{materials.filter(m=>m.lesson_id===lesson.id).map(m=><p key={m.id} style={{fontSize:13}}>📎 {m.title}</p>)}<label style={{display:'block',fontSize:13}}>{uploading===lesson.id?'Enviando PDF...':'Adicionar PDF da tarefa'}<input type="file" accept="application/pdf,.pdf" disabled={!!uploading||busy} onChange={e=>{const file=e.target.files?.[0];e.target.value='';void uploadTask(lesson,index,file)}} style={{display:'block',marginTop:8}} /></label></div>
         <label style={{display:'block',fontSize:13}}>Ações da tarefa (uma por linha)<textarea style={{...input,marginTop:6,minHeight:95,resize:'vertical'}} value={(lesson.protocol_checklist||[]).join('\n')} onChange={e=>editLesson(index,'protocol_checklist',e.target.value.split('\n'))} /></label>
         <label style={{display:'block',fontSize:13,marginTop:14}}>Texto do lembrete deste dia<input style={{...input,marginTop:6}} maxLength={180} value={lesson.protocol_notification||''} onChange={e=>editLesson(index,'protocol_notification',e.target.value)} /></label>
       </section>)}

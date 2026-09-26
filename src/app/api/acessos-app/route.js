@@ -36,5 +36,5 @@ export async function GET(request) {
       .eq('profile_id', user.id).eq('status', 'active').or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
     if (enrollments?.length === 1 && enrollments[0].courses?.is_published && enrollments[0].courses?.protocol_enabled) protocolOnlySlug = enrollments[0].courses.slug
   }
-  return NextResponse.json({ assistant, team_goals: active && contents.includes('team_goals'), contents, protocol_only_slug: protocolOnlySlug })
+  return NextResponse.json({ assistant, team_goals: active && contents.includes('team_goals'), contents, protocol_only_slug: null })
 }

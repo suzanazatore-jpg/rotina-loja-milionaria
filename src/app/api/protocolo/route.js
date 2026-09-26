@@ -1,3 +1,4 @@
+import { PROTOCOL_EDITING_OPEN } from '@/lib/protocolEditing'
 import { createClient } from '@supabase/supabase-js'
 import { protocolDay, protocolGuidance } from '@/lib/protocolGuidance'
 
@@ -90,7 +91,7 @@ export async function POST(request) {
       if (lessonsError) throw lessonsError
       if (lessons.length !== 7) return json({ error: 'As sete missões ainda estão sendo preparadas.' }, 409)
       const index = lessons.findIndex(item => item.id === body.lesson_id)
-      if (index < 0 || index >= 7 || index >= protocolDay(run.started_on, todayInBrazil())) return json({ error: 'Esta missão ainda não está disponível.' }, 403)
+      if (index < 0 || index >= 7 || (!PROTOCOL_EDITING_OPEN && index >= protocolDay(run.started_on, todayInBrazil()))) return json({ error: 'Esta missão ainda não está disponível.' }, 403)
       const expected = Array.isArray(lessons[index].protocol_checklist) ? lessons[index].protocol_checklist.length : 0
       const checks = body.checklist
       if (!Array.isArray(checks) || checks.length !== expected || checks.some(v => typeof v !== 'boolean')) return json({ error: 'Confira o checklist da tarefa.' }, 400)

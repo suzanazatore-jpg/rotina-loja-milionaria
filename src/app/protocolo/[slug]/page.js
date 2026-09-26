@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { protocolDay, protocolGuidance } from '@/lib/protocolGuidance'
 import { PROTOCOL_DAYS } from '@/lib/protocolContent'
+import { PROTOCOL_EDITING_OPEN } from '@/lib/protocolEditing'
 import NotificationPreference from '@/app/painel/NotificationPreference'
 import './protocolo.css'
 
@@ -37,6 +38,8 @@ function embed(url) {
 export default function Protocolo({ params }) {
   const { slug } = use(params)
   const router = useRouter()
+  const [pdfUrl, setPdfUrl] = useState('')
+  const [theme] = useState(() => typeof window !== 'undefined' && window.localStorage.getItem('rotina-tema') === 'escuro' ? 'escuro' : 'claro')
   const [course, setCourse] = useState(null)
   const [lessons, setLessons] = useState([])
   const [materials, setMaterials] = useState([])
@@ -126,10 +129,10 @@ export default function Protocolo({ params }) {
         setCourse(c);setLessons((ls.data || []).slice(0, 7));setMaterials(ms.data || []);setData(state)
         setRevenueBand(state.run?.monthly_revenue_band || '')
         setTeamSize(state.run?.team_size == null ? '' : String(state.run.team_size))
-        const today = state.run ? protocolDay(state.run.started_on, state.today) : 1
+        const today = PROTOCOL_EDITING_OPEN ? 7 : state.run ? protocolDay(state.run.started_on, state.today) : 1
         const requested = new URLSearchParams(window.location.search).get('aula')
         const fromLink = (ls.data || []).findIndex(item => item.id === requested)
-        const initial = fromLink >= 0 && fromLink < today ? fromLink : Math.max(0, today - 1)
+        const initial = fromLink >= 0 && fromLink < today ? fromLink : (PROTOCOL_EDITING_OPEN ? 0 : Math.max(0, today - 1))
         setSelected(initial);loadDraft((ls.data || [])[initial],state.entries)
       } catch (e) { if (active) setError(e.message) }
       finally { if (active) setLoading(false) }
@@ -138,7 +141,7 @@ export default function Protocolo({ params }) {
     return () => { active = false }
   }, [slug, router, call])
 
-  const day = preview ? 7 : data?.run ? protocolDay(data.run.started_on, data.today) : 0
+  const day = preview || PROTOCOL_EDITING_OPEN ? 7 : data?.run ? protocolDay(data.run.started_on, data.today) : 0
   const lesson = lessons[selected]
   const entry = data?.entries.find(item => item.lesson_id === lesson?.id)
   const checklist = Array.isArray(lesson?.protocol_checklist) ? lesson.protocol_checklist.filter(item => typeof item === 'string' && item.trim()) : []
@@ -180,45 +183,37 @@ export default function Protocolo({ params }) {
     setError('')
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const response = await fetch(`/api/material-curso?id=${encodeURIComponent(item.id)}&download=1`, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
+      const response = await fetch(`/api/material-curso?id=${encodeURIComponent(item.id)}`, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
       const result = await response.json()
       if (!response.ok || !result.url) throw new Error(result.error || 'Material indisponível.')
-      window.open(result.url, '_blank', 'noopener,noreferrer')
+      setPdfUrl(result.url)
     } catch (e) { setError(e.message) }
   }
   function selectDay(index) {
     if (index >= day) return
-    setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${demo?'demo=1&':preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
+    setPdfUrl('');setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${demo?'demo=1&':preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   if (loading) return <div className="pro-page pro-center">Abrindo seu Protocolo...</div>
   if (!course || !data) return <div className="pro-page pro-center"><p>{error || 'Protocolo não disponível.'}</p><button onClick={() => router.push('/painel?secao=conteudos')}>Voltar</button></div>
 
-  return <div className="pro-page">
+  return <div className={`pro-page pro-theme-${theme}`}>
     <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div><button className="pro-quiet" onClick={async()=>{if(preview){router.push(`/admin/cursos/conteudo?id=${course.id}`);return}await supabase.auth.signOut();router.replace('/login')}}>{preview?'← Voltar ao ADM':'Sair'}</button></header>
     <main className="pro-main">
       {!preview && <button className="pro-quiet" onClick={() => router.push('/painel?secao=conteudos')}>← Voltar ao painel</button>}
       {preview&&<div className="pro-preview" role="status"><strong>{demo?'Demonstração do aplicativo':'Prévia do ADM'}</strong> · dados fictícios. Você pode navegar e testar os registros; nada aqui é salvo na conta da aluna.</div>}
       {error && <div role="alert" className="pro-error">{error}</div>}
-      {!data.run && <>
-        <section className="pro-intro"><span className="pro-overline">Dia 1 de 7 · aula + missão</span><h2>{lessons[0]?.title || 'Sua campanha começa aqui'}</h2><p>Assista à aula, separe seu lote e defina a meta. Depois, marque as ações e acompanhe suas vendas.</p></section>
-        <nav className="pro-days" aria-label="Sua jornada de sete dias">{Array.from({ length: 7 }, (_, index) => <button type="button" key={index} disabled aria-current={index === 0 ? 'step' : undefined}><span>Dia</span><strong>{index + 1}</strong></button>)}</nav>
-        {lessons[0] && <section className="pro-card"><span className="pro-overline">Aula do dia</span><h2>{lessons[0].title}</h2><div className="pro-video">{embed(lessons[0].video_url) ? <iframe src={embed(lessons[0].video_url)} title={lessons[0].title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <p>Vídeo ainda não disponível.</p>}</div>
-          {materials.filter(item => item.lesson_id === lessons[0].id).map(item => <button key={item.id} className="pro-material" onClick={() => downloadMaterial(item)}>↓ {item.title}<span>Baixar tarefa em PDF</span></button>)}
-        </section>}
-      </>}
+      {lesson && <section className="pro-card pro-lesson-first"><div className="pro-video">{embed(lesson.video_url) ? <iframe key={lesson.id} src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <p>Vídeo ainda não disponível.</p>}</div><span className="pro-overline">Dia {selected+1} de 7 · aula + missão</span><h2>{lesson.title}</h2><p>{lesson.description}</p></section>}
+      <nav className="pro-days" aria-label="Dias do Protocolo">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
+      {lesson && <section className="pro-card"><span className="pro-overline">Tarefa do dia</span>{materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>Abrir {item.title} <span>Ler PDF no aplicativo</span></button>)}{pdfUrl && <iframe className="pro-pdf" src={pdfUrl} title="PDF da tarefa do dia" />}</section>}
       {!data.run ? <section className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Escolha um lote para trabalhar por 7 dias</h2><p>Separe as peças paradas que você quer vender nesta campanha. Use uma meta que faça sentido para esse lote.</p>
         <label>Nome do lote<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: vestidos da coleção anterior" /></label>
         <div className="pro-fields"><label>Peças no lote<input type="number" min="1" value={stock} onChange={e=>setStock(e.target.value)} placeholder="Ex.: 30" /></label><label>Meta de vendas (R$)<input inputMode="decimal" value={goal} onChange={e=>setGoal(e.target.value)} placeholder="Ex.: 3000,00" /></label></div>
         {lessons.length!==7||lessons.some(item=>!Array.isArray(item.protocol_checklist)||!item.protocol_checklist.length)?<p>As sete missões ainda estão sendo preparadas pela Suzana.</p>:<button className="pro-primary" disabled={busy} onClick={()=>submit({action:'start',lot_name:lot,starting_pieces:Number(stock),goal_cents:digits(goal)})}>{busy?'Preparando...':'Começar meu Protocolo'}</button>}
       </section> : <>
         <section className="pro-hero"><div><span className="pro-overline">Sua campanha · {data.run.lot_name}</span><h2>{money(totalCents)} <small>em vendas registradas</small></h2><p>{soldPieces} de {data.run.starting_pieces} peças vendidas · {completedCount} de {lessons.length} missões concluídas</p></div><div className="pro-goal"><strong>{percent}% da meta</strong><span>{money(data.run.goal_cents)}</span><div className="pro-bar"><span style={{width:`${percent}%`}} /></div></div></section>
-        <nav className="pro-days" aria-label="Dias do Protocolo">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
         {lesson ? <>
-          <section className="pro-card"><span className="pro-overline">Dia {selected+1} de 7 · aula</span><h2>{lesson.title}</h2><p>{lesson.description}</p><div className="pro-video">{embed(lesson.video_url)?<iframe src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />:<div>▶ Vídeo em breve. A missão já pode ser feita.</div>}</div></section>
           <section className="pro-card"><span className="pro-overline">A tarefa de hoje</span><h2>Faça e marque cada passo</h2>{checklist.length?<div className="pro-checklist">{checklist.map((item,index)=><label key={`${lesson.id}-${index}`} className="pro-check"><input type="checkbox" checked={!!checks[index]} onChange={e=>setChecks(old=>old.map((v,i)=>i===index?e.target.checked:v))} />{item}</label>)}</div>:<p>A tarefa deste dia será publicada pela Suzana.</p>}
-            {materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" disabled={preview&&item.is_published===false} onClick={()=>downloadMaterial(item)}>↓ {item.title} <span>{preview&&item.is_published===false?'Em rascunho':'Baixar material'}</span></button>)}
-            {preview&&!materials.some(item=>item.lesson_id===lesson.id)&&<p className="pro-material pro-placeholder">↓ PDF da tarefa será exibido aqui quando você anexar o material à aula.</p>}
           </section>
           <section className="pro-card"><span className="pro-overline">Seu registro</span><h2>O que você fez?</h2><p>Esses dados ajudam a orientar sua próxima ação.</p><div className="pro-fields pro-three"><label>Peças postadas<input type="number" min="0" value={piecesPosted} onChange={e=>setPiecesPosted(e.target.value)} placeholder="0" /></label><label>Clientes convidadas<input type="number" min="0" value={invites} onChange={e=>setInvites(e.target.value)} placeholder="0" /></label><label>Conversas<input type="number" min="0" value={conversations} onChange={e=>setConversations(e.target.value)} placeholder="0" /></label></div>
             <label>Me conte como foi<textarea maxLength={2000} value={note} onChange={e=>setNote(e.target.value)} placeholder="Ex.: mostrei 8 vestidos nos stories e convidei 20 clientes..." /></label>
