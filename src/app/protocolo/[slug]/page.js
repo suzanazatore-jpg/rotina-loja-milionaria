@@ -21,6 +21,8 @@ function embed(url) {
   if (!url) return ''
   try {
     const u = new URL(url)
+    if (u.protocol !== 'https:') return ''
+    if (u.hostname === 'video.smartplayer.ai') return u.href
     if (u.hostname === 'youtu.be') return `https://www.youtube.com/embed/${u.pathname.slice(1)}`
     if (u.hostname.endsWith('youtube.com')) {
       const id = u.searchParams.get('v') || u.pathname.match(/^\/embed\/([^/]+)/)?.[1]
@@ -195,21 +197,22 @@ export default function Protocolo({ params }) {
   return <div className="pro-page">
     <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div><button className="pro-quiet" onClick={async()=>{if(preview){router.push(`/admin/cursos/conteudo?id=${course.id}`);return}await supabase.auth.signOut();router.replace('/login')}}>{preview?'← Voltar ao ADM':'Sair'}</button></header>
     <main className="pro-main">
+      {!preview && <button className="pro-quiet" onClick={() => router.push('/painel?secao=conteudos')}>← Voltar ao painel</button>}
       {preview&&<div className="pro-preview" role="status"><strong>{demo?'Demonstração do aplicativo':'Prévia do ADM'}</strong> · dados fictícios. Você pode navegar e testar os registros; nada aqui é salvo na conta da aluna.</div>}
       {error && <div role="alert" className="pro-error">{error}</div>}
+      {!data.run && <>
+        <section className="pro-intro"><span className="pro-overline">Dia 1 de 7 · aula + missão</span><h2>{lessons[0]?.title || 'Sua campanha começa aqui'}</h2><p>Assista à aula, separe seu lote e defina a meta. Depois, marque as ações e acompanhe suas vendas.</p></section>
+        <nav className="pro-days" aria-label="Sua jornada de sete dias">{Array.from({ length: 7 }, (_, index) => <button type="button" key={index} disabled aria-current={index === 0 ? 'step' : undefined}><span>Dia</span><strong>{index + 1}</strong></button>)}</nav>
+        {lessons[0] && <section className="pro-card"><span className="pro-overline">Aula do dia</span><h2>{lessons[0].title}</h2><div className="pro-video">{embed(lessons[0].video_url) ? <iframe src={embed(lessons[0].video_url)} title={lessons[0].title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <p>Vídeo ainda não disponível.</p>}</div>
+          {materials.filter(item => item.lesson_id === lessons[0].id).map(item => <button key={item.id} className="pro-material" onClick={() => downloadMaterial(item)}>↓ {item.title}<span>Baixar tarefa em PDF</span></button>)}
+        </section>}
+      </>}
       {!data.run ? <section className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Escolha um lote para trabalhar por 7 dias</h2><p>Separe as peças paradas que você quer vender nesta campanha. Use uma meta que faça sentido para esse lote.</p>
         <label>Nome do lote<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: vestidos da coleção anterior" /></label>
         <div className="pro-fields"><label>Peças no lote<input type="number" min="1" value={stock} onChange={e=>setStock(e.target.value)} placeholder="Ex.: 30" /></label><label>Meta de vendas (R$)<input inputMode="decimal" value={goal} onChange={e=>setGoal(e.target.value)} placeholder="Ex.: 3000,00" /></label></div>
         {lessons.length!==7||lessons.some(item=>!Array.isArray(item.protocol_checklist)||!item.protocol_checklist.length)?<p>As sete missões ainda estão sendo preparadas pela Suzana.</p>:<button className="pro-primary" disabled={busy} onClick={()=>submit({action:'start',lot_name:lot,starting_pieces:Number(stock),goal_cents:digits(goal)})}>{busy?'Preparando...':'Começar meu Protocolo'}</button>}
       </section> : <>
         <section className="pro-hero"><div><span className="pro-overline">Sua campanha · {data.run.lot_name}</span><h2>{money(totalCents)} <small>em vendas registradas</small></h2><p>{soldPieces} de {data.run.starting_pieces} peças vendidas · {completedCount} de {lessons.length} missões concluídas</p></div><div className="pro-goal"><strong>{percent}% da meta</strong><span>{money(data.run.goal_cents)}</span><div className="pro-bar"><span style={{width:`${percent}%`}} /></div></div></section>
-        {!preview&&<section className="pro-card"><NotificationPreference cores={{borda:'#e2e0d8',card:'#fff',card2:'#f7f6f2',tx:'#1a1a18',tx2:'#686860'}} description="Ative as notificações do aplicativo para receber a missão de cada dia. O aviso abre a aula correspondente." /></section>}
-        <section className="pro-card pro-sale"><div className="pro-headline"><div><span className="pro-overline">Resultado em tempo real</span><h2>Registrar uma venda</h2></div><button className="pro-quiet" onClick={()=>setShowSales(!showSales)}>{showSales?'Ocultar':'Ver'} lançamentos</button></div>
-          <div className="pro-fields"><label>Valor da venda (R$)<input inputMode="decimal" value={saleValue} onChange={e=>setSaleValue(e.target.value)} placeholder="Ex.: 199,90" /></label><label>Peças vendidas<input type="number" min="1" value={salePieces} onChange={e=>setSalePieces(e.target.value)} /></label></div>
-          <label className="pro-check"><input type="checkbox" checked={sound} onChange={e=>setSound(e.target.checked)} /> Tocar som ao confirmar</label>
-          <button className="pro-primary" disabled={busy} onClick={()=>submit({action:'sale',amount_cents:digits(saleValue),pieces:Number(salePieces)},()=>{setSaleValue('');setSalePieces('1');playSound()})}>{busy?'Salvando...':'Confirmar venda'}</button>
-          {showSales && <ul className="pro-sales-list">{data.sales.length ? data.sales.map((sale,i)=><li key={sale.id}><span>{sale.pieces} {sale.pieces===1?'peça':'peças'} · {new Date(sale.created_at).toLocaleDateString('pt-BR')}</span><strong>{money(sale.amount_cents)}</strong>{i===0&&<button disabled={busy} onClick={()=>submit({action:'undo_sale',sale_id:sale.id})}>Desfazer</button>}</li>):<li>Nenhuma venda lançada ainda.</li>}</ul>}
-        </section>
         <nav className="pro-days" aria-label="Dias do Protocolo">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
         {lesson ? <>
           <section className="pro-card"><span className="pro-overline">Dia {selected+1} de 7 · aula</span><h2>{lesson.title}</h2><p>{lesson.description}</p><div className="pro-video">{embed(lesson.video_url)?<iframe src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />:<div>▶ Vídeo em breve. A missão já pode ser feita.</div>}</div></section>
@@ -222,6 +225,13 @@ export default function Protocolo({ params }) {
             <button className="pro-primary" disabled={busy||!checklist.length} onClick={()=>submit({action:'entry',lesson_id:lesson.id,checklist:checks,pieces_posted:piecesPosted,invited_count:invites,conversations_count:conversations,note,complete:checks.length>0&&checks.every(Boolean)},next=>setFeedback(next.guidance))}>{busy?'Salvando...':entry?.completed_at?'Atualizar meu registro':'Salvar e receber orientação'}</button>
             {feedback&&<div role="status" className="pro-feedback"><strong>{feedback.title}</strong><ul>{feedback.actions.map((action,index)=><li key={index}>{action}</li>)}</ul><small>A orientação considera os números e o checklist. Seu relato também fica registrado.</small></div>}
           </section>
+        {!preview&&<section className="pro-card"><NotificationPreference cores={{borda:'#e2e0d8',card:'#fff',card2:'#f7f6f2',tx:'#1a1a18',tx2:'#686860'}} description="Ative as notificações do aplicativo para receber a missão de cada dia. O aviso abre a aula correspondente." /></section>}
+        <section className="pro-card pro-sale"><div className="pro-headline"><div><span className="pro-overline">Resultado em tempo real</span><h2>Registrar uma venda</h2></div><button className="pro-quiet" onClick={()=>setShowSales(!showSales)}>{showSales?'Ocultar':'Ver'} lançamentos</button></div>
+          <div className="pro-fields"><label>Valor da venda (R$)<input inputMode="decimal" value={saleValue} onChange={e=>setSaleValue(e.target.value)} placeholder="Ex.: 199,90" /></label><label>Peças vendidas<input type="number" min="1" value={salePieces} onChange={e=>setSalePieces(e.target.value)} /></label></div>
+          <label className="pro-check"><input type="checkbox" checked={sound} onChange={e=>setSound(e.target.checked)} /> Tocar som ao confirmar</label>
+          <button className="pro-primary" disabled={busy} onClick={()=>submit({action:'sale',amount_cents:digits(saleValue),pieces:Number(salePieces)},()=>{setSaleValue('');setSalePieces('1');playSound()})}>{busy?'Salvando...':'Confirmar venda'}</button>
+          {showSales && <ul className="pro-sales-list">{data.sales.length ? data.sales.map((sale,i)=><li key={sale.id}><span>{sale.pieces} {sale.pieces===1?'peça':'peças'} · {new Date(sale.created_at).toLocaleDateString('pt-BR')}</span><strong>{money(sale.amount_cents)}</strong>{i===0&&<button disabled={busy} onClick={()=>submit({action:'undo_sale',sale_id:sale.id})}>Desfazer</button>}</li>):<li>Nenhuma venda lançada ainda.</li>}</ul>}
+        </section>
           <section className="pro-card"><button className="pro-help-toggle" onClick={()=>setHelp(help?'':'options')}>Ainda não vendi. O que faço? {help?'−':'+'}</button>{help&&<div className="pro-help">{['Poucas clientes viram','Viram, mas não perguntaram','Perguntaram, mas não compraram'].map((title,i)=><button key={title} onClick={()=>setHelp(String(i))}>{title}</button>)}{help!=='options'&&<p>{['Priorize clientes que já conhecem a loja e confira se o convite explica quando e como comprar.','Mostre foto real, tamanho, preço e uma combinação. Peça uma resposta simples à cliente.','Retome cada conversa com a peça de interesse e descubra qual informação falta para decidir.'][Number(help)]}</p>}</div>}</section>
           {selected===6&&entry?.completed_at&&<section className="pro-card pro-finish"><span className="pro-overline">Seu balanço</span><h2>{money(totalCents)} em vendas · {soldPieces} peças</h2><p>Você concluiu {completedCount} missões. Anote o que funcionou para planejar a próxima campanha.</p>
             <h3>Conte um pouco sobre sua loja</h3><p>Isso ajuda a Suzana a indicar o próximo passo adequado para você.</p>

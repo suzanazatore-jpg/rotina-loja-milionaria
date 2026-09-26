@@ -21,3 +21,24 @@
 .pro-feedback{background:#eff8ef;border-left:4px solid #3d8b5a;border-radius:9px;padding:14px;margin-top:14px;font-size:13px}.pro-feedback ul{padding-left:18px;margin:7px 0}.pro-feedback li{margin:6px 0}.pro-feedback small{color:#53705c}.pro-error{background:#ffeded;color:#8f3030;padding:13px;border-radius:10px;font-size:13px;margin:10px 0}
 .pro-help-toggle{border:0;background:none;color:#8e6c1f;text-align:left;font-weight:800;cursor:pointer;padding:0}.pro-help{margin-top:13px;display:grid;gap:7px}.pro-help button{background:#f7f6f2;border:1px solid #e2e0d8;border-radius:9px;padding:10px;text-align:left;cursor:pointer;font-size:12px}.pro-finish{border-color:#d4af37}
 @media(max-width:650px){.pro-main{padding:13px}.pro-header{padding:14px}.pro-card{padding:16px}.pro-hero{grid-template-columns:1fr}.pro-fields.pro-three{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.pro-three label{font-size:11px!important}.pro-three input{padding:9px 6px!important}.pro-days{gap:3px}.pro-days button{font-size:10px}}
+
+/* Protocol journey: dark violet treatment matching the approved reference. */
+.pro-page{background:#17141f;color:#f4effc}
+.pro-header{background:#231e2c;border-bottom:1px solid #46394f}
+.pro-main{max-width:760px}
+.pro-overline,.pro-header .pro-overline,.pro-quiet,.pro-header .pro-quiet{color:#d6b9fa}
+.pro-card{background:#272130;border-color:#4c3c5a}
+.pro-card p,.pro-intro p{color:#c2b7ce}
+.pro-intro{margin:24px 0 12px}.pro-intro h2{margin:7px 0;font-size:26px}.pro-intro p{font-size:14px;line-height:1.6}
+.pro-card input:not([type=checkbox]),.pro-card textarea,.pro-card select{background:#1d1727;color:#f4effc;border-color:#594667}
+.pro-card input::placeholder,.pro-card textarea::placeholder{color:#a89bb4}
+.pro-primary{background:#dbc1fa;color:#241630!important}
+.pro-days button{background:#292232;border-color:#544260;color:#eee5f7}
+.pro-days button[aria-current=step]{background:#dbc1fa;border-color:#dbc1fa;color:#241630;opacity:1}
+.pro-video{background:#38244e}
+.pro-material{background:#362b40;border-color:#5b4869;color:#f4effc}.pro-material span{color:#d6c6e3}
+.pro-hero{background:#292032;border:1px solid #594368}.pro-goal strong{color:#dbc1fa}.pro-bar span{background:#c7a0ee}
+.pro-check input{accent-color:#c7a0ee}.pro-help-toggle{color:#dbc1fa}.pro-help button{background:#201a28;border-color:#594667;color:#f4effc}
+.pro-feedback{background:#22382b;color:#e5f5e9}.pro-feedback small{color:#c1ddca}.pro-finish{border-color:#c7a0ee}
+.pro-page button:focus-visible,.pro-page a:focus-visible,.pro-card input:focus-visible,.pro-card textarea:focus-visible{outline-color:#dbc1fa}
+.pro-sales-list li{border-color:#594667}.pro-sales-list button{color:#dbc1fa}
