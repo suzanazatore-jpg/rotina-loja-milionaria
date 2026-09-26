@@ -75,7 +75,7 @@ export default function Protocolo({ params }) {
   const call = useCallback(async (action) => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.replace(`/login?next=${encodeURIComponent(`/protocolo/${slug}${window.location.search}`)}`); throw new Error('Entre na sua conta para continuar.') }
-    const response = await fetch('/api/protocolo', { method: action ? 'POST' : 'GET', headers: { Authorization: `Bearer ${session.access_token}`, ...(action ? { 'Content-Type': 'application/json' } : {}) }, body: action ? JSON.stringify({ slug, ...action }) : undefined })
+    const response = await fetch(action ? '/api/protocolo' : `/api/protocolo?slug=${encodeURIComponent(slug)}`, { method: action ? 'POST' : 'GET', headers: { Authorization: `Bearer ${session.access_token}`, ...(action ? { 'Content-Type': 'application/json' } : {}) }, body: action ? JSON.stringify({ slug, ...action }) : undefined })
     const result = await response.json()
     if (!response.ok) throw new Error(result.error || 'Não foi possível continuar.')
     return result
