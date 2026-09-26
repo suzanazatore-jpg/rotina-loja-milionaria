@@ -23,7 +23,8 @@ function embed(url) {
   try {
     const u = new URL(url)
     if (u.protocol !== 'https:') return ''
-    if (u.hostname === 'video.smartplayer.ai') return u.href
+    if (['video.smartplayer.ai', 'video.smartplayer.io'].includes(u.hostname)) return u.href
+    if (u.hostname === 'player.scaleup.com.br' && /^\/embed\/[a-zA-Z0-9-]+$/.test(u.pathname)) return u.href
     if (u.hostname === 'youtu.be') return `https://www.youtube.com/embed/${u.pathname.slice(1)}`
     if (u.hostname.endsWith('youtube.com')) {
       const id = u.searchParams.get('v') || u.pathname.match(/^\/embed\/([^/]+)/)?.[1]

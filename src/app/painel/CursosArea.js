@@ -52,7 +52,7 @@ export default function CursosArea({ cores, ouro, ouroGrad, authenticatedUser = 
 
       const liberados = (matriculas || [])
         .map(item => ehAdmin ? item : item.courses)
-        .filter(curso => curso?.is_published && !curso?.is_mentorship)
+        .filter(curso => curso?.is_published && !curso?.is_mentorship && !curso?.protocol_enabled)
         .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
 
       const carouselData = carrosseisResult.status === 'fulfilled' && carrosseisResult.value.ok
