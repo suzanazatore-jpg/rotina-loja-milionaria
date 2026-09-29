@@ -24,7 +24,7 @@ export async function POST(request) {
     if (authError || !user) return Response.json({ error: 'Sessão expirada. Entre novamente.' }, { status: 401 })
     const { data: profile } = await db.from('profiles').select('role,status').eq('id', user.id).maybeSingle()
     if (!(profile?.role === 'admin' && profile.status === 'active') && user.email !== 'suporte@suzanazatorre.com.br') return Response.json({ error: 'Acesso exclusivo do ADM.' }, { status: 403 })
-    const { material_id, lesson_id } = await request.json()
+    const { material_id, lesson_id, replacement_path } = await request.json()
     if (!UUID.test(material_id || '') || !UUID.test(lesson_id || '')) throw new Error('Selecione o PDF do dia.')
     const { data: material, error: materialError } = await db.from('materials').select('file_url,course_id,title,lesson_id').eq('id', material_id).eq('lesson_id', lesson_id).maybeSingle()
     if (materialError) throw materialError
@@ -34,8 +34,9 @@ export async function POST(request) {
     if (!lesson) throw new Error('Aula não encontrada.')
     // Read only our private bucket. Never fetch an arbitrary URL from a material.
     const prefix = 'storage://course-materials/'
-    if (!material.file_url?.startsWith(prefix)) throw new Error('Para importar as tarefas, envie o PDF pelo campo deste dia.')
-    const path = material.file_url.slice(prefix.length)
+    if (!replacement_path && !material.file_url?.startsWith(prefix)) throw new Error('Para importar as tarefas, envie o PDF pelo campo deste dia.')
+    const path = replacement_path ?? material.file_url.slice(prefix.length)
+    if (typeof path !== 'string' || (replacement_path !== undefined && !path.startsWith(`${material.course_id}/${lesson_id}/`))) throw new Error('O novo PDF precisa pertencer a esta aula.')
     if (!path || path.split('/').includes('..')) throw new Error('Arquivo inválido.')
     if (!process.env.OPENAI_API_KEY) throw new Error('A leitura inteligente ainda não está configurada.')
     const { data: file, error: downloadError } = await db.storage.from('course-materials').download(path)
