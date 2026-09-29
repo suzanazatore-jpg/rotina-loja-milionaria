@@ -16,7 +16,6 @@ export default function ProtocoloAdmin() {
   const [lessons,setLessons]=useState([])
   const [materials,setMaterials]=useState([])
   const [uploading,setUploading]=useState('')
-  const [report,setReport]=useState(null)
   const [importing,setImporting]=useState('')
   const [drafts,setDrafts]=useState({})
   const [replacements,setReplacements]=useState({})
@@ -38,11 +37,7 @@ export default function ProtocoloAdmin() {
     ])
     if(c.error||l.error||m.error)throw new Error(c.error?.message||l.error?.message||m.error?.message)
     setCourse(c.data);setLessons(l.data||[]);setMaterials(m.data||[])
-    const {data:{session}}=await supabase.auth.getSession()
-    if(session?.access_token){
-      const response=await fetch(`/api/admin/protocolo?course_id=${courseId}`,{headers:{Authorization:`Bearer ${session.access_token}`}})
-      if(response.ok)setReport(await response.json())
-    }
+
   }
   useEffect(()=>{
     let live=true
@@ -175,12 +170,6 @@ export default function ProtocoloAdmin() {
         <label style={{display:'block',fontSize:13}}>Ações da tarefa (uma por linha)<textarea style={{...input,marginTop:6,minHeight:95,resize:'vertical'}} value={(lesson.protocol_checklist||[]).join('\n')} onChange={e=>editLesson(index,'protocol_checklist',e.target.value.split('\n'))} /></label>
         <label style={{display:'block',fontSize:13,marginTop:14}}>Texto do lembrete deste dia<input style={{...input,marginTop:6}} maxLength={180} value={lesson.protocol_notification||''} onChange={e=>editLesson(index,'protocol_notification',e.target.value)} /></label>
       </section>)}
-      {report&&<section style={{background:'#151515',border:'1px solid #333',borderRadius:14,padding:18,margin:'18px 0'}}><h2 style={{fontSize:19,margin:'0 0 7px'}}>Acompanhamento das lojistas</h2><p style={{fontSize:12,color:'#aaa'}}>{report.rows.length} iniciaram · {report.rows.filter(row=>row.completed>=7).length} concluíram os sete dias</p>
-        {report.rows.map(row=><details key={row.owner_id} style={{borderTop:'1px solid #333',padding:'12px 0'}}><summary style={{cursor:'pointer'}}><strong>{row.name}</strong> · {row.completed}/7 missões · {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(row.total_cents/100)} em vendas registradas</summary>
-          <p style={{fontSize:12,color:'#aaa'}}>{row.email} · Lote: {row.lot_name} · {row.sold_pieces}/{row.starting_pieces} peças · equipe: {row.team_size??'não informado'} · faturamento: {row.monthly_revenue_band||'não informado'}</p>
-          {row.entries.map(entry=><p key={entry.lesson_id} style={{fontSize:12,color:'#bbb',whiteSpace:'pre-wrap'}}>Dia {lessons.findIndex(item=>item.id===entry.lesson_id)+1}: {entry.note||'Sem relato'} · {entry.completed_at?'concluído':'em andamento'}</p>)}
-        </details>)}
-      </section>}
       {course&&<button style={{...button,margin:'12px 0 30px'}} disabled={busy||!!importing||!!uploading||Object.keys(drafts).length>0} onClick={save}>{busy?'Salvando...':'Salvar configurações do Protocolo'}</button>}
     </>}
   </div></AdminCursosShell>
