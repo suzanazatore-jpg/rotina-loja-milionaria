@@ -12,7 +12,7 @@ import WeeklyRoutineCard from './WeeklyRoutineCard'
 import AppIcon from '@/app/components/AppIcon'
 import NotificationCenter from '@/app/components/NotificationCenter'
 import NotificationPreference from './NotificationPreference'
-import { toEmbedUrl } from '@/lib/tutorialVideos'
+import TutorialVideoPlayer from '@/app/components/TutorialVideoPlayer'
 import './premium.css'
 
 const BonusArea = dynamic(() => import('./BonusArea'))
@@ -745,7 +745,7 @@ export default function Painel() {
               {secao === 'precificacao' && (
                 precificacaoLiberada ? <div style={{ maxWidth: '1040px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
-                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.pricing?.title || 'Como usar a calculadora de precificação'} videoUrl={videosExplicativos.pricing?.video_url} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.pricing?.title || 'Como usar a calculadora de precificação'} videoUrl={videosExplicativos.pricing?.video_url} coverUrl={videosExplicativos.pricing?.cover_image_url} />
                   <PricingCenter userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} />
                 </div> : <AcessoBloqueado titulo="Precificação e Lucro" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
@@ -768,7 +768,7 @@ export default function Painel() {
 
               {/* VENDAS E METAS */}
               {secao === 'vendas' && (
-                metasLiberadas ? <div style={{ maxWidth: '980px', margin: '0 auto' }}><VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.team_goals?.title || 'Como usar a calculadora de metas'} videoUrl={videosExplicativos.team_goals?.video_url} /><SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} initialTab={vendasAbaInicial} rotinaSemanal={rotinaSemanal} onOpenRoutine={() => irPara('rotina')} /></div> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
+                metasLiberadas ? <div style={{ maxWidth: '980px', margin: '0 auto' }}><VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.team_goals?.title || 'Como usar a calculadora de metas'} videoUrl={videosExplicativos.team_goals?.video_url} coverUrl={videosExplicativos.team_goals?.cover_image_url} /><SalesCenter cores={cores} ouro={ouro} ouroGrad={ouroGrad} initialTab={vendasAbaInicial} rotinaSemanal={rotinaSemanal} onOpenRoutine={() => irPara('rotina')} /></div> : <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />
               )}
 
               {secao === 'metas-bloqueadas' && <AcessoBloqueado titulo="Calculadora de Metas" texto="Esta ferramenta não está incluída no seu plano atual." ouroGrad={ouroGrad} cores={cores} />}
@@ -779,7 +779,7 @@ export default function Painel() {
               {secao === 'campanhas' && campanhasLiberadas && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
-                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.campaigns?.title || 'Como usar a campanha do mês'} videoUrl={videosExplicativos.campaigns?.video_url} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.campaigns?.title || 'Como usar a campanha do mês'} videoUrl={videosExplicativos.campaigns?.video_url} coverUrl={videosExplicativos.campaigns?.cover_image_url} />
                   <div style={{ position: 'relative', overflow: 'hidden', background: tema === 'escuro' ? 'linear-gradient(135deg,#1b1608,#111 65%)' : 'linear-gradient(135deg,#fff4c7,#fff 70%)', border: `1px solid ${tema === 'escuro' ? '#554717' : '#ddc779'}`, borderRadius: '18px', padding: '23px', marginBottom: '18px' }}>
                     <div style={{ position: 'absolute', right: '-18px', top: '-22px', fontSize: '100px', opacity: .055 }}>🎯</div>
                     <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>AÇÃO DO MÊS</p>
@@ -802,7 +802,7 @@ export default function Painel() {
               {secao === 'calendario' && calendarioLiberado && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
-                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.calendar?.title || 'Como usar o calendário de postagens'} videoUrl={videosExplicativos.calendar?.video_url} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.calendar?.title || 'Como usar o calendário de postagens'} videoUrl={videosExplicativos.calendar?.video_url} coverUrl={videosExplicativos.calendar?.cover_image_url} />
                   <div style={{ background: tema === 'escuro' ? 'linear-gradient(145deg,#17150f,#111)' : 'linear-gradient(145deg,#fffaf0,#fff)', border: `1px solid ${tema === 'escuro' ? '#4a4020' : '#ddc779'}`, borderRadius: '18px', padding: '22px', marginBottom: '18px' }}>
                     <p style={{ color: ouro, fontSize: '10px', fontWeight: 900, letterSpacing: '.13em', margin: '0 0 7px' }}>PLANEJAMENTO MENSAL</p>
                     <h2 style={{ fontSize: '22px', fontWeight: 900, margin: '0 0 6px', color: cores.tx }}>Calendário de Conteúdo</h2>
@@ -830,7 +830,7 @@ export default function Painel() {
               {secao === 'rotina' && rotinaLiberada && (
                 <div style={{ maxWidth: '760px', margin: '0 auto' }}>
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
-                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.routine?.title || 'Como executar a rotina da loja'} videoUrl={videosExplicativos.routine?.video_url} />
+                  <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.routine?.title || 'Como executar a rotina da loja'} videoUrl={videosExplicativos.routine?.video_url} coverUrl={videosExplicativos.routine?.cover_image_url} />
 
                   {conteudosCarregando ? <SectionLoading label="Carregando rotina da semana..." /> : !rotinaSemanal ? (
                     <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}>
@@ -915,19 +915,16 @@ function VoltarConteudos({ onClick, cores }) {
   return <button onClick={onClick} style={{ background: 'transparent', border: `1px solid ${cores.borda}`, borderRadius: '9px', color: cores.tx, padding: '9px 12px', fontSize: '13px', fontWeight: 800, cursor: 'pointer', marginBottom: '14px' }}>← Voltar aos conteúdos</button>
 }
 
-function VideoEmBreve({ cores, ouro, titulo, videoUrl }) {
-  const embedUrl = toEmbedUrl(videoUrl)
+function VideoEmBreve({ cores, ouro, titulo, videoUrl, coverUrl }) {
   return <section style={{ marginBottom: '18px' }}>
     <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: '16px', border: `1px solid ${cores.borda}`, background: `linear-gradient(145deg, ${cores.card2}, ${cores.card})`, display: 'grid', placeItems: 'center', overflow: 'hidden', position: 'relative' }}>
-      {embedUrl ? (
-        <iframe src={embedUrl} title={titulo} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen style={{ width: '100%', height: '100%', border: 0 }} />
-      ) : (
+      <TutorialVideoPlayer videoUrl={videoUrl} coverUrl={coverUrl} title={titulo} fallback={
         <div style={{ textAlign: 'center', padding: '20px' }}>
           <div style={{ width: '54px', height: '54px', margin: '0 auto 12px', borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(212,175,55,.14)', border: `1px solid ${ouro}`, color: ouro, fontSize: '20px' }}>▶</div>
           <strong style={{ display: 'block', color: cores.tx, fontSize: '18px', marginBottom: '5px' }}>Em breve</strong>
           <span style={{ color: cores.tx2, fontSize: '13px' }}>{titulo}</span>
         </div>
-      )}
+      } />
     </div>
   </section>
 }

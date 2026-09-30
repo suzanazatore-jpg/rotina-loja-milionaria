@@ -13,10 +13,11 @@
     "mammoth": "1.12.3",
     "next": "16.2.9",
     "pdf-parse": "2.4.5",
+    "pdfjs-dist": "5.4.296",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "web-push": "3.6.7",
-    "pdfjs-dist": "5.4.296"
+    "sharp": "0.34.5",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

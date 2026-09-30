@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { appContentKeys } from '@/lib/appContentAccessServer'
 import { loadStudentAccount } from '@/lib/studentAccountServer'
+import { withTutorialCoverUrl } from '@/lib/tutorialVideoCovers'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 
@@ -160,7 +161,7 @@ async function loadContent(supabase, weekStart, user) {
       .order('created_at', { ascending: true }),
     supabase
       .from('tutorial_videos')
-      .select('module_key,title,video_url')
+      .select('module_key,title,video_url,cover_image_path')
       .eq('is_active', true),
   ])
 
@@ -189,7 +190,7 @@ async function loadContent(supabase, weekStart, user) {
     routine ? signFile(supabase, routine, 'rotinas') : null,
   ])
 
-  return { calendarios, acoes_calendario: calendarActions, campanhas, rotina, banners, tutorial_videos: tutorialVideos }
+  return { calendarios, acoes_calendario: calendarActions, campanhas, rotina, banners, tutorial_videos: tutorialVideos.map(video => withTutorialCoverUrl(supabase, video)) }
 }
 
 export async function GET(request) {
