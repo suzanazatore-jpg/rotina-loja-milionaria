@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
-import { TUTORIAL_VIDEO_KEYS, TUTORIAL_VIDEO_MODULES, toEmbedUrl } from '@/lib/tutorialVideos'
+import { TUTORIAL_VIDEO_KEYS, TUTORIAL_VIDEO_MODULES, TUTORIAL_VIDEO_PROVIDERS, toEmbedUrl } from '@/lib/tutorialVideos'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 
@@ -37,7 +37,7 @@ function normalizarVideos(videos) {
     const videoUrl = String(item?.video_url || '').trim()
     if (title.length > 120) throw new Error(`O título de ${modulo.label} deve ter no máximo 120 caracteres.`)
     if (videoUrl.length > 1000) throw new Error(`O link de ${modulo.label} está muito longo.`)
-    if (videoUrl && !toEmbedUrl(videoUrl)) throw new Error(`O link de ${modulo.label} não é válido. Use YouTube, Vimeo ou Loom com HTTPS.`)
+    if (videoUrl && !toEmbedUrl(videoUrl)) throw new Error(`O link de ${modulo.label} não é válido. Use ${TUTORIAL_VIDEO_PROVIDERS} com HTTPS. Para Panda Video e ScaleUp, use o link de incorporação (embed).`)
 
     return {
       module_key: moduleKey,

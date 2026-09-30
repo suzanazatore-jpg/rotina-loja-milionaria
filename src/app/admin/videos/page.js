@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { TUTORIAL_VIDEO_MODULES, toEmbedUrl } from '@/lib/tutorialVideos'
+import { TUTORIAL_VIDEO_MODULES, TUTORIAL_VIDEO_PROVIDERS, toEmbedUrl } from '@/lib/tutorialVideos'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
 const ouro = '#D4AF37'
@@ -75,7 +75,7 @@ export default function AdminVideos() {
     if (linkInvalido) {
       const modulo = TUTORIAL_VIDEO_MODULES.find(item => item.key === linkInvalido.module_key)
       setErro(true)
-      setMensagem(`Confira o link de ${modulo?.label}. Use um link HTTPS do YouTube, Vimeo ou Loom.`)
+      setMensagem(`Confira o link de ${modulo?.label}. Use um link HTTPS de ${TUTORIAL_VIDEO_PROVIDERS}. Para Panda Video e ScaleUp, copie o link de incorporação (embed).`)
       return
     }
 
@@ -107,7 +107,7 @@ export default function AdminVideos() {
         <p style={{ color: '#999', fontSize: '14px', lineHeight: 1.55, margin: '0 0 18px' }}>Cole o link da aula de cada ferramenta. O vídeo entra no lugar de “Em breve” automaticamente.</p>
 
         <div style={{ background: '#171409', border: '1px solid #5B4C17', borderRadius: '11px', color: '#E8CA56', padding: '12px 14px', fontSize: '13px', lineHeight: 1.5, marginBottom: '20px' }}>
-          Aceita links HTTPS do YouTube, Vimeo e Loom. Se deixar o campo vazio, a aluna continuará vendo “Em breve”.
+          Aceita links HTTPS de {TUTORIAL_VIDEO_PROVIDERS}. Para Panda Video e ScaleUp, copie o link de incorporação (embed). Se deixar o campo vazio, a aluna continuará vendo “Em breve”.
         </div>
 
         {mensagem && <div role="status" style={{ background: erro ? '#2A1113' : '#122015', border: `1px solid ${erro ? '#74323A' : '#285D35'}`, color: erro ? '#FFB5BD' : '#9DE2AA', borderRadius: '10px', padding: '11px 13px', marginBottom: '16px', fontSize: '13px' }}>{mensagem}</div>}
@@ -136,10 +136,10 @@ export default function AdminVideos() {
                       <input value={video.title || ''} maxLength={120} onChange={event => alterar(video.module_key, 'title', event.target.value)} style={campoStyle} placeholder={modulo?.defaultTitle} />
                     </label>
                     <label style={labelStyle}>Link da aula
-                      <input value={video.video_url || ''} onChange={event => alterar(video.module_key, 'video_url', event.target.value)} style={{ ...campoStyle, borderColor: linkPreenchido && !embedUrl ? '#A8404A' : '#393939' }} placeholder="https://www.youtube.com/watch?v=..." inputMode="url" autoCapitalize="none" />
+                      <input value={video.video_url || ''} maxLength={1000} onChange={event => alterar(video.module_key, 'video_url', event.target.value)} style={{ ...campoStyle, borderColor: linkPreenchido && !embedUrl ? '#A8404A' : '#393939' }} placeholder="Cole o link HTTPS do vídeo" inputMode="url" autoCapitalize="none" />
                     </label>
                     <p style={{ color: linkPreenchido && !embedUrl ? '#FF9AA5' : '#777', fontSize: '11px', margin: '-5px 0 0', lineHeight: 1.45 }}>
-                      {linkPreenchido && !embedUrl ? 'Este link ainda não é reconhecido.' : 'Pode colar o link normal do vídeo; o sistema prepara a exibição.'}
+                      {linkPreenchido && !embedUrl ? 'Link não reconhecido. Para Panda Video ou ScaleUp, use o link de incorporação (embed), sem o código HTML.' : 'Cole o link do vídeo. No Panda Video ou ScaleUp, use o link de incorporação (embed), sem o código HTML.'}
                     </p>
                     {linkPreenchido && <button type="button" onClick={() => alterar(video.module_key, 'video_url', '')} style={{ ...botaoSecundario, justifySelf: 'start', color: '#FF9AA5' }}>Remover vídeo</button>}
                   </div>

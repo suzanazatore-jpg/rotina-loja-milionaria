@@ -7,6 +7,7 @@ export const TUTORIAL_VIDEO_MODULES = [
 ]
 
 export const TUTORIAL_VIDEO_KEYS = new Set(TUTORIAL_VIDEO_MODULES.map(item => item.key))
+export const TUTORIAL_VIDEO_PROVIDERS = 'YouTube, Panda Video, ScaleUp, Vimeo ou Loom'
 
 export function toEmbedUrl(value) {
   const raw = String(value || '').trim()
@@ -14,8 +15,22 @@ export function toEmbedUrl(value) {
 
   try {
     const url = new URL(raw)
-    if (url.protocol !== 'https:') return ''
-    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+    if (url.protocol !== 'https:' || url.username || url.password || url.port) return ''
+    const hostname = url.hostname.toLowerCase()
+
+    // Only accept the providers' actual embed endpoints, never arbitrary pages
+    // or pasted HTML. Keep their query parameters for playback configuration.
+    if (hostname === 'player.scaleup.com.br') {
+      return /^\/embed\/[a-f0-9]{40}\/?$/i.test(url.pathname) ? url.href : ''
+    }
+
+    if (hostname === 'player.pandavideo.com.br' || /^player-vz-[a-z0-9-]+\.tv\.pandavideo\.com\.br$/.test(hostname)) {
+      const videoIds = url.searchParams.getAll('v')
+      const validId = videoIds.length === 1 && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(videoIds[0])
+      return /^\/embed\/?$/.test(url.pathname) && validId ? url.href : ''
+    }
+
+    const host = hostname.replace(/^www\./, '')
 
     if (host === 'youtu.be') {
       const id = url.pathname.split('/').filter(Boolean)[0]
