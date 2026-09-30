@@ -10,7 +10,7 @@ export default function ProtocolAccess({ protocols = [], cores }) {
       <p style={{ margin: '0 0 8px', color: cores.tx2, fontSize: 12, fontWeight: 800 }}>SUA CAMPANHA EM 7 DIAS</p>
       <h2 style={{ margin: '0 0 10px', fontSize: 'clamp(21px, 4vw, 28px)', lineHeight: 1.2 }}>{protocol.title}</h2>
       <p style={{ margin: '0 0 18px', color: cores.tx2, lineHeight: 1.6 }}>Acompanhe as missões, marque suas ações e registre as vendas do seu estoque.</p>
-      <Link href={`/protocolo/${encodeURIComponent(protocol.slug)}`} style={{ display: 'inline-block', padding: '12px 18px', borderRadius: 10, background: 'linear-gradient(135deg, #D4AF37, #F5D76E)', color: '#211A0E', fontWeight: 800, textDecoration: 'none' }}>Acessar Protocolo →</Link>
+      <Link prefetch={true} href={`/protocolo/${encodeURIComponent(protocol.slug)}`} style={{ display: 'inline-block', padding: '12px 18px', borderRadius: 10, background: 'linear-gradient(135deg, #D4AF37, #F5D76E)', color: '#211A0E', fontWeight: 800, textDecoration: 'none' }}>Acessar Protocolo →</Link>
     </article>)}
   </section>
 }

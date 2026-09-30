@@ -1,6 +1,7 @@
 'use client'
 
 import { normalizeProtocolProducts } from '@/lib/protocolProducts'
+import ProtocolLoading from '../ProtocolLoading'
 import ProductEditor from './ProductEditor'
 import ProtocolPdf from './ProtocolPdf'
 import { cashRegisterAudio } from '@/lib/cashRegisterAudio'
@@ -112,8 +113,8 @@ export default function Protocolo({ params }) {
           setSelected(0);loadDraft(sampleLessons[0], [])
           return
         }
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.replace(`/login?next=${encodeURIComponent(`/protocolo/${slug}${window.location.search}`)}`); return }
+        const { data: { session: initialSession } } = await supabase.auth.getSession()
+        if (!initialSession) { router.replace(`/login?next=${encodeURIComponent(`/protocolo/${slug}${window.location.search}`)}`); return }
         const previewRequested = new URLSearchParams(window.location.search).get('preview') === '1'
         if (previewRequested) {
           const { data: { session } } = await supabase.auth.getSession()
@@ -131,8 +132,8 @@ export default function Protocolo({ params }) {
         }
         const { data: c, error: ce } = await supabase.from('courses').select('id,slug,title,subtitle,protocol_enabled,protocol_offer_url,is_published').eq('slug', slug).eq('is_published', true).maybeSingle()
         if (ce || !c?.protocol_enabled) throw new Error('Este protocolo não está disponível.')
-        const state = await call()
-        const [ls, ms] = await Promise.all([
+        const [state, ls, ms] = await Promise.all([
+          call(),
           supabase.from('lessons').select('id,title,description,video_url,duration_label,protocol_checklist,sort_order,created_at').eq('course_id', c.id).eq('is_published', true).order('sort_order').order('created_at'),
           supabase.from('materials').select('id,title,lesson_id,file_url').eq('course_id', c.id).eq('is_published', true).order('sort_order'),
         ])
@@ -229,7 +230,7 @@ export default function Protocolo({ params }) {
     pdfRequest.current++;setPdfLoading(false);setPdfError('');setSavedMessage('');setPdfUrl('');setSelected(index);loadDraft(lessons[index],data.entries);router.replace(`/protocolo/${slug}?${demo?'demo=1&':preview?'preview=1&':''}aula=${lessons[index].id}`, { scroll: false })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  if (loading) return <div className="pro-page pro-center">Abrindo seu Protocolo...</div>
+  if (loading) return <ProtocolLoading theme={theme} />
   if (!course || !data) return <div className="pro-page pro-center"><p>{error || 'Protocolo não disponível.'}</p><button onClick={() => router.push('/painel?secao=conteudos')}>Voltar</button></div>
 
   return <div className={`pro-page pro-theme-${theme}`}>
