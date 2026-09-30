@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { sendPushNotification } from '@/lib/pushNotifications'
 import { dateInSaoPaulo } from '@/lib/scheduledPushNotifications'
+import { ensureProtocolHistory } from '@/lib/protocolNotificationHistory'
 import { protocolDay } from '@/lib/protocolGuidance'
 
 export const runtime = 'nodejs'
@@ -45,8 +46,13 @@ export async function GET(request) {
       const {data:lessons,error:lessonError}=await supabase.from('lessons').select('id,title,protocol_notification').eq('course_id',run.course_id).eq('is_published',true).order('sort_order').order('created_at')
       if(lessonError||lessons?.length!==7||!lessons[index]){skipped++;continue}
       const lesson=lessons[index]
-      const {data:entry}=await supabase.from('protocol_entries').select('completed_at').eq('owner_id',run.owner_id).eq('lesson_id',lesson.id).maybeSingle()
+      const {data:entry,error:entryError}=await supabase.from('protocol_entries').select('completed_at').eq('owner_id',run.owner_id).eq('lesson_id',lesson.id).maybeSingle()
+      if(entryError){failed++;continue}
       if(entry?.completed_at){skipped++;continue}
+      let history
+      try { history = await ensureProtocolHistory(supabase,run,course,lesson,index,today) }
+      catch { failed++;continue }
+      let runFailed=0
       for (const sub of subscriptionResult.data||[]) {
         const key={owner_id:run.owner_id,course_id:run.course_id,lesson_id:lesson.id,subscription_id:sub.id}
         const {error:claim}=await supabase.from('protocol_notification_deliveries').insert(key)
@@ -54,17 +60,21 @@ export async function GET(request) {
         if(claim){failed++;continue}
         try {
           await sendPushNotification({endpoint:sub.endpoint,keys:{p256dh:sub.p256dh,auth:sub.auth}}, {
-            title:`Dia ${index+1} do seu Protocolo`,body:lesson.protocol_notification||`Sua missão de hoje é: ${lesson.title}. Toque para abrir a aula.`,
+            title:history.title,body:history.body,
             icon:'/pwa-icon-192.png',badge:'/notification-badge.png',tag:`protocolo-${run.course_id}-${index+1}`,
-            url:`/protocolo/${course.slug}?aula=${lesson.id}`,
+            url:history.target_url,
           })
           sent++
         } catch (error) {
           await supabase.from('protocol_notification_deliveries').delete().match(key)
           if(error?.statusCode===404||error?.statusCode===410)await supabase.from('push_subscriptions').update({active:false,updated_at:new Date().toISOString()}).eq('id',sub.id)
-          failed++
+          failed++;runFailed++
         }
       }
+      const {data:deliveries,error:deliveryError}=await supabase.from('protocol_notification_deliveries').select('created_at').eq('owner_id',run.owner_id).eq('lesson_id',lesson.id).order('created_at',{ascending:false})
+      if(deliveryError){failed++;continue}
+      const {error:historyError}=await supabase.from('user_notifications').update({push_device_count:deliveries.length,push_sent_at:deliveries[0]?.created_at||null,push_failed_count:runFailed}).eq('id',history.id)
+      if(historyError)failed++
     }
     return Response.json({success:true,date:today,runs:runs.length,sent,skipped,failed},{headers:{'Cache-Control':'no-store'}})
   } catch { return Response.json({error:'Não foi possível processar os lembretes.'},{status:500}) }

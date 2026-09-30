@@ -71,6 +71,27 @@ export default function NotificationPreference({ cores, ouro = '#D4AF37', descri
     }
 
     await api('POST', { subscription: subscription.toJSON() })
+    return subscription
+  }
+
+  async function testNotification() {
+    if (saving || loading) return
+    setSaving(true)
+    setMessage('Volte à tela inicial do celular agora. O teste será enviado em 5 segundos.')
+    try {
+      const subscription = await activate()
+      setEnabled(true)
+      const accessToken = await token()
+      const response = await fetch('/api/notificacoes/teste', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ endpoint: subscription.endpoint }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Não foi possível testar agora.')
+      setMessage(data.message)
+    } catch (error) { setMessage(error.message || 'Não foi possível testar agora.') }
+    finally { setSaving(false) }
   }
 
   async function toggle() {
@@ -127,6 +148,10 @@ export default function NotificationPreference({ cores, ouro = '#D4AF37', descri
             {loading ? 'Carregando...' : saving ? 'Salvando...' : enabled ? '✓ Ativadas' : '✕ Desativadas'}
           </button>
         </div>
+        <button type="button" onClick={testNotification} disabled={loading || saving}
+          style={{ marginTop: 12, padding: '9px 12px', borderRadius: 8, border: `1px solid ${cores.borda}`, background: cores.card, color: cores.tx, fontWeight: 800, cursor: loading || saving ? 'wait' : 'pointer' }}>
+          Testar notificação
+        </button>
         {message && <p style={{ color: message.startsWith('Notificações ativadas') ? ouro : cores.tx2, fontSize: 11, lineHeight: 1.45, margin: '10px 0 0' }}>{message}</p>}
       </div>
     </section>

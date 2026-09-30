@@ -75,7 +75,7 @@ export async function PATCH(request) {
   }
 
   const id = String(payload.id || '')
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
     return Response.json({ error: 'Notificação inválida.' }, { status: 400, headers: noStore })
   }
 

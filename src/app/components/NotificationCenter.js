@@ -18,6 +18,7 @@ function timeLabel(value) {
 
 function notificationDestination(item) {
   const target = new URL(item?.target_url || '/painel', window.location.origin)
+  if (target.pathname.startsWith('/protocolo/')) return { target, section: null, label: 'Abrir missão do protocolo' }
   const section = target.searchParams.get('destino') || target.searchParams.get('secao') || 'inicio'
   const labels = {
     rotina: 'Abrir Rotina',
@@ -143,6 +144,7 @@ export default function NotificationCenter({ cores, ouro = '#D4AF37', onNavigate
     const { target, section } = notificationDestination(item)
     target.searchParams.delete('notificacao')
     target.searchParams.delete('destino')
+    if (target.pathname.startsWith('/protocolo/')) { window.location.assign(`${target.pathname}${target.search}`); return }
     window.history.pushState({}, '', `${target.pathname}${target.search}${target.hash}`)
     setSelected(null)
     onNavigate?.(section)
