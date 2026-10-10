@@ -158,10 +158,11 @@ function Indicador({ label, value, destaque = false, hint }) {
   </div>
 }
 
-export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
+export default function PricingCenter({ userId, cores, ouro, ouroGrad, fixedExpensePct = 0 }) {
   const [produto, setProduto] = useState('')
   const [custo, setCusto] = useState('')
   const [taxas, setTaxas] = useState('')
+  const [impostos, setImpostos] = useState('')
   const [extras, setExtras] = useState('')
   const [margem, setMargem] = useState('50')
   const [desconto, setDesconto] = useState(15)
@@ -171,15 +172,16 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
   const [mensagem, setMensagem] = useState(null)
 
   const calculo = useMemo(() => {
-    const custoTotal = numero(custo) + numero(taxas) + numero(extras)
+    const custoTotal = numero(custo) + numero(extras)
+    const pctOverhead = Number(fixedExpensePct) + numero(taxas) + numero(impostos)
     const margemDesejada = numero(margem)
-    const valido = custoTotal > 0 && String(margem).trim() !== '' && margemDesejada >= 0 && margemDesejada <= 90
-    const preco = valido ? custoTotal / (1 - margemDesejada / 100) : 0
-    const lucro = Math.max(0, preco - custoTotal)
+    const valido = custoTotal > 0 && String(margem).trim() !== '' && margemDesejada >= 0 && margemDesejada <= 90 && pctOverhead + margemDesejada < 100
+    const preco = valido ? custoTotal / (1 - (margemDesejada + pctOverhead) / 100) : 0
+    const lucro = preco - custoTotal - preco * pctOverhead / 100
     const markup = custoTotal ? preco / custoTotal : 0
-    const precoMinimo = custoTotal ? custoTotal / (1 - MARGEM_MINIMA / 100) : 0
+    const precoMinimo = custoTotal && MARGEM_MINIMA + pctOverhead < 100 ? custoTotal / (1 - (MARGEM_MINIMA + pctOverhead) / 100) : 0
     const precoPromocional = preco * (1 - Number(desconto) / 100)
-    const lucroPromocional = precoPromocional - custoTotal
+    const lucroPromocional = precoPromocional - custoTotal - precoPromocional * pctOverhead / 100
     const margemPromocional = precoPromocional > 0 ? lucroPromocional / precoPromocional * 100 : 0
 
     return {
@@ -187,7 +189,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
       precoPromocional, lucroPromocional, margemPromocional,
       seguro: valido && margemPromocional >= MARGEM_MINIMA,
     }
-  }, [custo, desconto, extras, margem, taxas])
+  }, [custo, desconto, extras, margem, taxas, impostos, fixedExpensePct])
 
   useEffect(() => {
     let ativo = true
@@ -196,7 +198,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
       if (!userId) return
       const { data, error } = await supabase
         .from('pricing_calculations')
-        .select('id,product_name,item_cost,fees,extra_costs,desired_margin,total_cost,suggested_price,profit,markup,created_at')
+        .select('id,product_name,item_cost,fees,extra_costs,card_fee_pct,tax_pct,fixed_expense_pct,desired_margin,total_cost,suggested_price,profit,markup,created_at')
         .eq('owner_id', userId)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -228,12 +230,15 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
         owner_id: userId,
         product_name: produto.trim(),
         item_cost: numero(custo),
-        fees: numero(taxas),
+        fees: 0,
+        card_fee_pct: numero(taxas),
+        tax_pct: numero(impostos),
+        fixed_expense_pct: Number(Number(fixedExpensePct).toFixed(3)),
         extra_costs: numero(extras),
         desired_margin: calculo.margemDesejada,
         minimum_margin: MARGEM_MINIMA,
       })
-      .select('id,product_name,item_cost,fees,extra_costs,desired_margin,total_cost,suggested_price,profit,markup,created_at')
+      .select('id,product_name,item_cost,fees,extra_costs,card_fee_pct,tax_pct,fixed_expense_pct,desired_margin,total_cost,suggested_price,profit,markup,created_at')
       .single()
 
     setSalvando(false)
@@ -249,7 +254,8 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
   function reutilizar(item) {
     setProduto(item.product_name || '')
     setCusto(String(item.item_cost || ''))
-    setTaxas(String(item.fees || ''))
+    setTaxas(String(item.card_fee_pct ?? 0))
+    setImpostos(String(item.tax_pct ?? 0))
     setExtras(String(item.extra_costs || ''))
     setMargem(String(item.desired_margin ?? '50'))
     setMensagem({ tipo: 'sucesso', texto: 'Valores carregados. Você já pode ajustar e salvar um novo cálculo.' })
@@ -348,16 +354,17 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
 
         <div className="pricing-fields-grid">
           <CampoNumero label="Quanto você pagou na peça?" value={custo} onChange={setCusto} placeholder="Ex.: 45,00" hint="Digite o custo de compra de uma unidade." />
-          <CampoNumero label="Quanto paga de taxas na venda?" value={taxas} onChange={setTaxas} placeholder="Ex.: 5,00" hint="Cartão, marketplace ou imposto. Se não tiver, digite 0." />
+          <CampoNumero label="Taxa da maquininha (%)" value={taxas} onChange={setTaxas} prefix="" suffix="%" placeholder="Ex.: 3" hint="Percentual sobre o preço de venda." />
+          <CampoNumero label="Impostos sobre a venda (%)" value={impostos} onChange={setImpostos} prefix="" suffix="%" placeholder="Ex.: 6" hint="Alíquota efetiva informada pelo contador." />
           <CampoNumero label="Tem embalagem, frete ou outro gasto?" value={extras} onChange={setExtras} placeholder="Ex.: 3,50" hint="Some os outros gastos de uma peça. Se não tiver, digite 0." />
           <CampoNumero label="Qual margem de lucro você deseja?" value={margem} onChange={setMargem} prefix="" suffix="%" min={0} max={90} step="1" placeholder="Ex.: 50" hint="Exemplo: para uma margem de 50%, digite 50." />
         </div>
 
-        <div className="pricing-cost-total"><span>Custo total do produto</span><strong>{brl(calculo.custoTotal)}</strong></div>
+        <div className="pricing-cost-total"><span>Custo da peça e gastos diretos</span><strong>{brl(calculo.custoTotal)}</strong></div>
       </div>
 
       <div className="pricing-panel pricing-result-panel">
-        <div className="pricing-title"><span>2</span><div><h2>Preço calculado</h2><p>Resultado baseado na margem desejada.</p></div></div>
+        <div className="pricing-title"><span>2</span><div><h2>Preço calculado</h2><p>Inclui despesas fixas, taxas e impostos.</p></div></div>
 
         <div className="pricing-price-main">
           <small>PREÇO DE VENDA CALCULADO</small>
@@ -377,7 +384,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad }) {
         </div>
 
         <div className="pricing-result-actions">
-          <button className="pricing-save" type="button" onClick={salvar} disabled={salvando || !userId} style={{ background: ouroGrad }}>
+          <button className="pricing-save" type="button" onClick={salvar} disabled={salvando || !userId || !calculo.valido} style={{ background: ouroGrad }}>
             {salvando ? 'Salvando...' : 'Salvar no histórico'}
           </button>
           <button className="pricing-share" type="button" onClick={() => compartilharResumo()} disabled={!calculo.valido || !produto.trim()}>
