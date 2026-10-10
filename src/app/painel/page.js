@@ -28,7 +28,7 @@ const VirtualAssistant = dynamic(() => import('./VirtualAssistant'), {
 const SalesCenter = dynamic(() => import('./SalesCenter'), {
   loading: () => <SectionLoading label="Abrindo vendas e metas..." />,
 })
-const PricingCenter = dynamic(() => import('./PricingCenter'), {
+const PricingCenter = dynamic(() => import('./PricingGate'), {
   loading: () => <SectionLoading label="Abrindo precificação e lucro..." />,
 })
 
