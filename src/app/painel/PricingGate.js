@@ -65,11 +65,11 @@ export default function PricingGate({userId,cores,ouro,ouroGrad}) {
   return <div style={{color:cores.tx}}>
     <nav aria-label="Etapas da precificação" style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:16}}>
       <button type="button" onClick={()=>setAba('fixas')} style={botao(ouro,aba==='fixas')}>1. Despesas Fixas {pronto ? '✓' : ''}</button>
-      <span style={{alignSelf:'center',fontSize:12,color:cores.tx2,fontWeight:650}}>— Para precificar, primeiro preencha suas despesas fixas.</span>
       <button type="button" disabled={!pronto} onClick={()=>setAba('precificar')} style={botao(ouro,aba==='precificar')}>
         {pronto ? '2. Precificação e Lucro' : '🔒 2. Precificação e Lucro'}
       </button>
     </nav>
+    <p style={{fontSize:12,color:cores.tx2,margin:'-7px 0 16px',lineHeight:1.5}}><strong>Observação:</strong> para precificar, primeiro preencha as despesas fixas.</p>
     {carregando ? <p>Carregando suas despesas fixas...</p> : aba==='fixas' ? <section style={{background:cores.card,border:'1px solid '+cores.borda,padding:20,borderRadius:16,maxWidth:760}}>
       <h2 style={{fontSize:21,fontWeight:800,marginBottom:8}}>Despesas Fixas da Loja</h2>
       <p style={{fontSize:13,color:cores.tx2,marginBottom:18}}>Preencha uma vez e atualize sempre que houver mudanças. Digite 0 quando não houver despesa.</p>
