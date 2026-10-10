@@ -8,6 +8,7 @@ const nomes = [
   ['rent','Aluguel mensal'], ['payroll','Salários e encargos'],
   ['utilities','Água, energia e internet'], ['accounting','Contabilidade'],
   ['systems','Sistemas e assinaturas'], ['other_expenses','Outras despesas fixas'],
+  ['other_expenses_2','Outras despesas fixas 2'], ['other_expenses_3','Outras despesas fixas 3'],
   ['forecast_revenue','Faturamento mensal previsto'],
 ]
 const vazio = Object.fromEntries(nomes.map(([chave]) => [chave,'']))
@@ -31,7 +32,7 @@ export default function PricingGate({userId,cores,ouro,ouroGrad}) {
     async function buscar() {
       if (!userId) {setCarregando(false);return}
       const {data,error}=await supabase.from('pricing_fixed_expenses')
-        .select('rent,payroll,utilities,accounting,systems,other_expenses,forecast_revenue')
+        .select('rent,payroll,utilities,accounting,systems,other_expenses,other_expenses_2,other_expenses_3,forecast_revenue')
         .eq('owner_id',userId).maybeSingle()
       if (!ativo) return
       if (error) setErro('Não foi possível consultar suas despesas. Tente recarregar a página.')
@@ -64,6 +65,7 @@ export default function PricingGate({userId,cores,ouro,ouroGrad}) {
   return <div style={{color:cores.tx}}>
     <nav aria-label="Etapas da precificação" style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:16}}>
       <button type="button" onClick={()=>setAba('fixas')} style={botao(ouro,aba==='fixas')}>1. Despesas Fixas {pronto ? '✓' : ''}</button>
+      <span style={{alignSelf:'center',fontSize:12,color:cores.tx2,fontWeight:650}}>— Para precificar, primeiro preencha suas despesas fixas.</span>
       <button type="button" disabled={!pronto} onClick={()=>setAba('precificar')} style={botao(ouro,aba==='precificar')}>
         {pronto ? '2. Precificação e Lucro' : '🔒 2. Precificação e Lucro'}
       </button>
