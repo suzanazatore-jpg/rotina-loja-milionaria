@@ -181,7 +181,7 @@ export default function Painel() {
   // Campanhas (vindo do banco)
   const [campanhas, setCampanhas] = useState([])
   const [mesSelecionadoCamp, setMesSelecionadoCamp] = useState(mesAtualValor())
-  // Rotina semanal (vinda do banco) — mostra só a rotina da semana atual
+  // Última rotina publicada, executada novamente a cada semana.
   const [rotinaSemanal, setRotinaSemanal] = useState(null)
   const [videosExplicativos, setVideosExplicativos] = useState({})
   const [conteudosCarregando, setConteudosCarregando] = useState(true)
@@ -616,7 +616,7 @@ export default function Painel() {
                   </BlocoCascata>
 
                   <BlocoCascata titulo="Rotina" subtitulo="Execução da semana" cores={cores} ouro={ouro}>
-                    {rotinaSemanal ? <ItemCascata titulo={rotinaSemanal.titulo} descricao={rotinaSemanal.descricao || rotuloSemana(rotinaSemanal.semana_inicio)} url={rotinaSemanal.arquivo_url} textoLink="Visualizar rotina" onDownload={() => baixarPdf(rotinaSemanal)} cores={cores} ouroGrad={ouroGrad} /> : <VazioCascata texto="A rotina desta semana ainda não foi publicada." cores={cores} />}
+                    {rotinaSemanal ? <ItemCascata titulo={rotinaSemanal.titulo} descricao={rotinaSemanal.descricao || rotuloSemana(rotinaSemanal.semana_inicio)} url={rotinaSemanal.arquivo_url} textoLink="Visualizar rotina" onDownload={() => baixarPdf(rotinaSemanal)} cores={cores} ouroGrad={ouroGrad} /> : <VazioCascata texto="A rotina ainda não foi publicada." cores={cores} />}
                   </BlocoCascata>
 
                   {metasLiberadas && <BlocoCascata titulo="Calculadora de Metas" subtitulo="Metas, ranking e histórico da equipe" cores={cores} ouro={ouro}>
@@ -832,10 +832,10 @@ export default function Painel() {
                   <VoltarConteudos onClick={() => setSecao('conteudos')} cores={cores} />
                   <VideoEmBreve cores={cores} ouro={ouro} titulo={videosExplicativos.routine?.title || 'Como executar a rotina da loja'} videoUrl={videosExplicativos.routine?.video_url} coverUrl={videosExplicativos.routine?.cover_image_url} />
 
-                  {conteudosCarregando ? <SectionLoading label="Carregando rotina da semana..." /> : !rotinaSemanal ? (
+                  {conteudosCarregando ? <SectionLoading label="Carregando rotina..." /> : !rotinaSemanal ? (
                     <div style={{ textAlign: 'center', padding: '54px 20px', background: cores.card, border: `1px solid ${cores.borda}`, borderRadius: '16px', color: cores.tx3 }}>
                       <div style={{ fontSize: '42px', marginBottom: '10px' }}>🔄</div>
-                      <strong style={{ color: cores.tx2 }}>A rotina desta semana aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>O material ainda não foi publicado.</p>
+                      <strong style={{ color: cores.tx2 }}>Sua rotina aparecerá aqui</strong><p style={{ fontSize: '13px', margin: '6px 0 0' }}>O material ainda não foi publicado.</p>
                     </div>
                   ) : <WeeklyRoutineCard item={rotinaSemanal} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => baixarPdf(rotinaSemanal)} />}
                 </div>

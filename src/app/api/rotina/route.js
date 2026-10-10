@@ -1,4 +1,5 @@
 import { appContentKeys } from '@/lib/appContentAccessServer'
+import { loadActiveRoutine } from '@/lib/activeRoutine'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
@@ -12,7 +13,7 @@ export async function GET(request) {
   if (!(await appContentKeys(supabase, user)).includes('routine')) return NextResponse.json({ error: 'Conteúdo não incluído no seu acesso.' }, { status: 403 })
   const semanaInicio = new URL(request.url).searchParams.get('semana_inicio')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(semanaInicio || '')) return NextResponse.json({ error: 'Semana inválida.' }, { status: 400 })
-  const { data: item, error } = await supabase.from('rotinas').select('*').eq('semana_inicio', semanaInicio).maybeSingle()
+  const { data: item, error } = await loadActiveRoutine(supabase, semanaInicio)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 }); if (!item) return NextResponse.json({ rotina: null })
   if (item.storage_bucket === BUCKET && item.arquivo_nome) { const { data } = await supabase.storage.from(BUCKET).createSignedUrl(item.arquivo_nome, 3600); item.arquivo_url = data?.signedUrl || null }
   return NextResponse.json({ rotina: item })
