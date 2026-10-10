@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { loadActiveRoutine } from '@/lib/activeRoutine'
 import { NextResponse } from 'next/server'
 import { appContentKeys } from '@/lib/appContentAccessServer'
 import { loadStudentAccount } from '@/lib/studentAccountServer'
@@ -153,7 +154,7 @@ async function loadContent(supabase, weekStart, user) {
       .order('action_date', { ascending: true })
       .order('sort_order', { ascending: true }) : empty,
     keys.includes('campaigns') ? supabase.from('campanhas').select('*').order('mes_ano', { ascending: false }) : empty,
-    keys.includes('routine') ? supabase.from('rotinas').select('*').eq('semana_inicio', weekStart).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    keys.includes('routine') ? loadActiveRoutine(supabase, weekStart) : Promise.resolve({ data: null, error: null }),
     supabase
       .from('panel_banners')
       .select('id,tag,title,body,image_url,link_url,sort_order')

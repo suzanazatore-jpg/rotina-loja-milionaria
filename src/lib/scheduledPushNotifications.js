@@ -2,6 +2,7 @@ import { withoutProtocolStudents } from '@/lib/protocolNotificationAudience'
 import { createClient } from '@supabase/supabase-js'
 import { getVapidPublicKey, sendPushNotification } from '@/lib/pushNotifications'
 import { planoDoDia } from '@/lib/dailyPlan'
+import { loadActiveRoutine } from '@/lib/activeRoutine'
 
 const PAGE_SIZE = 500
 const BATCH_SIZE = 20
@@ -149,11 +150,7 @@ function routineDateContext(today) {
 
 async function loadTodayRoutine(supabase, today) {
   const context = routineDateContext(today)
-  const { data, error } = await supabase
-    .from('rotinas')
-    .select('id,titulo,plano_dias')
-    .eq('semana_inicio', context.monday)
-    .maybeSingle()
+  const { data, error } = await loadActiveRoutine(supabase, context.monday, 'id,semana_inicio,titulo,plano_dias')
   if (error) throw error
   const plan = data?.plano_dias ? planoDoDia(data.plano_dias, new Date(`${context.taskDate}T12:00:00Z`)) : null
   const tasks = Array.isArray(plan?.tarefas)

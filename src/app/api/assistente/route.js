@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { loadActiveRoutine } from '@/lib/activeRoutine'
 import { createClient } from '@supabase/supabase-js'
 import { allowedKnowledgeCategories, createEmbeddings } from '@/lib/assistantKnowledgeServer'
 import { loadStudentAccount } from '@/lib/studentAccountServer'
@@ -165,7 +166,7 @@ async function loadLiveContext(supabase, user, contents) {
     canGoals ? supabase.from('sales_goals').select('*').eq('owner_id', user.id).eq('month_start', dates.monthStart).maybeSingle() : Promise.resolve({ data: null }),
     canGoals ? supabase.from('daily_sales').select('sale_date,amount,tickets,salesperson_id').eq('owner_id', user.id).gte('sale_date', dates.monthStart).lte('sale_date', dates.monthEnd) : Promise.resolve({ data: [] }),
     canGoals ? supabase.from('salespeople').select('id,name,active').eq('owner_id', user.id).eq('active', true) : Promise.resolve({ data: [] }),
-    canRoutine ? supabase.from('rotinas').select('id,semana_inicio,titulo,descricao,plano_dias').eq('semana_inicio', dates.weekStart).maybeSingle() : Promise.resolve({ data: null }),
+    canRoutine ? loadActiveRoutine(supabase, dates.weekStart, 'id,semana_inicio,titulo,descricao,plano_dias') : Promise.resolve({ data: null }),
     canCampaigns ? supabase.from('campanhas').select('id,mes_ano,titulo,descricao,plano_interativo').eq('mes_ano', dates.month).limit(1).maybeSingle() : Promise.resolve({ data: null }),
     canCalendar ? supabase.from('calendar_actions').select('id,action_date,title,description,channel,content_format,product_cta,content_text').eq('action_date', dates.today).eq('is_published', true).order('sort_order') : Promise.resolve({ data: [] }),
     loadStudentAccount(supabase, user.id),
