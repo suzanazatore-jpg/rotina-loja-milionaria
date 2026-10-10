@@ -65,7 +65,7 @@ export default function PricingGate({userId,cores,ouro,ouroGrad}) {
   return <div style={{color:cores.tx}}>
     <nav aria-label="Etapas da precificação" style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:16}}>
       <button type="button" onClick={()=>setAba('fixas')} style={botao(ouro,aba==='fixas')}>1. Despesas Fixas {pronto ? '✓' : ''}</button>
-      <button type="button" disabled={!pronto} onClick={()=>setAba('precificar')} style={botao(ouro,aba==='precificar')}>
+      <button type="button" onClick={()=>{if (!pronto) {window.alert('Preencha a aba Despesas Fixas primeiro.');setAba('fixas');return}setAba('precificar')}} style={botao(ouro,aba==='precificar')}>
         {pronto ? '2. Precificação e Lucro' : '🔒 2. Precificação e Lucro'}
       </button>
     </nav>
