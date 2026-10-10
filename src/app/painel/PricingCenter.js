@@ -175,7 +175,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad, fixedExpe
     const custoTotal = numero(custo) + numero(extras)
     const pctOverhead = Number(fixedExpensePct) + numero(taxas) + numero(impostos)
     const margemDesejada = numero(margem)
-    const valido = custoTotal > 0 && String(margem).trim() !== '' && margemDesejada >= 0 && margemDesejada <= 90 && pctOverhead + margemDesejada < 100
+    const valido = custoTotal > 0 && String(margem).trim() !== '' && margemDesejada >= 0 && margemDesejada <= 90 && pctOverhead + margemDesejada < 100 && numero(custo) > 0 && numero(extras) >= 0 && numero(taxas) >= 0 && numero(impostos) >= 0
     const preco = valido ? custoTotal / (1 - (margemDesejada + pctOverhead) / 100) : 0
     const lucro = preco - custoTotal - preco * pctOverhead / 100
     const markup = custoTotal ? preco / custoTotal : 0
@@ -256,7 +256,7 @@ export default function PricingCenter({ userId, cores, ouro, ouroGrad, fixedExpe
     setCusto(String(item.item_cost || ''))
     setTaxas(String(item.card_fee_pct ?? 0))
     setImpostos(String(item.tax_pct ?? 0))
-    setExtras(String(item.extra_costs || ''))
+    setExtras(String(Number(item.extra_costs || 0) + Number(item.fees || 0)))
     setMargem(String(item.desired_margin ?? '50'))
     setMensagem({ tipo: 'sucesso', texto: 'Valores carregados. Você já pode ajustar e salvar um novo cálculo.' })
     window.scrollTo({ top: 0, behavior: 'smooth' })
