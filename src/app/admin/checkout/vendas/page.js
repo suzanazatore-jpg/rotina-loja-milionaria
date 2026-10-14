@@ -15,7 +15,7 @@ function AdminVendasCheckout() {
   const searchParams = useSearchParams()
   const [token, setToken] = useState('')
   const [data, setData] = useState({ orders: [], products: [], count: 0, page: 1, limit: 25 })
-  const [filtros, setFiltros] = useState({ status: 'todos', produto: searchParams.get('produto') || '', inicio: '', fim: '' })
+  const [filtros, setFiltros] = useState({ status: 'todos', oferta: searchParams.get('oferta') || '', produto: searchParams.get('produto') || '', inicio: '', fim: '' })
   const [pagina, setPagina] = useState(1)
   const [detalhe, setDetalhe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -67,6 +67,7 @@ function AdminVendasCheckout() {
       <div style={{ color: OURO, fontWeight: 800, fontSize: 12, letterSpacing: 2 }}>VENDAS E CHECKOUT</div>
       <h1 style={{ margin: '8px 0' }}>Pedidos e Vendas</h1>
       <p style={{ color: 'var(--cv-muted)' }}>Consulte pagamentos, dados da cliente e produtos vendidos. Somente leitura: status vem do gateway.</p>
+      {filtros.oferta && <p className="central-data-note">Filtrando os pedidos da oferta selecionada.</p>}
       <section style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '22px 0', alignItems: 'end' }}>
         <label style={{ display: 'grid', gap: 6 }}>Status<select style={campo} value={filtros.status} onChange={e => mudar('status', e.target.value)}>{[['todos','Todos'],['pending','Pendente'],['paid','Pago'],['failed','Falhou'],['canceled','Cancelado'],['refunded','Reembolsado'],['authorized','Autorizado'],['processing','Processando'],['expired','Expirado'],['chargeback','Contestação']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label>
         <label style={{ display: 'grid', gap: 6 }}>Produto<select style={campo} value={filtros.produto} onChange={e => mudar('produto', e.target.value)}><option value="">Todos os produtos</option>{data.products.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>

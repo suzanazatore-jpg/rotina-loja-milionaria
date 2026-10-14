@@ -19,6 +19,7 @@ export async function GET(request) {
 
   const url = new URL(request.url)
   const id = url.searchParams.get('id')
+  const oferta = url.searchParams.get('oferta')
   const status = url.searchParams.get('status')
   const produto = url.searchParams.get('produto')
   const inicio = url.searchParams.get('inicio')
@@ -53,6 +54,7 @@ export async function GET(request) {
     }
 
     let query = db.from('orders').select('id,customer_id,offer_id,parent_order_id,status,payment_method,installments,subtotal_cents,interest_cents,discount_cents,total_cents,pagarme_order_id,created_at,paid_at', { count: 'exact' })
+    if (oferta) query = query.eq('offer_id', oferta)
     if (status && status !== 'todos') query = query.eq('status', status)
     if (inicio && /^\d{4}-\d{2}-\d{2}$/.test(inicio)) query = query.gte('created_at', `${inicio}T00:00:00.000Z`)
     if (fim && /^\d{4}-\d{2}-\d{2}$/.test(fim)) {

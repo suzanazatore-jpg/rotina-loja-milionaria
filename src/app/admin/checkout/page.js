@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { FormProduto } from './CheckoutForms'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -17,21 +18,9 @@ const dica = { display: 'block', color: 'var(--cv-muted)', fontSize: 11, marginT
 const botaoSecundario = { background: 'var(--cv-field)', color: ouro, border: '1px solid var(--cv-border)', borderRadius: '7px', padding: '7px 10px', cursor: 'pointer', fontSize: 13 }
 
 const PRODUTO_VAZIO = { name: '', type: 'one_time', plan_id: '', access_days: '', brevo_list_id: '', botconversa_tag: '', active: true }
-const OFERTA_VAZIA = {
-  name: '', price: '', payment_methods: ['pix', 'credit_card'], max_installments: 12, free_installments: 1,
-  monthly_interest_pct: '2.99', pix_discount_pct: '0', billing_interval: 'month', billing_interval_count: 1,
-  trial_days: 0, thank_you_url: '', active: true, bumps: [],
-}
 
 function moeda(centavos) {
   return ((centavos || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function paraCentavos(valor) {
-  const texto = String(valor || '').trim().replace(/[R$\s]/g, '')
-  const normal = texto.includes(',') ? texto.replace(/\./g, '').replace(',', '.') : texto
-  const numero = Number(normal)
-  return Number.isFinite(numero) ? Math.round(numero * 100) : 0
 }
 
 function totalParcelado(preco, parcelas, semJuros, jurosPct) {
@@ -41,7 +30,7 @@ function totalParcelado(preco, parcelas, semJuros, jurosPct) {
   return Math.ceil(preco * (i * f) / (f - 1)) * parcelas
 }
 
-export default function AdminCheckout() {
+export default function AdminCheckout({ initialProdutoId = null }) {
   const router = useRouter()
   const [carregando, setCarregando] = useState(true)
   const [autorizado, setAutorizado] = useState(false)
@@ -52,9 +41,8 @@ export default function AdminCheckout() {
   const [planos, setPlanos] = useState([])
   const [mensagem, setMensagem] = useState('')
   const [formProduto, setFormProduto] = useState(null) // { id?, dados }
-  const [formOferta, setFormOferta] = useState(null)   // { id?, dados }
   const [salvando, setSalvando] = useState(false)
-  const [produtoId, setProdutoId] = useState(null)
+  const produtoId = initialProdutoId
   const [aba, setAba] = useState('detalhes')
   const [busca, setBusca] = useState('')
 
@@ -90,22 +78,12 @@ export default function AdminCheckout() {
   }, [router, carregar])
 
   const nomePlano = useMemo(() => Object.fromEntries(planos.map(p => [p.id, p.commercial_name || p.name])), [planos])
-  const ofertaPorId = useMemo(() => Object.fromEntries(ofertas.map(o => [o.id, o])), [ofertas])
 
   async function salvarProduto(e) {
     e.preventDefault(); setSalvando(true); setMensagem('')
     try {
       await api('POST', { entidade: 'produto', id: formProduto.id, dados: formProduto.dados })
       setFormProduto(null); await carregar(); setMensagem('✓ Produto salvo.')
-    } catch (err) { setMensagem(err.message) }
-    setSalvando(false)
-  }
-
-  async function salvarOferta(e) {
-    e.preventDefault(); setSalvando(true); setMensagem('')
-    try {
-      await api('POST', { entidade: 'oferta', id: formOferta.id, dados: formOferta.dados })
-      setFormOferta(null); await carregar(); setMensagem('✓ Oferta salva.')
     } catch (err) { setMensagem(err.message) }
     setSalvando(false)
   }
@@ -123,25 +101,11 @@ export default function AdminCheckout() {
   }
 
   function novaOferta(produto) {
-    setMensagem('')
-    const base = produto.type === 'subscription'
-      ? { ...OFERTA_VAZIA, payment_methods: ['credit_card'], max_installments: 1, free_installments: 1, monthly_interest_pct: '0' }
-      : OFERTA_VAZIA
-    setFormOferta({ produto, dados: { ...base, product_id: produto.id } })
+    router.push(`/admin/checkout/produtos/${encodeURIComponent(produto.id)}/ofertas/nova`)
   }
-
-  function editarOferta(produto, o) {
-    setMensagem('')
-    setFormOferta({
-      id: o.id, produto,
-      dados: {
-        ...OFERTA_VAZIA, ...o, price: (o.price_cents / 100).toFixed(2).replace('.', ','),
-        thank_you_url: o.thank_you_url || '',
-        bumps: bumps.filter(b => b.offer_id === o.id).map(b => ({ bump_offer_id: b.bump_offer_id, headline: b.headline, description: b.description || '' })),
-      },
-    })
+  function editarOferta(produto, oferta) {
+    router.push(`/admin/checkout/produtos/${encodeURIComponent(produto.id)}/ofertas/${encodeURIComponent(oferta.id)}`)
   }
-
   function linkCheckout(o) {
     return `${typeof window !== 'undefined' ? window.location.origin : ''}/checkout/${o.slug}`
   }
@@ -150,6 +114,7 @@ export default function AdminCheckout() {
 
   if (carregando) return <Bloqueio texto="Carregando..." />
   if (!autorizado) return <Bloqueio texto="Acesso restrito ao administrador." />
+  if (produtoId && !selecionado) return <div className="central-error" role="alert">{mensagem || 'Produto não encontrado.'}<p><Link href="/admin/checkout">Voltar para Produtos</Link></p></div>
 
   return (
     <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
@@ -157,7 +122,7 @@ export default function AdminCheckout() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '18px', marginBottom: '22px', flexWrap: 'wrap' }}>
           <div>
             <p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>CHECKOUT</p>
-            <h1 style={{ fontSize: '24px', margin: '5px 0' }}>Produtos e Ofertas</h1>
+            <h1 style={{ fontSize: '24px', margin: '5px 0' }}>{selecionado ? selecionado.name : 'Produtos'}</h1>
             <p style={{ color: 'var(--cv-muted)', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>
           </div>
           <button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Cadastrar produto</button>
@@ -165,13 +130,13 @@ export default function AdminCheckout() {
 
         {mensagem && <div style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
 
-        {!produtos.length && <div style={{ background: 'var(--cv-panel)', border: '1px dashed var(--cv-border)', borderRadius: 14, padding: 30, textAlign: 'center', color: 'var(--cv-muted)' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
+        {!produtos.length && !mensagem && <div style={{ background: 'var(--cv-panel)', border: '1px dashed var(--cv-border)', borderRadius: 14, padding: 30, textAlign: 'center', color: 'var(--cv-muted)' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
 
         {!selecionado ? <>
           <div className="central-list-toolbar"><label>Buscar produto<input style={campo} value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome ou link do produto" /></label><span>{produtos.length} produto(s)</span></div>
-          <div className="central-table-wrap"><table className="central-table"><thead><tr><th>Produto</th><th>Tipo</th><th>Plano de acesso</th><th>Ofertas</th><th>Status</th><th /></tr></thead><tbody>{produtos.filter(p => `${p.name} ${p.slug}`.toLowerCase().includes(busca.toLowerCase())).map(p => <tr key={p.id}><td><button className="central-text-button" onClick={() => {setProdutoId(p.id); setAba('detalhes')}}>{p.name}</button><small>{p.slug}</small></td><td>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</td><td>{nomePlano[p.plan_id] || '—'}</td><td>{ofertas.filter(o => o.product_id === p.id).length}</td><td><span className="central-badge">{p.active ? 'Ativo' : 'Inativo'}</span></td><td><button style={botaoSecundario} onClick={() => {setProdutoId(p.id); setAba('detalhes')}}>Abrir →</button></td></tr>)}</tbody></table></div>
+          <div className="central-table-wrap"><table className="central-table"><thead><tr><th>Produto</th><th>Código / ID</th><th>Tipo</th><th>Plano de acesso</th><th>Ofertas</th><th>Status</th><th /></tr></thead><tbody>{produtos.filter(p => `${p.name} ${p.slug}`.toLowerCase().includes(busca.toLowerCase())).map(p => <tr key={p.id}><td><button className="central-text-button" onClick={() => {router.push(`/admin/checkout/produtos/${encodeURIComponent(p.id)}`)}}>{p.name}</button><small>{p.slug}</small></td><td>{p.code || p.guru_product_id || p.id}</td><td>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</td><td>{nomePlano[p.plan_id] || '—'}</td><td>{ofertas.filter(o => o.product_id === p.id).length}</td><td><span className="central-badge">{p.active ? 'Ativo' : 'Inativo'}</span></td><td><button style={botaoSecundario} onClick={() => {router.push(`/admin/checkout/produtos/${encodeURIComponent(p.id)}`)}}>Abrir →</button></td></tr>)}{!produtos.some(p => `${p.name} ${p.slug}`.toLowerCase().includes(busca.toLowerCase())) && <tr><td colSpan={7}>Nenhum produto encontrado.</td></tr>}</tbody></table></div>
         </> : <>
-          <div className="central-breadcrumb"><button className="central-text-button" onClick={() => setProdutoId(null)}>Produtos</button><span>/</span><strong>{selecionado.name}</strong></div>
+          <div className="central-breadcrumb"><button className="central-text-button" onClick={() => router.push('/admin/checkout')}>Produtos</button><span>/</span><strong>{selecionado.name}</strong></div>
           <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhes'],['ofertas','Ofertas'],['vendas','Vendas']].map(([key,label]) => <button key={key} aria-current={aba === key ? 'page' : undefined} onClick={() => setAba(key)}>{label}</button>)}</nav>
         {produtos.filter(p => p.id === produtoId).map(p => {
           const lista = ofertas.filter(o => o.product_id === p.id)
@@ -192,7 +157,7 @@ export default function AdminCheckout() {
                   <button onClick={() => alternar('produto', p)} style={{ ...botaoSecundario, color: p.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{p.active ? 'Desativar' : 'Ativar'}</button>
                 </div>
               </div>
-              {aba === 'detalhes' && <div className="central-product-detail"><dl><div><dt>Nome do produto</dt><dd>{p.name}</dd></div><div><dt>Tipo</dt><dd>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</dd></div><div><dt>Plano de acesso</dt><dd>{nomePlano[p.plan_id] || 'Sem plano vinculado'}</dd></div><div><dt>Prazo de acesso</dt><dd>{p.access_days ? `${p.access_days} dias` : 'Conforme o plano'}</dd></div><div><dt>Link amigável</dt><dd>{p.slug}</dd></div><div><dt>Status</dt><dd>{p.active ? 'Ativo' : 'Inativo'}</dd></div></dl></div>}
+              {aba === 'detalhes' && <div className="central-product-detail">{formProduto?.id === p.id ? <form onSubmit={salvarProduto}><FormProduto dados={formProduto.dados} planos={planos} editando onChange={dados => setFormProduto(f => ({...f,dados}))} /><div className="central-editor-actions"><button type="button" className="central-action" onClick={() => setFormProduto(null)}>Cancelar</button><button className="central-primary" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar produto'}</button></div></form> : <dl><div><dt>Código / ID</dt><dd>{p.code || p.guru_product_id || p.id}</dd></div><div><dt>Nome do produto</dt><dd>{p.name}</dd></div><div><dt>Tipo</dt><dd>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</dd></div><div><dt>Plano de acesso</dt><dd>{nomePlano[p.plan_id] || 'Sem plano vinculado'}</dd></div><div><dt>Prazo de acesso</dt><dd>{p.access_days ? `${p.access_days} dias` : 'Conforme o plano'}</dd></div><div><dt>Link amigável</dt><dd>{p.slug}</dd></div><div><dt>Status</dt><dd>{p.active ? 'Ativo' : 'Inativo'}</dd></div></dl>}</div>}
               {aba === 'vendas' && <div className="central-product-detail"><p>Consulte os pedidos deste produto no painel de vendas.</p><Link className="central-primary" href={`/admin/checkout/vendas?produto=${encodeURIComponent(p.id)}`}>Ver vendas deste produto →</Link></div>}
               {aba === 'ofertas' && lista.map(o => {
                 const bumpsOferta = bumps.filter(b => b.offer_id === o.id)
@@ -213,7 +178,7 @@ export default function AdminCheckout() {
                       <p style={{ color: 'var(--cv-muted)', fontSize: 11, margin: '4px 0 0', wordBreak: 'break-all' }}>{linkCheckout(o)}</p>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <button onClick={() => navigator.clipboard?.writeText(linkCheckout(o)).then(() => setMensagem('✓ Link copiado.'))} style={botaoSecundario}>Copiar link</button>
+                      <button onClick={async () => { try { await navigator.clipboard.writeText(linkCheckout(o)); setMensagem('✓ Link copiado.') } catch { setMensagem('Não foi possível copiar. Selecione o link da oferta.') } }} style={botaoSecundario}>Copiar link</button>
                       <button onClick={() => editarOferta(p, o)} style={botaoSecundario}>Editar</button>
                       <button onClick={() => alternar('oferta', o)} style={{ ...botaoSecundario, color: o.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{o.active ? 'Desativar' : 'Ativar'}</button>
                     </div>
@@ -227,157 +192,13 @@ export default function AdminCheckout() {
         </>}
       </main>
 
-      {formProduto && (
+      {formProduto && !formProduto.id && (
         <Modal titulo={formProduto.id ? 'Editar produto' : 'Cadastrar produto'} sub="O que a aluna recebe ao comprar." onFechar={() => !salvando && setFormProduto(null)} onSalvar={salvarProduto} salvando={salvando} textoBotao="Salvar produto">
           <FormProduto dados={formProduto.dados} planos={planos} editando={!!formProduto.id} onChange={dados => setFormProduto(f => ({ ...f, dados }))} />
         </Modal>
       )}
 
-      {formOferta && (
-        <Modal titulo={formOferta.id ? 'Editar oferta' : 'Nova oferta'} sub={`Produto: ${formOferta.produto.name}`} onFechar={() => !salvando && setFormOferta(null)} onSalvar={salvarOferta} salvando={salvando} textoBotao="Salvar oferta">
-          <FormOferta
-            dados={formOferta.dados}
-            produto={formOferta.produto}
-            ofertaId={formOferta.id}
-            ofertasBump={ofertas.filter(o => o.id !== formOferta.id && o.active && produtos.find(p => p.id === o.product_id)?.type === 'one_time')}
-            produtoDe={o => produtos.find(p => p.id === o.product_id)?.name || ''}
-            ofertaPorId={ofertaPorId}
-            onChange={dados => setFormOferta(f => ({ ...f, dados }))}
-          />
-        </Modal>
-      )}
-    </div>
-  )
-}
 
-function FormProduto({ dados, planos, editando, onChange }) {
-  const set = (campoNome, valor) => onChange({ ...dados, [campoNome]: valor })
-  return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <label style={rotulo}>Nome do produto<input value={dados.name} onChange={e => set('name', e.target.value)} style={campo} placeholder="Ex.: EVS — Equipe que Vende Sozinha" /></label>
-      <div>
-        <span style={rotulo}>Tipo</span>
-        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-          {[['one_time', 'Pagamento único'], ['subscription', 'Assinatura recorrente']].map(([valor, texto]) => (
-            <button key={valor} type="button" disabled={editando} onClick={() => set('type', valor)} style={{ flex: 1, border: dados.type === valor ? `1px solid ${ouro}` : '1px solid var(--cv-border)', background: dados.type === valor ? 'var(--cv-selected)' : 'var(--cv-field)', color: 'var(--cv-text)', borderRadius: 10, padding: 11, cursor: editando ? 'not-allowed' : 'pointer' }}>{dados.type === valor ? '✓ ' : ''}{texto}</button>
-          ))}
-        </div>
-        {editando && <small style={dica}>O tipo não pode ser alterado depois de criado.</small>}
-      </div>
-      <label style={rotulo}>Plano da Rotina liberado na compra
-        <select value={dados.plan_id} onChange={e => set('plan_id', e.target.value)} style={campo}>
-          <option value="">Nenhum (produto não libera acesso no app)</option>
-          {planos.map(p => <option key={p.id} value={p.id}>{p.commercial_name || p.name}{p.period_days ? ` · ${p.period_days} dias` : ''}</option>)}
-        </select>
-        <small style={dica}>É o mesmo plano usado hoje pelo Guru: cursos, mentorias e conteúdos vêm dele.</small>
-      </label>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
-        <label style={rotulo}>Prazo de acesso (dias)<input type="number" min="1" value={dados.access_days} onChange={e => set('access_days', e.target.value)} style={campo} placeholder="Usar o do plano" /></label>
-        <label style={rotulo}>Lista do Brevo (ID)<input type="number" value={dados.brevo_list_id} onChange={e => set('brevo_list_id', e.target.value)} style={campo} placeholder="Opcional" /></label>
-        <label style={rotulo}>Tag no BotConversa<input value={dados.botconversa_tag} onChange={e => set('botconversa_tag', e.target.value)} style={campo} placeholder="Opcional" /></label>
-      </div>
-    </div>
-  )
-}
-
-function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange }) {
-  const set = (campoNome, valor) => onChange({ ...dados, [campoNome]: valor })
-  const assinatura = produto.type === 'subscription'
-  const preco = paraCentavos(dados.price)
-  const cartao = dados.payment_methods.includes('credit_card')
-  const pix = dados.payment_methods.includes('pix')
-  const max = Number(dados.max_installments) || 1
-  const semJuros = Math.min(Number(dados.free_installments) || 1, max)
-
-  function alternarMetodo(m) {
-    const atual = dados.payment_methods
-    set('payment_methods', atual.includes(m) ? atual.filter(x => x !== m) : [...atual, m])
-  }
-
-  function alternarBump(id) {
-    const existe = dados.bumps.find(b => b.bump_offer_id === id)
-    set('bumps', existe ? dados.bumps.filter(b => b.bump_offer_id !== id) : [...dados.bumps, { bump_offer_id: id, headline: 'Sim, quero adicionar!', description: '' }])
-  }
-
-  function editarBump(id, campoNome, valor) {
-    set('bumps', dados.bumps.map(b => b.bump_offer_id === id ? { ...b, [campoNome]: valor } : b))
-  }
-
-  const simulacao = []
-  if (preco > 0 && cartao && !assinatura) {
-    for (const n of [1, 2, 3, 6, 10, 12].filter(n => n <= max)) {
-      const total = totalParcelado(preco, n, semJuros, dados.monthly_interest_pct)
-      simulacao.push({ n, parcela: Math.ceil(total / n), total })
-    }
-  }
-
-  return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
-        <label style={rotulo}>Nome da oferta<input value={dados.name} onChange={e => set('name', e.target.value)} style={campo} placeholder="Ex.: Lançamento outubro" /></label>
-        <label style={rotulo}>Preço (R$){assinatura && ' por cobrança'}<input value={dados.price} onChange={e => set('price', e.target.value)} style={campo} placeholder="Ex.: 1.997,00" /></label>
-      </div>
-
-      {!assinatura ? (
-        <div>
-          <span style={rotulo}>Formas de pagamento</span>
-          <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-            {[['pix', 'Pix'], ['credit_card', 'Cartão de crédito']].map(([m, texto]) => (
-              <button key={m} type="button" onClick={() => alternarMetodo(m)} style={{ flex: 1, border: dados.payment_methods.includes(m) ? `1px solid ${ouro}` : '1px solid var(--cv-border)', background: dados.payment_methods.includes(m) ? 'var(--cv-selected)' : 'var(--cv-field)', color: 'var(--cv-text)', borderRadius: 10, padding: 11, cursor: 'pointer' }}>{dados.payment_methods.includes(m) ? '✓ ' : ''}{texto}</button>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div style={{ background: '#151315', border: '1px solid var(--cv-border)', borderRadius: 10, padding: 12, fontSize: 13, color: '#bbb' }}>
-          Assinatura cobra automaticamente no <strong>cartão de crédito</strong>.
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 10 }}>
-            <label style={rotulo}>Cobrar a cada<input type="number" min="1" max="12" value={dados.billing_interval_count} onChange={e => set('billing_interval_count', e.target.value)} style={campo} /></label>
-            <label style={rotulo}>Período<select value={dados.billing_interval} onChange={e => set('billing_interval', e.target.value)} style={campo}><option value="month">mês(es)</option><option value="year">ano(s)</option></select></label>
-            <label style={rotulo}>Dias grátis<input type="number" min="0" value={dados.trial_days} onChange={e => set('trial_days', e.target.value)} style={campo} /></label>
-          </div>
-        </div>
-      )}
-
-      {!assinatura && cartao && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
-          <label style={rotulo}>Máximo de parcelas<select value={dados.max_installments} onChange={e => set('max_installments', Number(e.target.value))} style={campo}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}x</option>)}</select></label>
-          <label style={rotulo}>Sem juros até<select value={semJuros} onChange={e => set('free_installments', Number(e.target.value))} style={campo}>{Array.from({ length: max }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n === 1 ? 'à vista' : `${n}x`}</option>)}</select></label>
-          <label style={rotulo}>Juros ao mês (%)<input value={dados.monthly_interest_pct} disabled={semJuros >= max} onChange={e => set('monthly_interest_pct', e.target.value)} style={campo} /><small style={dica}>Repassado à cliente acima das parcelas sem juros.</small></label>
-        </div>
-      )}
-
-      {!assinatura && pix && (
-        <label style={rotulo}>Desconto no Pix (%)<input value={dados.pix_discount_pct} onChange={e => set('pix_discount_pct', e.target.value)} style={campo} />{preco > 0 && Number(String(dados.pix_discount_pct).replace(',', '.')) > 0 && <small style={dica}>No Pix sai por {moeda(Math.round(preco * (1 - Number(String(dados.pix_discount_pct).replace(',', '.')) / 100)))}</small>}</label>
-      )}
-
-      {simulacao.length > 0 && (
-        <div style={{ background: '#151315', border: '1px solid var(--cv-border)', borderRadius: 10, padding: 12 }}>
-          <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 13 }}>Como a cliente vai ver no checkout</p>
-          {simulacao.map(s => <div key={s.n} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#ccc', padding: '3px 0' }}><span>{s.n}x de {moeda(s.parcela)}{s.n <= semJuros ? ' sem juros' : ''}</span><span style={{ color: 'var(--cv-muted)' }}>total {moeda(s.total)}</span></div>)}
-        </div>
-      )}
-
-      <label style={rotulo}>Página de obrigado (opcional)<input value={dados.thank_you_url} onChange={e => set('thank_you_url', e.target.value)} style={campo} placeholder="https://" /><small style={dica}>Se ficar vazio, a cliente vê a página de obrigado padrão do checkout.</small></label>
-
-      {!assinatura && (
-        <section style={{ paddingTop: 14, borderTop: '1px solid var(--cv-border)' }}>
-          <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 14 }}>Order bumps</p>
-          <p style={{ margin: '0 0 10px', color: 'var(--cv-muted)', fontSize: 12 }}>Ofertas que aparecem como caixinha de &quot;adicionar também&quot; neste checkout.</p>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {ofertasBump.map(o => {
-              const ativo = dados.bumps.some(b => b.bump_offer_id === o.id)
-              return <button key={o.id} type="button" onClick={() => alternarBump(o.id)} style={{ border: ativo ? `1px solid ${ouro}` : '1px solid var(--cv-border)', background: ativo ? 'var(--cv-selected)' : 'var(--cv-field)', color: 'var(--cv-text)', borderRadius: 999, padding: '8px 11px', cursor: 'pointer', fontSize: 13 }}>{ativo ? '✓ ' : ''}{produtoDe(o)} — {o.name} ({moeda(o.price_cents)})</button>
-            })}
-            {!ofertasBump.length && <span style={{ color: 'var(--cv-muted)', fontSize: 13 }}>Cadastre outras ofertas de pagamento único para usar como bump.</span>}
-          </div>
-          {dados.bumps.map(b => (
-            <div key={b.bump_offer_id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, marginTop: 10, background: '#151315', border: '1px solid var(--cv-border)', borderRadius: 10, padding: 10 }}>
-              <label style={rotulo}>Chamada do bump<input value={b.headline} onChange={e => editarBump(b.bump_offer_id, 'headline', e.target.value)} style={campo} /></label>
-              <label style={rotulo}>Descrição<input value={b.description} onChange={e => editarBump(b.bump_offer_id, 'description', e.target.value)} style={campo} placeholder="Opcional" /></label>
-            </div>
-          ))}
-        </section>
-      )}
     </div>
   )
 }
@@ -385,14 +206,14 @@ function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange }) {
 function Modal({ titulo, sub, onFechar, onSalvar, salvando, textoBotao, children }) {
   return (
     <div onMouseDown={e => e.target === e.currentTarget && onFechar()} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', padding: 18 }}>
-      <form onSubmit={onSalvar} style={{ width: 'min(760px,100%)', maxHeight: '92vh', overflowY: 'auto', background: '#141214', border: '1px solid #373238', borderRadius: 18, boxShadow: '0 28px 90px #000', color: 'var(--cv-text)' }}>
+      <form onSubmit={onSalvar} style={{ width: 'min(760px,100%)', maxHeight: '92vh', overflowY: 'auto', background: 'var(--cv-panel)', border: '1px solid #373238', borderRadius: 18, boxShadow: '0 28px 90px #000', color: 'var(--cv-text)' }}>
         <header style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '18px 20px', background: 'var(--cv-panel)', borderBottom: '1px solid var(--cv-border)' }}>
           <div><h2 style={{ fontSize: 18, margin: 0 }}>{titulo}</h2><p style={{ color: 'var(--cv-muted)', fontSize: 12, margin: '4px 0 0' }}>{sub}</p></div>
-          <button type="button" onClick={onFechar} disabled={salvando} aria-label="Fechar" style={{ width: 34, height: 34, background: '#242024', color: 'var(--cv-muted)', border: '1px solid #3c373c', borderRadius: 9, fontSize: 20, cursor: 'pointer' }}>×</button>
+          <button type="button" onClick={onFechar} disabled={salvando} aria-label="Fechar" style={{ width: 34, height: 34, background: 'var(--cv-field)', color: 'var(--cv-muted)', border: '1px solid #3c373c', borderRadius: 9, fontSize: 20, cursor: 'pointer' }}>×</button>
         </header>
         <div style={{ padding: 20 }}>{children}</div>
         <footer style={{ position: 'sticky', bottom: 0, display: 'flex', justifyContent: 'flex-end', gap: 9, padding: '14px 20px', background: 'var(--cv-panel)', borderTop: '1px solid var(--cv-border)' }}>
-          <button type="button" onClick={onFechar} disabled={salvando} style={{ background: '#242124', color: 'var(--cv-text)', border: '1px solid #3c373c', borderRadius: 9, padding: '10px 16px', fontWeight: 800, cursor: 'pointer' }}>Cancelar</button>
+          <button type="button" onClick={onFechar} disabled={salvando} style={{ background: 'var(--cv-field)', color: 'var(--cv-text)', border: '1px solid #3c373c', borderRadius: 9, padding: '10px 16px', fontWeight: 800, cursor: 'pointer' }}>Cancelar</button>
           <button disabled={salvando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: 9, padding: '10px 17px', fontWeight: 900, cursor: 'pointer' }}>{salvando ? 'Salvando...' : textoBotao}</button>
         </footer>
       </form>
