@@ -38,5 +38,7 @@ test('offer lookup filters active records and exposes only public product/offer 
  assert.equal(exposed.product.botconversa_tag,undefined)
  assert.equal(exposed.test.publicKey,'pk_test_mock')
  assert.equal(exposed.test.key,undefined)
+ assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'preview'}).analytics_enabled,false)
+ assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'production'}).analytics_enabled,true)
  assert.equal(await loadCheckoutOffer('../invalid',db),null)
 })

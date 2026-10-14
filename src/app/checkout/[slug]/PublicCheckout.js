@@ -1,5 +1,6 @@
 'use client'
 import Image from 'next/image'
+import CheckoutAnalytics from './CheckoutAnalytics'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import '../../admin/checkout/checkout-preview.css'
@@ -34,6 +35,8 @@ export default function PublicCheckout({ data }) {
   }, { ...base })
   const selected = cartPrice(basePrice)
   const frozen = busy || attemptStarted
+  const analyticsCart = { total_cents: selected.total_cents, items: [{ item_id: product.id, item_name: product.name, price_cents: basePrice.total_cents }, ...bumps.filter(bump => selectedBumps.includes(bump.offer_id)).map(bump => ({ item_id: bump.product_id, item_name: bump.product_name, price_cents: bumpPrice(bump)?.total_cents }))] }
+  const viewCart = { total_cents: offer.price_cents, items: [{ item_id: product.id, item_name: product.name, price_cents: offer.price_cents }] }
 
   async function checkStatus() {
     const response = await fetch(endpoint, { cache: 'no-store' })
@@ -103,6 +106,7 @@ export default function PublicCheckout({ data }) {
   }
   const color = { '--cp-bg': config.background, '--cp-panel': config.panel, '--cp-text': config.text, '--cp-accent': config.accent, '--cp-button-text': config.button_text_color, fontFamily: config.font }
   return <main className="pc-checkout" style={color}>
+    <CheckoutAnalytics config={config} enabled={data.analytics_enabled} viewCart={viewCart} currentCart={analyticsCart} started={attemptStarted} purchase={result?.purchase} />
     <div className={`cp-page ${config.layout === 'stacked' ? 'stacked' : ''}`}>
       <header className="cp-header"><div className="cp-brand">{config.logo_url ? <Asset src={config.logo_url} alt={config.store_name} className="cp-logo" /> : <span className="cp-brand-mark">SZ</span>}<strong>{config.store_name}</strong></div><span className="cp-security">Pagamento protegido</span></header>
       <div className="pc-notice" role="status">{test.ready ? 'Ambiente de teste — disponível somente para o administrador.' : 'Checkout em preparação. Pagamentos ainda não disponíveis.'}</div>

@@ -39,7 +39,7 @@ Emails usam os templates existentes. Falha de email fica em `webhook_events` e p
 
 Reembolsos/chargebacks atualizam o estado financeiro. Revogação seletiva de acesso (sem afetar planos adquiridos no Guru ou em outros pedidos) ainda requer implementação. Cancelamento interrompe recorrência sem apagar o período já comprado. Trial comercial não libera acesso automaticamente nesta versão: aguarda pagamento.
 
-Aparência e redirecionamentos salvos já são lidos pela página pública. Pixels/GTM ainda não são disparados por esta página. Order bumps de produtos de pagamento único estão conectados.
+Aparência e redirecionamentos salvos já são lidos pela página pública. Eventos de navegador de GTM/Pixel foram conectados, com ativação controlada e consentimento. Order bumps de produtos de pagamento único estão conectados.
 
 ## Validação
 
@@ -63,4 +63,15 @@ Central de Vendas → Configurações → Rastreamento global salva GTM e Meta P
 
 checkout_settings aceita acesso apenas pelo servidor (service_role), com RLS habilitada e sem grants para anon/authenticated. A API administrativa valida a sessão e os formatos dos IDs. Tokens e scripts não são aceitos nesses campos. O checkout resolve os identificadores efetivos no servidor.
 
-Esta etapa entrega o cadastro e a herança. Carregamento de GTM/Pixel, eventos no navegador e API de Conversões ainda serão conectados, incluindo prevenção de duplicação de Purchase. Nenhum evento de compra ou pixel foi disparado nesta entrega.
+O cadastro e a herança estão conectados aos eventos do navegador descritos abaixo. A API de Conversões ainda será conectada. Nenhum evento real de compra foi disparado durante o desenvolvimento.
+
+
+## Eventos do navegador
+
+CHECKOUT_TRACKING_ENABLED=true ativa o componente somente com PAGARME_BASE_URL de produção e VERCEL_ENV=production. A prévia sandbox não carrega rastreadores nem envia compras de teste. A cliente pode permitir/recusar cookies e rever a escolha; scripts carregam após consentimento.
+
+Se GTM estiver preenchido, somente ele é carregado. Meta Pixel direto é usado apenas sem GTM. No container, configurar tags para page_view, view_item, begin_checkout e purchase; desativar PageView automático se usar o evento explícito, para não duplicar visitas. A tag Meta do GTM precisa usar o ID configurado no container e event_id do dataLayer; cadastrar o Pixel junto do GTM não cria essa tag automaticamente.
+
+A compra usa transaction_id e event_id estáveis por pedido. O payload de Purchase sai do backend somente para pedidos pagos, com data de pagamento e preços dos itens consistentes com o total. Inclui os adicionais efetivamente pagos. O navegador memoriza pedidos já enviados para evitar reenvio por polling/atualização. Falhas de tracking não bloqueiam o checkout.
+
+Essa entrega envia eventos pelo navegador enquanto a página estiver aberta. Bloqueadores, conexão e limpeza do armazenamento podem afetar entrega/deduplicação. A API de Conversões servidor a servidor ainda não está conectada; usará o mesmo event_id. Credenciais secretas não são enviadas ao navegador.

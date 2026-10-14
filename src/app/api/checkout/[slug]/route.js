@@ -5,6 +5,7 @@ import { loadCheckoutOffer, checkoutTestConfiguration } from '@/lib/checkoutPubl
 import { signCheckoutSession, readCheckoutSession, safeCheckoutRedirect } from '@/lib/checkoutSession'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
 import { createPayment } from '@/lib/checkoutPaymentsServer'
+import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
 
 export const runtime = 'nodejs'
@@ -22,10 +23,15 @@ async function checkout(request, context) {
   return { db, loaded, store, name, session, slug }
 }
 async function readStatus(db, loaded, session) {
-  const { data: order, error } = await db.from('orders').select('id,status,total_cents,payment_method,installments,pix_qr_code,pix_expires_at').eq('event_id', `checkout:${session.key}`).eq('offer_id', loaded.offer.id).maybeSingle()
+  const { data: order, error } = await db.from('orders').select('id,event_id,paid_at,status,total_cents,payment_method,installments,pix_qr_code,pix_expires_at').eq('event_id', `checkout:${session.key}`).eq('offer_id', loaded.offer.id).maybeSingle()
   if (error) throw new PaymentError('Não foi possível consultar o pagamento.', 503)
   if (!order) return { status: 'not_started' }
-  return { status: order.status, total_cents: order.total_cents, payment_method: order.payment_method, installments: order.installments, pix_code: order.pix_qr_code, pix_expires_at: order.pix_expires_at, redirect_url: safeCheckoutRedirect(loaded.config, order.status, order.payment_method) }
+  let purchase = null
+  if (order.status === 'paid') {
+    const { data, error } = await db.from('webhook_events').select('payload').eq('pagarme_event_id', `request:${session.key}`).maybeSingle()
+    if (!error) purchase = purchaseAnalytics(order, data?.payload?.items)
+  }
+  return { purchase, status: order.status, total_cents: order.total_cents, payment_method: order.payment_method, installments: order.installments, pix_code: order.pix_qr_code, pix_expires_at: order.pix_expires_at, redirect_url: safeCheckoutRedirect(loaded.config, order.status, order.payment_method) }
 }
 export async function GET(request, context) {
   try {
