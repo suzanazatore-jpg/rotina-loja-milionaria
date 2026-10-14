@@ -1,6 +1,6 @@
 # Backend do checkout próprio
 
-Implementação na branch `checkout/painel-admin`. A main e o webhook Guru não foram modificados. Utiliza as tabelas existentes; nenhuma migração necessária.
+Implementação na branch `checkout/painel-admin`. A main e o webhook Guru não foram modificados. Pagamentos utilizam as tabelas existentes. O cadastro global de rastreamento usa a tabela própria checkout_settings, criada pela migração checkout_global_tracking_settings.
 
 ## Rotas
 
@@ -55,3 +55,12 @@ O total e as parcelas incluem os adicionais selecionados. O parcelamento e os ju
 A lista dos planos comprados é registrada junto do pedido para que alterações posteriores no vínculo do produto não liberem um plano diferente. Após o pagamento, cada plano usa seu period_days no app. Cursos compartilhados mantêm a maior expiração aplicável e acessos vitalícios existentes são preservados. Uma única liberação e um único email de acesso são processados por pedido.
 
 Validação local: cálculo do carrinho, seleção e cobrança de adicionais, entrega de dois planos com períodos distintos e repetição da confirmação. O teste ponta a ponta no Pagar.me permanece reservado para o final.
+
+
+## Cadastro global de rastreamento
+
+Central de Vendas → Configurações → Rastreamento global salva GTM e Meta Pixel uma vez. Na oferta, Pixels permite usar o padrão, personalizar ou desativar. IDs anteriores por oferta são preservados como personalizados. Novas ofertas sem IDs herdam o padrão automaticamente; uma personalização com campo vazio não reintroduz o ID global.
+
+checkout_settings aceita acesso apenas pelo servidor (service_role), com RLS habilitada e sem grants para anon/authenticated. A API administrativa valida a sessão e os formatos dos IDs. Tokens e scripts não são aceitos nesses campos. O checkout resolve os identificadores efetivos no servidor.
+
+Esta etapa entrega o cadastro e a herança. Carregamento de GTM/Pixel, eventos no navegador e API de Conversões ainda serão conectados, incluindo prevenção de duplicação de Purchase. Nenhum evento de compra ou pixel foi disparado nesta entrega.

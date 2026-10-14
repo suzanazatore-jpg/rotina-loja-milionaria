@@ -21,7 +21,7 @@ const menu = [
   ['Assinaturas', '/admin/checkout/assinaturas', 'subscriptions'],
   ['Checkouts', null, 'checkouts'],
   ['Integrações', null, 'integrations'],
-  ['Configurações', null, 'settings'],
+  ['Configurações', '/admin/checkout/configuracoes', 'settings'],
 ]
 export default function CentralShell({ children }) {
   const pathname = usePathname()

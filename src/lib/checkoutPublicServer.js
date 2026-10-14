@@ -1,3 +1,4 @@
+import { loadGlobalTracking, resolveTracking } from './checkoutTracking.js'
 import { checkoutAdminClient } from './checkoutAdminServer.js'
 import { normalizeCheckoutSettings } from './checkoutSettings.js'
 import { loadOrderBumps, quoteBump } from './checkoutCart.js'
@@ -12,6 +13,10 @@ export async function loadCheckoutOffer(slug, db = checkoutAdminClient()) {
   if (productError) throw new Error('Não foi possível carregar o produto.')
   if (!product) return null
   const config = normalizeCheckoutSettings(offer.checkout_config || {})
+  const tracking = resolveTracking(config, await loadGlobalTracking(db))
+  config.gtm_id = tracking.gtm_id
+  config.meta_pixel_id = tracking.meta_pixel_id
+  config.tracking_source = tracking.source
   config.redirects.approved ||= offer.thank_you_url || ''
   const methods = (offer.payment_methods || []).filter(method => product.type !== 'subscription' || method === 'credit_card')
   const prices = methods.flatMap(method => Array.from({ length: method === 'pix' || product.type === 'subscription' ? 1 : offer.max_installments || 1 }, (_, index) => ({ method, installments: index + 1, ...calculatePayment(offer, product, method, index + 1) })))

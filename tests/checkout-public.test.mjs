@@ -7,6 +7,7 @@ const source=readFileSync(new URL('../src/lib/checkoutPublicServer.js',import.me
  .replace("'./checkoutSettings.js'",JSON.stringify(moduleUrl('checkoutSettings')))
  .replace("'./pagarme.js'",JSON.stringify(moduleUrl('pagarme')))
  .replace("'./checkoutCart.js'",JSON.stringify(moduleUrl('checkoutCart')))
+ .replace("'./checkoutTracking.js'",JSON.stringify(moduleUrl('checkoutTracking')))
 const {checkoutTestConfiguration,loadCheckoutOffer,publicCheckoutData}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env={CHECKOUT_TEST_ENABLED:'true',CHECKOUT_SESSION_SECRET:'a'.repeat(32),PAGARME_SECRET_KEY:'sk_test_mock',PAGARME_PUBLIC_KEY:'pk_test_mock'}
 test('public checkout denies real payments, incomplete configuration and accidental activation',()=>{
@@ -24,11 +25,11 @@ test('offer lookup filters active records and exposes only public product/offer 
  const db={from(table){
   const data=table==='order_bumps'?[]:table==='offers'?offer:product
   const operations=[]
-  const query={select(){return query},eq(key,value){operations.push([key,value]);return query},order(){return query},then(resolve){calls++;assert.ok(operations.some(([key,value])=>key==='active'&&value===true));resolve({data})},async maybeSingle(){assert.ok(operations.some(([key,value])=>key==='active'&&value===true));calls++;return {data}}}
+  const query={select(){return query},eq(key,value){operations.push([key,value]);return query},order(){return query},then(resolve){calls++;assert.ok(operations.some(([key,value])=>key==='active'&&value===true));resolve({data})},async maybeSingle(){assert.ok(operations.some(([key,value])=>table==='checkout_settings'?key==='id'&&value==='global':key==='active'&&value===true));calls++;return {data}}}
   return query
  }}
  const loaded=await loadCheckoutOffer('offer',db)
- assert.equal(calls,3)
+ assert.equal(calls,4)
  assert.equal(loaded.prices.find(p=>p.method==='pix').total_cents,4230)
  assert.equal(loaded.prices.find(p=>p.installments===3).total_cents,4700)
  const exposed=publicCheckoutData(loaded,env)

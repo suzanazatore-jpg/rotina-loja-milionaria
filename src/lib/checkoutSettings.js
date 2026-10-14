@@ -1,3 +1,4 @@
+import { trackingMode } from './checkoutTracking.js'
 export const CHECKOUT_DEFAULTS = {
   button_text_color: '#17130a', subtitle: '', product_image_url: '', mobile_banner_url: '', favicon_url: '', support_email: '', support_phone: '', terms_url: '', privacy_url: '', layout: 'split',
   background: '#f5f5f3', panel: '#ffffff', text: '#202020', accent: '#d4af37', button_text: 'Comprar agora', store_name: 'Suzana Zatorre', logo_url: '', banner_url: '', font: 'Arial', gtm_id: '', meta_pixel_id: '', redirects: { approved: '', declined: '', pending: '', pix: '', trial: '' },
@@ -25,6 +26,7 @@ export function normalizeCheckoutSettings(input) {
     throw new Error('Informe uma URL válida começando com https:// ou http://.')
   }
   for (const key of ['logo_url','banner_url','mobile_banner_url','product_image_url','favicon_url','terms_url','privacy_url']) result[key] = safeUrl(input[key])
+  result.tracking_mode = trackingMode(input)
   result.gtm_id = String(input.gtm_id || '').trim().toUpperCase()
   result.meta_pixel_id = String(input.meta_pixel_id || '').trim()
   if (result.gtm_id && !/^GTM-[A-Z0-9]{4,20}$/.test(result.gtm_id)) throw new Error('ID do GTM inválido.')
