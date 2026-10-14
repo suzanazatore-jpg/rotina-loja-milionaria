@@ -17,7 +17,7 @@ function orderItemRecords(orderId, items) {
   })
 }
 
-export async function createPayment(db, input, key) {
+export async function createPayment(db, input, key, tracking = null) {
   if (!/^[a-zA-Z0-9_-]{16,100}$/.test(key || '')) throw new PaymentError('Informe uma chave única de idempotência (16–100 caracteres).')
   const selection = normalizeBumpSelection(input.bumps)
   const offer = await result(db.from('offers').select('*').eq('id', input.offer_id).single())
@@ -53,7 +53,7 @@ export async function createPayment(db, input, key) {
     if (inserted.error?.code === '23505') throw new PaymentError('Pedido em processamento. Repita com a mesma chave.', 409)
     if (inserted.error) throw new PaymentError('Não foi possível registrar o pedido.', 500)
     order = inserted.data
-    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items }, processed_at: new Date().toISOString() }))
+    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items, tracking }, processed_at: new Date().toISOString() }))
     await result(db.from('order_items').upsert(orderItemRecords(order.id, items), { onConflict: 'id', ignoreDuplicates: true }))
   }
   let gatewayCustomer = customer

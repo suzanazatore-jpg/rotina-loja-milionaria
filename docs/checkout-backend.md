@@ -75,3 +75,13 @@ Se GTM estiver preenchido, somente ele é carregado. Meta Pixel direto é usado 
 A compra usa transaction_id e event_id estáveis por pedido. O payload de Purchase sai do backend somente para pedidos pagos, com data de pagamento e preços dos itens consistentes com o total. Inclui os adicionais efetivamente pagos. O navegador memoriza pedidos já enviados para evitar reenvio por polling/atualização. Falhas de tracking não bloqueiam o checkout.
 
 Essa entrega envia eventos pelo navegador enquanto a página estiver aberta. Bloqueadores, conexão e limpeza do armazenamento podem afetar entrega/deduplicação. A API de Conversões servidor a servidor ainda não está conectada; usará o mesmo event_id. Credenciais secretas não são enviadas ao navegador.
+
+### Meta Conversions API — Purchase
+
+A compra confirmada pode ser enviada pelo servidor após pagamento imediato, webhook Pagar.me ou sincronização administrativa. O envio exige consentimento de marketing registrado no início da cobrança; usa o Pixel efetivo da oferta e os itens/valores salvos. Email normalizado é enviado com SHA-256; cartão e documento nunca entram no evento. O `event_id` é `purchase:<order_id>`, igual ao navegador. Tags de Purchase no GTM devem encaminhar esse mesmo ID à Meta para deduplicação.
+
+Configuração exclusivamente no servidor: `META_CAPI_PIXEL_ID`, `META_CAPI_ACCESS_TOKEN`, opcional `META_GRAPH_API_VERSION` (padrão suportado `v25.0`). O Pixel da compra precisa corresponder ao configurado. Em produção, exige `CHECKOUT_CAPI_ENABLED=true`, `VERCEL_ENV=production` e gateway de produção. Em preview, somente testes com `CHECKOUT_CAPI_TEST_ENABLED=true`, gateway sandbox e `META_CAPI_TEST_EVENT_CODE`; nenhum envio fica ligado por padrão. A origem sandbox/produção é salva na compra para impedir envio de uma compra sandbox como conversão real depois.
+
+`webhook_events`, marcador `capi:<order_id>`, registra tentativa, confirmação e falhas sem token nem resposta externa. A disputa por registro impede envios concorrentes. Falhas retornam a `retry`; sincronizar novamente o pedido no endpoint administrativo de pagamentos tenta reenviar com o mesmo event ID. Não há worker automático de reenvio nesta etapa. Registros presos em `processing` exigem revisão manual (o processo pode ter encerrado após o envio). Eventos com mais de sete dias são ignorados. Compras antigas sem consentimento e renovações sem snapshot de consentimento não são enviadas. O consentimento é o registrado na cobrança, não um cadastro global de preferências. Falhas de analytics não interrompem pagamentos nem acesso.
+
+Validação local usa fetch simulado; configuração na Meta, teste de recebimento/deduplicação e teste integral do checkout permanecem para a etapa final.

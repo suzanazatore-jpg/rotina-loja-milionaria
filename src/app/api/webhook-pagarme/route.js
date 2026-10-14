@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { syncPayment, reconcileSubscriptionCharge } from '@/lib/checkoutPaymentsServer'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
+import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'
 import { pagarme } from '@/lib/pagarme'
 
 export const runtime = 'nodejs'
@@ -48,7 +49,10 @@ export async function POST(request) {
     }
     if (orderId) {
       const order = reconciled || await syncPayment(db, orderId)
-      if (order.status === 'paid') await fulfillPaidOrder(db, orderId)
+      if (order.status === 'paid') {
+        await fulfillPaidOrder(db, orderId)
+        await deliverPaidConversion(db, orderId)
+      }
     }
     const { error } = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', event.id)
     if (error) throw error

@@ -5,6 +5,7 @@ import { loadCheckoutOffer, checkoutTestConfiguration } from '@/lib/checkoutPubl
 import { signCheckoutSession, readCheckoutSession, safeCheckoutRedirect } from '@/lib/checkoutSession'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
 import { createPayment } from '@/lib/checkoutPaymentsServer'
+import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'
 import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
 
@@ -57,10 +58,13 @@ export async function POST(request, context) {
     }
     if (input.action !== 'pay' || !session) throw new PaymentError('Inicie uma sessão válida antes do pagamento.', 401)
     // Não permita alterar oferta nem aceitar dados abertos do cartão no endpoint público.
-    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps'])
+    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps','marketing_consent'])
     if (Object.keys(input).some(key => !allowed.has(key))) throw new PaymentError('Dados de pagamento inválidos.')
-    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key)
-    if (payment.status === 'paid') await fulfillPaidOrder(db, payment.order_id)
+    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, input.marketing_consent === true ? { consent: true, gateway_base: process.env.PAGARME_BASE_URL, pixel_id: loaded.config.meta_pixel_id, source_url: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}` } : null)
+    if (payment.status === 'paid') {
+      await fulfillPaidOrder(db, payment.order_id)
+      await deliverPaidConversion(db, payment.order_id)
+    }
     return response(await readStatus(db, loaded, session))
   } catch (error) { return response({ error: error instanceof PaymentError ? error.message : 'Não foi possível processar o checkout.' }, error.status || 500) }
 }

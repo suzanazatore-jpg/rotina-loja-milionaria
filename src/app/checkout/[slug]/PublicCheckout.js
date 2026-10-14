@@ -82,7 +82,7 @@ export default function PublicCheckout({ data }) {
       if (!pendingRequest.current) {
         const get = key => String(values.get(key) || '').trim()
         const customer = { name: get('name'), email: get('email'), document: get('document'), phone: get('phone'), address: { line_1: get('line_1'), line_2: get('line_2'), zip_code: get('zip_code'), city: get('city'), state: get('state').toUpperCase() } }
-        const payload = { action: 'pay', customer, payment_method: method, installments, bumps: selectedBumps }
+        const payload = { action: 'pay', customer, payment_method: method, installments, bumps: selectedBumps, marketing_consent: (() => { try { return localStorage.getItem('sz-checkout-consent-v2') === 'granted' } catch { return false } })() }
         if (method === 'credit_card') {
           if (!test.publicKey) throw new Error('Pagamento por cartão em preparação.')
           const expiry = get('expiry').match(/^(\d{2})\/(\d{2}|\d{4})$/)

@@ -2,7 +2,7 @@
 import Script from 'next/script'
 import { useEffect, useSyncExternalStore } from 'react'
 import { trackingDestination, dispatchAnalytics } from '@/lib/checkoutAnalytics'
-const CONSENT_KEY='sz-checkout-consent-v1'
+const CONSENT_KEY='sz-checkout-consent-v2'
 function subscribe(callback) {
   window.addEventListener('storage',callback);window.addEventListener('sz-checkout-consent',callback)
   return ()=>{window.removeEventListener('storage',callback);window.removeEventListener('sz-checkout-consent',callback)}
@@ -67,7 +67,7 @@ export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,s
   if(!enabled || destination.channel==='off')return null
   return <>
     {allowed && (destination.channel==='gtm' ? <Script id={`sz-gtm-${destination.id}`} src={`https://www.googletagmanager.com/gtm.js?id=${destination.id}`} strategy="afterInteractive"/> : <Script id="sz-meta-sdk" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive"/>)}
-    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir cookies de análise e publicidade? Eles ajudam a entender as visitas e melhorar nossas campanhas.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
+    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir análise e publicidade? Usaremos cookies e enviaremos dados da compra e um identificador derivado do seu email à Meta para medir campanhas.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
     {consent!=='unknown' && <button type="button" className="pc-cookie-settings" onClick={()=>choose('unknown')}>Preferências de cookies</button>}
   </>
 }
