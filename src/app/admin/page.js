@@ -67,12 +67,10 @@ export default function Admin() {
       ],
     },
     {
-      titulo: 'Vendas e Checkout',
-      descricao: 'Checkout próprio com Pagar.me: produtos, ofertas, vendas e integrações.',
+      titulo: 'Central de Vendas',
+      descricao: 'Sua operação comercial em um só lugar.',
       cards: [
-        { icone: '💳', titulo: 'Produtos e Ofertas', sub: 'Preços, parcelas, Pix, order bumps e links do checkout.', rota: '/admin/checkout' },
-        { icone: '🧾', titulo: 'Vendas', sub: 'Pedidos, pagamentos, filtros e detalhes.', rota: '/admin/checkout/vendas' },
-        { icone: '🔗', titulo: 'Webhooks', sub: 'Envie cada venda para Pabbly, BotConversa e outros apps.', status: 'Em breve' },
+        { icone: 'plans', titulo: 'Central de Vendas', sub: 'Gerencie produtos, ofertas, checkouts e acompanhe suas vendas.', rota: '/admin/central-vendas' },
       ],
     },
     {

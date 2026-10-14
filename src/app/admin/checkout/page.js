@@ -5,15 +5,15 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const ADMIN_EMAIL = 'suporte@suzanazatorre.com.br'
-const ouro = '#D4AF37'
-const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
+const ouro = 'var(--cv-gold)'
+const ouroGrad = 'linear-gradient(135deg, var(--cv-gold), var(--cv-gold))'
 const campo = {
-  width: '100%', background: '#0A0A0A', color: '#FFF', border: '1px solid #333',
+  width: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', border: '1px solid var(--cv-border)',
   borderRadius: '8px', padding: '10px 12px', fontSize: '14px', boxSizing: 'border-box', marginTop: 5,
 }
-const rotulo = { display: 'block', fontSize: 13, color: '#ddd' }
-const dica = { display: 'block', color: '#777', fontSize: 11, marginTop: 5 }
-const botaoSecundario = { background: '#1A1A1A', color: ouro, border: '1px solid #333', borderRadius: '7px', padding: '7px 10px', cursor: 'pointer', fontSize: 13 }
+const rotulo = { display: 'block', fontSize: 13, color: 'var(--cv-text)' }
+const dica = { display: 'block', color: 'var(--cv-muted)', fontSize: 11, marginTop: 5 }
+const botaoSecundario = { background: 'var(--cv-field)', color: ouro, border: '1px solid var(--cv-border)', borderRadius: '7px', padding: '7px 10px', cursor: 'pointer', fontSize: 13 }
 
 const PRODUTO_VAZIO = { name: '', type: 'one_time', plan_id: '', access_days: '', brevo_list_id: '', botconversa_tag: '', active: true }
 const OFERTA_VAZIA = {
@@ -146,52 +146,49 @@ export default function AdminCheckout() {
   if (!autorizado) return <Bloqueio texto="Acesso restrito ao administrador." />
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#FFF', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
-      <header style={{ padding: '16px 20px', borderBottom: '1px solid #2A2A2A', background: '#111', position: 'sticky', top: 0, zIndex: 10 }}>
-        <button onClick={() => router.push('/admin')} style={{ background: 'transparent', border: '1px solid #333', borderRadius: '8px', color: ouro, padding: '7px 12px', cursor: 'pointer' }}>← Admin</button>
-      </header>
-      <main style={{ maxWidth: '1040px', margin: '0 auto', padding: '26px 18px 60px' }}>
+    <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+  <main style={{ width: '100%', margin: 0, padding: '26px 18px 60px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '18px', marginBottom: '22px', flexWrap: 'wrap' }}>
           <div>
             <p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>CHECKOUT</p>
             <h1 style={{ fontSize: '24px', margin: '5px 0' }}>Produtos e Ofertas</h1>
-            <p style={{ color: '#888', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>
+            <p style={{ color: 'var(--cv-muted)', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>
           </div>
-          <button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: '#ff2b67', color: '#fff', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Cadastrar produto</button>
+          <button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Cadastrar produto</button>
         </div>
 
-        {mensagem && <div style={{ background: '#18150b', border: '1px solid #5b4c17', color: '#F5D76E', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
+        {mensagem && <div style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
 
-        {!produtos.length && <div style={{ background: '#111', border: '1px dashed #333', borderRadius: 14, padding: 30, textAlign: 'center', color: '#888' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
+        {!produtos.length && <div style={{ background: 'var(--cv-panel)', border: '1px dashed var(--cv-border)', borderRadius: 14, padding: 30, textAlign: 'center', color: 'var(--cv-muted)' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
 
         {produtos.map(p => {
           const lista = ofertas.filter(o => o.product_id === p.id)
           return (
-            <section key={p.id} style={{ background: '#111', border: '1px solid #2A2A2A', borderRadius: 14, marginBottom: 16, opacity: p.active ? 1 : 0.55 }}>
-              <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid #262226' }}>
+            <section key={p.id} style={{ background: 'var(--cv-panel)', border: '1px solid var(--cv-border)', borderRadius: 14, marginBottom: 16, opacity: p.active ? 1 : 0.55 }}>
+              <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid var(--cv-border)' }}>
                 <div>
                   <strong style={{ fontSize: 16 }}>{p.name}</strong>
-                  {!p.active && <span style={{ marginLeft: 8, color: '#f99', fontSize: 12 }}>inativo</span>}
-                  <p style={{ color: '#888', fontSize: 12, margin: '5px 0 0' }}>
-                    {p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'} · Plano liberado: <span style={{ color: p.plan_id ? ouro : '#f99' }}>{p.plan_id ? nomePlano[p.plan_id] || 'plano removido' : 'nenhum (não libera acesso)'}</span>
+                  {!p.active && <span style={{ marginLeft: 8, color: 'var(--cv-danger)', fontSize: 12 }}>inativo</span>}
+                  <p style={{ color: 'var(--cv-muted)', fontSize: 12, margin: '5px 0 0' }}>
+                    {p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'} · Plano liberado: <span style={{ color: p.plan_id ? ouro : 'var(--cv-danger)' }}>{p.plan_id ? nomePlano[p.plan_id] || 'plano removido' : 'nenhum (não libera acesso)'}</span>
                     {p.access_days ? ` · ${p.access_days} dias` : ''}
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <button onClick={() => novaOferta(p)} style={botaoSecundario}>＋ Oferta</button>
                   <button onClick={() => editarProduto(p)} style={botaoSecundario}>Editar</button>
-                  <button onClick={() => alternar('produto', p)} style={{ ...botaoSecundario, color: p.active ? '#f99' : '#9f9' }}>{p.active ? 'Desativar' : 'Ativar'}</button>
+                  <button onClick={() => alternar('produto', p)} style={{ ...botaoSecundario, color: p.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{p.active ? 'Desativar' : 'Ativar'}</button>
                 </div>
               </div>
               {lista.map(o => {
                 const bumpsOferta = bumps.filter(b => b.offer_id === o.id)
                 const total = totalParcelado(o.price_cents, o.max_installments, o.free_installments, o.monthly_interest_pct)
                 return (
-                  <div key={o.id} style={{ padding: '13px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid #1d1a1d', opacity: o.active ? 1 : 0.5 }}>
+                  <div key={o.id} style={{ padding: '13px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid var(--cv-border)', opacity: o.active ? 1 : 0.5 }}>
                     <div style={{ minWidth: 0 }}>
                       <span style={{ fontWeight: 700 }}>{o.name}</span> <span style={{ color: ouro, fontWeight: 800 }}>{moeda(o.price_cents)}</span>
-                      {!o.active && <span style={{ marginLeft: 8, color: '#f99', fontSize: 12 }}>inativa</span>}
-                      <p style={{ color: '#888', fontSize: 12, margin: '4px 0 0' }}>
+                      {!o.active && <span style={{ marginLeft: 8, color: 'var(--cv-danger)', fontSize: 12 }}>inativa</span>}
+                      <p style={{ color: 'var(--cv-muted)', fontSize: 12, margin: '4px 0 0' }}>
                         {o.payment_methods.map(m => m === 'pix' ? 'Pix' : 'Cartão').join(' + ')}
                         {o.max_installments > 1 && ` · até ${o.max_installments}x de ${moeda(Math.ceil(total / o.max_installments))}`}
                         {o.free_installments > 1 && ` · ${o.free_installments}x sem juros`}
@@ -199,17 +196,17 @@ export default function AdminCheckout() {
                         {o.billing_interval && ` · cobra a cada ${o.billing_interval_count} ${o.billing_interval === 'month' ? 'mês(es)' : 'ano(s)'}`}
                         {bumpsOferta.length > 0 && ` · ${bumpsOferta.length} order bump${bumpsOferta.length > 1 ? 's' : ''}`}
                       </p>
-                      <p style={{ color: '#666', fontSize: 11, margin: '4px 0 0', wordBreak: 'break-all' }}>{linkCheckout(o)}</p>
+                      <p style={{ color: 'var(--cv-muted)', fontSize: 11, margin: '4px 0 0', wordBreak: 'break-all' }}>{linkCheckout(o)}</p>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <button onClick={() => navigator.clipboard?.writeText(linkCheckout(o)).then(() => setMensagem('✓ Link copiado.'))} style={botaoSecundario}>Copiar link</button>
                       <button onClick={() => editarOferta(p, o)} style={botaoSecundario}>Editar</button>
-                      <button onClick={() => alternar('oferta', o)} style={{ ...botaoSecundario, color: o.active ? '#f99' : '#9f9' }}>{o.active ? 'Desativar' : 'Ativar'}</button>
+                      <button onClick={() => alternar('oferta', o)} style={{ ...botaoSecundario, color: o.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{o.active ? 'Desativar' : 'Ativar'}</button>
                     </div>
                   </div>
                 )
               })}
-              {!lista.length && <p style={{ color: '#777', fontSize: 13, padding: '12px 16px', margin: 0 }}>Sem ofertas. Clique em ＋ Oferta para definir preço e link de venda.</p>}
+              {!lista.length && <p style={{ color: 'var(--cv-muted)', fontSize: 13, padding: '12px 16px', margin: 0 }}>Sem ofertas. Clique em ＋ Oferta para definir preço e link de venda.</p>}
             </section>
           )
         })}
@@ -247,7 +244,7 @@ function FormProduto({ dados, planos, editando, onChange }) {
         <span style={rotulo}>Tipo</span>
         <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
           {[['one_time', 'Pagamento único'], ['subscription', 'Assinatura recorrente']].map(([valor, texto]) => (
-            <button key={valor} type="button" disabled={editando} onClick={() => set('type', valor)} style={{ flex: 1, border: dados.type === valor ? `1px solid ${ouro}` : '1px solid #333', background: dados.type === valor ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: 10, padding: 11, cursor: editando ? 'not-allowed' : 'pointer' }}>{dados.type === valor ? '✓ ' : ''}{texto}</button>
+            <button key={valor} type="button" disabled={editando} onClick={() => set('type', valor)} style={{ flex: 1, border: dados.type === valor ? `1px solid ${ouro}` : '1px solid var(--cv-border)', background: dados.type === valor ? 'var(--cv-selected)' : 'var(--cv-field)', color: 'var(--cv-text)', borderRadius: 10, padding: 11, cursor: editando ? 'not-allowed' : 'pointer' }}>{dados.type === valor ? '✓ ' : ''}{texto}</button>
           ))}
         </div>
         {editando && <small style={dica}>O tipo não pode ser alterado depois de criado.</small>}
@@ -311,12 +308,12 @@ function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange }) {
           <span style={rotulo}>Formas de pagamento</span>
           <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
             {[['pix', 'Pix'], ['credit_card', 'Cartão de crédito']].map(([m, texto]) => (
-              <button key={m} type="button" onClick={() => alternarMetodo(m)} style={{ flex: 1, border: dados.payment_methods.includes(m) ? `1px solid ${ouro}` : '1px solid #333', background: dados.payment_methods.includes(m) ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: 10, padding: 11, cursor: 'pointer' }}>{dados.payment_methods.includes(m) ? '✓ ' : ''}{texto}</button>
+              <button key={m} type="button" onClick={() => alternarMetodo(m)} style={{ flex: 1, border: dados.payment_methods.includes(m) ? `1px solid ${ouro}` : '1px solid var(--cv-border)', background: dados.payment_methods.includes(m) ? 'var(--cv-selected)' : 'var(--cv-field)', color: 'var(--cv-text)', borderRadius: 10, padding: 11, cursor: 'pointer' }}>{dados.payment_methods.includes(m) ? '✓ ' : ''}{texto}</button>
             ))}
           </div>
         </div>
       ) : (
-        <div style={{ background: '#151315', border: '1px solid #302b30', borderRadius: 10, padding: 12, fontSize: 13, color: '#bbb' }}>
+        <div style={{ background: '#151315', border: '1px solid var(--cv-border)', borderRadius: 10, padding: 12, fontSize: 13, color: '#bbb' }}>
           Assinatura cobra automaticamente no <strong>cartão de crédito</strong>.
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 10 }}>
             <label style={rotulo}>Cobrar a cada<input type="number" min="1" max="12" value={dados.billing_interval_count} onChange={e => set('billing_interval_count', e.target.value)} style={campo} /></label>
@@ -339,27 +336,27 @@ function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange }) {
       )}
 
       {simulacao.length > 0 && (
-        <div style={{ background: '#151315', border: '1px solid #302b30', borderRadius: 10, padding: 12 }}>
+        <div style={{ background: '#151315', border: '1px solid var(--cv-border)', borderRadius: 10, padding: 12 }}>
           <p style={{ margin: '0 0 8px', fontWeight: 800, fontSize: 13 }}>Como a cliente vai ver no checkout</p>
-          {simulacao.map(s => <div key={s.n} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#ccc', padding: '3px 0' }}><span>{s.n}x de {moeda(s.parcela)}{s.n <= semJuros ? ' sem juros' : ''}</span><span style={{ color: '#888' }}>total {moeda(s.total)}</span></div>)}
+          {simulacao.map(s => <div key={s.n} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#ccc', padding: '3px 0' }}><span>{s.n}x de {moeda(s.parcela)}{s.n <= semJuros ? ' sem juros' : ''}</span><span style={{ color: 'var(--cv-muted)' }}>total {moeda(s.total)}</span></div>)}
         </div>
       )}
 
       <label style={rotulo}>Página de obrigado (opcional)<input value={dados.thank_you_url} onChange={e => set('thank_you_url', e.target.value)} style={campo} placeholder="https://" /><small style={dica}>Se ficar vazio, a cliente vê a página de obrigado padrão do checkout.</small></label>
 
       {!assinatura && (
-        <section style={{ paddingTop: 14, borderTop: '1px solid #302b30' }}>
+        <section style={{ paddingTop: 14, borderTop: '1px solid var(--cv-border)' }}>
           <p style={{ margin: '0 0 4px', fontWeight: 800, fontSize: 14 }}>Order bumps</p>
-          <p style={{ margin: '0 0 10px', color: '#777', fontSize: 12 }}>Ofertas que aparecem como caixinha de &quot;adicionar também&quot; neste checkout.</p>
+          <p style={{ margin: '0 0 10px', color: 'var(--cv-muted)', fontSize: 12 }}>Ofertas que aparecem como caixinha de &quot;adicionar também&quot; neste checkout.</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {ofertasBump.map(o => {
               const ativo = dados.bumps.some(b => b.bump_offer_id === o.id)
-              return <button key={o.id} type="button" onClick={() => alternarBump(o.id)} style={{ border: ativo ? `1px solid ${ouro}` : '1px solid #333', background: ativo ? '#30280d' : '#1b191b', color: '#FFF', borderRadius: 999, padding: '8px 11px', cursor: 'pointer', fontSize: 13 }}>{ativo ? '✓ ' : ''}{produtoDe(o)} — {o.name} ({moeda(o.price_cents)})</button>
+              return <button key={o.id} type="button" onClick={() => alternarBump(o.id)} style={{ border: ativo ? `1px solid ${ouro}` : '1px solid var(--cv-border)', background: ativo ? 'var(--cv-selected)' : 'var(--cv-field)', color: 'var(--cv-text)', borderRadius: 999, padding: '8px 11px', cursor: 'pointer', fontSize: 13 }}>{ativo ? '✓ ' : ''}{produtoDe(o)} — {o.name} ({moeda(o.price_cents)})</button>
             })}
-            {!ofertasBump.length && <span style={{ color: '#777', fontSize: 13 }}>Cadastre outras ofertas de pagamento único para usar como bump.</span>}
+            {!ofertasBump.length && <span style={{ color: 'var(--cv-muted)', fontSize: 13 }}>Cadastre outras ofertas de pagamento único para usar como bump.</span>}
           </div>
           {dados.bumps.map(b => (
-            <div key={b.bump_offer_id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, marginTop: 10, background: '#151315', border: '1px solid #302b30', borderRadius: 10, padding: 10 }}>
+            <div key={b.bump_offer_id} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 10, marginTop: 10, background: '#151315', border: '1px solid var(--cv-border)', borderRadius: 10, padding: 10 }}>
               <label style={rotulo}>Chamada do bump<input value={b.headline} onChange={e => editarBump(b.bump_offer_id, 'headline', e.target.value)} style={campo} /></label>
               <label style={rotulo}>Descrição<input value={b.description} onChange={e => editarBump(b.bump_offer_id, 'description', e.target.value)} style={campo} placeholder="Opcional" /></label>
             </div>
@@ -373,14 +370,14 @@ function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange }) {
 function Modal({ titulo, sub, onFechar, onSalvar, salvando, textoBotao, children }) {
   return (
     <div onMouseDown={e => e.target === e.currentTarget && onFechar()} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,.78)', backdropFilter: 'blur(4px)', display: 'grid', placeItems: 'center', padding: 18 }}>
-      <form onSubmit={onSalvar} style={{ width: 'min(760px,100%)', maxHeight: '92vh', overflowY: 'auto', background: '#141214', border: '1px solid #373238', borderRadius: 18, boxShadow: '0 28px 90px #000', color: '#FFF' }}>
-        <header style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '18px 20px', background: '#171417', borderBottom: '1px solid #302b30' }}>
-          <div><h2 style={{ fontSize: 18, margin: 0 }}>{titulo}</h2><p style={{ color: '#777', fontSize: 12, margin: '4px 0 0' }}>{sub}</p></div>
-          <button type="button" onClick={onFechar} disabled={salvando} aria-label="Fechar" style={{ width: 34, height: 34, background: '#242024', color: '#aaa', border: '1px solid #3c373c', borderRadius: 9, fontSize: 20, cursor: 'pointer' }}>×</button>
+      <form onSubmit={onSalvar} style={{ width: 'min(760px,100%)', maxHeight: '92vh', overflowY: 'auto', background: '#141214', border: '1px solid #373238', borderRadius: 18, boxShadow: '0 28px 90px #000', color: 'var(--cv-text)' }}>
+        <header style={{ position: 'sticky', top: 0, zIndex: 2, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '18px 20px', background: 'var(--cv-panel)', borderBottom: '1px solid var(--cv-border)' }}>
+          <div><h2 style={{ fontSize: 18, margin: 0 }}>{titulo}</h2><p style={{ color: 'var(--cv-muted)', fontSize: 12, margin: '4px 0 0' }}>{sub}</p></div>
+          <button type="button" onClick={onFechar} disabled={salvando} aria-label="Fechar" style={{ width: 34, height: 34, background: '#242024', color: 'var(--cv-muted)', border: '1px solid #3c373c', borderRadius: 9, fontSize: 20, cursor: 'pointer' }}>×</button>
         </header>
         <div style={{ padding: 20 }}>{children}</div>
-        <footer style={{ position: 'sticky', bottom: 0, display: 'flex', justifyContent: 'flex-end', gap: 9, padding: '14px 20px', background: '#171417', borderTop: '1px solid #302b30' }}>
-          <button type="button" onClick={onFechar} disabled={salvando} style={{ background: '#242124', color: '#fff', border: '1px solid #3c373c', borderRadius: 9, padding: '10px 16px', fontWeight: 800, cursor: 'pointer' }}>Cancelar</button>
+        <footer style={{ position: 'sticky', bottom: 0, display: 'flex', justifyContent: 'flex-end', gap: 9, padding: '14px 20px', background: 'var(--cv-panel)', borderTop: '1px solid var(--cv-border)' }}>
+          <button type="button" onClick={onFechar} disabled={salvando} style={{ background: '#242124', color: 'var(--cv-text)', border: '1px solid #3c373c', borderRadius: 9, padding: '10px 16px', fontWeight: 800, cursor: 'pointer' }}>Cancelar</button>
           <button disabled={salvando} style={{ background: ouroGrad, color: '#090909', border: 0, borderRadius: 9, padding: '10px 17px', fontWeight: 900, cursor: 'pointer' }}>{salvando ? 'Salvando...' : textoBotao}</button>
         </footer>
       </form>
@@ -389,5 +386,5 @@ function Modal({ titulo, sub, onFechar, onSalvar, salvando, textoBotao, children
 }
 
 function Bloqueio({ texto }) {
-  return <div style={{ minHeight: '100vh', background: '#0A0A0A', color: '#AAA', display: 'grid', placeItems: 'center' }}>{texto}</div>
+  return <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-muted)', display: 'grid', placeItems: 'center' }}>{texto}</div>
 }
