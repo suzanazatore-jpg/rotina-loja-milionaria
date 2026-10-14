@@ -42,7 +42,10 @@ export async function GET(request) {
       ])
       if (errCliente) throw errCliente
       if (errItens) throw errItens
-      return { ...pedido, customer: cliente, items: (itens || []).map(i => ({ ...i, product_name: nomes.get(i.product_id) || 'Produto', offer_name: mapaOfertas.get(i.offer_id)?.name || 'Oferta' })) }
+      const conversion = await db.from('webhook_events').select('error,processed_at,payload').eq('pagarme_event_id', `capi:${pedido.id}`).maybeSingle()
+      if (conversion.error) throw conversion.error
+      const registro = conversion.data
+      return { ...pedido, conversion: registro ? { status: registro.processed_at ? 'sent' : registro.error, mode: registro.payload?.mode, attempts: registro.payload?.attempts || 0, next_attempt_at: registro.payload?.next_attempt_at } : null, customer: cliente, items: (itens || []).map(i => ({ ...i, product_name: nomes.get(i.product_id) || 'Produto', offer_name: mapaOfertas.get(i.offer_id)?.name || 'Oferta' })) }
     }
 
     if (id) {

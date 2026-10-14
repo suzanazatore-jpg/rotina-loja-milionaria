@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const analytics = `data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/checkoutAnalytics.js', import.meta.url))).toString('base64')}`
 const source = readFileSync(new URL('../src/lib/checkoutConversionsServer.js', import.meta.url), 'utf8').replace('./checkoutAnalytics.js', analytics)
-const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion, retryConversions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env = { META_CAPI_PIXEL_ID:'123456', META_CAPI_ACCESS_TOKEN:'secret', VERCEL_ENV:'production', CHECKOUT_CAPI_ENABLED:'true', PAGARME_BASE_URL:'https://api.pagar.me/core/v5' }
 const now = Date.now()
 const order = { id:'order', status:'paid', paid_at:new Date(now-1000).toISOString(), total_cents:4700 }
@@ -45,7 +45,7 @@ function database() {
  const tables={orders:[{...order,event_id:'checkout:session',customer_id:'customer'}],customers:[{id:'customer',email:'buyer@example.com'}],webhook_events:[{pagarme_event_id:'request:session',payload:{...snapshot,tracking:{...snapshot.tracking,pixel_id:'123456',gateway_base:env.PAGARME_BASE_URL}}}]}
  return {tables,from(table){
   let action='read',value,filters=[],single=false
-  const q={select(){return q},eq(key,value){filters.push(row=>row[key]===value);return q},is(key,value){filters.push(row=>(row[key]??null)===value);return q},single(){single=true;return q},maybeSingle(){single=true;return q},upsert(v){action='insert';value=v;return q},update(v){action='update';value=v;return q},then(resolve,reject){return Promise.resolve().then(()=>{
+  const q={order(){return q},limit(){return q},select(){return q},eq(key,value){filters.push(row=>row[key]===value);return q},is(key,value){filters.push(row=>(row[key]??null)===value);return q},single(){single=true;return q},maybeSingle(){single=true;return q},upsert(v){action='insert';value=v;return q},update(v){action='update';value=v;return q},then(resolve,reject){return Promise.resolve().then(()=>{
    if(action==='insert'){if(!tables[table].some(row=>row.pagarme_event_id===value.pagarme_event_id))tables[table].push({id:'marker',...value});return {data:null,error:null}}
    const rows=tables[table].filter(row=>filters.every(filter=>filter(row)))
    if(action==='update')rows.forEach(row=>Object.assign(row,value))
@@ -64,9 +64,56 @@ test('concurrent delivery claims once; failed delivery retries with same ID and 
   assert.equal(calls,1)
   assert.equal(db.tables.webhook_events.find(row=>row.type==='checkout.capi').error,'retry')
   globalThis.fetch=async(url,options)=>{calls++;assert.equal(JSON.parse(options.body).data[0].event_id,'purchase:order');return {ok:true,json:async()=>({events_received:1})}}
+  assert.equal((await deliverPaidConversion(db,'order')).status,'scheduled')
+  assert.equal(calls,1)
+  db.tables.webhook_events.find(row=>row.type==='checkout.capi').payload.next_attempt_at=null
   assert.equal((await deliverPaidConversion(db,'order')).status,'sent')
   await deliverPaidConversion(db,'order');assert.equal(calls,2)
   const sandbox=database();sandbox.tables.webhook_events[0].payload.tracking.gateway_base='https://sdx-api.pagar.me/core/v5'
   assert.equal((await deliverPaidConversion(sandbox,'order')).status,'disabled');assert.equal(calls,2)
  } finally {globalThis.fetch=originalFetch;for(const [key,value] of Object.entries(oldEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+})
+
+test('worker respects gates and due times, limits batch, and retires ineligible rows',async()=>{
+ const old=Object.fromEntries(Object.keys(env).map(key=>[key,process.env[key]]));Object.assign(process.env,env)
+ try {
+  const db=database();db.tables.webhook_events=[]
+  for(let i=0;i<7;i++){
+   const id=`00000000-0000-0000-0000-${String(i).padStart(12,'0')}`
+   db.tables.webhook_events.push({pagarme_event_id:`capi:${id}`,type:'checkout.capi',error:'retry',payload:{order_id:id,next_attempt_at:new Date(i===0?now+86400000:now-1000).toISOString()}})
+  }
+  let calls=0
+  const result=await retryConversions(db,async()=>{calls++;return {status:calls===1?'skipped':'sent'}},now)
+  assert.equal(calls,4);assert.equal(result.checked,4);assert.equal(result.sent,3)
+  assert.equal(db.tables.webhook_events[1].error,'ineligible')
+  process.env.CHECKOUT_CAPI_ENABLED='false'
+  assert.equal((await retryConversions({from(){throw new Error('should not query')}})).disabled,true)
+ }finally{for(const [key,value]of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+})
+test('eighth failed attempt stops automatic retries for review',async()=>{
+ const old=Object.fromEntries(Object.keys(env).map(key=>[key,process.env[key]]));const original=globalThis.fetch;Object.assign(process.env,env)
+ try{
+  const db=database()
+  db.tables.webhook_events.push({id:'marker',pagarme_event_id:'capi:order',type:'checkout.capi',error:'retry',payload:{attempts:7}})
+  globalThis.fetch=async()=>{throw new Error('network')}
+  await deliverPaidConversion(db,'order')
+  const record=db.tables.webhook_events.find(row=>row.type==='checkout.capi')
+  assert.equal(record.error,'review_required');assert.equal(record.payload.attempts,8)
+  await deliverPaidConversion(db,'order');assert.equal(record.payload.attempts,8)
+ }finally{globalThis.fetch=original;for(const[key,value]of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+})
+test('cron rejects missing or wrong secret and accepts authenticated disabled run',async()=>{
+ const routeSource=readFileSync(new URL('../src/app/api/cron/checkout-conversoes/route.js',import.meta.url),'utf8')
+  .replace("import { checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const checkoutAdminClient = () => ({})')
+  .replace("import { retryConversions } from '@/lib/checkoutConversionsServer'",'const retryConversions = async () => ({disabled:true,checked:0,sent:0})')
+ const {GET}=await import(`data:text/javascript;base64,${Buffer.from(routeSource).toString('base64')}`)
+ const saved=process.env.CRON_SECRET
+ try{
+  delete process.env.CRON_SECRET
+  assert.equal((await GET(new Request('https://example.com/api/cron/checkout-conversoes'))).status,401)
+  process.env.CRON_SECRET='test-only-secret'
+  assert.equal((await GET(new Request('https://example.com/api/cron/checkout-conversoes',{headers:{authorization:'Bearer wrong'}}))).status,401)
+  const result=await GET(new Request('https://example.com/api/cron/checkout-conversoes',{headers:{authorization:'Bearer test-only-secret'}}))
+  assert.equal(result.status,200);assert.equal((await result.json()).disabled,true)
+ }finally{if(saved===undefined)delete process.env.CRON_SECRET;else process.env.CRON_SECRET=saved}
 })

@@ -41,15 +41,43 @@ export async function deliverPaidConversion(db, orderId) {
     if (!event) return { status: 'skipped' }
     const inserted = await db.from('webhook_events').upsert({ pagarme_event_id: marker, type: 'checkout.capi', payload: { order_id: order.id, pixel_id: pixelId, event_id: event.event_id, mode: config.testCode ? 'test' : 'live' }, error: 'retry' }, { onConflict: 'pagarme_event_id', ignoreDuplicates: true })
     if (inserted.error) return { status: 'pending' }
-    const claimed = await db.from('webhook_events').update({ error: 'processing' }).eq('pagarme_event_id', marker).eq('error', 'retry').is('processed_at', null).select('id')
+    const claimed = await db.from('webhook_events').update({ error: 'processing' }).eq('pagarme_event_id', marker).eq('error', 'retry').is('processed_at', null).select('id,payload')
     if (claimed.error || !claimed.data?.length) return { status: 'recorded' }
+    const payload = claimed.data[0].payload || {}
+    if (payload.next_attempt_at && new Date(payload.next_attempt_at).getTime() > Date.now()) {
+      await db.from('webhook_events').update({ error: 'retry' }).eq('pagarme_event_id', marker).eq('error', 'processing')
+      return { status: 'scheduled' }
+    }
+    const attempts = (Number(payload.attempts) || 0) + 1
+    const attemptPayload = { ...payload, attempts, last_attempt_at: new Date().toISOString(), next_attempt_at: new Date(Date.now() + Math.min(86400, 300 * 2 ** (attempts - 1)) * 1000).toISOString() }
+    const recorded = await db.from('webhook_events').update({ payload: attemptPayload }).eq('pagarme_event_id', marker).eq('error', 'processing')
+    if (recorded.error) return { status: 'review_required' }
     try {
       await sendConversion(config, pixelId, event)
       const done = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', marker)
       return { status: done.error ? 'review_required' : 'sent' }
     } catch {
-      await db.from('webhook_events').update({ error: 'retry' }).eq('pagarme_event_id', marker).is('processed_at', null)
+      await db.from('webhook_events').update({ error: attempts >= 8 ? 'review_required' : 'retry', received_at: new Date().toISOString() }).eq('pagarme_event_id', marker).is('processed_at', null)
       return { status: 'pending' }
     }
   } catch { return { status: 'pending' } }
+}
+
+export async function retryConversions(db, deliver = deliverPaidConversion, now = Date.now()) {
+  if (!conversionConfiguration(process.env.META_CAPI_PIXEL_ID)) return { disabled: true, checked: 0, sent: 0 }
+  const { data, error } = await db.from('webhook_events').select('pagarme_event_id,payload').eq('type', 'checkout.capi').eq('error', 'retry').is('processed_at', null).order('received_at', { ascending: true }).limit(100)
+  if (error) throw new Error('Não foi possível consultar a fila de conversões.')
+  const due = (data || []).filter(row => !row.payload?.next_attempt_at || new Date(row.payload.next_attempt_at).getTime() <= now).slice(0, 4)
+  let sent = 0
+  for (const row of due) {
+    const id = row.payload?.order_id
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '') || row.pagarme_event_id !== `capi:${id}`) {
+      await db.from('webhook_events').update({ error: 'review_required' }).eq('pagarme_event_id', row.pagarme_event_id).eq('error', 'retry')
+      continue
+    }
+    const result = await deliver(db, id)
+    if (result.status === 'sent') sent++
+    if (result.status === 'skipped') await db.from('webhook_events').update({ error: 'ineligible' }).eq('pagarme_event_id', row.pagarme_event_id).eq('error', 'retry')
+  }
+  return { disabled: false, checked: due.length, sent }
 }
