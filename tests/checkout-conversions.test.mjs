@@ -117,3 +117,10 @@ test('cron rejects missing or wrong secret and accepts authenticated disabled ru
   assert.equal(result.status,200);assert.equal((await result.json()).disabled,true)
  }finally{if(saved===undefined)delete process.env.CRON_SECRET;else process.env.CRON_SECRET=saved}
 })
+test('scheduler stays within 100 jobs and each conversion expression runs once daily',()=>{
+ const config=JSON.parse(readFileSync(new URL('../vercel.json',import.meta.url),'utf8'))
+ assert.ok(config.crons.length<=100)
+ const jobs=config.crons.filter(job=>job.path==='/api/cron/checkout-conversoes')
+ assert.equal(jobs.length,48);assert.equal(new Set(jobs.map(job=>job.schedule)).size,48)
+ for(const job of jobs)assert.match(job.schedule,/^(15|45) ([0-9]|1[0-9]|2[0-3]) \* \* \*$/)
+})
