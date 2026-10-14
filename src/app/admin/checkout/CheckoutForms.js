@@ -10,7 +10,7 @@ const rotulo = { display: 'block', fontSize: 13, color: 'var(--cv-text)' }
 const dica = { display: 'block', color: 'var(--cv-muted)', fontSize: 11, marginTop: 5 }
 const botaoSecundario = { background: 'var(--cv-field)', color: ouro, border: '1px solid var(--cv-border)', borderRadius: '7px', padding: '7px 10px', cursor: 'pointer', fontSize: 13 }
 
-export const PRODUTO_VAZIO = { name: '', type: 'one_time', plan_id: '', access_days: '', brevo_list_id: '', botconversa_tag: '', active: true }
+export const PRODUTO_VAZIO = { name: '', type: 'one_time', plan_id: '', brevo_list_id: '', botconversa_tag: '', active: true }
 export const OFERTA_VAZIA = {
   name: '', price: '', payment_methods: ['pix', 'credit_card'], max_installments: 12, free_installments: 1,
   monthly_interest_pct: '2.99', pix_discount_pct: '0', billing_interval: 'month', billing_interval_count: 1,
@@ -54,10 +54,9 @@ export function FormProduto({ dados, planos, editando, onChange }) {
           <option value="">Nenhum (produto não libera acesso no app)</option>
           {planos.map(p => <option key={p.id} value={p.id}>{p.commercial_name || p.name}{p.period_days ? ` · ${p.period_days} dias` : ''}</option>)}
         </select>
-        <small style={dica}>É o mesmo plano usado hoje pelo Guru: cursos, mentorias e conteúdos vêm dele.</small>
+        <small style={dica}>Cursos, conteúdos e prazo de acesso seguem a configuração deste plano no app.</small>
       </label>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
-        <label style={rotulo}>Prazo de acesso (dias)<input type="number" min="1" value={dados.access_days} onChange={e => set('access_days', e.target.value)} style={campo} placeholder="Usar o do plano" /></label>
         <label style={rotulo}>Lista do Brevo (ID)<input type="number" value={dados.brevo_list_id} onChange={e => set('brevo_list_id', e.target.value)} style={campo} placeholder="Opcional" /></label>
         <label style={rotulo}>Tag no BotConversa<input value={dados.botconversa_tag} onChange={e => set('botconversa_tag', e.target.value)} style={campo} placeholder="Opcional" /></label>
       </div>

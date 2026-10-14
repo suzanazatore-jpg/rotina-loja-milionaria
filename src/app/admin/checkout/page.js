@@ -17,7 +17,7 @@ const rotulo = { display: 'block', fontSize: 13, color: 'var(--cv-text)' }
 const dica = { display: 'block', color: 'var(--cv-muted)', fontSize: 11, marginTop: 5 }
 const botaoSecundario = { background: 'var(--cv-field)', color: ouro, border: '1px solid var(--cv-border)', borderRadius: '7px', padding: '7px 10px', cursor: 'pointer', fontSize: 13 }
 
-const PRODUTO_VAZIO = { name: '', type: 'one_time', plan_id: '', access_days: '', brevo_list_id: '', botconversa_tag: '', active: true }
+const PRODUTO_VAZIO = { name: '', type: 'one_time', plan_id: '', brevo_list_id: '', botconversa_tag: '', active: true }
 
 function moeda(centavos) {
   return ((centavos || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -97,7 +97,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
 
   function editarProduto(p) {
     setMensagem('')
-    setFormProduto({ id: p.id, dados: { ...PRODUTO_VAZIO, ...p, plan_id: p.plan_id || '', access_days: p.access_days ?? '', brevo_list_id: p.brevo_list_id ?? '', botconversa_tag: p.botconversa_tag || '' } })
+    setFormProduto({ id: p.id, dados: { ...PRODUTO_VAZIO, ...p, plan_id: p.plan_id || '', brevo_list_id: p.brevo_list_id ?? '', botconversa_tag: p.botconversa_tag || '' } })
   }
 
   function novaOferta(produto) {
@@ -148,7 +148,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
                   {!p.active && <span style={{ marginLeft: 8, color: 'var(--cv-danger)', fontSize: 12 }}>inativo</span>}
                   <p style={{ color: 'var(--cv-muted)', fontSize: 12, margin: '5px 0 0' }}>
                     {p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'} · Plano liberado: <span style={{ color: p.plan_id ? ouro : 'var(--cv-danger)' }}>{p.plan_id ? nomePlano[p.plan_id] || 'plano removido' : 'nenhum (não libera acesso)'}</span>
-                    {p.access_days ? ` · ${p.access_days} dias` : ''}
+                    {planos.find(plano => plano.id === p.plan_id)?.period_days ? ` · ${planos.find(plano => plano.id === p.plan_id).period_days} dias (plano)` : ''}
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -157,7 +157,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
                   <button onClick={() => alternar('produto', p)} style={{ ...botaoSecundario, color: p.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{p.active ? 'Desativar' : 'Ativar'}</button>
                 </div>
               </div>
-              {aba === 'detalhes' && <div className="central-product-detail">{formProduto?.id === p.id ? <form onSubmit={salvarProduto}><FormProduto dados={formProduto.dados} planos={planos} editando onChange={dados => setFormProduto(f => ({...f,dados}))} /><div className="central-editor-actions"><button type="button" className="central-action" onClick={() => setFormProduto(null)}>Cancelar</button><button className="central-primary" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar produto'}</button></div></form> : <dl><div><dt>Código / ID</dt><dd>{p.code || p.guru_product_id || p.id}</dd></div><div><dt>Nome do produto</dt><dd>{p.name}</dd></div><div><dt>Tipo</dt><dd>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</dd></div><div><dt>Plano de acesso</dt><dd>{nomePlano[p.plan_id] || 'Sem plano vinculado'}</dd></div><div><dt>Prazo de acesso</dt><dd>{p.access_days ? `${p.access_days} dias` : 'Conforme o plano'}</dd></div><div><dt>Link amigável</dt><dd>{p.slug}</dd></div><div><dt>Status</dt><dd>{p.active ? 'Ativo' : 'Inativo'}</dd></div></dl>}</div>}
+              {aba === 'detalhes' && <div className="central-product-detail">{formProduto?.id === p.id ? <form onSubmit={salvarProduto}><FormProduto dados={formProduto.dados} planos={planos} editando onChange={dados => setFormProduto(f => ({...f,dados}))} /><div className="central-editor-actions"><button type="button" className="central-action" onClick={() => setFormProduto(null)}>Cancelar</button><button className="central-primary" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar produto'}</button></div></form> : <dl><div><dt>Código / ID</dt><dd>{p.code || p.guru_product_id || p.id}</dd></div><div><dt>Nome do produto</dt><dd>{p.name}</dd></div><div><dt>Tipo</dt><dd>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</dd></div><div><dt>Plano de acesso</dt><dd>{nomePlano[p.plan_id] || 'Sem plano vinculado'}</dd></div><div><dt>Prazo de acesso</dt><dd>{planos.find(plano => plano.id === p.plan_id)?.period_days ? `${planos.find(plano => plano.id === p.plan_id).period_days} dias — definido no plano` : p.plan_id ? 'Conforme configuração do plano no app' : 'Vincule um plano de acesso'}</dd></div><div><dt>Link amigável</dt><dd>{p.slug}</dd></div><div><dt>Status</dt><dd>{p.active ? 'Ativo' : 'Inativo'}</dd></div></dl>}</div>}
               {aba === 'vendas' && <div className="central-product-detail"><p>Consulte os pedidos deste produto no painel de vendas.</p><Link className="central-primary" href={`/admin/checkout/vendas?produto=${encodeURIComponent(p.id)}`}>Ver vendas deste produto →</Link></div>}
               {aba === 'ofertas' && lista.map(o => {
                 const bumpsOferta = bumps.filter(b => b.offer_id === o.id)

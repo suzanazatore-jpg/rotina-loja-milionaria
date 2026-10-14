@@ -35,8 +35,6 @@ async function montarProduto(dados) {
   const nome = String(dados.name || '').trim()
   if (!nome) throw new Error('Informe o nome do produto.')
   const tipo = TIPOS_PRODUTO.has(dados.type) ? dados.type : 'one_time'
-  const accessDays = inteiroOuNulo(dados.access_days)
-  if (Number.isNaN(accessDays) || (accessDays !== null && accessDays < 1)) throw new Error('Prazo de acesso inválido.')
   const brevo = inteiroOuNulo(dados.brevo_list_id)
   if (Number.isNaN(brevo)) throw new Error('ID da lista do Brevo deve ser um número.')
   return {
@@ -44,7 +42,7 @@ async function montarProduto(dados) {
     slug: gerarSlug(dados.slug || nome),
     type: tipo,
     plan_id: dados.plan_id || null,
-    access_days: accessDays,
+    access_days: null, // O prazo é definido exclusivamente pelo plano do app.
     brevo_list_id: brevo,
     botconversa_tag: String(dados.botconversa_tag || '').trim() || null,
     active: dados.active !== false,
