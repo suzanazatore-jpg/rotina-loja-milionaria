@@ -1,3 +1,4 @@
+import { normalizeCheckoutSettings } from '@/lib/checkoutSettings'
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient, gerarSlug, reaisParaCentavos } from '@/lib/checkoutAdminServer'
 
@@ -37,7 +38,10 @@ async function montarProduto(dados) {
   const tipo = TIPOS_PRODUTO.has(dados.type) ? dados.type : 'one_time'
   const brevo = inteiroOuNulo(dados.brevo_list_id)
   if (Number.isNaN(brevo)) throw new Error('ID da lista do Brevo deve ser um número.')
+  const code = dados.code === undefined || dados.code === '' ? undefined : Number(dados.code)
+  if (code !== undefined && (!Number.isSafeInteger(code) || code < 1000000000 || code > 9999999999)) throw new Error('O código deve ter 10 dígitos.')
   return {
+    ...(code !== undefined ? { code } : {}),
     name: nome,
     slug: gerarSlug(dados.slug || nome),
     type: tipo,
@@ -95,7 +99,8 @@ async function montarOferta(supabase, dados) {
     billing_interval: intervalo,
     billing_interval_count: qtdIntervalo,
     trial_days: trial,
-    thank_you_url: obrigado,
+    thank_you_url: dados.checkout_config ? normalizeCheckoutSettings(dados.checkout_config).redirects.approved || null : obrigado,
+    ...(dados.checkout_config ? {checkout_config: normalizeCheckoutSettings(dados.checkout_config)} : {}),
     active: dados.active !== false,
   }
 }

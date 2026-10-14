@@ -39,6 +39,7 @@ export function FormProduto({ dados, planos, editando, onChange }) {
   const set = (campoNome, valor) => onChange({ ...dados, [campoNome]: valor })
   return (
     <div style={{ display: 'grid', gap: 14 }}>
+      <label style={rotulo}>Código do produto<input inputMode="numeric" pattern="[0-9]{10}" value={dados.code || ''} onChange={e => set('code', e.target.value)} style={campo} placeholder="Gerado automaticamente" /><small style={dica}>Para um produto vindo do Guru, informe o mesmo código de 10 dígitos.</small></label>
       <label style={rotulo}>Nome do produto<input value={dados.name} onChange={e => set('name', e.target.value)} style={campo} placeholder="Ex.: EVS — Equipe que Vende Sozinha" /></label>
       <div>
         <span style={rotulo}>Tipo</span>
@@ -142,7 +143,7 @@ export function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange, s
         </div>
       )}
 
-      <label style={rotulo}>Página de obrigado (opcional)<input value={dados.thank_you_url} onChange={e => set('thank_you_url', e.target.value)} style={campo} placeholder="https://" /><small style={dica}>Se ficar vazio, a cliente vê a página de obrigado padrão do checkout.</small></label>
+
 
       {showBumps && !assinatura && (
         <section style={{ paddingTop: 14, borderTop: '1px solid var(--cv-border)' }}>

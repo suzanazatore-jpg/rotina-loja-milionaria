@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import CheckoutSettingsEditor from './CheckoutSettingsEditor'
+import { CHECKOUT_DEFAULTS } from '@/lib/checkoutSettings'
 import { FormOferta, OFERTA_VAZIA } from './CheckoutForms'
 const money = n => (Number(n || 0) / 100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
 export default function OfferEditor({produtoId,ofertaId}) {
@@ -33,6 +35,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
         const offer = json.ofertas.find(o=>o.id===ofertaId && o.product_id===produtoId)
         if (!product || (ofertaId!=='nova' && !offer)) throw new Error('Produto ou oferta não encontrado.')
         const initial = offer ? {...OFERTA_VAZIA,...offer,price:(offer.price_cents/100).toFixed(2).replace('.',','),thank_you_url:offer.thank_you_url || '',bumps:json.bumps.filter(b=>b.offer_id===offer.id).map(b=>({bump_offer_id:b.bump_offer_id,headline:b.headline,description:b.description || ''}))} : {...OFERTA_VAZIA,product_id:produtoId,payment_methods:product.type==='subscription'?['credit_card']:['pix','credit_card'],max_installments:product.type==='subscription'?1:12,monthly_interest_pct:product.type==='subscription'?'0':'2.99',bumps:[]}
+        initial.checkout_config = {...CHECKOUT_DEFAULTS,...offer?.checkout_config,redirects:{...CHECKOUT_DEFAULTS.redirects,...offer?.checkout_config?.redirects,approved:offer?.checkout_config?.redirects?.approved || offer?.thank_you_url || ''}}
         if (active) {setCatalog(json);setDados(initial);setBaseline(JSON.stringify(initial));setToken(session.access_token)}
       } catch(e) {if(active)setMessage(e.message)}
       finally {if(active)setLoading(false)}
@@ -71,7 +74,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
   return <main className="central-home">
     <div className="central-breadcrumb"><Link href="/admin/checkout">Produtos</Link><span>/</span><Link href={base}>{product.name}</Link><span>/</span><span>Ofertas</span><span>/</span><strong>{dados.name || 'Nova oferta'}</strong></div>
     <div className="central-dashboard-heading"><div><span className="central-eyebrow">OFERTA</span><h1>{dados.name || 'Nova oferta'}</h1><p>{product.name} · {product.type==='subscription'?'Assinatura':'Pagamento único'}</p></div><Link className="central-action" href={base}>← Voltar ao produto</Link></div>
-    <nav className="central-product-tabs" aria-label="Abas da oferta">{[['detalhes','Detalhes'],['bumps','Order Bump'],['vendas','Vendas']].map(([key,label])=><button key={key} disabled={key==='bumps' && product.type==='subscription'} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
+    <nav className="central-product-tabs" aria-label="Abas da oferta">{[['detalhes','Detalhes'],['bumps','Order Bump'],['vendas','Vendas'],['checkout','Configurar checkout']].map(([key,label])=><button key={key} disabled={key==='bumps' && product.type==='subscription'} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
     {message && <p role="status" className="central-editor-message">{message}</p>}
     {ofertaId!=='nova' && <section className="central-chart-panel"><h2>Link de pagamento</h2><div className="central-payment-link"><code>{link}</code><button className="central-action" onClick={async()=>{try{await navigator.clipboard.writeText(link);setMessage('✓ Link copiado.')}catch{setMessage('Não foi possível copiar. Selecione o link acima.')}}}>Copiar link</button></div><p className="central-data-note">Este é o link da oferta. O checkout público precisa estar disponível para receber pagamentos.</p></section>}
     <form onSubmit={save}>
@@ -81,6 +84,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
         <div className="central-table-wrap"><table className="central-table"><thead><tr><th>Produto / Oferta</th><th>Descrição</th><th>Valor</th><th>Ordem</th><th /></tr></thead><tbody>{dados.bumps.map((b,index)=>{const offer=catalog.ofertas.find(o=>o.id===b.bump_offer_id);return <tr key={b.bump_offer_id}><td>{catalog.produtos.find(p=>p.id===offer?.product_id)?.name || 'Produto'}<small>{offer?.name || 'Oferta indisponível'}</small></td><td><input aria-label={`Chamada do adicional ${index+1}`} className="central-inline-input" value={b.headline} onChange={e=>setDados({...dados,bumps:dados.bumps.map((item,i)=>i===index?{...item,headline:e.target.value}:item)})}/><textarea aria-label={`Descrição do adicional ${index+1}`} className="central-inline-input" value={b.description} rows={2} onChange={e=>setDados({...dados,bumps:dados.bumps.map((item,i)=>i===index?{...item,description:e.target.value}:item)})}/></td><td>{money(offer?.price_cents)}</td><td><button type="button" className="central-action" aria-label={`Mover adicional ${index+1} para cima`} disabled={index===0} onClick={()=>move(index,-1)}>↑</button><button type="button" className="central-action" aria-label={`Mover adicional ${index+1} para baixo`} disabled={index===dados.bumps.length-1} onClick={()=>move(index,1)}>↓</button></td><td><button type="button" className="central-action" onClick={()=>setDados({...dados,bumps:dados.bumps.filter((_,i)=>i!==index)})}>Remover</button></td></tr>})}{!dados.bumps.length && <tr><td colSpan={5}>Nenhum adicional vinculado.</td></tr>}</tbody></table></div>
       </section>
       <section hidden={tab!=='vendas'} className="central-chart-panel"><h2>Vendas desta oferta</h2>{ofertaId==='nova'?<p>Salve a oferta antes de consultar suas vendas.</p>:<Link className="central-action" href={`/admin/checkout/vendas?oferta=${encodeURIComponent(ofertaId)}`}>Consultar pedidos da oferta →</Link>}</section>
+      <div hidden={tab!=='checkout'}><CheckoutSettingsEditor value={dados.checkout_config} onChange={checkout_config=>setDados({...dados,checkout_config})} offer={dados} product={product} /></div>
       <div className="central-editor-actions"><span>{dirty?'Alterações ainda não salvas':'Nenhuma alteração pendente'}</span><button type="button" className="central-action" disabled={saving || !dirty} onClick={()=>setDados(JSON.parse(baseline))}>Descartar alterações</button><button className="central-primary" disabled={saving || (!dirty && ofertaId!=='nova')}>{saving?'Salvando…':'Salvar oferta'}</button></div>
     </form>
   </main>
