@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 const OURO = 'var(--cv-gold)'
@@ -10,11 +10,12 @@ const moeda = n => (Number(n || 0) / 100).toLocaleString('pt-BR', { style: 'curr
 const dataBR = d => d ? new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) : '—'
 const statusPT = { paid: 'Pago', pending: 'Pendente', failed: 'Falhou', canceled: 'Cancelado', refunded: 'Reembolsado', authorized: 'Autorizado', processing: 'Processando', expired: 'Expirado', chargeback: 'Contestação' }
 
-export default function AdminVendasCheckout() {
+function AdminVendasCheckout() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [token, setToken] = useState('')
   const [data, setData] = useState({ orders: [], products: [], count: 0, page: 1, limit: 25 })
-  const [filtros, setFiltros] = useState({ status: 'todos', produto: '', inicio: '', fim: '' })
+  const [filtros, setFiltros] = useState({ status: 'todos', produto: searchParams.get('produto') || '', inicio: '', fim: '' })
   const [pagina, setPagina] = useState(1)
   const [detalhe, setDetalhe] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -84,3 +85,5 @@ export default function AdminVendasCheckout() {
     {detalhe && <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setDetalhe(null) }} style={{ position: 'fixed', inset: 0, background: '#000c', display: 'grid', placeItems: 'center', zIndex: 100, padding: 16 }}><section role="dialog" aria-modal="true" aria-label="Detalhes do pedido" style={{ background: 'var(--cv-panel)', border: '1px solid #555', borderRadius: 14, maxWidth: 720, width: '100%', padding: 23, maxHeight: '85vh', overflowY: 'auto' }}><button style={{ ...campo, float: 'right', cursor: 'pointer' }} onClick={() => setDetalhe(null)}>Fechar ×</button><h2 style={{ color: OURO }}>Detalhes do pedido</h2><p style={{ overflowWrap: 'anywhere' }}><strong>ID:</strong> {detalhe.id}</p><p><strong>Cliente:</strong> {detalhe.customer?.name || '—'} · {detalhe.customer?.email || '—'} · {detalhe.customer?.phone || '—'}</p><p><strong>Status:</strong> {statusPT[detalhe.status] || detalhe.status} · <strong>Pagamento:</strong> {detalhe.payment_method || '—'} · {detalhe.installments || 1}x</p><p><strong>Criado:</strong> {dataBR(detalhe.created_at)} · <strong>Pago:</strong> {dataBR(detalhe.paid_at)}</p><p><strong>Subtotal:</strong> {moeda(detalhe.subtotal_cents)} · <strong>Juros:</strong> {moeda(detalhe.interest_cents)} · <strong>Desconto:</strong> {moeda(detalhe.discount_cents)}</p><h3 style={{ color: OURO }}>Total: {moeda(detalhe.total_cents)}</h3><h3>Itens</h3>{detalhe.items?.map(i => <p key={i.id}>{i.product_name} ({i.kind}) — {moeda(i.price_cents)}</p>)}<h3>Rastreamento</h3><p>Origem: {detalhe.utm_source || '—'} · Mídia: {detalhe.utm_medium || '—'} · Campanha: {detalhe.utm_campaign || '—'}</p><p style={{ overflowWrap: 'anywhere', color: 'var(--cv-muted)', fontSize: 12 }}>Pagar.me: {detalhe.pagarme_order_id || '—'} · Cobrança: {detalhe.pagarme_charge_id || '—'} · Pedido de origem: {detalhe.parent_order_id || '—'}</p>{detalhe.refusal_reason && <p style={{ color: 'var(--cv-danger)' }}>Motivo da recusa: {detalhe.refusal_reason}</p>}</section></div>}
   </div>
 }
+
+export default function Page() { return <Suspense fallback={<p>Carregando vendas…</p>}><AdminVendasCheckout /></Suspense> }

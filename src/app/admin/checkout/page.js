@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -53,6 +54,9 @@ export default function AdminCheckout() {
   const [formProduto, setFormProduto] = useState(null) // { id?, dados }
   const [formOferta, setFormOferta] = useState(null)   // { id?, dados }
   const [salvando, setSalvando] = useState(false)
+  const [produtoId, setProdutoId] = useState(null)
+  const [aba, setAba] = useState('detalhes')
+  const [busca, setBusca] = useState('')
 
   const api = useCallback(async (metodo, corpo, tk = token) => {
     const resposta = await fetch('/api/admin/checkout', {
@@ -142,6 +146,8 @@ export default function AdminCheckout() {
     return `${typeof window !== 'undefined' ? window.location.origin : ''}/checkout/${o.slug}`
   }
 
+  const selecionado = produtos.find(p => p.id === produtoId)
+
   if (carregando) return <Bloqueio texto="Carregando..." />
   if (!autorizado) return <Bloqueio texto="Acesso restrito ao administrador." />
 
@@ -161,7 +167,13 @@ export default function AdminCheckout() {
 
         {!produtos.length && <div style={{ background: 'var(--cv-panel)', border: '1px dashed var(--cv-border)', borderRadius: 14, padding: 30, textAlign: 'center', color: 'var(--cv-muted)' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
 
-        {produtos.map(p => {
+        {!selecionado ? <>
+          <div className="central-list-toolbar"><label>Buscar produto<input style={campo} value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome ou link do produto" /></label><span>{produtos.length} produto(s)</span></div>
+          <div className="central-table-wrap"><table className="central-table"><thead><tr><th>Produto</th><th>Tipo</th><th>Plano de acesso</th><th>Ofertas</th><th>Status</th><th /></tr></thead><tbody>{produtos.filter(p => `${p.name} ${p.slug}`.toLowerCase().includes(busca.toLowerCase())).map(p => <tr key={p.id}><td><button className="central-text-button" onClick={() => {setProdutoId(p.id); setAba('detalhes')}}>{p.name}</button><small>{p.slug}</small></td><td>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</td><td>{nomePlano[p.plan_id] || '—'}</td><td>{ofertas.filter(o => o.product_id === p.id).length}</td><td><span className="central-badge">{p.active ? 'Ativo' : 'Inativo'}</span></td><td><button style={botaoSecundario} onClick={() => {setProdutoId(p.id); setAba('detalhes')}}>Abrir →</button></td></tr>)}</tbody></table></div>
+        </> : <>
+          <div className="central-breadcrumb"><button className="central-text-button" onClick={() => setProdutoId(null)}>Produtos</button><span>/</span><strong>{selecionado.name}</strong></div>
+          <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhes'],['ofertas','Ofertas'],['vendas','Vendas']].map(([key,label]) => <button key={key} aria-current={aba === key ? 'page' : undefined} onClick={() => setAba(key)}>{label}</button>)}</nav>
+        {produtos.filter(p => p.id === produtoId).map(p => {
           const lista = ofertas.filter(o => o.product_id === p.id)
           return (
             <section key={p.id} style={{ background: 'var(--cv-panel)', border: '1px solid var(--cv-border)', borderRadius: 14, marginBottom: 16, opacity: p.active ? 1 : 0.55 }}>
@@ -180,7 +192,9 @@ export default function AdminCheckout() {
                   <button onClick={() => alternar('produto', p)} style={{ ...botaoSecundario, color: p.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{p.active ? 'Desativar' : 'Ativar'}</button>
                 </div>
               </div>
-              {lista.map(o => {
+              {aba === 'detalhes' && <div className="central-product-detail"><dl><div><dt>Nome do produto</dt><dd>{p.name}</dd></div><div><dt>Tipo</dt><dd>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</dd></div><div><dt>Plano de acesso</dt><dd>{nomePlano[p.plan_id] || 'Sem plano vinculado'}</dd></div><div><dt>Prazo de acesso</dt><dd>{p.access_days ? `${p.access_days} dias` : 'Conforme o plano'}</dd></div><div><dt>Link amigável</dt><dd>{p.slug}</dd></div><div><dt>Status</dt><dd>{p.active ? 'Ativo' : 'Inativo'}</dd></div></dl></div>}
+              {aba === 'vendas' && <div className="central-product-detail"><p>Consulte os pedidos deste produto no painel de vendas.</p><Link className="central-primary" href={`/admin/checkout/vendas?produto=${encodeURIComponent(p.id)}`}>Ver vendas deste produto →</Link></div>}
+              {aba === 'ofertas' && lista.map(o => {
                 const bumpsOferta = bumps.filter(b => b.offer_id === o.id)
                 const total = totalParcelado(o.price_cents, o.max_installments, o.free_installments, o.monthly_interest_pct)
                 return (
@@ -206,10 +220,11 @@ export default function AdminCheckout() {
                   </div>
                 )
               })}
-              {!lista.length && <p style={{ color: 'var(--cv-muted)', fontSize: 13, padding: '12px 16px', margin: 0 }}>Sem ofertas. Clique em ＋ Oferta para definir preço e link de venda.</p>}
+              {aba === 'ofertas' && !lista.length && <p style={{ color: 'var(--cv-muted)', fontSize: 13, padding: '12px 16px', margin: 0 }}>Sem ofertas. Clique em ＋ Oferta para definir preço e link de venda.</p>}
             </section>
           )
         })}
+        </>}
       </main>
 
       {formProduto && (
