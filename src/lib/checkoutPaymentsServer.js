@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { PaymentError, calculatePayment, normalizeCustomer, cardReference, orderPayload, confirmedOrderState, pagarme, digest } from './pagarme.js'
+import { PaymentError, normalizeCustomer, cardReference, orderPayload, confirmedOrderState, pagarme, digest } from './pagarme.js'
+
+import { loadOrderBumps, buildCheckoutCart, normalizeBumpSelection } from './checkoutCart.js'
 
 async function result(query) {
   const { data, error } = await query
@@ -7,25 +9,37 @@ async function result(query) {
   return data
 }
 
+function orderItemRecords(orderId, items) {
+  return items.map(item => {
+    const hash = digest([orderId, item.offer_id])
+    const id = `${hash.slice(0,8)}-${hash.slice(8,12)}-4${hash.slice(13,16)}-8${hash.slice(17,20)}-${hash.slice(20,32)}`
+    return { id, order_id: orderId, product_id: item.product_id, offer_id: item.offer_id, kind: item.kind, price_cents: item.subtotal_cents }
+  })
+}
+
 export async function createPayment(db, input, key) {
   if (!/^[a-zA-Z0-9_-]{16,100}$/.test(key || '')) throw new PaymentError('Informe uma chave única de idempotência (16–100 caracteres).')
-  if (input.bumps?.length) throw new PaymentError('Adicionais serão conectados após a validação do pagamento principal.')
+  const selection = normalizeBumpSelection(input.bumps)
   const offer = await result(db.from('offers').select('*').eq('id', input.offer_id).single())
   const product = await result(db.from('products').select('*').eq('id', offer.product_id).single())
   if (!product.plan_id) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
   const customer = normalizeCustomer(input.customer)
   const installments = input.installments ?? 1
-  const amount = calculatePayment(offer, product, input.payment_method, installments)
+  const available = selection.length ? await loadOrderBumps(db, offer.id) : []
+  const { items, amount } = buildCheckoutCart(offer, product, available, selection, input.payment_method, installments)
   const card = input.payment_method === 'credit_card' ? cardReference(input) : null
   if (input.payment_method === 'pix' && (input.card || input.card_number || input.cvv)) throw new PaymentError('Não envie dados de cartão.')
   // A impressão digital impede que a mesma chave cobre outra oferta, valor ou cliente.
-  const fingerprint = digest({ offer: offer.id, customer, payment_method: input.payment_method, installments, amount, card })
+  const fingerprint = digest({ offer: offer.id, customer, payment_method: input.payment_method, installments, amount, card, items })
   const eventId = `checkout:${key}`
   let order = await result(db.from('orders').select('*').eq('event_id', eventId).maybeSingle())
   if (order) {
     if (!order.pagarme_order_id && Date.now() - new Date(order.created_at).getTime() > 23 * 3600000) throw new PaymentError('Pedido antigo sem confirmação. Concilie antes de tentar nova cobrança.', 409)
     const saved = await result(db.from('webhook_events').select('payload').eq('pagarme_event_id', `request:${key}`).maybeSingle())
     if (saved?.payload?.fingerprint !== fingerprint) throw new PaymentError('Esta chave já foi usada com outros dados.', 409)
+    const existingItems = await result(db.from('order_items').select('offer_id,product_id,kind').eq('order_id', order.id))
+    if (!existingItems?.length) await result(db.from('order_items').upsert(orderItemRecords(order.id, items), { onConflict: 'id', ignoreDuplicates: true }))
+    else if (existingItems.length !== items.length || items.some(item => !existingItems.some(saved => saved.offer_id === item.offer_id && saved.product_id === item.product_id && saved.kind === item.kind))) throw new PaymentError('Os itens do pedido não correspondem à compra.', 409)
     if (order.pagarme_order_id) return syncPayment(db, order.id)
     if (product.type === 'subscription') {
       const sub = await result(db.from('subscriptions').select('*').eq('origin_order_id', order.id).maybeSingle())
@@ -39,8 +53,8 @@ export async function createPayment(db, input, key) {
     if (inserted.error?.code === '23505') throw new PaymentError('Pedido em processamento. Repita com a mesma chave.', 409)
     if (inserted.error) throw new PaymentError('Não foi possível registrar o pedido.', 500)
     order = inserted.data
-    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint }, processed_at: new Date().toISOString() }))
-    await result(db.from('order_items').insert({ order_id: order.id, product_id: product.id, offer_id: offer.id, kind: 'main', price_cents: amount.subtotal_cents }))
+    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items }, processed_at: new Date().toISOString() }))
+    await result(db.from('order_items').upsert(orderItemRecords(order.id, items), { onConflict: 'id', ignoreDuplicates: true }))
   }
   let gatewayCustomer = customer
   let gatewayCard = card
@@ -66,7 +80,7 @@ export async function createPayment(db, input, key) {
     // Assinatura ativa NÃO prova que a primeira cobrança foi paga.
     return { order_id: order.id, subscription, status: 'pending' }
   }
-  const remote = await pagarme('/orders', { method: 'POST', idempotencyKey: order.id, body: orderPayload(order, offer, product, gatewayCustomer, gatewayCard) })
+  const remote = await pagarme('/orders', { method: 'POST', idempotencyKey: order.id, body: orderPayload(order, offer, product, gatewayCustomer, gatewayCard, items) })
   const update = confirmedOrderState(remote, { ...order, email: customer.email })
   await result(db.from('orders').update(update).eq('id', order.id))
   return { order_id: order.id, ...update }

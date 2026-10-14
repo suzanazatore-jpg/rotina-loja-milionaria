@@ -66,11 +66,11 @@ export function cardReference(input) {
   return { card_token: input.card_token }
 }
 
-export function orderPayload(order, offer, product, customer, card) {
+export function orderPayload(order, offer, product, customer, card, cartItems) {
   const payment = order.payment_method === 'pix'
     ? { payment_method: 'pix', amount: order.total_cents, pix: { expires_in: 3600 } }
     : { payment_method: 'credit_card', amount: order.total_cents, credit_card: { ...card, installments: order.installments, operation_type: 'auth_and_capture', statement_descriptor: 'SUZANA ZATORRE' } }
-  return { code: order.id, ...(customer.id ? { customer_id: customer.id } : { customer }), closed: true, items: [{ code: product.id, description: product.name.slice(0,256), amount: order.total_cents, quantity: 1 }], payments: [payment], metadata: { local_order_id: order.id, offer_id: offer.id } }
+  return { code: order.id, ...(customer.id ? { customer_id: customer.id } : { customer }), closed: true, items: cartItems ? cartItems.map(item => ({ code: item.product_id, description: item.name.slice(0,256), amount: item.total_cents, quantity: 1 })) : [{ code: product.id, description: product.name.slice(0,256), amount: order.total_cents, quantity: 1 }], payments: [payment], metadata: { local_order_id: order.id, offer_id: offer.id } }
 }
 
 export function confirmedOrderState(remote, expected) {

@@ -48,7 +48,9 @@ test('customer normalization whitelists fields', () => {
   assert.throws(() => normalizeCustomer({name:'Ana'}))
 })
 
-const paymentsSource = readFileSync(new URL('../src/lib/checkoutPaymentsServer.js', import.meta.url), 'utf8').replace("'./pagarme.js'", JSON.stringify(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`))
+const cartSource = readFileSync(new URL('../src/lib/checkoutCart.js', import.meta.url), 'utf8').replace("'./pagarme.js'", JSON.stringify(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`))
+const cartUrl = `data:text/javascript;base64,${Buffer.from(cartSource).toString('base64')}`
+const paymentsSource = readFileSync(new URL('../src/lib/checkoutPaymentsServer.js', import.meta.url), 'utf8').replace("'./pagarme.js'", JSON.stringify(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)).replace("'./checkoutCart.js'", JSON.stringify(cartUrl))
 const { createPayment, syncPayment } = await import(`data:text/javascript;base64,${Buffer.from(paymentsSource).toString('base64')}`)
 function scriptedDatabase(steps) {
   return { from(table) {

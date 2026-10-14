@@ -13,7 +13,7 @@ Implementação na branch `checkout/painel-admin`. A main e o webhook Guru não 
 
 `PAGARME_SECRET_KEY` (servidor), `PAGARME_BASE_URL` (padrão sandbox `https://sdx-api.pagar.me/core/v5`), `PAGARME_WEBHOOK_SECRET`. As variáveis Supabase e Brevo existentes são reaproveitadas.
 
-A criação de pagamentos nesta etapa é administrativa, para homologação. O formulário público chama sua própria rota, limitada à homologação administrativa. Adicionais não são cobrados nesta entrega; pedidos com bumps são recusados explicitamente.
+A criação de pagamentos nesta etapa é administrativa, para homologação. O formulário público chama sua própria rota, limitada à homologação administrativa. Os adicionais selecionados são validados pelo vínculo em order_bumps, cobrados com o produto principal e registrados como itens separados.
 
 Produção exige `CHECKOUT_LIVE_ENABLED=true` e chave `sk_live_` com URL de produção. Liberação de acesso exige `CHECKOUT_FULFILLMENT_ENABLED=true`; deixar desligada durante a homologação com contas reais. Não habilitar cobrança real antes de validar o ciclo completo no sandbox.
 
@@ -39,8 +39,19 @@ Emails usam os templates existentes. Falha de email fica em `webhook_events` e p
 
 Reembolsos/chargebacks atualizam o estado financeiro. Revogação seletiva de acesso (sem afetar planos adquiridos no Guru ou em outros pedidos) ainda requer implementação. Cancelamento interrompe recorrência sem apagar o período já comprado. Trial comercial não libera acesso automaticamente nesta versão: aguarda pagamento.
 
-Aparência e redirecionamentos salvos já são lidos pela página pública. Pixels/GTM e order bumps ainda não são disparados/cobrados por esta página.
+Aparência e redirecionamentos salvos já são lidos pela página pública. Pixels/GTM ainda não são disparados por esta página. Order bumps de produtos de pagamento único estão conectados.
 
 ## Validação
 
 Testes automatizados locais de cálculo, bloqueio de produção, carteira de cartão, correspondência de confirmação, assinatura/expiração de cookies e redirecionamento; build Next.js e lint dos arquivos alterados. Sem credenciais Pagar.me neste ambiente: nenhuma transação foi criada e não há homologação ponta a ponta.
+
+
+## Order Bump
+
+Os adicionais ativos aparecem na ordem cadastrada, sem pré-seleção. Só são aceitas ofertas adicionais vinculadas ao checkout, com produto ativo de pagamento único e plano do app definido. Seleções duplicadas, IDs externos à oferta ou método de pagamento incompatível são recusados antes da cobrança. Assinaturas continuam sem adicionais.
+
+O total e as parcelas incluem os adicionais selecionados. O parcelamento e os juros seguem a oferta principal; o desconto Pix segue cada item. O backend recalcula todos os valores em centavos e envia os itens ao Pagar.me em um único pedido. O navegador envia apenas IDs de ofertas; não informa preços.
+
+A lista dos planos comprados é registrada junto do pedido para que alterações posteriores no vínculo do produto não liberem um plano diferente. Após o pagamento, cada plano usa seu period_days no app. Cursos compartilhados mantêm a maior expiração aplicável e acessos vitalícios existentes são preservados. Uma única liberação e um único email de acesso são processados por pedido.
+
+Validação local: cálculo do carrinho, seleção e cobrança de adicionais, entrega de dois planos com períodos distintos e repetição da confirmação. O teste ponta a ponta no Pagar.me permanece reservado para o final.

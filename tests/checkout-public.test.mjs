@@ -1,11 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-const moduleUrl=name=>`data:text/javascript;base64,${Buffer.from(readFileSync(new URL(`../src/lib/${name}.js`,import.meta.url),'utf8')).toString('base64')}`
+const moduleUrl=name=>{let source=readFileSync(new URL(`../src/lib/${name}.js`,import.meta.url),'utf8');source=source.replace(/from '(\.\/([^']+)\.js)'/g,(_all,_path,dependency)=>`from ${JSON.stringify(moduleUrl(dependency))}`);return `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`}
 const source=readFileSync(new URL('../src/lib/checkoutPublicServer.js',import.meta.url),'utf8')
  .replace("import { checkoutAdminClient } from './checkoutAdminServer.js'", "const checkoutAdminClient=()=>{throw new Error('Unexpected real database access')}")
  .replace("'./checkoutSettings.js'",JSON.stringify(moduleUrl('checkoutSettings')))
  .replace("'./pagarme.js'",JSON.stringify(moduleUrl('pagarme')))
+ .replace("'./checkoutCart.js'",JSON.stringify(moduleUrl('checkoutCart')))
 const {checkoutTestConfiguration,loadCheckoutOffer,publicCheckoutData}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env={CHECKOUT_TEST_ENABLED:'true',CHECKOUT_SESSION_SECRET:'a'.repeat(32),PAGARME_SECRET_KEY:'sk_test_mock',PAGARME_PUBLIC_KEY:'pk_test_mock'}
 test('public checkout denies real payments, incomplete configuration and accidental activation',()=>{
@@ -21,13 +22,13 @@ test('offer lookup filters active records and exposes only public product/offer 
  const product={id:'product',name:'Produto',type:'one_time',active:true,plan_id:'internal-plan',botconversa_tag:'private'}
  let calls=0
  const db={from(table){
-  const data=table==='offers'?offer:product
+  const data=table==='order_bumps'?[]:table==='offers'?offer:product
   const operations=[]
-  const query={select(){return query},eq(key,value){operations.push([key,value]);return query},async maybeSingle(){assert.ok(operations.some(([key,value])=>key==='active'&&value===true));calls++;return {data}}}
+  const query={select(){return query},eq(key,value){operations.push([key,value]);return query},order(){return query},then(resolve){calls++;assert.ok(operations.some(([key,value])=>key==='active'&&value===true));resolve({data})},async maybeSingle(){assert.ok(operations.some(([key,value])=>key==='active'&&value===true));calls++;return {data}}}
   return query
  }}
  const loaded=await loadCheckoutOffer('offer',db)
- assert.equal(calls,2)
+ assert.equal(calls,3)
  assert.equal(loaded.prices.find(p=>p.method==='pix').total_cents,4230)
  assert.equal(loaded.prices.find(p=>p.installments===3).total_cents,4700)
  const exposed=publicCheckoutData(loaded,env)

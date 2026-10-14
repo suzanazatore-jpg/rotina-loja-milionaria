@@ -18,6 +18,33 @@ export function accessExpiration(paidAt, periodDays) {
   return date.toISOString()
 }
 
+export async function loadPurchasedPlans(db, order) {
+  const items = await checked(db.from('order_items').select('product_id,offer_id,kind').eq('order_id', order.id))
+  let planIds
+  if (order.event_id?.startsWith('checkout:')) {
+    const request = await checked(db.from('webhook_events').select('payload').eq('pagarme_event_id', `request:${order.event_id.slice(9)}`).maybeSingle())
+    const snapshot = request?.payload?.items
+    if (snapshot) {
+      if (!Array.isArray(snapshot) || snapshot.length !== items.length || snapshot.some(item => !item.plan_id || !items.some(purchased => purchased.product_id === item.product_id && purchased.offer_id === item.offer_id && purchased.kind === item.kind))) throw new PaymentError('Os planos não correspondem aos itens comprados.', 409)
+      planIds = [...new Set(snapshot.map(item => item.plan_id))]
+    }
+  }
+  if (!planIds) {
+    let productIds = [...new Set((items || []).map(item => item.product_id))]
+    // Compatibilidade com ciclos e pedidos anteriores, sem itens adicionais.
+    if (!productIds.length) {
+      const offer = await checked(db.from('offers').select('product_id').eq('id', order.offer_id).single())
+      productIds = [offer.product_id]
+    }
+    const products = await checked(db.from('products').select('id,plan_id').in('id', productIds))
+    if (products.length !== productIds.length || products.some(product => !product.plan_id)) throw new PaymentError('Um produto comprado está sem plano.', 409)
+    planIds = [...new Set(products.map(product => product.plan_id))]
+  }
+  const plans = await checked(db.from('plans').select('id,period_days').in('id', planIds))
+  if (!plans.length || plans.length !== planIds.length) throw new PaymentError('Plano comprado não encontrado.', 409)
+  return plans.map(plan => ({ ...plan, expires_at: accessExpiration(order.paid_at, plan.period_days) }))
+}
+
 export async function fulfillPaidOrder(db, orderId) {
   if (process.env.CHECKOUT_FULFILLMENT_ENABLED !== 'true') return { fulfillment: 'disabled' }
   const order = await checked(db.from('orders').select('*').eq('id', orderId).single())
@@ -32,10 +59,8 @@ export async function fulfillPaidOrder(db, orderId) {
   if (!claimed?.length) throw new PaymentError('Liberação em andamento.', 503)
   try {
     const customer = await checked(db.from('customers').select('*').eq('id', order.customer_id).single())
-    const offer = await checked(db.from('offers').select('product_id').eq('id', order.offer_id).single())
-    const product = await checked(db.from('products').select('plan_id').eq('id', offer.product_id).single())
-    const plan = await checked(db.from('plans').select('id,period_days').eq('id', product.plan_id).single())
-    const expiration = accessExpiration(order.paid_at, plan.period_days)
+    const plans = await loadPurchasedPlans(db, order)
+    const expiration = plans.map(plan => plan.expires_at).sort().at(-1)
     let profile = await checked(db.from('perfis').select('id,acesso_expira_em').eq('email', customer.email).maybeSingle())
     let password
     if (!profile) {
@@ -49,9 +74,16 @@ export async function fulfillPaidOrder(db, orderId) {
       await checked(db.from('perfis').update({ acesso_expira_em: keep ? profile.acesso_expira_em : expiration, status_assinatura: 'ativo' }).eq('id', profile.id))
     }
     await checked(db.from('profiles').upsert({ id: profile.id, name: customer.name, email: customer.email, phone: customer.phone, role: 'student', status: 'active', updated_at: new Date().toISOString() }, { onConflict: 'id', ignoreDuplicates: true }))
-    await checked(db.from('profile_plans').upsert({ profile_id: profile.id, plan_id: plan.id }, { onConflict: 'profile_id,plan_id', ignoreDuplicates: true }))
-    const links = await checked(db.from('plan_courses').select('course_id').eq('plan_id', plan.id))
-    for (const { course_id } of links || []) {
+    const courseExpirations = new Map()
+    for (const plan of plans) {
+      await checked(db.from('profile_plans').upsert({ profile_id: profile.id, plan_id: plan.id }, { onConflict: 'profile_id,plan_id', ignoreDuplicates: true }))
+      const links = await checked(db.from('plan_courses').select('course_id').eq('plan_id', plan.id))
+      for (const { course_id } of links || []) {
+        const current = courseExpirations.get(course_id)
+        if (!current || plan.expires_at > current) courseExpirations.set(course_id, plan.expires_at)
+      }
+    }
+    for (const [course_id, expiration] of courseExpirations) {
       const existing = await checked(db.from('enrollments').select('id,expires_at').eq('profile_id', profile.id).eq('course_id', course_id))
       if (existing.length) {
         const forever = existing.some(row => row.expires_at === null)
@@ -68,7 +100,7 @@ export async function fulfillPaidOrder(db, orderId) {
       if (password) await enviarEmailBoasVindas({ nome: customer.name, email: customer.email, senha: password })
       else await enviarEmailRenovacao({ nome: customer.name, email: customer.email, valor: (order.total_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), proximaCobranca: new Date(expiration).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) })
     } catch { emailStatus = 'failed' }
-    await checked(db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: emailStatus === 'failed' ? 'Email não enviado; reenviar pelo painel de alunas.' : null, payload: { order_id: order.id, profile_id: profile.id, email_status: emailStatus } }).eq('id', event.id))
+    await checked(db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: emailStatus === 'failed' ? 'Email não enviado; reenviar pelo painel de alunas.' : null, payload: { order_id: order.id, profile_id: profile.id, plan_ids: plans.map(plan => plan.id), email_status: emailStatus } }).eq('id', event.id))
     return { fulfillment: 'completed', email_status: emailStatus }
   } catch (error) {
     await db.from('webhook_events').update({ error: 'retry' }).eq('id', event.id)
