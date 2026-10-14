@@ -13,11 +13,21 @@ Implementação na branch `checkout/painel-admin`. A main e o webhook Guru não 
 
 `PAGARME_SECRET_KEY` (servidor), `PAGARME_BASE_URL` (padrão sandbox `https://sdx-api.pagar.me/core/v5`), `PAGARME_WEBHOOK_SECRET`. As variáveis Supabase e Brevo existentes são reaproveitadas.
 
-A criação de pagamentos nesta etapa é administrativa, para homologação. O formulário público ainda não chama essas rotas. Adicionais não são cobrados nesta entrega; pedidos com bumps são recusados explicitamente.
+A criação de pagamentos nesta etapa é administrativa, para homologação. O formulário público chama sua própria rota, limitada à homologação administrativa. Adicionais não são cobrados nesta entrega; pedidos com bumps são recusados explicitamente.
 
 Produção exige `CHECKOUT_LIVE_ENABLED=true` e chave `sk_live_` com URL de produção. Liberação de acesso exige `CHECKOUT_FULFILLMENT_ENABLED=true`; deixar desligada durante a homologação com contas reais. Não habilitar cobrança real antes de validar o ciclo completo no sandbox.
 
-Confirmar se a conta aceita `card_token` para pedidos transparentes: o Pagar.me restringe seu uso em pedidos a clientes Gateway. Se a conta for PSP, integrar a carteira de cartões e `card_id` validado no servidor antes de ligar o formulário público.
+O navegador tokeniza o cartão diretamente no Pagar.me, com `PAGARME_PUBLIC_KEY` (`pk_test_...`) e domínio autorizado no painel do gateway. O servidor cria a carteira do cliente e o cartão via token + endereço, e usa o `card_id` gerado no próprio gateway. PAN/CVV não chegam ao backend. Nenhum `card_id` enviado pelo navegador é aceito.
+
+## Checkout público e homologação administrativa
+
+O link `/checkout/{slug}` carrega a aparência salva e as opções de pagamento da oferta ativa. `POST /api/checkout/{slug}` inicia a sessão (`action: start`) e paga (`action: pay`). `GET` consulta exclusivamente o pedido da sessão assinada, sem retornar dados pessoais ou aceitar IDs arbitrários. O estado financeiro é atualizado pelos webhooks; o navegador apenas lê esse estado a cada 10 segundos.
+
+Para iniciar testes no formulário: `CHECKOUT_TEST_ENABLED=true`, `CHECKOUT_SESSION_SECRET` com pelo menos 32 caracteres, chave secreta sandbox e, para cartão, `PAGARME_PUBLIC_KEY`. A sessão de compra dura 30 minutos, usa cookie HttpOnly e SameSite Strict, e vincula a oferta à chave do pedido. As requisições POST verificam a origem e requerem a sessão administrativa do app durante a homologação. O modo de produção é recusado nesta rota.
+
+Não habilitar o checkout anônimo de produção até homologar os fluxos reais e concluir proteção contra abuso/limites de tentativas. Se faltar configuração, a página exibe o visual e deixa o pagamento indisponível. O formulário preserva o mesmo payload em memória nas retentativas para evitar uma segunda cobrança. Ao recarregar, consulta o pedido existente; não reenvia automaticamente.
+
+Os destinos por situação aparecem como botão Continuar após a resposta financeira, sem tirar o Pix copia e cola da tela. A aba Assinaturas permite listar, atualizar e cancelar com confirmação explícita na interface.
 
 ## Confirmação e acesso
 
@@ -29,8 +39,8 @@ Emails usam os templates existentes. Falha de email fica em `webhook_events` e p
 
 Reembolsos/chargebacks atualizam o estado financeiro. Revogação seletiva de acesso (sem afetar planos adquiridos no Guru ou em outros pedidos) ainda requer implementação. Cancelamento interrompe recorrência sem apagar o período já comprado. Trial comercial não libera acesso automaticamente nesta versão: aguarda pagamento.
 
-Redirecionamentos e aparência continuam salvos na oferta; o frontend público será conectado a esses dados em etapa própria. Não há alteração visual nesta entrega.
+Aparência e redirecionamentos salvos já são lidos pela página pública. Pixels/GTM e order bumps ainda não são disparados/cobrados por esta página.
 
 ## Validação
 
-Testes automatizados locais de cálculo, bloqueio de produção, tokenização e correspondência de confirmação; build Next.js e lint dos arquivos alterados. Sem credenciais Pagar.me neste ambiente: nenhuma transação foi criada e não há homologação ponta a ponta.
+Testes automatizados locais de cálculo, bloqueio de produção, carteira de cartão, correspondência de confirmação, assinatura/expiração de cookies e redirecionamento; build Next.js e lint dos arquivos alterados. Sem credenciais Pagar.me neste ambiente: nenhuma transação foi criada e não há homologação ponta a ponta.

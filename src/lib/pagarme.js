@@ -16,7 +16,7 @@ export function gatewayConfiguration(env = process.env) {
 
 export async function pagarme(path, { method = 'GET', body, idempotencyKey } = {}, fetcher = fetch) {
   const { base, key } = gatewayConfiguration()
-  if (!/^\/(orders|subscriptions|plans|charges)(\/[a-zA-Z0-9_-]+)?$/.test(path)) throw new PaymentError('Recurso inválido.')
+  if (!/^\/(orders|subscriptions|plans|charges|customers)(\/[a-zA-Z0-9_-]+)?(\/cards)?$/.test(path)) throw new PaymentError('Recurso inválido.')
   const response = await fetcher(`${base}${path}`, {
     method, cache: 'no-store', signal: AbortSignal.timeout(20000),
     headers: { Authorization: `Basic ${Buffer.from(`${key}:`).toString('base64')}`, 'Content-Type': 'application/json', 'User-Agent': 'suzana-checkout/1.0', ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}) },
@@ -70,7 +70,7 @@ export function orderPayload(order, offer, product, customer, card) {
   const payment = order.payment_method === 'pix'
     ? { payment_method: 'pix', amount: order.total_cents, pix: { expires_in: 3600 } }
     : { payment_method: 'credit_card', amount: order.total_cents, credit_card: { ...card, installments: order.installments, operation_type: 'auth_and_capture', statement_descriptor: 'SUZANA ZATORRE' } }
-  return { code: order.id, customer, closed: true, items: [{ code: product.id, description: product.name.slice(0,256), amount: order.total_cents, quantity: 1 }], payments: [payment], metadata: { local_order_id: order.id, offer_id: offer.id } }
+  return { code: order.id, ...(customer.id ? { customer_id: customer.id } : { customer }), closed: true, items: [{ code: product.id, description: product.name.slice(0,256), amount: order.total_cents, quantity: 1 }], payments: [payment], metadata: { local_order_id: order.id, offer_id: offer.id } }
 }
 
 export function confirmedOrderState(remote, expected) {

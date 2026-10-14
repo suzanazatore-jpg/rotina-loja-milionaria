@@ -18,7 +18,7 @@ const menu = [
   ['Dashboard', '/admin/central-vendas', 'overview'],
   ['Produtos e Ofertas', '/admin/checkout', 'products'],
   ['Vendas', '/admin/checkout/vendas', 'sales'],
-  ['Assinaturas', null, 'subscriptions'],
+  ['Assinaturas', '/admin/checkout/assinaturas', 'subscriptions'],
   ['Checkouts', null, 'checkouts'],
   ['Integrações', null, 'integrations'],
   ['Configurações', null, 'settings'],

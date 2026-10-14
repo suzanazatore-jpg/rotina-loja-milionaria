@@ -76,6 +76,7 @@ test('paid order creation registers locally before gateway and verifies returned
     {table:'offers',data:{...offer,product_id:'product'}},
     {table:'products',data:{...product,plan_id:'plan-local'}},
     {table:'orders',data:null},
+    {table:'customers',data:null},
     {table:'customers',data:{id:'customer'}},
     {table:'orders',get data(){return localOrder},check(operations){localOrder=operations.find(row=>row[0]==='insert')[1]; assert.equal(localOrder.total_cents,4230)}},
     {table:'webhook_events',data:null},
@@ -110,4 +111,36 @@ test('reusing request key with different fingerprint never calls gateway', async
   const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:{id:'local',created_at:new Date().toISOString()}},{table:'webhook_events',data:{payload:{fingerprint:'different'}}}]
   await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'request-key-123456'),/outros dados/)
   assert.equal(steps.length,0)
+})
+test('card wallet receives token and billing address, and order receives only server card ID', async () => {
+  process.env.PAGARME_SECRET_KEY='sk_test_mock'
+  const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393',address:{line_1:'Rua 1, 10',zip_code:'59000000',city:'Natal',state:'RN'}}
+  let localOrder
+  const steps=[
+    {table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
+    {table:'customers',data:null},{table:'customers',data:{id:'customer'}},
+    {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
+    {table:'webhook_events',data:null},{table:'order_items',data:null},{table:'customers',data:{id:'customer',pagarme_customer_id:null}},
+    {table:'customers',data:null},{table:'orders',data:null},
+  ]
+  const oldFetch=globalThis.fetch
+  const called=[]
+  globalThis.fetch=async(url,options)=>{
+    called.push(url)
+    const body=JSON.parse(options.body)
+    if(url.endsWith('/customers')) return Response.json({id:'cus_owned'})
+    if(url.endsWith('/customers/cus_owned/cards')) {
+      assert.deepEqual(body,{token:'token_secure',billing_address:{country:'BR',state:'RN',city:'Natal',zip_code:'59000000',line_1:'Rua 1, 10'}})
+      assert.equal(body.number,undefined); assert.equal(body.cvv,undefined)
+      return Response.json({id:'card_owned'})
+    }
+    assert.equal(body.customer_id,'cus_owned')
+    assert.equal(body.payments[0].credit_card.card_id,'card_owned')
+    assert.equal(body.payments[0].credit_card.card_token,undefined)
+    return Response.json({id:'or_card',code:localOrder.id,amount:4700,customer:{email:customer.email},charges:[{id:'ch_card',status:'paid'}]})
+  }
+  try {
+    const value=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'credit_card',card_token:'token_secure'},'card-request-123456')
+    assert.equal(value.status,'paid');assert.equal(called.length,3);assert.equal(steps.length,0)
+  } finally {globalThis.fetch=oldFetch;delete process.env.PAGARME_SECRET_KEY}
 })

@@ -32,7 +32,8 @@ export async function createPayment(db, input, key) {
       if (sub) return { order_id: order.id, subscription: sub, status: order.status }
     }
   } else {
-    const localCustomer = await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}` }, { onConflict: 'email' }).select('id').single())
+    await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}` }, { onConflict: 'email', ignoreDuplicates: true }))
+    const localCustomer = await result(db.from('customers').select('id').eq('email', customer.email).single())
     // A chave única no banco e a idempotência do gateway protegem tentativas concorrentes.
     const inserted = await db.from('orders').insert({ id: randomUUID(), event_id: eventId, customer_id: localCustomer.id, offer_id: offer.id, payment_method: input.payment_method, installments, ...amount }).select('*').single()
     if (inserted.error?.code === '23505') throw new PaymentError('Pedido em processamento. Repita com a mesma chave.', 409)
@@ -41,16 +42,31 @@ export async function createPayment(db, input, key) {
     await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint }, processed_at: new Date().toISOString() }))
     await result(db.from('order_items').insert({ order_id: order.id, product_id: product.id, offer_id: offer.id, kind: 'main', price_cents: amount.subtotal_cents }))
   }
+  let gatewayCustomer = customer
+  let gatewayCard = card
+  if (card) {
+    const local = await result(db.from('customers').select('id,pagarme_customer_id').eq('id', order.customer_id).single())
+    let customerId = local.pagarme_customer_id
+    if (!customerId) {
+      const created = await pagarme('/customers', { method: 'POST', body: customer, idempotencyKey: `customer-${local.id}` })
+      customerId = created.id
+      await result(db.from('customers').update({ pagarme_customer_id: customerId }).eq('id', local.id))
+    }
+    // Carteira do gateway aceita o token com endereço; PAN e CVV nunca chegam aqui.
+    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, billing_address: customer.address } })
+    gatewayCard = { card_id: walletCard.id }
+    gatewayCustomer = { id: customerId }
+  }
   const metadata = { local_order_id: order.id, offer_id: offer.id }
   if (product.type === 'subscription') {
     const planBody = { name: `${product.name} — ${offer.name}`.slice(0,64), currency: 'BRL', interval: offer.billing_interval, interval_count: offer.billing_interval_count, billing_type: 'prepaid', payment_methods: ['credit_card'], installments: [1], trial_period_days: offer.trial_days || 0, items: [{ name: product.name.slice(0,64), quantity: 1, pricing_scheme: { scheme_type: 'unit', price: offer.price_cents } }] }
     const plan = await pagarme('/plans', { method: 'POST', body: planBody, idempotencyKey: `plan-${digest(planBody)}` })
-    const remote = await pagarme('/subscriptions', { method: 'POST', idempotencyKey: order.id, body: { code: order.id, plan_id: plan.id, payment_method: 'credit_card', customer, ...card, installments: 1, metadata } })
+    const remote = await pagarme('/subscriptions', { method: 'POST', idempotencyKey: order.id, body: { code: order.id, plan_id: plan.id, payment_method: 'credit_card', customer_id: gatewayCustomer.id, ...gatewayCard, installments: 1, metadata } })
     const subscription = await result(db.from('subscriptions').upsert({ customer_id: order.customer_id, offer_id: offer.id, origin_order_id: order.id, pagarme_subscription_id: remote.id, status: remote.status === 'canceled' ? 'canceled' : 'active', current_period_end: remote.current_cycle?.end_at || null }, { onConflict: 'pagarme_subscription_id' }).select('*').single())
     // Assinatura ativa NÃO prova que a primeira cobrança foi paga.
     return { order_id: order.id, subscription, status: 'pending' }
   }
-  const remote = await pagarme('/orders', { method: 'POST', idempotencyKey: order.id, body: orderPayload(order, offer, product, customer, card) })
+  const remote = await pagarme('/orders', { method: 'POST', idempotencyKey: order.id, body: orderPayload(order, offer, product, gatewayCustomer, gatewayCard) })
   const update = confirmedOrderState(remote, { ...order, email: customer.email })
   await result(db.from('orders').update(update).eq('id', order.id))
   return { order_id: order.id, ...update }
