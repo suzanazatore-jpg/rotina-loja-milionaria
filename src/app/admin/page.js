@@ -67,6 +67,13 @@ export default function Admin() {
       ],
     },
     {
+      titulo: 'Central de Vendas',
+      descricao: 'Sua operação comercial em um só lugar.',
+      cards: [
+        { icone: 'plans', titulo: 'Central de Vendas', sub: 'Gerencie produtos, ofertas, checkouts e acompanhe suas vendas.', rota: '/admin/central-vendas' },
+      ],
+    },
+    {
       titulo: 'Configurações',
       descricao: 'Preferências, segurança e administração do aplicativo.',
       cards: [
