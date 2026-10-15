@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { WEBHOOK_EVENTS } from '@/lib/checkoutWebhookSettings'
-import { CreateDialog, Switch, WebhookForm } from './WebhookForm'
+import { CreateDialog, FilterDialog, Switch, WebhookForm } from './WebhookForm'
 import './webhooks.css'
 const sections = { detalhe: 'Detalhe', atividades: 'Atividades', auditoria: 'Auditoria' }
 const states = { pending: 'Na fila', processing: 'Processando', delivered: 'Entregue', failed: 'Falha', retry: 'Aguardando nova tentativa', skipped: 'Ignorado' }
@@ -20,7 +20,7 @@ export default function Webhooks() {
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('todos')
   const [search, setSearch] = useState('')
-  const [product, setProduct] = useState('')
+  const [urlFilter, setUrlFilter] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [receipts, setReceipts] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -57,7 +57,7 @@ export default function Webhooks() {
     finally { setBusy(false) }
   }
   const categoryRows = data.webhooks.filter(row => inCategory(row, category))
-  const rows = categoryRows.filter(row => (status === 'todos' || row.active === (status === 'active')) && row.name.toLowerCase().includes(search.toLowerCase()) && (!product || row.product_ids === null || row.product_ids.includes(product)))
+  const rows = categoryRows.filter(row => (status === 'todos' || row.active === (status === 'active')) && row.name.toLowerCase().includes(search.trim().toLowerCase()) && row.url.toLowerCase().includes(urlFilter.trim().toLowerCase()))
   const stored = data.webhooks.find(row => row.id === hookId)
   const history = Boolean(selected && tab !== 'detalhe' || receipts)
   return <main className="central-home webhook-page">
@@ -70,7 +70,6 @@ export default function Webhooks() {
       <div className="webhook-section-heading"><h2>{receipts ? 'Recebimentos Pagar.me' : selected ? sections[tab] : category === 'vendas' ? 'Vendas' : 'Assinaturas'}</h2>{(!selected && !receipts || selected && tab === 'atividades') && <button className="central-action" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>▽ Filtros</button>}</div>
       {!loading && !data.delivery_enabled && <p className="webhook-paused">Envios pausados durante a configuração.</p>}
       {!selected && !receipts && <><small className="webhook-count">{rows.length} de {categoryRows.length}</small>
-        {filtersOpen && <div className="webhook-filters"><label>Nome<input value={search} onChange={event => setSearch(event.target.value)} /></label><label>Status<select value={status} onChange={event => setStatus(event.target.value)}><option value="todos">Todos</option><option value="active">Ativo</option><option value="inactive">Inativo</option></select></label><label>Produto<select value={product} onChange={event => setProduct(event.target.value)}><option value="">Todos</option>{data.products.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label></div>}
         <div className="central-table-wrap"><table className="central-table webhook-list"><thead><tr><th>Nome</th><th>URL</th><th><span className="webhook-sr-only">Atividades</span></th><th><span className="webhook-sr-only">Ativo</span></th></tr></thead><tbody>{!loading && rows.map(row => <tr key={row.id}><td><button className="webhook-name" onClick={() => open(row)}>{row.name}</button></td><td><span className="webhook-list-url" title={row.url}>{row.url}</span></td><td><button className="webhook-history-button" aria-label={`Atividades de ${row.name}`} onClick={() => { open(row); setTab('atividades') }}>◷</button></td><td><Switch checked={row.active} disabled={busy} label={`${row.active ? 'Desativar' : 'Ativar'} ${row.name}`} onChange={active => mutate({ action: 'toggle', id: row.id, active })} /></td></tr>)}{(loading || !rows.length) && <tr><td colSpan={4}>{loading ? 'Carregando…' : 'Nenhum webhook encontrado.'}</td></tr>}</tbody></table></div>
       </>}
       {selected && tab === 'detalhe' && <><p className="webhook-info">O aviso será enviado quando a venda atingir um dos status selecionados. Cada envio tem um identificador para reconhecer novas tentativas e evitar ações duplicadas no destino.</p><WebhookForm value={selected} products={data.products} busy={busy} onChange={setSelected} onSubmit={() => mutate({ action: 'save', id: selected.id, dados: selected }, selected)} onCancel={back} dates={{ created: date(stored?.created_at), updated: date(data.updated_at || stored?.created_at) }} /></>}
@@ -82,5 +81,6 @@ export default function Webhooks() {
     </section>
     <div className="webhook-bottom-actions"><button disabled={loading || busy} onClick={() => setRefresh(value => value + 1)}>Atualizar</button>{!selected && !receipts && <button onClick={() => { setReceipts(true); setPage(1); setStatus('todos') }}>Recebimentos Pagar.me →</button>}</div>
     {creating && <CreateDialog products={data.products} busy={busy} error={error} onClose={() => { setCreating(false); setError('') }} onSave={draft => mutate({ action: 'save', dados: draft }, draft)} />}
+    {filtersOpen && !selected && !receipts && <FilterDialog filters={{ name: search, url: urlFilter, status }} onClose={() => setFiltersOpen(false)} onApply={filters => { setSearch(filters.name); setUrlFilter(filters.url); setStatus(filters.status); setPage(1); setFiltersOpen(false) }} />}
   </main>
 }

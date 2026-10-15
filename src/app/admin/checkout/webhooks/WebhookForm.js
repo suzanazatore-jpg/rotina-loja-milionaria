@@ -31,3 +31,21 @@ export function CreateDialog({ products, busy, error, onClose, onSave }) {
     <div className="webhook-dialog-body">{error && <p className="central-editor-message" role="alert">{error}</p>}<WebhookForm value={draft} products={products} busy={busy} onChange={setDraft} onSubmit={() => onSave(draft)} onCancel={onClose} /></div>
   </dialog>
 }
+
+export function FilterDialog({ filters, onClose, onApply }) {
+  const ref = useRef(null)
+  const [draft, setDraft] = useState(filters)
+  useEffect(() => { ref.current?.showModal() }, [])
+  return <dialog ref={ref} className="webhook-filter-dialog" aria-labelledby="webhook-filter-title" onCancel={event => { event.preventDefault(); onClose() }}>
+    <div className="webhook-filter-close-bar"><button type="button" onClick={onClose}>× Fechar</button></div>
+    <form className="webhook-filter-card" onSubmit={event => { event.preventDefault(); onApply(draft) }}>
+      <h2 id="webhook-filter-title">Características</h2>
+      <div className="webhook-filter-characteristics">
+        <label>Nome<input value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
+        <label>URL<input type="text" value={draft.url} onChange={event => setDraft({ ...draft, url: event.target.value })} /></label>
+      </div>
+      <fieldset className="webhook-filter-status"><legend>Status</legend><div>{[['todos', 'Todos'], ['active', 'Ativo'], ['inactive', 'Inativo']].map(([value, label]) => <label key={value}><input type="radio" name="webhook-list-status" value={value} checked={draft.status === value} onChange={() => setDraft({ ...draft, status: value })} />{label}</label>)}</div></fieldset>
+      <div className="webhook-filter-footer"><button type="button" className="webhook-clear-filters" onClick={() => setDraft({ name: '', url: '', status: 'todos' })}>Limpar filtros</button><button type="submit" className="central-primary">Filtrar</button></div>
+    </form>
+  </dialog>
+}
