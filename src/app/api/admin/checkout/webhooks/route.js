@@ -25,7 +25,7 @@ export async function GET(request) {
     if (hook && !UUID.test(hook)) return reply({ error: 'Webhook inválido.' }, 400)
     const [webhooks, products] = await Promise.all([
       checked(db.from('outbound_webhooks').select(fields).order('created_at', { ascending: false })),
-      checked(db.from('products').select('id,name').order('name')),
+      checked(db.from('products').select('id,name,code').order('name')),
     ])
     let query
     if (tab === 'atividades') {
@@ -36,11 +36,13 @@ export async function GET(request) {
       query = query.order('created_at', { ascending: false })
     } else if (tab === 'auditoria') {
       query = db.from('webhook_events').select('id,payload,received_at,processed_at,error', { count: 'exact' }).eq('type', 'checkout.webhook.admin').order('received_at', { ascending: false })
+      if (hook) query = query.or(`payload->>webhook_id.eq.${hook},payload->>target_id.eq.${hook}`)
     } else if (tab === 'recebimentos') {
       query = db.from('webhook_events').select('id,pagarme_event_id,type,received_at,processed_at,error', { count: 'exact' }).like('pagarme_event_id', 'hook_%').order('received_at', { ascending: false })
     } else if (tab !== 'cadastros') return reply({ error: 'Aba inválida.' }, 400)
     const activity = query ? await checked(query.range((page - 1) * limit, page * limit - 1)) : { data: [], count: 0 }
-    return reply({ webhooks: webhooks.data, products: products.data, rows: activity.data, count: activity.count, page, limit, delivery_enabled: process.env.CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED === 'true' })
+    const latest = hook ? await checked(db.from('webhook_events').select('processed_at').eq('type', 'checkout.webhook.admin').eq('payload->>target_id', hook).in('payload->>action', ['save', 'toggle']).not('processed_at', 'is', null).order('processed_at', { ascending: false }).limit(1)) : { data: [] }
+    return reply({ webhooks: webhooks.data, products: products.data, rows: activity.data, count: activity.count, page, limit, updated_at: latest.data?.[0]?.processed_at || null, delivery_enabled: process.env.CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED === 'true' })
   } catch { return reply({ error: 'Não foi possível carregar os webhooks.' }, 500) }
 }
 
@@ -70,9 +72,12 @@ export async function POST(request) {
     auditId = `webhook-admin:${randomUUID()}`
     await checked(db.from('webhook_events').insert({ pagarme_event_id: auditId, type: 'checkout.webhook.admin', payload: { action, target_id: id || null, name: record?.name || null }, error: 'processing' }))
     let savedId = id
+    let webhookId = id
     if (action === 'retry') {
       const delivery = await checked(db.from('webhook_deliveries').select('webhook_id,status').eq('id', id).maybeSingle())
       if (!delivery.data || !['failed', 'retry'].includes(delivery.data.status)) throw new Error('Somente envios com falha podem voltar para a fila.')
+      webhookId = delivery.data.webhook_id
+      await checked(db.from('webhook_events').update({ payload: { action, target_id: id, webhook_id: webhookId } }).eq('pagarme_event_id', auditId))
       const hook = await checked(db.from('outbound_webhooks').select('active').eq('id', delivery.data.webhook_id).single())
       if (!hook.data.active) throw new Error('Ative o webhook antes de solicitar um reenvio.')
       const changed = await checked(db.from('webhook_deliveries').update({ status: 'pending', next_attempt_at: new Date().toISOString() }).eq('id', id).in('status', ['failed', 'retry']).select('id'))
@@ -81,8 +86,9 @@ export async function POST(request) {
       const query = action === 'toggle' ? db.from('outbound_webhooks').update({ active: input.active }).eq('id', id) : id ? db.from('outbound_webhooks').update(record).eq('id', id) : db.from('outbound_webhooks').insert(record)
       const saved = await checked(query.select('id').single())
       savedId = saved.data.id
+      webhookId = savedId
     }
-    await checked(db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null, payload: { action, target_id: savedId, name: record?.name || null } }).eq('pagarme_event_id', auditId))
+    await checked(db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null, payload: { action, target_id: savedId, webhook_id: webhookId, name: record?.name || null } }).eq('pagarme_event_id', auditId))
     if (action === 'retry') after(async () => { try { await processOutboundWebhooks(db) } catch { console.error('checkout outbound: fila pendente') } })
     return reply({ ok: true, id: savedId })
   } catch (error) {

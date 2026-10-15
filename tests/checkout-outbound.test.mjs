@@ -48,3 +48,25 @@ test('admin API rejects unauthorized access before data reads and writes',async(
  assert.equal((await GET(new Request('https://example.com/api/admin/checkout/webhooks'))).status,401)
  assert.equal((await POST(new Request('https://example.com/api/admin/checkout/webhooks',{method:'POST',body:JSON.stringify({action:'toggle',id:'hook',active:true})}))).status,401)
 })
+test('detail audit and last update stay scoped to the selected webhook',async()=>{
+ const id='00000000-0000-4000-8000-000000000001'
+ const shared=readFileSync(new URL('../src/lib/checkoutWebhookSettings.js',import.meta.url),'utf8')
+ const sharedURL=`data:text/javascript;base64,${Buffer.from(shared).toString('base64')}`
+ const calls=[]
+ globalThis.__webhookScopeDB={from(table){const ops=[];calls.push({table,ops});const q=new Proxy({}, {get(_target,key){if(key==='then')return resolve=>resolve({data:[],count:0,error:null});return(...args)=>{ops.push([key,...args]);return q}}});return q}}
+ const source=readFileSync(new URL('../src/app/api/admin/checkout/webhooks/route.js',import.meta.url),'utf8')
+ .replace("import { after } from 'next/server'",'const after = () => {}')
+ .replace("import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'",'const processOutboundWebhooks = () => {}')
+ .replace("import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const autorizarAdmin = async () => true; const checkoutAdminClient = () => globalThis.__webhookScopeDB')
+ .replace("'@/lib/checkoutWebhookSettings'",JSON.stringify(sharedURL))
+ try {
+  const {GET}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+  const response=await GET(new Request(`https://example.com/api/admin/checkout/webhooks?tab=auditoria&webhook_id=${id}`))
+  assert.equal(response.status,200)
+  const audit=calls.find(call=>call.ops.some(op=>op[0]==='or'))
+  assert.equal(audit.table,'webhook_events')
+  assert.deepEqual(audit.ops.find(op=>op[0]==='or'),['or',`payload->>webhook_id.eq.${id},payload->>target_id.eq.${id}`])
+  assert.ok(calls.some(call=>call.ops.some(op=>op[0]==='eq'&&op[1]==='payload->>target_id'&&op[2]===id)))
+  assert.ok(calls.every(call=>call.ops.every(op=>op[0]!=='select'||!String(op[1]).includes('secret'))))
+ } finally {delete globalThis.__webhookScopeDB}
+})
