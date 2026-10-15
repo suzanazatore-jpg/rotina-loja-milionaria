@@ -8,7 +8,7 @@ async function checked(query) {
   return data
 }
 
-async function reconcileOrder(db, id, gateway) {
+async function reconcileOrder(db, id, gateway, charge = null) {
   if (!/^or_[a-zA-Z0-9]+$/.test(id || '')) throw pending()
   const remote = await gateway(`/orders/${id}`)
   if (remote.id !== id || !uuid.test(remote.code || '')) throw pending()
@@ -18,7 +18,8 @@ async function reconcileOrder(db, id, gateway) {
   if (!order || !order.event_id?.startsWith('checkout:') || (order.pagarme_order_id && order.pagarme_order_id !== id)) throw pending()
   const customer = await checked(db.from('customers').select('email').eq('id', order.customer_id).single())
   if (!customer) throw pending()
-  const update = confirmedOrderState(remote, { ...order, email: customer.email })
+  if (charge && (charge.order?.id !== id || charge.amount !== order.total_cents || !remote.charges?.some(row => row.id === charge.id))) throw pending()
+  const update = confirmedOrderState(charge ? { ...remote, charges: [charge] } : remote, { ...order, email: customer.email })
   let query = db.from('orders').update(update).eq('id', order.id)
   query = order.pagarme_order_id ? query.eq('pagarme_order_id', id) : query.is('pagarme_order_id', null)
   const updated = await checked(query.select('id'))
@@ -27,6 +28,13 @@ async function reconcileOrder(db, id, gateway) {
 }
 
 export async function reconcileWebhookResource(db, event, { gateway = pagarme, reconcileSubscriptionCharge } = {}) {
+  if (event.type === 'chargeback.received') {
+    const id = event.data.charge_id || event.data.charge?.id
+    if (!/^ch_[a-zA-Z0-9]+$/.test(id || '')) throw pending()
+    const charge = await gateway(`/charges/${id}`)
+    if (charge.id !== id || charge.status !== 'chargedback') throw pending()
+    return reconcileWebhookResource(db, { type: 'charge.updated', data: { id } }, { reconcileSubscriptionCharge, gateway: path => path === `/charges/${id}` ? Promise.resolve(charge) : gateway(path) })
+  }
   if (event.type.startsWith('order.')) return reconcileOrder(db, event.data.id, gateway)
   if (event.type.startsWith('charge.')) {
     if (!/^ch_[a-zA-Z0-9]+$/.test(event.data.id)) throw pending()
@@ -37,7 +45,7 @@ export async function reconcileWebhookResource(db, event, { gateway = pagarme, r
       return reconcileSubscriptionCharge(db, charge)
     }
     if (!charge.order?.id) throw pending()
-    return reconcileOrder(db, charge.order.id, gateway)
+    return reconcileOrder(db, charge.order.id, gateway, charge)
   }
   if (event.type.startsWith('subscription.')) {
     if (!/^sub_[a-zA-Z0-9]+$/.test(event.data.id)) throw pending()

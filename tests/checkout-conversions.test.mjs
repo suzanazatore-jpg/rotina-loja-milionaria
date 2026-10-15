@@ -104,6 +104,7 @@ test('eighth failed attempt stops automatic retries for review',async()=>{
 })
 test('cron rejects missing or wrong secret and accepts authenticated disabled run',async()=>{
  const routeSource=readFileSync(new URL('../src/app/api/cron/checkout-conversoes/route.js',import.meta.url),'utf8')
+  .replace("import { expireOrderAccess } from '@/lib/checkoutAccessServer'",'const expireOrderAccess = async () => ({disabled:true,checked:0})')
   .replace("import { checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const checkoutAdminClient = () => ({})')
   .replace("import { retryConversions } from '@/lib/checkoutConversionsServer'",'const retryConversions = async () => ({disabled:true,checked:0,sent:0})')
  const {GET}=await import(`data:text/javascript;base64,${Buffer.from(routeSource).toString('base64')}`)

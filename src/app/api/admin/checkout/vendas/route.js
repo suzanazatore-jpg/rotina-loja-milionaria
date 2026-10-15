@@ -44,8 +44,14 @@ export async function GET(request) {
       if (errItens) throw errItens
       const conversion = await db.from('webhook_events').select('error,processed_at,payload').eq('pagarme_event_id', `capi:${pedido.id}`).maybeSingle()
       if (conversion.error) throw conversion.error
+      const [grant, reversal] = await Promise.all([
+        db.from('checkout_access_grants').select('expires_at,next_expiration,revoked_at,reason,review_required').eq('order_id', pedido.id).maybeSingle(),
+        db.from('webhook_events').select('error,processed_at').eq('pagarme_event_id', `revoke:${pedido.id}`).maybeSingle(),
+      ])
+      if (grant.error || reversal.error) throw new Error('Falha ao consultar acessos.')
+      const access = { grant: grant.data, review_required: grant.data?.review_required || reversal.data?.error === 'review_required' }
       const registro = conversion.data
-      return { ...pedido, conversion: registro ? { status: registro.processed_at ? 'sent' : registro.error, mode: registro.payload?.mode, attempts: registro.payload?.attempts || 0, next_attempt_at: registro.payload?.next_attempt_at } : null, customer: cliente, items: (itens || []).map(i => ({ ...i, product_name: nomes.get(i.product_id) || 'Produto', offer_name: mapaOfertas.get(i.offer_id)?.name || 'Oferta' })) }
+      return { ...pedido, access, conversion: registro ? { status: registro.processed_at ? 'sent' : registro.error, mode: registro.payload?.mode, attempts: registro.payload?.attempts || 0, next_attempt_at: registro.payload?.next_attempt_at } : null, customer: cliente, items: (itens || []).map(i => ({ ...i, product_name: nomes.get(i.product_id) || 'Produto', offer_name: mapaOfertas.get(i.offer_id)?.name || 'Oferta' })) }
     }
 
     if (id) {

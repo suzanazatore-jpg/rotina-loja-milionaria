@@ -1,3 +1,4 @@
+import { applyOrderAccess } from './checkoutAccessServer.js'
 import { randomBytes } from 'node:crypto'
 import { PaymentError } from './pagarme.js'
 import { enviarEmailBoasVindas } from './enviarEmailBoasVindas.js'
@@ -19,6 +20,11 @@ export function accessExpiration(paidAt, periodDays) {
 }
 
 export async function loadPurchasedPlans(db, order) {
+  if (order.event_id?.startsWith('cycle:')) {
+    const origin = await checked(db.from('orders').select('*').eq('id', order.parent_order_id).single())
+    if (!origin.event_id?.startsWith('checkout:') || origin.customer_id !== order.customer_id || origin.offer_id !== order.offer_id) throw new PaymentError('Ciclo sem compra de origem válida.', 409)
+    return loadPurchasedPlans(db, { ...origin, paid_at: order.paid_at })
+  }
   const items = await checked(db.from('order_items').select('product_id,offer_id,kind').eq('order_id', order.id))
   let planIds
   if (order.event_id?.startsWith('checkout:')) {
@@ -68,12 +74,17 @@ export async function fulfillPaidOrder(db, orderId) {
       const { data, error } = await db.auth.admin.createUser({ email: customer.email, password, email_confirm: true })
       if (error) throw new PaymentError('Não foi possível criar o acesso. Verifique se a conta já existe.', 409)
       profile = { id: data.user.id }
-      await checked(db.from('perfis').upsert({ id: profile.id, email: customer.email, nome: customer.name, whatsapp: customer.phone, tipo_acesso: 'rotina', acesso_expira_em: expiration, status_assinatura: 'ativo' }))
-    } else {
+      if (process.env.CHECKOUT_ACCESS_LEDGER_ENABLED === 'true') await checked(db.from('webhook_events').update({ payload: { order_id: order.id, profile_id: profile.id, new_profile: true } }).eq('id', event.id))
+      await checked(db.from('perfis').upsert({ id: profile.id, email: customer.email, nome: customer.name, whatsapp: customer.phone, tipo_acesso: 'rotina', acesso_expira_em: process.env.CHECKOUT_ACCESS_LEDGER_ENABLED === 'true' ? null : expiration, status_assinatura: 'ativo' }))
+    } else if (process.env.CHECKOUT_ACCESS_LEDGER_ENABLED !== 'true') {
       const keep = profile.acesso_expira_em && new Date(profile.acesso_expira_em) > new Date(expiration)
       await checked(db.from('perfis').update({ acesso_expira_em: keep ? profile.acesso_expira_em : expiration, status_assinatura: 'ativo' }).eq('id', profile.id))
     }
     await checked(db.from('profiles').upsert({ id: profile.id, name: customer.name, email: customer.email, phone: customer.phone, role: 'student', status: 'active', updated_at: new Date().toISOString() }, { onConflict: 'id', ignoreDuplicates: true }))
+    if (process.env.CHECKOUT_ACCESS_LEDGER_ENABLED === 'true') {
+      const access = await applyOrderAccess(db, order.id, profile.id, plans.map(plan => plan.id), Boolean(password) || event.payload?.new_profile === true)
+      if (access.status !== 'completed') throw new PaymentError('Acesso requer revisão: houve alteração externa ou origem não identificada.', 409)
+    } else {
     const courseExpirations = new Map()
     for (const plan of plans) {
       await checked(db.from('profile_plans').upsert({ profile_id: profile.id, plan_id: plan.id }, { onConflict: 'profile_id,plan_id', ignoreDuplicates: true }))
@@ -92,6 +103,7 @@ export async function fulfillPaidOrder(db, orderId) {
       } else {
         await checked(db.from('enrollments').insert({ profile_id: profile.id, course_id, status: 'active', source: 'pagarme', purchased_at: order.paid_at, expires_at: expiration }))
       }
+    }
     }
     await checked(db.from('customers').update({ profile_id: profile.id }).eq('id', customer.id))
     // Falha de email fica registrada para reenvio no painel; não repete a liberação.

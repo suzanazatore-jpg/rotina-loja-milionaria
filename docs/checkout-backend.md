@@ -37,7 +37,7 @@ Cada cobrança de ciclo tem registro local idempotente; o vencimento do acesso �
 
 Emails usam os templates existentes. Falha de email fica em `webhook_events` e pode ser reenviada pelo painel de alunas. O mecanismo registra uma única liberação por pedido. Um evento `checkout.access` com `error=processing` após interrupção deve ser verificado e liberado manualmente para retentativa; não executar duas liberações concorrentes.
 
-Reembolsos/chargebacks atualizam o estado financeiro. Revogação seletiva de acesso (sem afetar planos adquiridos no Guru ou em outros pedidos) ainda requer implementação. Cancelamento interrompe recorrência sem apagar o período já comprado. Trial comercial não libera acesso automaticamente nesta versão: aguarda pagamento.
+Reembolsos/chargebacks atualizam o estado financeiro. Revogação seletiva está disponível para compras com origem registrada no ledger, mediante `CHECKOUT_ACCESS_LEDGER_ENABLED=true`; compras antigas sem origem identificável exigem revisão, preservando os acessos. Cancelamento interrompe recorrência sem apagar o período já comprado. Trial comercial não libera acesso automaticamente nesta versão: aguarda pagamento.
 
 Aparência e redirecionamentos salvos já são lidos pela página pública. Eventos de navegador de GTM/Pixel foram conectados, com ativação controlada e consentimento. Order bumps de produtos de pagamento único estão conectados.
 
@@ -95,3 +95,20 @@ O webhook de pedido consulta o recurso na API Pagar.me e encontra o pedido local
 Pedido/assinatura ainda ausente, conflito ou falha de consulta mantém `processed_at` vazio, registra `reconciliation_pending` e responde HTTP 503, permitindo reenvio pela Pagar.me. Reenvios dependem da configuração do webhook na conta do gateway; não existe worker local de reprocessamento financeiro nesta etapa. Evento já concluído não libera acesso novamente. O mesmo ID de webhook com outro tipo/recurso é recusado. JSON inválido retorna 400 e corpo acima de 256 KiB retorna 413. Eventos fora das famílias order/charge/subscription continuam apenas registrados, sem alteração financeira. Webhook Guru permanece separado.
 
 Testes simulam aviso antecipado, ausência do registro local, dados divergentes, disputa pelo vínculo, cobranças de assinatura, repetição de evento, falha seguida de reenvio e resposta inicial atrasada. O teste integrado com Pagar.me e emails reais continua reservado para o final.
+
+
+### Pós-venda por compra e ciclo
+
+Ativar `CHECKOUT_ACCESS_LEDGER_ENABLED=true` junto da liberação de acesso somente na homologação final. Por padrão, a nova rotina permanece desativada. As migrações adicionam `checkout_access_accounts` (estado anterior e estado esperado dos acessos) e `checkout_access_grants` (origem por pedido, planos, cursos e datas). As tabelas têm RLS e privilégios exclusivos de `service_role`. A RPC `checkout_apply_access` usa `SECURITY INVOKER`, execução restrita ao servidor, transação, trava por perfil e atualização dos registros sob lock; não cria novos usuários nem envia emails.
+
+O primeiro acesso rastreado salva os acessos anteriores como base. Cada pedido ou ciclo registra separadamente os planos e os cursos então vinculados, com expiração calculada usando `plans.period_days` e o pagamento confirmado. Renovações recuperam o plano do snapshot da compra original, mesmo que o produto seja remapeado depois. Repetir a mesma compra não soma dias. Cancelar a assinatura somente altera a cobrança na Pagar.me e o registro de assinatura; não revoga os direitos já pagos.
+
+Reembolso total ou contestação confirmada pela API Pagar.me chama a RPC para retirar a contribuição daquele pedido e recalcular o restante. Curso compartilhado mantém o maior prazo das demais compras e os acessos anteriores, incluindo os vitalícios. Links de planos são mantidos quando há outra compra válida ou um vínculo anterior. A conta global não é bloqueada se existe acesso anterior válido ou outra compra ativa. O webhook Guru não foi modificado.
+
+Eventos `chargeback.received` usam o ID de cobrança informado para consultar a Pagar.me e exigem status `chargedback` na consulta autenticada antes de agir. Cobranças avulsas também precisam constar no pedido consultado, com o valor total correspondente. Reembolso parcial não possui política de retirada automática por item nesta etapa; a rotina atua no estado integral `refunded` informado pelo gateway. O formato real do novo evento e os casos de reembolso parcial precisam ser conferidos na homologação.
+
+A expiração por plano roda nos mesmos horários do worker `/api/cron/checkout-conversoes`, antes e independentemente da configuração da Meta, em lotes de quatro compras. Cursos respeitam o próprio `expires_at` na leitura. A retirada de links de planos e a atualização global dependem dessa execução, sujeita ao atraso do agendamento Hobby. A fila usa a próxima expiração individual, não somente o prazo máximo do carrinho.
+
+A RPC compara os acessos atuais com o último estado que gravou. Se houve mudança externa (Guru, edição manual ou outro fluxo), preserva os registros e devolve `review_required`. Esse caso, assim como uma compra antiga sem proveniência, aparece nos detalhes da venda; não tenta adivinhar a origem nem apagar acessos compartilhados. A revisão exige conciliação administrativa dos vínculos/baseline antes de nova tentativa. Não há botão para ignorar essa proteção. Registros vencidos que exigem revisão saem da fila automática para não travar o restante.
+
+`tests/checkout-access.sql` testa a transação com fixtures revertidas por `ROLLBACK`, inclusive sob `service_role`: acesso compartilhado, compras independentes, reembolso, contestação, plano vitalício anterior, renovação, repetição, alteração externa e vencimentos parciais/totais. Testes JavaScript simulam cancelamento, webhook, RPC e worker. Nenhuma cobrança ou email real é executado nessa validação; o teste completo de compra continua pendente.

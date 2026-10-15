@@ -1,3 +1,4 @@
+import { reverseOrderAccess } from '@/lib/checkoutAccessServer'
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
@@ -35,6 +36,7 @@ export async function POST(request) {
       await fulfillPaidOrder(db, order.order_id)
       await deliverPaidConversion(db, order.order_id)
     }
+    if (order && ['refunded','chargedback'].includes(order.status)) await reverseOrderAccess(db, order.order_id)
     const { error } = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', event.id)
     if (error) throw error
     return NextResponse.json({ received: true })

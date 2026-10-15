@@ -39,7 +39,7 @@ test('lost conditional claim requests retry instead of overwriting another gatew
 })
 test('charge looks up its verified order and subscription charge uses cycle reconciliation',async()=>{
  const db=database(),paths=[]
- const result=await reconcileWebhookResource(db,{type:'charge.paid',data:{id:'ch_test'}},{gateway:async path=>{paths.push(path);return path.startsWith('/charges/')?{id:'ch_test',order:{id:'or_test'}}:remote}})
+ const result=await reconcileWebhookResource(db,{type:'charge.paid',data:{id:'ch_test'}},{gateway:async path=>{paths.push(path);return path.startsWith('/charges/')?{id:'ch_test',amount:4700,status:'paid',order:{id:'or_test'}}:remote}})
  assert.equal(result.status,'paid');assert.deepEqual(paths,['/charges/ch_test','/orders/or_test'])
  const cycle=await reconcileWebhookResource(db,{type:'charge.paid',data:{id:'ch_test'}},{gateway:async()=>({id:'ch_test',invoice:{subscription_id:'sub_test'},order:{id:'or_unknown'}}),reconcileSubscriptionCharge:async(database,charge)=>{assert.equal(database,db);assert.equal(charge.invoice.subscription_id,'sub_test');return {order_id:'cycle',status:'paid'}}})
  assert.equal(cycle.order_id,'cycle')
@@ -66,6 +66,7 @@ test('webhook HTTP failure remains unprocessed; retry completes and duplicate ne
  }}
  globalThis.__checkoutWebhook={db,state}
  let route=readFileSync(new URL('../src/app/api/webhook-pagarme/route.js',import.meta.url),'utf8')
+ route=route.replace("import { reverseOrderAccess } from '@/lib/checkoutAccessServer'",'const reverseOrderAccess = async () => ({})')
  route=route.replace("import { NextResponse } from 'next/server'",'const NextResponse = Response')
  route=route.replace("import { checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const checkoutAdminClient = () => globalThis.__checkoutWebhook.db')
  route=route.replace("import { reconcileSubscriptionCharge } from '@/lib/checkoutPaymentsServer'",'const reconcileSubscriptionCharge = () => {}')
@@ -86,4 +87,12 @@ test('webhook HTTP failure remains unprocessed; retry completes and duplicate ne
   assert.equal((await POST(req())).status,200);assert.equal(state.grants,1)
   assert.equal((await POST(req(body.replace('or_test','or_other')))).status,503);assert.equal(state.grants,1)
  }finally{delete globalThis.__checkoutWebhook;if(originalSecret===undefined)delete process.env.PAGARME_WEBHOOK_SECRET;else process.env.PAGARME_WEBHOOK_SECRET=originalSecret}
+})
+test('new chargeback event verifies charge at gateway before changing financial status',async()=>{
+ const db=database(),charge={id:'ch_test',amount:4700,status:'chargedback',order:{id:'or_test'}}
+ const gateway=async path=>path.startsWith('/charges/')?charge:remote
+ const result=await reconcileWebhookResource(db,{type:'chargeback.received',data:{id:'cb_test',charge_id:'ch_test'}},{gateway})
+ assert.equal(result.status,'chargedback');assert.equal(db.tables.orders[0].status,'chargedback')
+ await assert.rejects(reconcileWebhookResource(database(),{type:'chargeback.received',data:{id:'cb_test',charge_id:'ch_test'}},{gateway:async()=>({...charge,status:'paid'})}))
+ await assert.rejects(reconcileWebhookResource(database(),{type:'charge.refunded',data:{id:'ch_test'}},{gateway:async path=>path.startsWith('/charges/')?{...charge,status:'refunded',amount:1}:remote}))
 })

@@ -1,3 +1,4 @@
+import { expireOrderAccess } from '@/lib/checkoutAccessServer'
 import { timingSafeEqual } from 'node:crypto'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { retryConversions } from '@/lib/checkoutConversionsServer'
@@ -12,6 +13,8 @@ export async function GET(request) {
   const expected = Buffer.from(`Bearer ${secret || ''}`)
   if (!secret || actual.length !== expected.length || !timingSafeEqual(actual, expected)) return Response.json({ error: 'Não autorizado.' }, { status: 401 })
   try {
-    return Response.json(await retryConversions(checkoutAdminClient()), { headers: { 'Cache-Control': 'no-store' } })
+    const db = checkoutAdminClient()
+    const access = await expireOrderAccess(db)
+    return Response.json({ ...await retryConversions(db), access }, { headers: { 'Cache-Control': 'no-store' } })
   } catch { return Response.json({ error: 'Não foi possível processar conversões.' }, { status: 503 }) }
 }
