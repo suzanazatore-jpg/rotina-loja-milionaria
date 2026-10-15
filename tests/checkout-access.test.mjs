@@ -15,6 +15,10 @@ test('legacy refund without provenance requires review and never deletes courses
  const steps=[{table:'orders',data:{id:'order',status:'chargedback'}},{table:'checkout_access_grants',data:null},{table:'webhook_events',data:{processed_at:'2026-10-15'}},{table:'webhook_events',data:null,check(ops){const row=ops.find(x=>x[0]==='upsert')[1];assert.equal(row.error,'review_required');assert.equal(row.processed_at,null)}}]
  assert.equal((await reverseOrderAccess(db(steps),'order')).access_reversal,'review_required');assert.equal(steps.length,0)
 }))
+test('interrupted legacy grant also requires review instead of assuming no access',async()=>enabled(async()=>{
+ const steps=[{table:'orders',data:{id:'order',status:'chargedback'}},{table:'checkout_access_grants',data:null},{table:'webhook_events',data:{processed_at:null}},{table:'webhook_events',data:null,check(ops){const row=ops.find(x=>x[0]==='upsert')[1];assert.equal(row.error,'review_required');assert.equal(row.processed_at,null)}}]
+ assert.equal((await reverseOrderAccess(db(steps),'order')).access_reversal,'review_required');assert.equal(steps.length,0)
+}))
 test('pending, canceled and paid orders do not trigger a refund reversal',async()=>enabled(async()=>{
  for(const status of ['paid','pending','canceled'])assert.equal((await reverseOrderAccess(db([{table:'orders',data:{status}}]),'order')).access_reversal,'unchanged')
  await assert.rejects(applyOrderAccess(db([{rpc:'checkout_apply_access',error:{message:'fail'}}]),'order','profile'),{status:503})

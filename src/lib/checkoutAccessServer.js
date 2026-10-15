@@ -17,7 +17,7 @@ export async function reverseOrderAccess(db, orderId) {
   else {
     const prior = await db.from('webhook_events').select('processed_at').eq('pagarme_event_id', `access:${order.id}`).maybeSingle()
     if (prior.error) throw new PaymentError('Não foi possível consultar a liberação.', 503)
-    if (!prior.data?.processed_at) result = { status: 'completed', reason: 'not_granted' }
+    if (!prior.data) result = { status: 'completed', reason: 'not_granted' }
   }
   const saved = await db.from('webhook_events').upsert({ pagarme_event_id: `revoke:${order.id}`, type: 'checkout.access_reversal', payload: { order_id: order.id, status: result.status, reason: result.reason || order.status }, processed_at: result.status === 'completed' ? new Date().toISOString() : null, error: result.status === 'review_required' ? 'review_required' : null }, { onConflict: 'pagarme_event_id' })
   if (saved.error) throw new PaymentError('Não foi possível registrar a revisão de acesso.', 503)
