@@ -83,7 +83,7 @@ test('paid order creation registers locally before gateway and verifies returned
     {table:'orders',get data(){return localOrder},check(operations){localOrder=operations.find(row=>row[0]==='insert')[1]; assert.equal(localOrder.total_cents,4230)}},
     {table:'webhook_events',data:null},
     {table:'order_items',data:null},
-    {table:'orders',data:null,check(operations){assert.equal(operations.find(row=>row[0]==='update')[1].status,'paid')}},
+    {table:'orders',data:[{id:'saved'}],check(operations){assert.equal(operations.find(row=>row[0]==='update')[1].status,'paid');assert.deepEqual(operations.find(row=>row[0]==='is'),['is','pagarme_order_id',null])}},
   ]
   const oldFetch = globalThis.fetch
   globalThis.fetch = async (url, options) => {
@@ -123,7 +123,7 @@ test('card wallet receives token and billing address, and order receives only se
     {table:'customers',data:null},{table:'customers',data:{id:'customer'}},
     {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
     {table:'webhook_events',data:null},{table:'order_items',data:null},{table:'customers',data:{id:'customer',pagarme_customer_id:null}},
-    {table:'customers',data:null},{table:'orders',data:null},
+    {table:'customers',data:null},{table:'orders',data:[{id:'saved'}]},
   ]
   const oldFetch=globalThis.fetch
   const called=[]
@@ -145,4 +145,25 @@ test('card wallet receives token and billing address, and order receives only se
     const value=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'credit_card',card_token:'token_secure'},'card-request-123456')
     assert.equal(value.status,'paid');assert.equal(called.length,3);assert.equal(steps.length,0)
   } finally {globalThis.fetch=oldFetch;delete process.env.PAGARME_SECRET_KEY}
+})
+test('creation response cannot overwrite an order already linked by an early webhook',async()=>{
+ process.env.PAGARME_SECRET_KEY='sk_test_mock'
+ const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393',address:{line_1:'Rua 1, 10',zip_code:'59000000',city:'Natal',state:'RN'}}
+ let localOrder
+ const steps=[
+  {table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
+  {table:'customers',data:null},{table:'customers',data:{id:'customer'}},
+  {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
+  {table:'webhook_events',data:null},{table:'order_items',data:null},
+  {table:'orders',data:[],check(ops){assert.deepEqual(ops.find(row=>row[0]==='is'),['is','pagarme_order_id',null])}},
+  {table:'orders',get data(){return {...localOrder,pagarme_order_id:'or_early',status:'paid'}}},{table:'customers',data:{email:customer.email}},
+  {table:'orders',data:null},
+ ]
+ const original=globalThis.fetch;let gets=0
+ globalThis.fetch=async(url,options)=>{
+  if(options.method==='GET')gets++
+  return Response.json({id:'or_early',code:localOrder.id,amount:4230,customer:{email:customer.email},charges:[{id:'ch_early',status:options.method==='GET'?'paid':'pending'}]})
+ }
+ try{const value=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'early-request-123456');assert.equal(value.status,'paid');assert.equal(gets,1);assert.equal(steps.length,0)}
+ finally{globalThis.fetch=original;delete process.env.PAGARME_SECRET_KEY}
 })

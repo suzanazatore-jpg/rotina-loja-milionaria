@@ -76,7 +76,7 @@ test('payment registers and charges main plus selected additional in one gateway
     {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1];assert.equal(localOrder.total_cents,7930)}},
     {table:'webhook_events',data:null,check(ops){assert.equal(ops.find(row=>row[0]==='insert')[1].payload.items[1].plan_id,'plan-bump')}},
     {table:'order_items',data:null,check(ops){const items=ops.find(row=>row[0]==='upsert')[1];assert.equal(items.length,2);assert.equal(items[1].kind,'bump');assert.equal(items[1].price_cents,3700);assert.notEqual(items[0].id,items[1].id)}},
-    {table:'orders',data:null},
+    {table:'orders',data:[{id:'saved'}]},
   ]
   const previousFetch=globalThis.fetch, previousKey=process.env.PAGARME_SECRET_KEY
   process.env.PAGARME_SECRET_KEY='sk_test_mock'

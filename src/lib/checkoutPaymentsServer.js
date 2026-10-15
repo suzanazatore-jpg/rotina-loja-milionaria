@@ -82,7 +82,9 @@ export async function createPayment(db, input, key, tracking = null) {
   }
   const remote = await pagarme('/orders', { method: 'POST', idempotencyKey: order.id, body: orderPayload(order, offer, product, gatewayCustomer, gatewayCard, items) })
   const update = confirmedOrderState(remote, { ...order, email: customer.email })
-  await result(db.from('orders').update(update).eq('id', order.id))
+  const saved = await result(db.from('orders').update(update).eq('id', order.id).is('pagarme_order_id', null).select('id'))
+  // Um webhook pode ter conciliado antes de a resposta da criação chegar.
+  if (!saved?.length) return syncPayment(db, order.id)
   return { order_id: order.id, ...update }
 }
 

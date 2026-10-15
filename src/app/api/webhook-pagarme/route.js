@@ -1,10 +1,10 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
-import { syncPayment, reconcileSubscriptionCharge } from '@/lib/checkoutPaymentsServer'
+import { reconcileSubscriptionCharge } from '@/lib/checkoutPaymentsServer'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
 import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'
-import { pagarme } from '@/lib/pagarme'
+import { reconcileWebhookResource } from '@/lib/checkoutWebhookServer'
 
 export const runtime = 'nodejs'
 function authorized(request) {
@@ -15,49 +15,33 @@ function authorized(request) {
 }
 export async function POST(request) {
   if (!authorized(request)) return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 })
+  let db, eventId
   try {
-    const event = await request.json()
-    if (!/^hook_[a-zA-Z0-9]+$/.test(event.id || '') || !event.type || !event.data?.id) return NextResponse.json({ error: 'Evento inválido.' }, { status: 400 })
-    const db = checkoutAdminClient()
+    const text = await request.text()
+    if (Buffer.byteLength(text) > 262144) return NextResponse.json({ error: 'Evento excede o limite.' }, { status: 413 })
+    let event
+    try { event = JSON.parse(text) } catch { return NextResponse.json({ error: 'Evento inválido.' }, { status: 400 }) }
+    if (!event || typeof event !== 'object' || !/^hook_[a-zA-Z0-9]+$/.test(event.id || '') || typeof event.type !== 'string' || !/^[a-z_]+\.[a-z_]+$/.test(event.type) || typeof event.data?.id !== 'string' || !/^[a-zA-Z0-9_]{1,100}$/.test(event.data.id)) return NextResponse.json({ error: 'Evento inválido.' }, { status: 400 })
+    db = checkoutAdminClient()
+    eventId = event.id
     const registered = await db.from('webhook_events').upsert({ pagarme_event_id: event.id, type: event.type, payload: { resource_id: event.data.id } }, { onConflict: 'pagarme_event_id', ignoreDuplicates: true })
     if (registered.error) throw registered.error
-    const { data: stored, error: readError } = await db.from('webhook_events').select('processed_at').eq('pagarme_event_id', event.id).single()
+    const { data: stored, error: readError } = await db.from('webhook_events').select('processed_at,type,payload').eq('pagarme_event_id', event.id).single()
     if (readError) throw readError
+    if (stored.type !== event.type || stored.payload?.resource_id !== event.data.id) throw new Error('Evento conflitante.')
     if (stored.processed_at) return NextResponse.json({ received: true })
-    let orderId
-    let reconciled
-    if (event.type.startsWith('order.')) {
-      const { data, error } = await db.from('orders').select('id').eq('pagarme_order_id', event.data.id).maybeSingle()
-      if (error) throw error
-      orderId = data?.id
-    } else if (event.type.startsWith('charge.')) {
-      // O payload recebido nunca é usado como prova de pagamento.
-      const charge = await pagarme(`/charges/${event.data.id}`)
-      if (charge.order?.id) {
-        const { data, error } = await db.from('orders').select('id').eq('pagarme_order_id', charge.order.id).maybeSingle()
-        if (error) throw error
-        orderId = data?.id
-      }
-      if (charge.invoice?.subscription_id || charge.invoice?.subscription?.id) {
-        reconciled = await reconcileSubscriptionCharge(db, charge)
-        orderId = reconciled.order_id
-      }
-    } else if (event.type.startsWith('subscription.')) {
-      const remote = await pagarme(`/subscriptions/${event.data.id}`)
-      const { error } = await db.from('subscriptions').update({ status: remote.status === 'canceled' ? 'canceled' : 'active', current_period_end: remote.current_cycle?.end_at || null, canceled_at: remote.canceled_at || null }).eq('pagarme_subscription_id', remote.id)
-      if (error) throw error
-    }
-    if (orderId) {
-      const order = reconciled || await syncPayment(db, orderId)
-      if (order.status === 'paid') {
-        await fulfillPaidOrder(db, orderId)
-        await deliverPaidConversion(db, orderId)
-      }
+    const order = await reconcileWebhookResource(db, event, { reconcileSubscriptionCharge })
+    if (order?.status === 'paid') {
+      await fulfillPaidOrder(db, order.order_id)
+      await deliverPaidConversion(db, order.order_id)
     }
     const { error } = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', event.id)
     if (error) throw error
     return NextResponse.json({ received: true })
   } catch {
+    if (db && eventId) {
+      try { await db.from('webhook_events').update({ error: 'reconciliation_pending' }).eq('pagarme_event_id', eventId).is('processed_at', null) } catch { /* O HTTP 503 continua solicitando reenvio. */ }
+    }
     return NextResponse.json({ error: 'Não foi possível conciliar o evento. Reenvie o webhook.' }, { status: 503 })
   }
 }
