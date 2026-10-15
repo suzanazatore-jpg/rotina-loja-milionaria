@@ -2,10 +2,11 @@ import { expireOrderAccess } from '@/lib/checkoutAccessServer'
 import { timingSafeEqual } from 'node:crypto'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { retryConversions } from '@/lib/checkoutConversionsServer'
+import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-export const maxDuration = 60
+export const maxDuration = 120
 
 export async function GET(request) {
   const secret = process.env.CRON_SECRET
@@ -15,6 +16,8 @@ export async function GET(request) {
   try {
     const db = checkoutAdminClient()
     const access = await expireOrderAccess(db)
-    return Response.json({ ...await retryConversions(db), access }, { headers: { 'Cache-Control': 'no-store' } })
+    let outbound
+    try { outbound = await processOutboundWebhooks(db) } catch { outbound = { error: 'queue_pending' } }
+    return Response.json({ ...await retryConversions(db), access, outbound }, { headers: { 'Cache-Control': 'no-store' } })
   } catch { return Response.json({ error: 'Não foi possível processar conversões.' }, { status: 503 }) }
 }
