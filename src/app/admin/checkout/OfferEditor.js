@@ -37,7 +37,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
         if (!product || (ofertaId!=='nova' && !offer)) throw new Error('Produto ou oferta não encontrado.')
         const initial = offer ? {...OFERTA_VAZIA,...offer,price:(offer.price_cents/100).toFixed(2).replace('.',','),thank_you_url:offer.thank_you_url || '',bumps:json.bumps.filter(b=>b.offer_id===offer.id).map(b=>({bump_offer_id:b.bump_offer_id,headline:b.headline,description:b.description || ''}))} : {...OFERTA_VAZIA,product_id:produtoId,payment_methods:product.type==='subscription'?['credit_card']:['pix','credit_card'],max_installments:product.type==='subscription'?1:12,monthly_interest_pct:product.type==='subscription'?'0':'2.99',bumps:[]}
         initial.checkout_config = {...CHECKOUT_DEFAULTS,...offer?.checkout_config,tracking_mode:trackingMode(offer?.checkout_config),redirects:{...CHECKOUT_DEFAULTS.redirects,...offer?.checkout_config?.redirects,approved:offer?.checkout_config?.redirects?.approved || offer?.thank_you_url || ''}}
-        if (active) {setCatalog(json);setDados(initial);setBaseline(JSON.stringify(initial));setToken(session.access_token)}
+        if (active) {setCatalog(json);setDados(initial);setBaseline(JSON.stringify(initial));setToken(session.access_token);if(window.location.hash==='#checkout')setTab('checkout')}
       } catch(e) {if(active)setMessage(e.message)}
       finally {if(active)setLoading(false)}
     }
