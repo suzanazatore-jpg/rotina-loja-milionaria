@@ -13,7 +13,7 @@ const panel={background:'#141414',border:'1px solid #333029',borderRadius:14,pad
 const inputStyle={background:'#1C1C1C',border:'1px solid #47423A',borderRadius:8,padding:'10px 12px',color:'#FFF',maxWidth:'100%',fontSize:14}
 const buttonStyle={background:'#D4AF37',color:'#151515',border:0,borderRadius:8,padding:'10px 15px',fontWeight:750,cursor:'pointer'}
 
-export default function TrafficOffice(){
+export default function TrafficOffice({management=false}){
  const router=useRouter()
  const [authorized,setAuthorized]=useState(false)
  const [loading,setLoading]=useState(true)
@@ -34,7 +34,7 @@ export default function TrafficOffice(){
   const [a,b,m,g,r]=await Promise.all([
    supabase.from('traffic_clients').select('id,name,meta_account_id,mcp_status,business_id').order('name'),
    supabase.from('traffic_businesses').select('id,name').order('name'),
-   supabase.from('traffic_daily_metrics').select('client_id,metric_date,spend,clicks,impressions,ctr,cpc,leads,cpl,frequency,data_status').order('metric_date',{ascending:false}).limit(5000),
+   supabase.from('traffic_daily_metrics').select('client_id,metric_date,spend,clicks,impressions,ctr,cpc,leads,cpl,frequency,data_status,messages,purchases,message_spend').order('metric_date',{ascending:false}).limit(5000),
    supabase.from('traffic_goals').select('id,client_id,campaign_id,campaign_name,objective,metric_label,target_cost,target_quantity,valid_from').order('valid_from',{ascending:false}).limit(1000),
    supabase.from('traffic_reports').select('id,client_id,period_type,period_end,published_at').limit(1000)
   ])
@@ -93,14 +93,12 @@ export default function TrafficOffice(){
  }
  if(loading)return <main style={{background:'#0A0A0A',color:'#FFF',minHeight:'100vh',padding:30}}>Carregando...</main>
  if(!authorized)return <main style={{background:'#0A0A0A',color:'#FFF',minHeight:'100vh',padding:30}}>Acesso restrito ao escritório.</main>
- return <main style={{background:'#f5f4ef',color:'#25221c',minHeight:'100vh',padding:'24px clamp(16px,3vw,56px) 90px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'}}>
+ return <><aside className="td-sidebar"><div className="td-brand">SZ <span>INTELIGÊNCIA</span></div><p>SUZANA ZATORRE</p><nav><a className={!management?'current':''} href="/admin/trafego">▦ Relatório por cliente</a><a className={management?'current':''} href="/admin/trafego/configuracoes">⚙ Contas e configurações</a><a href="/admin/alunas">Alunas e vínculos</a><a href="/admin/trafego/relatorios">Relatórios por período</a><a href="/admin">← Meu Escritório</a></nav></aside><main className="traffic-office-shell" style={{background:'#f5f4ef',color:'#25221c',minHeight:'100vh',padding:'24px clamp(16px,3vw,56px) 90px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'}}>
   <div style={{width:'100%'}}>
-   <button style={{...buttonStyle,background:'transparent',border:'1px solid #5A4A28',color:'#D4AF37'}} onClick={()=>router.push('/admin')}>← Meu Escritório</button>
-   <div className="td-office-nav"><h1 className="td-office-title">CENTRAL DE TRÁFEGO • SUZANA ZATORRE</h1><a href="/admin/alunas">Alunas e vínculos</a><a href="/admin/trafego/relatorios">Relatórios semanais e mensais</a></div>
    {error&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>Erro na leitura: {error}</div>}
    {actionError&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>{actionError}</div>}
-   <TrafficDashboard accounts={clients} metrics={metrics} onRefresh={load} />
-   <details className="td-management"><summary>Gerenciar clientes, contas, objetivos e metas</summary>
+   {!management&&<TrafficDashboard accounts={clients} metrics={metrics} onRefresh={load} />}
+   {management&&<section className="td-management"><h1>Contas, clientes e metas</h1><p>As configurações ficam separadas do relatório individual.</p>
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(185px,1fr))',gap:12,marginBottom:20}}>
      {[['Clientes cadastrados',businesses.length],['Contas vinculadas',countLinked+' de '+clients.length],['MCP habilitado',clients.filter(c=>c.mcp_status==='enabled').length],['Integração pendente',clients.filter(c=>c.mcp_status!=='enabled').length]].map(([label,value])=><div key={label} style={panel}><strong style={{display:'block',color:'#D4AF37',fontSize:28}}>{value}</strong><span style={{color:'#AFAFAF',fontSize:13}}>{label}</span></div>)}
    </div>
@@ -146,7 +144,7 @@ export default function TrafficOffice(){
      </section>
    })}
    <section style={panel}><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relatórios individuais</h2><p style={{color:'#AAA',fontSize:13,lineHeight:1.7}}>Relatórios cadastrados no backend: {reports.length}. As alunas consultam apenas as contas vinculadas aos seus cadastros; relatórios precisam ser publicados para aparecerem no acesso individual. A contagem de leads não é utilizada como meta universal; precisamos associar a métrica correta a cada campanha.</p><p style={{color:'#D4AF37',fontSize:13}}>Áudio oculto para todas as alunas.</p></section>
-   </details>
+   </section>}
    {editing&&<div role="dialog" aria-modal="true" aria-label="Configuração de objetivo" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.82)',zIndex:99,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
      <form onSubmit={saveGoal} style={{...panel,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box'}}>
       <h2 style={{margin:'0 0 6px',fontSize:21}}>Objetivo da conta</h2><p style={{color:'#AAA',fontSize:13}}>{editing.account.name}. Configuração inicial da conta; metas de cada campanha poderão ser cadastradas separadamente.</p>
@@ -158,5 +156,5 @@ export default function TrafficOffice(){
      </form>
     </div>}
   </div>
- </main>
+ </main></>
 }
