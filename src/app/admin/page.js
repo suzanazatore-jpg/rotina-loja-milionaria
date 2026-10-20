@@ -74,6 +74,13 @@ export default function Admin() {
       ],
     },
     {
+      titulo: 'Gestão de Tráfego Pago',
+      descricao: 'Acompanhe os clientes de anúncios e os relatórios semanais e mensais.',
+      cards: [
+        { icone: 'goals', titulo: 'Meu Tráfego Pago', sub: 'Central das 17 contas, indicadores e relatórios dos clientes.', rota: '/admin/trafego' },
+      ],
+    },
+    {
       titulo: 'Configurações',
       descricao: 'Preferências, segurança e administração do aplicativo.',
       cards: [
