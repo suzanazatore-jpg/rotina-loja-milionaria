@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
+import TrafficBinding from './TrafficBinding'
+
 const ouro = '#D4AF37'
 const ouroGrad = 'linear-gradient(135deg, #D4AF37, #F5D76E)'
 
@@ -80,6 +82,7 @@ function AcessoAlunaConteudo() {
       <Secao titulo="Conteúdos do Aplicativo" subtitulo="Libere conteúdos extras somente para esta aluna, sem alterar o plano dela.">
         <Chips itens={dados.conteudosApp || []} selecionados={conteudosApp} alternar={id => alternar(conteudosApp, setConteudosApp, id)} nome="name" vazio="Nenhum conteúdo disponível." />
       </Secao>
+      <TrafficBinding userId={alunaId} />
       <Secao titulo="Datas" subtitulo="A expiração individual tem prioridade sobre a validade do plano.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))', gap: '12px' }}>
           <label>Data da compra<input type="date" value={compra} onChange={e => setCompra(e.target.value)} style={campo} /></label>

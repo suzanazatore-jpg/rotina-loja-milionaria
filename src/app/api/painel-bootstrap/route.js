@@ -1,3 +1,4 @@
+import { loadTrafficAccess } from '@/lib/trafficAccess'
 import { createClient } from '@supabase/supabase-js'
 import { loadActiveRoutine } from '@/lib/activeRoutine'
 import { NextResponse } from 'next/server'
@@ -128,6 +129,7 @@ async function loadCritical(supabase, user) {
       assistant: active && (isAdmin || profile?.assistant_enabled === true || contents.includes('assistant')),
       team_goals: active && (isAdmin || contents.includes('team_goals')),
       pricing: active && (isAdmin || contents.includes('pricing')),
+      traffic: active && await loadTrafficAccess(supabase, user.id),
       contents,
       protocol_only_slug: protocolOnlySlug,
       protocols,

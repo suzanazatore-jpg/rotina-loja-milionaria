@@ -174,6 +174,7 @@ export default function Painel() {
   const [precificacaoLiberada, setPrecificacaoLiberada] = useState(false)
   const [protocolos, setProtocolos] = useState([])
   const [conteudosLiberados, setConteudosLiberados] = useState([])
+  const [trafegoLiberado,setTrafegoLiberado] = useState(false)
   // Calendário (vindo do banco)
   const [calendario, setCalendario] = useState([])
   const [acoesCalendario, setAcoesCalendario] = useState([])
@@ -290,6 +291,7 @@ export default function Painel() {
         setAssistenteLiberado(dados.acessos?.assistant === true)
         setMetasLiberadas(dados.acessos?.team_goals === true)
         setPrecificacaoLiberada(dados.acessos?.pricing === true)
+        setTrafegoLiberado(dados.acessos?.traffic === true)
         setProtocolos(dados.acessos?.protocols || [])
         setConteudosLiberados(dados.acessos?.contents || [])
         setDadosConta(dados.conta || { planos: [], inicio_em: null, ultimo_acesso_em: null, expira_em: null })
@@ -643,6 +645,7 @@ export default function Painel() {
                   <ProtocolAccess protocols={protocolos} cores={cores} />
                   <div className="premium-hub-heading"><p>CONTEÚDOS LIBERADOS</p><h2>Acesse seus materiais</h2><span>Cursos, campanhas, calendários e mentorias em um só lugar.</span></div>
                   <div className="premium-hub-grid">
+                    {trafegoLiberado && <CardAcesso cores={cores} icone="content" titulo="Meus relatórios de tráfego" sub="Anúncios e resultados da sua loja" onClick={() => router.push('/trafego')} destaque ouroGrad={ouroGrad} />}
                     {campanhasLiberadas && <CardAcesso cores={cores} icone="quickCampaigns" titulo="Campanhas" sub="Vendas prontas" onClick={() => irPara('campanhas')} destaque ouroGrad={ouroGrad} />}
                     {calendarioLiberado && <CardAcesso cores={cores} icone="quickCalendar" titulo="Calendário" sub="Conteúdo do mês" onClick={() => irPara('calendario')} />}
                     {precificacaoLiberada && <CardAcesso cores={cores} icone="content" titulo="Precificação e Lucro" sub="Preço, margem e descontos" onClick={() => irPara('precificacao')} />}
