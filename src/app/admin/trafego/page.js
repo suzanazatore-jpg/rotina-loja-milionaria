@@ -97,6 +97,7 @@ export default function TrafficOffice(){
    <button style={{...buttonStyle,background:'transparent',border:'1px solid #5A4A28',color:'#D4AF37'}} onClick={()=>router.push('/admin')}>← Meu Escritório</button>
    <p style={{color:'#D4AF37',fontSize:12,fontWeight:800,letterSpacing:1.5,margin:'28px 0 5px'}}>PAINEL DO ESCRITÓRIO</p>
    <h1 style={{fontSize:'clamp(25px,3vw,37px)',margin:'0 0 6px'}}>Meu Tráfego Pago</h1>
+   <button onClick={()=>router.push('/admin/trafego/relatorios')} style={{...buttonStyle,margin:'12px 0 16px'}}>📊 Abrir relatórios semanais e mensais</button>
    <p style={{color:'#B1B1B1',margin:'0 0 20px',lineHeight:1.6}}>Cada cliente tem seu acompanhamento. Uma loja pode possuir várias contas; as metas variam conforme o objetivo das campanhas. Nada é somado entre clientes diferentes.</p>
    {error&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>Erro na leitura: {error}</div>}
    {actionError&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>{actionError}</div>}
