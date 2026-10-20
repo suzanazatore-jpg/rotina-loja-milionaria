@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import TrafficDashboard from './TrafficDashboard'
 
 const ADMIN='suporte@suzanazatorre.com.br'
 const brl=n=>n==null?'Sem dado':Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
@@ -92,15 +93,14 @@ export default function TrafficOffice(){
  }
  if(loading)return <main style={{background:'#0A0A0A',color:'#FFF',minHeight:'100vh',padding:30}}>Carregando...</main>
  if(!authorized)return <main style={{background:'#0A0A0A',color:'#FFF',minHeight:'100vh',padding:30}}>Acesso restrito ao escritório.</main>
- return <main style={{background:'#0A0A0A',color:'#FFF',minHeight:'100vh',padding:'24px clamp(16px,3vw,56px) 90px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'}}>
+ return <main style={{background:'#f5f4ef',color:'#25221c',minHeight:'100vh',padding:'24px clamp(16px,3vw,56px) 90px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'}}>
   <div style={{width:'100%'}}>
    <button style={{...buttonStyle,background:'transparent',border:'1px solid #5A4A28',color:'#D4AF37'}} onClick={()=>router.push('/admin')}>← Meu Escritório</button>
-   <p style={{color:'#D4AF37',fontSize:12,fontWeight:800,letterSpacing:1.5,margin:'28px 0 5px'}}>PAINEL DO ESCRITÓRIO</p>
-   <h1 style={{fontSize:'clamp(25px,3vw,37px)',margin:'0 0 6px'}}>Meu Tráfego Pago</h1>
-   <button onClick={()=>router.push('/admin/trafego/relatorios')} style={{...buttonStyle,margin:'12px 0 16px'}}>📊 Abrir relatórios semanais e mensais</button>
-   <p style={{color:'#B1B1B1',margin:'0 0 20px',lineHeight:1.6}}>Cada cliente tem seu acompanhamento. Uma loja pode possuir várias contas; as metas variam conforme o objetivo das campanhas. Nada é somado entre clientes diferentes.</p>
+   <div className="td-office-nav"><h1 className="td-office-title">CENTRAL DE TRÁFEGO • SUZANA ZATORRE</h1><a href="/admin/alunas">Alunas e vínculos</a><a href="/admin/trafego/relatorios">Relatórios semanais e mensais</a></div>
    {error&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>Erro na leitura: {error}</div>}
    {actionError&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>{actionError}</div>}
+   <TrafficDashboard accounts={clients} metrics={metrics} onRefresh={load} />
+   <details className="td-management"><summary>Gerenciar clientes, contas, objetivos e metas</summary>
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(185px,1fr))',gap:12,marginBottom:20}}>
      {[['Clientes cadastrados',businesses.length],['Contas vinculadas',countLinked+' de '+clients.length],['MCP habilitado',clients.filter(c=>c.mcp_status==='enabled').length],['Integração pendente',clients.filter(c=>c.mcp_status!=='enabled').length]].map(([label,value])=><div key={label} style={panel}><strong style={{display:'block',color:'#D4AF37',fontSize:28}}>{value}</strong><span style={{color:'#AFAFAF',fontSize:13}}>{label}</span></div>)}
    </div>
@@ -124,7 +124,7 @@ export default function TrafficOffice(){
     return <section key={group.id} style={{...panel,marginBottom:20}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:12,flexWrap:'wrap',marginBottom:15}}>
        <div><h2 style={{margin:'0 0 4px',fontSize:23}}>{group.name}</h2><p style={{color:'#AAA',fontSize:13,margin:0}}>{group.accounts.length} conta(s) de anúncios • {known.length} conta(s) com números registrados para este dia</p></div>
-       <div style={{textAlign:'right'}}><div style={{color:'#AAA',fontSize:12}}>Investimento conhecido do cliente</div><strong style={{color:'#D4AF37',fontSize:25}}>{known.length?brl(spent):'Sem dados'}</strong></div>
+       <div style={{textAlign:'right'}}><div style={{color:'#AAA',fontSize:12}}>{group.id==='unassigned'?'Contas sem cliente definido':'Investimento conhecido do cliente'}</div><strong style={{color:'#D4AF37',fontSize:25}}>{group.id==='unassigned'?'Valores individuais abaixo':known.length?brl(spent):'Sem dados'}</strong></div>
       </div>
       {group.accounts.map(a=>{
        const m=daily.get(a.id)
@@ -135,7 +135,7 @@ export default function TrafficOffice(){
          <label style={{fontSize:12,color:'#AAA'}}>Cliente responsável <select aria-label={'Cliente responsável pela conta '+a.name} disabled={saving} value={a.business_id||''} onChange={e=>assign(a.id,e.target.value)} style={{...inputStyle,marginLeft:7}}><option value="">Sem vínculo</option>{businesses.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(125px,1fr))',gap:9,marginBottom:12}}>
-         {[['Investimento',m?.data_status==='ok'?brl(m.spend):'—'],['Cliques totais',m?.data_status==='ok'?num(m.clicks):'—'],['CTR total',m?.data_status==='ok'?pc(m.ctr):'—'],['Leads',m?.data_status==='ok'&&m.leads!=null?num(m.leads):'—']].map(([title,value])=><div key={title} style={{background:'#111',borderRadius:9,padding:12}}><div style={{fontSize:12,color:'#999',marginBottom:5}}>{title}</div><strong style={{fontSize:18}}>{value}</strong></div>)}
+         {[['Investimento',m?.data_status==='ok'?brl(m.spend):'—'],['Cliques no link',m?.data_status==='ok'?num(m.clicks):'—'],['CTR do link',m?.data_status==='ok'?pc(m.ctr):'—'],['Leads',m?.data_status==='ok'&&m.leads!=null?num(m.leads):'—']].map(([title,value])=><div key={title} style={{background:'#111',borderRadius:9,padding:12}}><div style={{fontSize:12,color:'#999',marginBottom:5}}>{title}</div><strong style={{fontSize:18}}>{value}</strong></div>)}
         </div>
         <div style={{display:'flex',justifyContent:'space-between',gap:10,flexWrap:'wrap',alignItems:'center'}}>
          <div style={{color:'#B7B7B7',fontSize:13}}>Objetivo configurado: <strong style={{color:'#FFF'}}>{goal?objectives[goal.objective]||goal.objective:'Ainda não definido'}</strong>{goal?.target_cost!=null?' • Custo-alvo: '+brl(goal.target_cost):''}{m?.data_status==='no_data'?' • Sem dados retornados':!m?' • Sem coleta neste dia':''}</div>
@@ -145,7 +145,8 @@ export default function TrafficOffice(){
       })}
      </section>
    })}
-   <section style={panel}><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relatórios individuais</h2><p style={{color:'#AAA',fontSize:13,lineHeight:1.7}}>Relatórios cadastrados no backend: {reports.length}. A publicação semanal e mensal para as alunas ainda não está ativa. A contagem de leads não é utilizada como meta universal; precisamos associar a métrica correta a cada campanha.</p><p style={{color:'#D4AF37',fontSize:13}}>Áudio oculto para todas as alunas.</p></section>
+   <section style={panel}><h2 style={{fontSize:18,margin:'0 0 8px'}}>Relatórios individuais</h2><p style={{color:'#AAA',fontSize:13,lineHeight:1.7}}>Relatórios cadastrados no backend: {reports.length}. As alunas consultam apenas as contas vinculadas aos seus cadastros; relatórios precisam ser publicados para aparecerem no acesso individual. A contagem de leads não é utilizada como meta universal; precisamos associar a métrica correta a cada campanha.</p><p style={{color:'#D4AF37',fontSize:13}}>Áudio oculto para todas as alunas.</p></section>
+   </details>
    {editing&&<div role="dialog" aria-modal="true" aria-label="Configuração de objetivo" style={{position:'fixed',inset:0,background:'rgba(0,0,0,.82)',zIndex:99,display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
      <form onSubmit={saveGoal} style={{...panel,width:'100%',maxWidth:480,maxHeight:'90vh',overflowY:'auto',boxSizing:'border-box'}}>
       <h2 style={{margin:'0 0 6px',fontSize:21}}>Objetivo da conta</h2><p style={{color:'#AAA',fontSize:13}}>{editing.account.name}. Configuração inicial da conta; metas de cada campanha poderão ser cadastradas separadamente.</p>
