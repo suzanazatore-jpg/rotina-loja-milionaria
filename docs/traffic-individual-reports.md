@@ -1,54 +1,19 @@
 # Relatórios individuais de tráfego
 
-Implementação no aplicativo Rotina, repositório `rotina-loja-milionaria`.
+O relatório administrativo está em `/admin/trafego`; a cliente usa `/trafego`. A API valida sessão, plano ativo e vínculos autorizados, e retorna apenas contas liberadas e relatórios publicados. A aba Clientes mostra apenas clientes elegíveis vinculadas. Vários vínculos são gravados em transação com detecção de concorrência.
 
-- `/admin/trafego`: relatório com todos os dados administrativos; aba Clientes lista somente cadastros elegíveis e vinculados.
-- `/trafego`: a mesma apresentação recebe exclusivamente as contas ativas vinculadas à sessão. Links `?report=` selecionam o relatório autorizado e a conta correta.
-- `/api/trafego`: valida sessão no servidor, plano ativo e vínculo; pagina todas as consultas e retorna somente relatórios publicados, nunca rascunhos ou publicações futuras.
-- Cadastro administrativo permite aprovar várias contas em uma transação com detecção de alterações concorrentes.
-- Cards comparáveis, períodos, tabelas e prévias reais de criativos. Alcance e frequência utilizam totais deduplicados do intervalo. Tabelas agregadas não são exibidas como se pertencessem a outro período.
-- O endpoint administrativo de importação JSON aceita `meta_account_id`, `period_start`, `period_end`, `payload` com `totals`, `daily`, `campaigns`, `adsets`, `ads`. Prévia de criativo usa `image_url`/`thumbnail_url` HTTPS; `results` e `result_label` são os da campanha. Campos arbitrários e credenciais não são persistidos.
+Criativos são comparados dentro da mesma campanha e evento. Resultados desconhecidos continuam desconhecidos. Alcance e frequência utilizam o total deduplicado do período. Snapshots são preservados por conta e intervalo exato, permitindo comparar mês e semanas sem misturar números.
 
-## Avisos semanais
+## Avisos
 
-Cron `/api/cron/trafego`, segunda-feira 11h UTC / 8h Brasília. Por padrão permanece desativado até a validação dos canais. O endpoint administrativo de configurações permite ativar/pausar. Um relatório só é publicado automaticamente se houver sete dias completos da semana encerrada; rascunhos existentes são preservados. Usuários são requalificados antes de cada lote.
+Segunda às 8h de Brasília: preparação dos relatórios, sem enviar mensagens. Segunda às 10h: avisos automáticos, caso não sejam pausados e haja sete dias completos. Rascunhos existentes são preservados. Canais: histórico no aplicativo, Web Push, Brevo e Pabbly/BotConversa. Entregas têm identificadores idempotentes; aceite do provedor não é confirmação de recebimento.
 
-Canais:
+O teste permite selecionar um cadastro aprovado e carrega nome, e-mail e telefone do banco. Não aceita endereço/telefone livre. O teste real para a cliente escolhida foi confirmado pela usuária em 21/10/2026, incluindo push.
 
-- Histórico dentro do app e Web Push nas inscrições ativas existentes.
-- Brevo: reutiliza `BREVO_API_KEY` do servidor e remetente `suporte@suzanazatorre.com.br`.
-- WhatsApp: exige **novo webhook específico** `TRAFFIC_REPORT_WHATSAPP_WEBHOOK_URL`. Não reutiliza o fluxo de mensagens em massa sem validar seu mapeamento. O payload contém `evento: campanha_em_massa`, `tipo: relatorio_trafego_pronto`, `campanha_id` (chave idempotente), `titulo`, `mensagem` e um único item em `destinatarios`, com `id`, `nome`, `primeiro_nome`, `email`, `telefone`.
-- Uma linha de entrega por relatório/usuário/canal impede duplicação concorrente. Aceite de Brevo/Pabbly é registrado como `accepted`, não como entrega comprovada. Timeouts e erros ambíguos são `unknown` e exigem conferência antes de reenviar.
+O WhatsApp usa variável privada exclusiva do servidor, workflow dedicado no Pabbly e modelo de utilidade aprovado na companhia oficial 193579. O webhook legado do BotConversa com identificador 179901 pertence a essa companhia e foi verificado antes da reutilização. O antigo agendamento semanal Pabbly está desligado. O e-mail possui saudação com nome cadastrado, aviso genérico, link fixo `/trafego` e observação para acessar com login e senha.
 
-## Estado da integração e liberação
+## Coleta
 
-Código validado por testes e build local usando variáveis substitutas (sem credenciais de produção).
+Ver [procedimento de coleta](traffic-collection-runbook.md). A conexão usada para a recorrência é Meta Ads MCP → tarefa ChatGPT → Supabase, sem credenciais Meta no código da aplicação. Os dados e imagens devem ser validados antes da gravação. Existem contas ainda não habilitadas no MCP; elas permanecem pendentes sem dados inventados. O histórico de `traffic_collection_runs` registra cada execução e seus resultados.
 
-**Migração ainda NÃO aplicada**: `supabase/patches/traffic_individual_reports.sql`. O conector retornou `Invalid or expired requestState` em tentativas de escrita; leitura confirmou ausência das tabelas/função novas. É necessário aplicar este SQL, testar políticas e transação no banco e executar os testes reais de isolamento antes de ativar a versão completa. O dashboard pode ser publicado com o vínculo individual anterior preservado por compatibilidade; múltiplas contas e avisos permanecem pendentes.
-
-Em 21/10/2026, foram coletados e gravados 127 anúncios reais com URLs de imagens em 13 contas, para 01/10 a 20/10. Uma conta habilitada não retornou anúncios com investimento e três contas seguem sem acesso Meta habilitado. Os snapshots preservaram totais, diário e campanhas. A coleta recorrente precisa continuar incluindo anúncios e atualizando URLs de mídia da Meta, que podem expirar. Conjuntos ainda não foram coletados.
-
-A aba Integrações foi removida a pedido da usuária e sua rota redireciona ao relatório. Campanhas em destaque permanece no mesmo lugar. A seção de criativos compara menor/maior custo do mesmo evento dentro de cada campanha, mostra imagem, investimento e volume, permite filtrar a campanha e abrir todos os criativos. Empates ou apenas um anúncio não geram um pior artificial; valores desconhecidos não viram zero. Alcance usa custo por mil contas alcançadas.
-
-No Pabbly já existe `[ Envio Relatório Semanal WhatsApp ]`, às segundas às 9h America/Fortaleza, usando Google Sheets, filtro e BotConversa. Não foi alterado nem duplicado. Antes de ativar o novo aviso, definir se esse fluxo será migrado ou mantido para outro público.
-
-Pendências: aplicar SQL; validar destinatários e webhook específico; validar Brevo e Web Push; manter a coleta recorrente de anúncios e imagens; coletar conjuntos; testar os fluxos semanais completos. Dashboard e criativos publicados no projeto Vercel existente e conferidos em navegador autenticado. A automação diária do ChatGPT foi criada separadamente na conversa.
-
-
-## Atualização de avisos — 21/10/2026
-
-Aplicadas no projeto de produção as migrações `traffic_weekly_delivery_tracking`, `traffic_notification_report_links` e `traffic_internal_notification_tests`. As tabelas de entregas e configurações estão com RLS e sem leitura para anon/authenticated. A parte de múltiplos vínculos e políticas restritivas do patch original continua pendente; não considerar o patch inteiro aplicado.
-
-Controles disponíveis em Sobre os dados, dentro da Central existente. Teste administrativo restringe destinatário ao usuário administrador autenticado, com identificador idempotente por execução, histórico por canal e bloqueio de repetição após resultado ambíguo. Não aceita endereço, telefone ou cliente arbitrário. O horário preparado segue segunda às 8h de Brasília.
-
-Teste real: um aviso criado no histórico do cadastro administrativo, e-mail aceito pelo Brevo com identificador do provedor. Push não enviado por ausência de dispositivo inscrito nesse cadastro. WhatsApp não enviado, pois falta configurar e validar fluxo específico. Nenhuma entrega para clientes ou relatório publicado pelo teste. Agendamento semanal permanece desativado.
-
-BotConversa: companhia [Mentoriadas] ID 58339 informa WhatsApp desconectado; criado apenas webhook `Central de Tráfego — relatório pronto`, em Modo Teste e sem ações de envio. O fluxo Pabbly anterior aponta para outra companhia, ID 179901, ausente do seletor atual, e não foi alterado. Companhia alternativa disponível: [Low Tocket]-API Oficial ID 193579. Definir qual WhatsApp deve ser o remetente antes de concluir o fluxo e ativar o agendamento.
-
-Validação desta etapa: 26 testes passaram e build de produção concluído.
-
-
-Continuação de 21/10: confirmado remetente oficial Suporte Suzana Zatorre, final 4124, conectado, verificado e ativo na companhia 193579. Criado modelo `relatoriosemanaltrafego`, categoria Utilidade, pt_BR, com aviso informativo e botão fixo “Ver meu relatório” para https://rotina.suzanazatorre.com.br/trafego. A Meta confirmou “Modelo enviado para revisão”; status observado “Em revisão”. Não houve disparo WhatsApp. Após aprovação, conectar a ação do modelo ao fluxo específico Pabbly e configurar a variável exclusiva do servidor; executar teste interno antes da ativação geral. Não reutilizar o webhook antigo da companhia 179901. Não considerar o fluxo WhatsApp pronto apenas porque o modelo foi enviado para revisão.
-
-
-Texto do e-mail ajustado a pedido da usuária: saudação com o nome cadastrado, sem nome da conta ou campanha; aviso de relatório pronto; link fixo https://rotina.suzanazatorre.com.br/trafego; observação para acessar com login e senha. Remetente e destinatário permanecem os do envio individual. Testes internos preservam a identificação de teste.
+Migrações aplicadas: entregas/configurações semanais, links de notificação, testes individuais, função transacional de múltiplos vínculos e histórico de snapshots por período. As políticas restritivas adicionais do patch original não devem ser consideradas aplicadas por esta documentação; o isolamento da API permanece obrigatório.

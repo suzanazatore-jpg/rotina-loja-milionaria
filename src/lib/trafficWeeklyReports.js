@@ -21,7 +21,7 @@ export async function deliverTraffic(db,report,user,channel,send){
  try{const result=await send(claimed[0].id);await checked(await db.from('traffic_report_deliveries').update({status:result?.status||'sent',provider_id:result?.id||null,sent_at:['skipped','failed'].includes(result?.status)?null:new Date().toISOString(),error_message:result?.reason||null}).eq('id',claimed[0].id));return {id:claimed[0].id,channel,status:result?.status||'sent',reason:result?.reason}}
  catch(error){await checked(await db.from('traffic_report_deliveries').update({status:'unknown',error_message:String(error.message||'Falha de entrega').slice(0,240)}).eq('id',claimed[0].id));return {id:claimed[0].id,channel,status:'unknown',reason:String(error.message||'Falha de entrega')}}
 }
-export async function runTrafficWeekly(now=new Date()){
+export async function runTrafficWeekly(now=new Date(),{notify=true}={}){
  const db=trafficDb(),configuration=await db.from('traffic_report_settings').select('*').eq('id',true).single()
  if(['PGRST205','42P01'].includes(configuration.error?.code))return {enabled:false,reason:'Atualização do banco pendente.'}
  const settings=await checked(configuration)
@@ -39,6 +39,7 @@ export async function runTrafficWeekly(now=new Date()){
   if(report&&!report.published_at){skipped++;continue} // Preserve drafts under editorial review.
   if(!report){const result=await db.from('traffic_reports').insert({client_id:account.id,period_type:'weekly',period_start:range.from,period_end:range.to,summary:content.summary,recommendations:content.recommendations,published_at:now.toISOString()}).select('id,published_at').single();if(result.error?.code==='23505')report=await checked(await db.from('traffic_reports').select('id,published_at').eq('client_id',account.id).eq('period_type','weekly').eq('period_start',range.from).eq('period_end',range.to).single());else report=await checked(result);published++}
   if(!report?.published_at||new Date(report.published_at)>now)continue
+  if(!notify)continue
   for(const membership of members){
    if(!await loadTrafficAccess(db,membership.user_id)){skipped++;continue}
    const profile=await checked(await db.from('profiles').select('id,name,email,phone').eq('id',membership.user_id).single())
@@ -52,5 +53,5 @@ export async function runTrafficWeekly(now=new Date()){
    }
   }
  }
- return {enabled:true,published,skipped,period:range}
+ return {enabled:true,published,skipped,period:range,notifications:notify}
 }

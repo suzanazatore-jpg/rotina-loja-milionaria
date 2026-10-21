@@ -30,7 +30,7 @@ export async function reportData(db,user) {
   const [metrics,reports,snapshots]=await Promise.all([
     allRows(()=>db.from('traffic_daily_metrics').select('*').in('client_id',activeIds).order('metric_date',{ascending:false}).order('client_id')),
     allRows(()=>db.from('traffic_reports').select('id,client_id,period_type,period_start,period_end,summary,recommendations,published_at').in('client_id',activeIds).not('published_at','is',null).lte('published_at',new Date().toISOString()).order('period_end',{ascending:false}).order('id')),
-    allRows(()=>db.from('traffic_metric_snapshots').select('meta_account_id,period_start,period_end,collected_at,payload').in('meta_account_id',accounts.map(a=>a.meta_account_id)).order('meta_account_id')),
+    allRows(()=>db.from('traffic_metric_snapshots').select('meta_account_id,period_start,period_end,collected_at,payload').in('meta_account_id',accounts.map(a=>a.meta_account_id)).order('meta_account_id').order('period_start').order('period_end')),
   ])
   let clients=[]
   if(admin){

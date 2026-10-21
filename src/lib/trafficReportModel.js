@@ -8,6 +8,14 @@ export function numeric(value) {
 export function safeMedia(value) {
   try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password ? u.href : null } catch { return null }
 }
+export function selectTrafficSnapshot(snapshots, accountId, from, to) {
+  const matching = snapshots.filter(s => s.meta_account_id === accountId)
+  const exact = from && to ? matching.filter(s => s.period_start === from && s.period_end === to) : []
+  return (exact.length ? exact : matching).slice().sort((a,b) =>
+    String(b.period_end || '').localeCompare(String(a.period_end || '')) ||
+    String(a.period_start || '').localeCompare(String(b.period_start || '')) ||
+    String(b.collected_at || '').localeCompare(String(a.collected_at || '')))[0]
+}
 export function normalizeEntity(row = {}) {
   const spend = numeric(row.spend ?? row.amount_spent)
   const impressions = numeric(row.impressions)

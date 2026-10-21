@@ -1,6 +1,6 @@
 'use client'
 import {useEffect,useMemo,useRef,useState} from 'react'
-import {normalizeEntity, numeric, previousRange, rangeTotals, safeMedia} from '@/lib/trafficReportModel'
+import {normalizeEntity, numeric, previousRange, rangeTotals, safeMedia, selectTrafficSnapshot} from '@/lib/trafficReportModel'
 import './traffic-dashboard.css'
 import TrafficCreatives from './TrafficCreatives'
 const num=n=>n==null?'—':Number(n).toLocaleString('pt-BR',{maximumFractionDigits:2})
@@ -27,7 +27,7 @@ export default function TrafficDashboard({accounts=[],metrics=[],snapshots=[],re
  useEffect(()=>{if(!detail)return;const previous=document.activeElement;function key(event){if(event.key==='Escape')setDetail(null);if(event.key==='Tab'){const nodes=dialogRef.current?.querySelectorAll('button,a[href]');if(!nodes?.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus()}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus()}}}document.addEventListener('keydown',key);return()=>{document.removeEventListener('keydown',key);previous?.focus()}},[detail])
  const available=clientId?accounts.filter(a=>clients.find(c=>c.id===clientId)?.account_ids.includes(a.id)):accounts
  const account=available.find(a=>a.id===accountId)||available[0]
- const snapshot=snapshots.find(s=>s.meta_account_id===account?.meta_account_id)
+ const snapshot=selectTrafficSnapshot(snapshots,account?.meta_account_id,from,to)
  const latest=metrics.filter(m=>m.client_id===account?.id).map(m=>m.metric_date).sort().at(-1)
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Sao_Paulo'}).format(new Date())
  const start=from||snapshot?.period_start||(latest?latest.slice(0,7)+'-01':today.slice(0,7)+'-01'), end=to||snapshot?.period_end||latest||today
@@ -35,7 +35,7 @@ export default function TrafficDashboard({accounts=[],metrics=[],snapshots=[],re
  const accountRows=useMemo(()=>metrics.filter(m=>m.client_id===account?.id).sort((a,b)=>a.metric_date.localeCompare(b.metric_date)),[metrics,account?.id])
  const rows=accountRows.filter(r=>valid&&r.metric_date>=start&&r.metric_date<=end&&r.data_status==='ok')
  const previous=valid?previousRange(start,end):null
- const current=valid?rangeTotals(accountRows,start,end,snapshot):{}, past=previous?rangeTotals(accountRows,previous.from,previous.to,snapshot):{}
+ const current=valid?rangeTotals(accountRows,start,end,snapshot):{}, past=previous?rangeTotals(accountRows,previous.from,previous.to,selectTrafficSnapshot(snapshots,account?.meta_account_id,previous.from,previous.to)):{}
  const currency=snapshot?.payload?.totals?.amount_spent?.unit||'BRL'
  const exact=valid&&snapshot?.period_start===start&&snapshot?.period_end===end
  const entityRows=kind=>exact?(snapshot?.payload?.[kind]||[]).map(normalizeEntity).filter(r=>r.name.toLowerCase().includes(query.toLowerCase())):[]
