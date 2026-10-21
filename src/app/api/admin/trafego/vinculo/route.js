@@ -19,34 +19,15 @@ export async function GET(request){try{
   db.from('traffic_client_users').select('client_id').eq('user_id',id),
  ])
  if(accounts.error||links.error)throw accounts.error||links.error
- return json({eligible,accounts:accounts.data,clientId:links.data?.[0]?.client_id||''})
+ return json({eligible,accounts:accounts.data,clientIds:(links.data||[]).map(x=>x.client_id)})
 }catch(e){console.error('traffic binding read',e);return json({error:'Não foi possível carregar a vinculação.'},500)}}
 export async function POST(request){try{
  const db=await authorize(request);if(!db)return json({error:'Não autorizado.'},403)
- const {userId,clientId}=await request.json()
- if(!UUID.test(userId||'')||(clientId&&!UUID.test(clientId)))return json({error:'Cadastro ou conta inválidos.'},400)
- if(clientId&&!await loadTrafficAccess(db,userId))return json({error:'A aluna precisa de uma das duas ofertas de tráfego ativas.'},403)
- const previous=await db.from('traffic_client_users').select('client_id').eq('user_id',userId)
- if(previous.error)throw previous.error
- if(previous.data.length>1)return json({error:'Este cadastro possui várias contas. Revise os vínculos antes de substituir.'},409)
- const old=previous.data[0]?.client_id
- if(clientId){
-  const account=await db.from('traffic_clients').select('id').eq('id',clientId).eq('active',true).maybeSingle()
-  if(account.error)throw account.error
-  if(!account.data)return json({error:'Conta indisponível. Atualize a lista.'},400)
- }
- if(old!==clientId){
-  if(old&&clientId){
-   const result=await db.from('traffic_client_users').update({client_id:clientId}).eq('user_id',userId).eq('client_id',old).select('client_id')
-   if(result.error)throw result.error
-   if(result.data.length!==1)return json({error:'O vínculo mudou em outra sessão. Recarregue a página.'},409)
-  }else if(old){
-   const result=await db.from('traffic_client_users').delete().eq('user_id',userId).eq('client_id',old)
-   if(result.error)throw result.error
-  }else if(clientId){
-   const result=await db.from('traffic_client_users').insert({user_id:userId,client_id:clientId})
-   if(result.error)throw result.error
-  }
- }
+ const {userId,clientIds,expectedIds}=await request.json()
+ if(!UUID.test(userId||'')||!Array.isArray(clientIds)||!Array.isArray(expectedIds)||clientIds.length>100||expectedIds.length>100||[...clientIds,...expectedIds].some(x=>!UUID.test(x))||new Set(clientIds).size!==clientIds.length)return json({error:'Cadastro ou contas inválidos.'},400)
+ if(clientIds.length&&!await loadTrafficAccess(db,userId))return json({error:'A cliente precisa de um plano de tráfego ativo.'},403)
+ const result=await db.rpc('replace_traffic_memberships',{p_user_id:userId,p_client_ids:clientIds,p_expected_ids:expectedIds})
+ if(result.error?.code==='40001')return json({error:'Os vínculos mudaram em outra sessão. Recarregue antes de salvar.'},409)
+ if(result.error)throw result.error
  return json({success:true})
 }catch(e){console.error('traffic binding write',e);return json({error:'Não foi possível salvar o vínculo. Tente novamente.'},500)}}

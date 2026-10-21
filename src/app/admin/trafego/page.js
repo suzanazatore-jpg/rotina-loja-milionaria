@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import TrafficDashboard from './TrafficDashboard'
+import TrafficNotifications from './TrafficNotifications'
+import TrafficImport from './TrafficImport'
 
 const ADMIN='suporte@suzanazatorre.com.br'
 const brl=n=>n==null?'Sem dado':Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
@@ -19,6 +21,8 @@ export default function TrafficOffice({management=false}){
  const [loading,setLoading]=useState(true)
  const [error,setError]=useState('')
  const [clients,setClients]=useState([])
+ const [bundle,setBundle]=useState({accounts:[],metrics:[],snapshots:[],reports:[],clients:[]})
+ const [view,setView]=useState('report')
  const [businesses,setBusinesses]=useState([])
  const [metrics,setMetrics]=useState([])
  const [goals,setGoals]=useState([])
@@ -31,6 +35,11 @@ export default function TrafficOffice({management=false}){
  const [actionError,setActionError]=useState('')
 
  async function load(){
+  const {data:{session}}=await supabase.auth.getSession()
+  const response=await fetch('/api/trafego',{headers:{Authorization:`Bearer ${session?.access_token}`},cache:'no-store'})
+  const payload=await response.json()
+  if(!response.ok){setError(payload.error);return}
+  setBundle(payload)
   const [a,b,m,g,r]=await Promise.all([
    supabase.from('traffic_clients').select('id,name,meta_account_id,mcp_status,business_id').order('name'),
    supabase.from('traffic_businesses').select('id,name').order('name'),
@@ -93,12 +102,14 @@ export default function TrafficOffice({management=false}){
  }
  if(loading)return <main style={{background:'#0A0A0A',color:'#FFF',minHeight:'100vh',padding:30}}>Carregando...</main>
  if(!authorized)return <main style={{background:'#0A0A0A',color:'#FFF',minHeight:'100vh',padding:30}}>Acesso restrito ao escritório.</main>
- return <><aside className="td-sidebar"><div className="td-brand">SZ <span>INTELIGÊNCIA</span></div><p>SUZANA ZATORRE</p><nav><a className={!management?'current':''} href="/admin/trafego">▦ Relatório por cliente</a><a className={management?'current':''} href="/admin/trafego/configuracoes">⚙ Contas e configurações</a><a href="/admin/alunas">Alunas e vínculos</a><a href="/admin/trafego/relatorios">Relatórios por período</a><a href="/admin">← Meu Escritório</a></nav></aside><main className="traffic-office-shell" style={{background:'#f5f4ef',color:'#25221c',minHeight:'100vh',padding:'24px clamp(16px,3vw,56px) 90px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'}}>
+ return <><aside className="td-sidebar"><div className="td-brand">SZ <span>INTELIGÊNCIA</span></div><p>SUZANA ZATORRE</p><nav><a className={!management&&view==='report'?'current':''} href="/admin/trafego" onClick={e=>{if(!management){e.preventDefault();setView('report')}}}>▦ Relatório por cliente</a><a className={view==='clients'?'current':''} href="/admin/trafego#clientes" onClick={e=>{if(!management){e.preventDefault();setView('clients')}}}>Clientes</a><a className={management?'current':''} href="/admin/trafego/configuracoes">Integrações</a><a href="/admin/trafego#sobre" onClick={e=>{if(!management){e.preventDefault();setView('about')}}}>Sobre os dados</a></nav><a href="/admin" style={{display:'block',marginTop:30}}>← Meu Escritório</a></aside><main className="traffic-office-shell" style={{background:'#f5f4ef',color:'#25221c',minHeight:'100vh',padding:'24px clamp(16px,3vw,56px) 90px',fontFamily:'-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif'}}>
   <div style={{width:'100%'}}>
    {error&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>Erro na leitura: {error}</div>}
    {actionError&&<div role="alert" style={{...panel,borderColor:'#C55',marginBottom:18}}>{actionError}</div>}
-   {!management&&<TrafficDashboard accounts={clients} metrics={metrics} onRefresh={load} />}
-   {management&&<section className="td-management"><h1>Contas, clientes e metas</h1><p>As configurações ficam separadas do relatório individual.</p>
+   {!management&&view==='report'&&<TrafficDashboard {...bundle} onRefresh={load} />}
+   {!management&&view==='clients'&&<section className="traffic-dashboard td-panel"><h1>Clientes aprovadas</h1><p>Somente cadastros com plano de tráfego ativo e contas liberadas por você.</p>{!bundle.clients.length?<p>Nenhuma cliente aprovada com vínculo ativo.</p>:bundle.clients.map(c=><article key={c.id} className="td-panel"><h2>{c.name}</h2><p>{c.account_ids.map(id=>bundle.accounts.find(a=>a.id===id)?.name).filter(Boolean).join(' · ')}</p><a href={'/admin/alunas/acesso?id='+c.id}>Editar aprovação e contas</a></article>)}</section>}
+   {!management&&view==='about'&&<section className="traffic-dashboard td-panel"><h1>Sobre os dados</h1><p>Resultados são apresentados conforme o objetivo e evento de cada campanha. CTR e CPC de link estão identificados separadamente dos indicadores de todos os cliques.</p><p>Alcance e frequência usam o total deduplicado do período coletado. Ausência de dados aparece como “—”. Atualizar recarrega a coleta salva.</p><p>Os relatórios individuais são protegidos pelo login e pelos vínculos aprovados no cadastro de cada cliente.</p></section>}
+   {management&&<section className="td-management"><h1>Contas, clientes e metas</h1><TrafficNotifications/><TrafficImport/><p>As configurações ficam separadas do relatório individual.</p>
    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(185px,1fr))',gap:12,marginBottom:20}}>
      {[['Clientes cadastrados',businesses.length],['Contas vinculadas',countLinked+' de '+clients.length],['MCP habilitado',clients.filter(c=>c.mcp_status==='enabled').length],['Integração pendente',clients.filter(c=>c.mcp_status!=='enabled').length]].map(([label,value])=><div key={label} style={panel}><strong style={{display:'block',color:'#D4AF37',fontSize:28}}>{value}</strong><span style={{color:'#AFAFAF',fontSize:13}}>{label}</span></div>)}
    </div>
