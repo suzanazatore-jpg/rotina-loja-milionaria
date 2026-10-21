@@ -19,7 +19,8 @@ export async function GET(request){try{
   db.from('traffic_client_users').select('client_id').eq('user_id',id),
  ])
  if(accounts.error||links.error)throw accounts.error||links.error
- return json({eligible,accounts:accounts.data,clientIds:(links.data||[]).map(x=>x.client_id)})
+ const schema=await db.from('traffic_report_settings').select('id').eq('id',true).maybeSingle()
+ return json({eligible,supportsMultiple:!schema.error,accounts:accounts.data,clientIds:(links.data||[]).map(x=>x.client_id)})
 }catch(e){console.error('traffic binding read',e);return json({error:'Não foi possível carregar a vinculação.'},500)}}
 export async function POST(request){try{
  const db=await authorize(request);if(!db)return json({error:'Não autorizado.'},403)
@@ -28,6 +29,18 @@ export async function POST(request){try{
  if(clientIds.length&&!await loadTrafficAccess(db,userId))return json({error:'A cliente precisa de um plano de tráfego ativo.'},403)
  const result=await db.rpc('replace_traffic_memberships',{p_user_id:userId,p_client_ids:clientIds,p_expected_ids:expectedIds})
  if(result.error?.code==='40001')return json({error:'Os vínculos mudaram em outra sessão. Recarregue antes de salvar.'},409)
- if(result.error)throw result.error
+ if(result.error?.code==='PGRST202'){
+  // Backward-compatible single-account writes until the additive migration is installed.
+  const previous=await db.from('traffic_client_users').select('client_id').eq('user_id',userId)
+  if(previous.error)throw previous.error
+  const currentIds=(previous.data||[]).map(x=>x.client_id).sort()
+  if(JSON.stringify(currentIds)!==JSON.stringify([...expectedIds].sort()))return json({error:'Os vínculos mudaram. Recarregue antes de salvar.'},409)
+  if(currentIds.length>1||clientIds.length>1)return json({error:'A liberação de várias contas aguarda a atualização do banco. O acesso individual existente continua disponível.'},503)
+  const old=currentIds[0],next=clientIds[0]
+  if(old===next)return json({success:true})
+  if(next){const active=await db.from('traffic_clients').select('id').eq('id',next).eq('active',true).maybeSingle();if(active.error)throw active.error;if(!active.data)return json({error:'Conta indisponível.'},400)}
+  const write=old&&next?await db.from('traffic_client_users').update({client_id:next}).eq('user_id',userId).eq('client_id',old):old?await db.from('traffic_client_users').delete().eq('user_id',userId).eq('client_id',old):await db.from('traffic_client_users').insert({user_id:userId,client_id:next})
+  if(write.error)throw write.error
+ }else if(result.error)throw result.error
  return json({success:true})
 }catch(e){console.error('traffic binding write',e);return json({error:'Não foi possível salvar o vínculo. Tente novamente.'},500)}}

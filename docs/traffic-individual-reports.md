@@ -24,7 +24,7 @@ Canais:
 
 Código validado por testes e build local usando variáveis substitutas (sem credenciais de produção).
 
-**Migração ainda NÃO aplicada**: `supabase/patches/traffic_individual_reports.sql`. O conector retornou `Invalid or expired requestState` em tentativas de escrita; leitura confirmou ausência das tabelas/função novas. É necessário aplicar este SQL, testar políticas e transação no banco e executar os testes reais de isolamento antes de publicar a versão completa.
+**Migração ainda NÃO aplicada**: `supabase/patches/traffic_individual_reports.sql`. O conector retornou `Invalid or expired requestState` em tentativas de escrita; leitura confirmou ausência das tabelas/função novas. É necessário aplicar este SQL, testar políticas e transação no banco e executar os testes reais de isolamento antes de ativar a versão completa. O dashboard pode ser publicado com o vínculo individual anterior preservado por compatibilidade; múltiplas contas e avisos permanecem pendentes.
 
 A coleta atual no banco tem totais, diário e campanhas, mas não anúncios/conjuntos/imagens. O importador está preparado; a coleta real de criativos ainda precisa ser conectada. Não foram criadas imagens fictícias.
 

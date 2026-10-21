@@ -22,7 +22,9 @@ async function deliver(db,report,user,channel,send){
  catch(error){await checked(await db.from('traffic_report_deliveries').update({status:'unknown',error_message:String(error.message||'Falha de entrega').slice(0,240)}).eq('id',claimed[0].id))}
 }
 export async function runTrafficWeekly(now=new Date()){
- const db=trafficDb(),settings=await checked(await db.from('traffic_report_settings').select('*').eq('id',true).single())
+ const db=trafficDb(),configuration=await db.from('traffic_report_settings').select('*').eq('id',true).single()
+ if(['PGRST205','42P01'].includes(configuration.error?.code))return {enabled:false,reason:'Atualização do banco pendente.'}
+ const settings=await checked(configuration)
  if(!settings.weekly_enabled)return {enabled:false,reason:'Avisos semanais aguardam ativação.'}
  const range=lastClosedWeek(now),links=await allRows(()=>db.from('traffic_client_users').select('client_id,user_id').order('client_id').order('user_id'))
  const accounts=await allRows(()=>db.from('traffic_clients').select('id,name,active,mcp_status').eq('active',true).order('id'))

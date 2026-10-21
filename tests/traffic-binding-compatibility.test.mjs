@@ -1,0 +1,12 @@
+import {test} from 'node:test'
+import assert from 'node:assert/strict'
+import {readFile} from 'node:fs/promises'
+let code=await readFile(new URL('../src/app/api/admin/trafego/vinculo/route.js',import.meta.url),'utf8')
+code=code.replace("import { createClient } from '@supabase/supabase-js'",'let testDb; export function configure(db){testDb=db}; const createClient=()=>testDb').replace("import { NextResponse } from 'next/server'",'const NextResponse={json:(body,options)=>Response.json(body,options)}').replace("import { loadTrafficAccess } from '@/lib/trafficAccess'",'const loadTrafficAccess=async()=>true')
+const route=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))
+const userId='aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',old='bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',next='cccccccc-cccc-cccc-cccc-cccccccccccc'
+function db(){const writes=[];return {writes,auth:{getUser:async()=>({data:{user:{email:'suporte@suzanazatorre.com.br'}}})},rpc:async()=>({error:{code:'PGRST202'}}),from(table){let writing=false;const q={select(){return q},eq(){return q},update(value){writing=true;writes.push({table,value});return q},delete(){writing=true;writes.push({table,remove:true});return q},insert(value){writing=true;writes.push({table,value});return q},async maybeSingle(){return {data:{id:next}}},then(resolve,reject){return Promise.resolve({data:writing?[]:[{client_id:old}],error:null}).then(resolve,reject)}};return q}}}
+function request(clientIds,expectedIds=[old]){return new Request('https://example.com/api/admin/trafego/vinculo',{method:'POST',headers:{Authorization:'Bearer test','Content-Type':'application/json'},body:JSON.stringify({userId,clientIds,expectedIds})})}
+test('single-account replacement remains available before migration',async()=>{const store=db();route.configure(store);const response=await route.POST(request([next]));assert.equal(response.status,200);assert.deepEqual(store.writes,[{table:'traffic_client_users',value:{client_id:next}}])})
+test('multiple-account save is rejected without any mutation until transaction exists',async()=>{const store=db();route.configure(store);const response=await route.POST(request([old,next]));assert.equal(response.status,503);assert.equal(store.writes.length,0)})
+test('stale membership selection cannot overwrite another session',async()=>{const store=db();route.configure(store);const response=await route.POST(request([next],[]));assert.equal(response.status,409);assert.equal(store.writes.length,0)})
