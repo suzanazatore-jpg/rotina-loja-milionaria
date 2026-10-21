@@ -33,3 +33,16 @@ A aba Integrações foi removida a pedido da usuária e sua rota redireciona ao 
 No Pabbly já existe `[ Envio Relatório Semanal WhatsApp ]`, às segundas às 9h America/Fortaleza, usando Google Sheets, filtro e BotConversa. Não foi alterado nem duplicado. Antes de ativar o novo aviso, definir se esse fluxo será migrado ou mantido para outro público.
 
 Pendências: aplicar SQL; validar destinatários e webhook específico; validar Brevo e Web Push; manter a coleta recorrente de anúncios e imagens; coletar conjuntos; testar os fluxos semanais completos. Dashboard e criativos publicados no projeto Vercel existente e conferidos em navegador autenticado. A automação diária do ChatGPT foi criada separadamente na conversa.
+
+
+## Atualização de avisos — 21/10/2026
+
+Aplicadas no projeto de produção as migrações `traffic_weekly_delivery_tracking`, `traffic_notification_report_links` e `traffic_internal_notification_tests`. As tabelas de entregas e configurações estão com RLS e sem leitura para anon/authenticated. A parte de múltiplos vínculos e políticas restritivas do patch original continua pendente; não considerar o patch inteiro aplicado.
+
+Controles disponíveis em Sobre os dados, dentro da Central existente. Teste administrativo restringe destinatário ao usuário administrador autenticado, com identificador idempotente por execução, histórico por canal e bloqueio de repetição após resultado ambíguo. Não aceita endereço, telefone ou cliente arbitrário. O horário preparado segue segunda às 8h de Brasília.
+
+Teste real: um aviso criado no histórico do cadastro administrativo, e-mail aceito pelo Brevo com identificador do provedor. Push não enviado por ausência de dispositivo inscrito nesse cadastro. WhatsApp não enviado, pois falta configurar e validar fluxo específico. Nenhuma entrega para clientes ou relatório publicado pelo teste. Agendamento semanal permanece desativado.
+
+BotConversa: companhia [Mentoriadas] ID 58339 informa WhatsApp desconectado; criado apenas webhook `Central de Tráfego — relatório pronto`, em Modo Teste e sem ações de envio. O fluxo Pabbly anterior aponta para outra companhia, ID 179901, ausente do seletor atual, e não foi alterado. Companhia alternativa disponível: [Low Tocket]-API Oficial ID 193579. Definir qual WhatsApp deve ser o remetente antes de concluir o fluxo e ativar o agendamento.
+
+Validação desta etapa: 26 testes passaram e build de produção concluído.
