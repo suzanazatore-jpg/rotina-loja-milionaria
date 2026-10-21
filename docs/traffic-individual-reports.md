@@ -49,3 +49,6 @@ Validação desta etapa: 26 testes passaram e build de produção concluído.
 
 
 Continuação de 21/10: confirmado remetente oficial Suporte Suzana Zatorre, final 4124, conectado, verificado e ativo na companhia 193579. Criado modelo `relatoriosemanaltrafego`, categoria Utilidade, pt_BR, com aviso informativo e botão fixo “Ver meu relatório” para https://rotina.suzanazatorre.com.br/trafego. A Meta confirmou “Modelo enviado para revisão”; status observado “Em revisão”. Não houve disparo WhatsApp. Após aprovação, conectar a ação do modelo ao fluxo específico Pabbly e configurar a variável exclusiva do servidor; executar teste interno antes da ativação geral. Não reutilizar o webhook antigo da companhia 179901. Não considerar o fluxo WhatsApp pronto apenas porque o modelo foi enviado para revisão.
+
+
+Texto do e-mail ajustado a pedido da usuária: saudação com o nome cadastrado, sem nome da conta ou campanha; aviso de relatório pronto; link fixo https://rotina.suzanazatorre.com.br/trafego; observação para acessar com login e senha. Remetente e destinatário permanecem os do envio individual. Testes internos preservam a identificação de teste.

@@ -19,7 +19,10 @@ export async function sendTrafficChannel(db,profile,channel,notice,deliveryId){
  }
  if(channel==='email'){
   if(!trafficChannels().email||!profile.email)return {status:'skipped',reason:'E-mail ou configuração ausente.'}
-  const response=await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',headers:{'Content-Type':'application/json','api-key':process.env.BREVO_API_KEY},signal:AbortSignal.timeout(15000),body:JSON.stringify({sender:{name:'Suzana Zatorre',email:'suporte@suzanazatorre.com.br'},to:[{email:profile.email}],subject:title,textContent:`Olá!\n\n${body}\n\n${url}`,headers:{'X-Mailin-custom':'traffic-delivery:'+deliveryId}})})
+  const greeting=profile.name?.trim()?`Olá, ${profile.name.trim()}!`:'Olá!'
+  const message=title.startsWith('[TESTE]')?body:'Seu relatório de campanhas já está pronto. Acesse a plataforma para consultar os resultados.'
+  const textContent=`${greeting}\n\n${message}\n\nhttps://rotina.suzanazatorre.com.br/trafego\n\nObservação: acesse com o seu login e senha.`
+  const response=await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',headers:{'Content-Type':'application/json','api-key':process.env.BREVO_API_KEY},signal:AbortSignal.timeout(15000),body:JSON.stringify({sender:{name:'Suzana Zatorre',email:'suporte@suzanazatorre.com.br'},to:[{email:profile.email,name:profile.name||undefined}],subject:title,textContent,headers:{'X-Mailin-custom':'traffic-delivery:'+deliveryId}})})
   if(!response.ok)throw Error('Brevo retornou HTTP '+response.status)
   return {status:'accepted',id:(await response.json()).messageId}
  }
