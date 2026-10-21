@@ -1,8 +1,8 @@
 import {lastClosedWeek,rangeTotals} from './trafficReportModel.js'
 import {allRows,trafficDb} from './trafficReportServer'
 import {loadTrafficAccess} from './trafficAccess'
-import {sendPushNotification,getVapidPublicKey} from './pushNotifications'
-export function trafficChannels(env=process.env){return {email:!!env.BREVO_API_KEY,whatsapp:!!env.TRAFFIC_REPORT_WHATSAPP_WEBHOOK_URL,push:!!getVapidPublicKey()&&!!(env.PUSH_VAPID_PRIVATE_KEY||env.VAPID_PRIVATE_KEY)}}
+import {trafficChannels,sendTrafficChannel} from './trafficNotificationChannels'
+export {trafficChannels} from './trafficNotificationChannels'
 const brl=n=>n==null?'Não informado':n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
 const number=n=>n==null?'Não informado':n.toLocaleString('pt-BR')
 export function weeklySummary(account,rows,range){
@@ -11,15 +11,15 @@ export function weeklySummary(account,rows,range){
  return {totals,summary,recommendations:'Resultados devem ser avaliados de acordo com o objetivo e evento de cada campanha. As recomendações específicas da gestão serão acrescentadas pela equipe.'}
 }
 async function checked(result){if(result.error)throw result.error;return result.data}
-async function deliver(db,report,user,channel,send){
- const key={report_id:report.id,user_id:user.id,channel}
+export async function deliverTraffic(db,report,user,channel,send){
+ const key={...(report.test_id?{test_id:report.test_id}:{report_id:report.id}),user_id:user.id,channel}
  const inserted=await db.from('traffic_report_deliveries').insert(key)
  if(inserted.error&&inserted.error.code!=='23505')throw inserted.error
  // A processing/unknown delivery is never retried automatically: the provider may have received it.
  const claimed=await checked(await db.from('traffic_report_deliveries').update({status:'processing',attempted_at:new Date().toISOString()}).match(key).eq('status','pending').select('id'))
- if(!claimed?.length)return
- try{const result=await send(claimed[0].id);await checked(await db.from('traffic_report_deliveries').update({status:result?.status||'sent',provider_id:result?.id||null,sent_at:new Date().toISOString()}).eq('id',claimed[0].id))}
- catch(error){await checked(await db.from('traffic_report_deliveries').update({status:'unknown',error_message:String(error.message||'Falha de entrega').slice(0,240)}).eq('id',claimed[0].id))}
+ if(!claimed?.length){const existing=await checked(await db.from('traffic_report_deliveries').select('id,channel,status,error_message').match(key).single());return {...existing,reused:true}}
+ try{const result=await send(claimed[0].id);await checked(await db.from('traffic_report_deliveries').update({status:result?.status||'sent',provider_id:result?.id||null,sent_at:['skipped','failed'].includes(result?.status)?null:new Date().toISOString(),error_message:result?.reason||null}).eq('id',claimed[0].id));return {id:claimed[0].id,channel,status:result?.status||'sent',reason:result?.reason}}
+ catch(error){await checked(await db.from('traffic_report_deliveries').update({status:'unknown',error_message:String(error.message||'Falha de entrega').slice(0,240)}).eq('id',claimed[0].id));return {id:claimed[0].id,channel,status:'unknown',reason:String(error.message||'Falha de entrega')}}
 }
 export async function runTrafficWeekly(now=new Date()){
  const db=trafficDb(),configuration=await db.from('traffic_report_settings').select('*').eq('id',true).single()
@@ -43,31 +43,13 @@ export async function runTrafficWeekly(now=new Date()){
    if(!await loadTrafficAccess(db,membership.user_id)){skipped++;continue}
    const profile=await checked(await db.from('profiles').select('id,name,email,phone').eq('id',membership.user_id).single())
    const legacy=await checked(await db.from('perfis').select('whatsapp').eq('id',membership.user_id).maybeSingle())
-   const url=`https://rotina.suzanazatorre.com.br/trafego?report=${report.id}`
    const body=`Seu relatório de campanhas de ${account.name} está pronto. Acesse a plataforma para consultar os resultados.`.slice(0,240)
-   await deliver(db,report,profile,'app',async()=>{
-    const existing=await checked(await db.from('user_notifications').select('id').eq('user_id',profile.id).eq('rule_id',`traffic-${report.id}`).maybeSingle())
-    if(existing)return {id:existing.id}
-    const row=await checked(await db.from('user_notifications').insert({user_id:profile.id,notification_type:'personalizada',title:'Seu relatório de campanhas está pronto',body,target_url:'/trafego?report='+report.id,rule_id:`traffic-${report.id}`,scheduled_for:range.to,sent_at:now.toISOString()}).select('id').single())
-    return {id:row.id}
-   })
-   if(settings.push_enabled&&trafficChannels().push)await deliver(db,report,profile,'push',async()=>{
-    const subscriptions=await checked(await db.from('push_subscriptions').select('endpoint,p256dh,auth').eq('user_id',profile.id).eq('active',true))
-    if(!subscriptions.length)return {status:'skipped'}
-    const outcomes=await Promise.allSettled(subscriptions.map(sub=>sendPushNotification({endpoint:sub.endpoint,keys:{p256dh:sub.p256dh,auth:sub.auth}},{title:'Seu relatório está pronto',body,url:'/trafego?report='+report.id,tag:'traffic-'+report.id,icon:'/pwa-icon-192.png',badge:'/notification-badge.png'})))
-    if(outcomes.some(r=>r.status==='rejected'))throw Error('Verificar entrega nos dispositivos antes de reenviar.')
-   })
-   if(settings.email_enabled&&trafficChannels().email&&profile.email)await deliver(db,report,profile,'email',async id=>{
-    const response=await fetch('https://api.brevo.com/v3/smtp/email',{method:'POST',headers:{'Content-Type':'application/json','api-key':process.env.BREVO_API_KEY},signal:AbortSignal.timeout(15000),body:JSON.stringify({sender:{name:'Suzana Zatorre',email:'suporte@suzanazatorre.com.br'},to:[{email:profile.email}],subject:'Seu relatório de campanhas está pronto',textContent:`Olá!\n\n${body}\n\n${url}`,headers:{'X-Mailin-custom':'traffic-delivery:'+id}})})
-    if(!response.ok)throw Error('Brevo retornou HTTP '+response.status)
-    return {status:'accepted',id:(await response.json()).messageId}
-   })
-   const phone=String(profile.phone||legacy?.whatsapp||'').replace(/\D/g,'');const recipient=phone.length===10||phone.length===11?'55'+phone:phone
-   if(settings.whatsapp_enabled&&trafficChannels().whatsapp&&recipient)await deliver(db,report,profile,'whatsapp',async id=>{
-    const response=await fetch(process.env.TRAFFIC_REPORT_WHATSAPP_WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},signal:AbortSignal.timeout(15000),body:JSON.stringify({evento:'campanha_em_massa',tipo:'relatorio_trafego_pronto',campanha_id:id,titulo:'Seu relatório de campanhas está pronto',mensagem:`${body}\n${url}`,destinatarios:[{id:profile.id,nome:profile.name||'',primeiro_nome:(profile.name||'Cliente').split(' ')[0],email:profile.email||'',telefone:recipient}]})})
-    if(!response.ok)throw Error('Pabbly retornou HTTP '+response.status)
-    return {status:'accepted',id}
-   })
+   const notice={title:'Seu relatório de campanhas está pronto',body,path:'/trafego?report='+report.id,ruleId:'traffic-'+report.id,period:range.from.split('-').reverse().join('/')+' a '+range.to.split('-').reverse().join('/')}
+   const recipient={...profile,phone:profile.phone||legacy?.whatsapp}
+   for(const channel of ['app','push','email','whatsapp']){
+    if(channel!=='app'&&!settings[channel+'_enabled'])continue
+    await deliverTraffic(db,report,recipient,channel,id=>sendTrafficChannel(db,recipient,channel,notice,id))
+   }
   }
  }
  return {enabled:true,published,skipped,period:range}
