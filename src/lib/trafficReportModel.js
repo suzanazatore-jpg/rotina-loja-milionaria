@@ -18,7 +18,7 @@ export function normalizeEntity(row = {}) {
   return {
     id: String(row.id || row.ad_id || row.adset_id || row.campaign_id || ''),
     name: row.name || row.ad_name || row.adset_name || row.campaign_name || 'Sem nome',
-    campaign_id: row.campaign_id || null, adset_id: row.adset_id || null,
+    campaign_id: row.campaign_id || null, campaign_name: row.campaign_name || '', adset_id: row.adset_id || null,
     objective: row.objective || '', status: row.effective_status || row.status || '',
     spend, impressions, clicks, reach: numeric(row.reach), frequency: numeric(row.frequency),
     ctr: clicks != null && impressions > 0 ? clicks / impressions * 100 : null,
@@ -26,7 +26,8 @@ export function normalizeEntity(row = {}) {
     cpm: spend != null && impressions > 0 ? spend / impressions * 1000 : null,
     clicks_all: numeric(row.clicks_all), ctr_all: numeric(row.ctr_all), cpc_all: numeric(row.cpc_all),
     results, result_label: String(rawLabel).replace(/^conversions:/, ''),
-    cost: numeric(row.cost_per_result ?? row.cost) ?? (spend != null && results > 0 ? spend / results : null),
+    cost: numeric(row.cost_per_result ?? row.cost) ?? (spend != null && results > 0 ? spend / results * (row.results?.indicator === 'reach' ? 1000 : 1) : null),
+    cost_label: row.cost_label || (row.results?.indicator === 'reach' || /^(alcance|reach)$/i.test(rawLabel) ? 'Custo por 1.000 contas alcançadas' : 'Custo por resultado'),
     leads: numeric(row.leads) ?? action('lead'), purchases: numeric(row.purchases) ?? action('omni_purchase'),
     messages: numeric(row.messages) ?? action('onsite_conversion.messaging_conversation_started_7d'),
     revenue: numeric(row.revenue ?? row.omni_purchase_values),
