@@ -43,10 +43,10 @@ export function normalizeEntity(row = {}) {
     follows: action('instagram_profile_follow_v2'),
     image_url: safeMedia(row.image_url || row.thumbnail_url || row.creative?.image_url || row.creative?.thumbnail_url),
     preview_url: safeMedia(row.preview_url),
-    video_25: numeric(row.video_25 ?? row.video_p25_watched_actions?.[0]?.value),
-    video_50: numeric(row.video_50 ?? row.video_p50_watched_actions?.[0]?.value),
-    video_75: numeric(row.video_75 ?? row.video_p75_watched_actions?.[0]?.value),
-    video_100: numeric(row.video_100 ?? row.video_p100_watched_actions?.[0]?.value),
+    video_25: numeric(row.video_25 ?? row.video_p25_watched_actions?.[0]?.value ?? row.video_p25_watched_actions),
+    video_50: numeric(row.video_50 ?? row.video_p50_watched_actions?.[0]?.value ?? row.video_p50_watched_actions),
+    video_75: numeric(row.video_75 ?? row.video_p75_watched_actions?.[0]?.value ?? row.video_p75_watched_actions),
+    video_100: numeric(row.video_100 ?? row.video_p100_watched_actions?.[0]?.value ?? row.video_p100_watched_actions),
   }
 }
 export function previousRange(from, to) {
