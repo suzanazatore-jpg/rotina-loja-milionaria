@@ -11,3 +11,9 @@ export function selectExpandedMetrics(snapshot,from,to){
 }
 export function campaignResultValue(c){return c.results?.values?.length===1?metricValue(c.results.values[0].value):metricValue(c.results)}
 export function campaignResultName(c){const names={reach:'Alcance','actions:link_click':'Cliques no link','actions:offsite_conversion.fb_pixel_purchase':'Compras no site','actions:omni_purchase':'Compras','actions:lead':'Leads','actions:onsite_conversion.messaging_conversation_started_7d':'Conversas por mensagem iniciadas'};return names[c.results?.indicator]||c.cost_per_result?.conversion_type||c.results?.indicator||'Não informado'}
+
+export function recordedMessageSummary(rows){
+ const known=rows.filter(x=>metricValue(x.messages)!==null)
+ const total=known.length?known.reduce((n,x)=>n+metricValue(x.messages),0):null
+ return {total,partial:known.length>0&&known.length<rows.length,knownDays:known.length,days:rows.length}
+}

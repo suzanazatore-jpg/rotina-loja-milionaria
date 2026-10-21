@@ -20,7 +20,14 @@ export async function GET(request){
   const collection=await db.from('traffic_metric_snapshots').select('period_start,period_end,collected_at,payload').eq('meta_account_id',metaId).maybeSingle()
   if(collection.error)throw collection.error
   const selected=collection.data
+  let payload=selected?.payload||null
+  if(payload){
+   const recorded=await db.from('traffic_daily_metrics').select('metric_date,messages,message_spend').eq('client_id',account.data.id).eq('data_status','ok').gte('metric_date',selected.period_start).lte('metric_date',selected.period_end).order('metric_date').limit(1000)
+   if(recorded.error)throw recorded.error
+   const byDate=new Map((recorded.data||[]).map(x=>[x.metric_date,x]))
+   payload={...payload,daily:(payload.daily||[]).map(d=>({...d,messages:byDate.get(d.date_start)?.messages??null,message_spend:byDate.get(d.date_start)?.message_spend??null}))}
+  }
   // Never serialize the full collection: a student receives only their linked account.
-  return reply({since:selected?.period_start||null,until:selected?.period_end||null,collectedAt:selected?.collected_at||null,available:!!selected,account:selected?.payload||null})
+  return reply({since:selected?.period_start||null,until:selected?.period_end||null,collectedAt:selected?.collected_at||null,available:!!selected,account:payload})
  }catch(e){console.error('expanded traffic',e);return reply({error:'Não foi possível carregar as métricas ampliadas.'},500)}
 }
