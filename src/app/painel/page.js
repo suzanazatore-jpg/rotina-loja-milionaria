@@ -432,6 +432,7 @@ export default function Painel() {
     ...(metasLiberadas ? [{ id: 'vendas', icone: 'goals', label: 'Vendas e Metas' }] : []),
     ...(rotinaLiberada ? [{ id: 'rotina', icone: 'routine', label: 'Rotina' }] : []),
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
+    ...(trafegoLiberado ? [{ id: 'trafego', icone: 'campaigns', label: 'Relatórios de tráfego' }] : []),
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
     { id: 'ajuda', icone: 'support', label: 'Suporte' },
   ]
@@ -503,6 +504,7 @@ export default function Painel() {
   }
 
   function irPara(id) {
+    if (id === 'trafego') { if (trafegoLiberado) router.push('/trafego'); setMenuMobile(false); return }
     if ((id === 'rotina' && !rotinaLiberada) || (id === 'campanhas' && !campanhasLiberadas) || (id === 'calendario' && !calendarioLiberado)) { setSecao('conteudos'); setMenuMobile(false); return }
     if (id === 'calculadora') { router.push('/calculadora'); return }
     if (id === 'markup') { router.push('/markup'); return }
@@ -594,6 +596,7 @@ export default function Painel() {
               assistenteLiberado={assistenteLiberado}
               metasLiberadas={metasLiberadas}
               precificacaoLiberada={precificacaoLiberada}
+              trafegoLiberado={trafegoLiberado}
               rotinaSemanal={rotinaSemanal}
               calendarActions={acoesCalendario}
               campaign={campanhas.find(item => item.mes_ano === mesAtualValor()) || campanhas[0] || null}
