@@ -2,6 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["gru1"],
   "crons": [
+    { "path": "/api/cron/trafego/preparar", "schedule": "0 11 * * 1" },
+    { "path": "/api/cron/trafego", "schedule": "0 13 * * 1" },
     { "path": "/api/cron/checkout-conversoes", "schedule": "15 0 * * *" },
     { "path": "/api/cron/checkout-conversoes", "schedule": "45 0 * * *" },
     { "path": "/api/cron/checkout-conversoes", "schedule": "15 1 * * *" },

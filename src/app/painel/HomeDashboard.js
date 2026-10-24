@@ -47,6 +47,7 @@ export default function HomeDashboard({
   assistenteLiberado,
   metasLiberadas,
   precificacaoLiberada,
+  trafegoLiberado = false,
   rotinaSemanal,
   calendarActions = [],
   campaign = null,
@@ -119,6 +120,7 @@ export default function HomeDashboard({
   const dataPorExtenso = capitalizar(new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' }).format(hoje))
   const mesAtual = capitalizar(new Intl.DateTimeFormat('pt-BR', { month: 'long' }).format(hoje))
   const atalhosRapidos = [
+    ...(trafegoLiberado ? [['campaigns', 'Relatórios de tráfego', 'Anúncios e resultados da sua loja', 'trafego']] : []),
     ['content', 'Bônus', 'Seus PDFs de bônus', 'bonus'],
     ...(mentoriaLiberada ? [['quickCourses', 'Mentorias', 'Encontros e gravações', 'mentoria']] : []),
     ...(precificacaoLiberada ? [['content', 'Precificação e Lucro', 'Preço, margem e descontos', 'precificacao']] : []),

@@ -1,4 +1,4 @@
-const SHELL_CACHE = 'rotina-shell-v5'
+const SHELL_CACHE = 'rotina-shell-v6'
 const APP_SHELL = [
   '/painel',
   '/manifest.webmanifest',
@@ -62,7 +62,9 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return
 
   if (request.mode === 'navigate' && url.pathname === '/painel') {
-    event.respondWith(staleWhileRevalidate(request))
+    event.respondWith(fetch(request)
+      .then(response => cacheResponse(request, response))
+      .catch(async () => (await caches.match(request)) || Response.error()))
     return
   }
 
