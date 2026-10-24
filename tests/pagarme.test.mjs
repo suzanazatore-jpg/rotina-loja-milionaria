@@ -174,3 +174,23 @@ test('a product assigned to a future marketplace cannot be charged through Pagar
  await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',payment_method:'pix'},'request-marketplace-123'),/Marketplace ainda não disponível/)
  assert.equal(steps.length,0)
 })
+test('compact Pix accepts no address but default and card processing still require it',async()=>{
+ const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393'}
+ assert.equal(normalizeCustomer(customer,{requireAddress:false}).address,undefined)
+ assert.throws(()=>normalizeCustomer(customer),/endereço/)
+ assert.throws(()=>normalizeCustomer({...customer,address:{city:'Natal'}},{requireAddress:false}),/endereço/)
+ const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}}]
+ await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'credit_card',card_token:'token_secure'},'compact-card-123456',null,{requireAddress:false}),/endereço/)
+ assert.equal(steps.length,0)
+})
+test('compact Pix sends a valid address-free customer to the gateway and preserves totals',async()=>{
+ process.env.PAGARME_SECRET_KEY='sk_test_mock'
+ const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393'}
+ let localOrder
+ const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
+ {table:'customers',data:null},{table:'customers',data:{id:'customer'}},{table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
+ {table:'webhook_events',data:null},{table:'order_items',data:null},{table:'orders',data:[{id:'saved'}]}]
+ const original=globalThis.fetch
+ globalThis.fetch=async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.customer.address,undefined);assert.equal(body.payments[0].amount,4230);return Response.json({id:'or_compact',code:localOrder.id,amount:4230,customer:{email:customer.email},charges:[{id:'ch_compact',status:'pending'}]})}
+ try{const result=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'compact-pix-123456',null,{requireAddress:false});assert.equal(result.status,'waiting_payment');assert.equal(steps.length,0)}finally{globalThis.fetch=original;delete process.env.PAGARME_SECRET_KEY}
+})

@@ -9,7 +9,7 @@ import styles from './SettingsHub.module.css'
 
 const groups = [
   {name:'Personalização',items:[
-    {id:'checkout',name:'Checkout',description:'Personalize cores, banners, fontes e aparência dos seus checkouts.',icon:'plans'},
+    {id:'checkout',name:'Padrões do checkout',description:'Defina o visual padrão. Edite cada checkout em Produtos e ofertas → Oferta → Checkout.',icon:'plans'},
     {id:'identity',name:'Marca, suporte e termos',description:'Configure a identidade da empresa, os contatos e os links legais.',icon:'profile'},
     {id:'emails',name:'Emails transacionais',description:'Consulte o que o aplicativo envia e o que ainda está em preparação.',icon:'broadcast'},
   ]},

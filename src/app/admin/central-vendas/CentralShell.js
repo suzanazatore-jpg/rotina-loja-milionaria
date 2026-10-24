@@ -19,7 +19,6 @@ const menu = [
   ['Produtos e Ofertas', '/admin/checkout', 'products'],
   ['Vendas', '/admin/checkout/vendas', 'sales'],
   ['Assinaturas', '/admin/checkout/assinaturas', 'subscriptions'],
-  ['Checkouts', '/admin/checkout/checkouts', 'checkouts'],
   ['Webhooks', '/admin/checkout/webhooks', 'integrations'],
   ['Configurações', '/admin/checkout/configuracoes', 'settings'],
 ]

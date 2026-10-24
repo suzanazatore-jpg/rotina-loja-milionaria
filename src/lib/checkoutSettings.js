@@ -1,13 +1,13 @@
 import { trackingMode } from './checkoutTracking.js'
 export const CHECKOUT_DEFAULTS = {
-  confirm_email: false, require_terms: false, require_privacy: false, product_display_name: '', countdown_enabled: false, countdown_ends_at: '', countdown_message: 'Esta condição termina em:',
+  form_profile: 'complete', company_name: 'Suzana Zatorre Educacional Ltda', company_document: '', company_address: '', confirm_email: false, require_terms: false, require_privacy: false, product_display_name: '', countdown_enabled: false, countdown_ends_at: '', countdown_message: 'Esta condição termina em:',
   button_text_color: '#17130a', subtitle: '', product_image_url: '', mobile_banner_url: '', favicon_url: '', support_email: '', support_phone: '', terms_url: '', privacy_url: '', layout: 'split', headline: '', headline_highlight: '',
   background: '#f5f5f3', panel: '#ffffff', text: '#202020', accent: '#d4af37', button_text: 'Comprar agora', store_name: 'Suzana Zatorre', logo_url: '', banner_url: '', font: 'Arial', gtm_id: '', meta_pixel_id: '', redirects: { approved: '', declined: '', pending: '', pix: '', trial: '' },
 }
 export const REDIRECT_LABELS = { approved: 'Aprovada', declined: 'Negada', pending: 'Pendente', pix: 'Pix', trial: 'Trial' }
 // Somente identidade e aparência são herdadas. Preço, entrega e redirecionamentos
 // continuam exclusivos de cada oferta. Ofertas antigas preservam seu visual.
-export const SHARED_CHECKOUT_KEYS = ['background','panel','text','accent','button_text_color','store_name','logo_url','banner_url','mobile_banner_url','favicon_url','font','layout','support_email','support_phone','terms_url','privacy_url','countdown_enabled','countdown_ends_at','countdown_message']
+export const SHARED_CHECKOUT_KEYS = ['background','panel','text','accent','button_text_color','store_name','logo_url','banner_url','mobile_banner_url','favicon_url','font','layout','support_email','support_phone','terms_url','privacy_url','company_name','company_document','company_address','countdown_enabled','countdown_ends_at','countdown_message']
 export function resolveCheckoutSettings(offer = {}, global = {}) {
   const resolved = { ...offer }
   if (offer.appearance_mode === 'inherit') {
@@ -36,11 +36,14 @@ export function normalizeCheckoutSettings(input) {
     result[key] = value
   }
   for (const key of ['button_text','store_name']) result[key] = String(input[key] ?? CHECKOUT_DEFAULTS[key]).trim().slice(0,100) || CHECKOUT_DEFAULTS[key]
+  result.form_profile = input.form_profile === 'compact' ? 'compact' : 'complete'
+  for (const key of ['company_name','company_document','company_address']) result[key] = String(input[key] ?? CHECKOUT_DEFAULTS[key]).trim().slice(0, key === 'company_address' ? 300 : 150)
+  if (result.company_document && !/^\d{14}$/.test(result.company_document.replace(/\D/g, ''))) throw new Error('Informe um CNPJ de 14 dígitos para o vendedor.')
   result.subtitle = String(input.subtitle || '').trim().slice(0,500)
   result.support_email = String(input.support_email || '').trim().slice(0,254)
   if (result.support_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.support_email)) throw new Error('Email de suporte inválido.')
   result.support_phone = String(input.support_phone || '').trim().slice(0,40)
-  result.layout = ['split','stacked','focused'].includes(input.layout) ? input.layout : 'split'
+  result.layout = ['split','stacked','focused','guru','banner'].includes(input.layout) ? input.layout : 'split'
   result.headline = String(input.headline || '').trim().slice(0,180)
   result.headline_highlight = String(input.headline_highlight || '').trim().slice(0,100)
   result.product_display_name = String(input.product_display_name || '').trim().slice(0,150)

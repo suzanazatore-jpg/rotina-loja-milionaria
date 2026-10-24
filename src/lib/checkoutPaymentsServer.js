@@ -17,14 +17,14 @@ function orderItemRecords(orderId, items) {
   })
 }
 
-export async function createPayment(db, input, key, tracking = null) {
+export async function createPayment(db, input, key, tracking = null, { requireAddress = true } = {}) {
   if (!/^[a-zA-Z0-9_-]{16,100}$/.test(key || '')) throw new PaymentError('Informe uma chave única de idempotência (16–100 caracteres).')
   const selection = normalizeBumpSelection(input.bumps)
   const offer = await result(db.from('offers').select('*').eq('id', input.offer_id).single())
   const product = await result(db.from('products').select('*').eq('id', offer.product_id).single())
   if ((product.marketplace_id || 'pagarme') !== 'pagarme') throw new PaymentError('Marketplace ainda não disponível para pagamentos.')
   if (!product.plan_id) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
-  const customer = normalizeCustomer(input.customer)
+  const customer = normalizeCustomer(input.customer, { requireAddress: input.payment_method !== 'pix' || requireAddress })
   const billingAddress = { ...customer.address }
   for (const [field, limit] of [['street', 128], ['number', 32], ['district', 64]]) {
     const value = input.customer?.address?.[field]

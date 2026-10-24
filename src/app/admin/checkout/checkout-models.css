@@ -1,0 +1,63 @@
+/* Additional offer templates. All payment controls keep their original behavior. */
+.cp-page.guru,.cp-page.banner{--model-muted:#69717a;line-height:1.5}
+.cp-page.guru .cp-header,.cp-page.banner .cp-header{margin-bottom:20px}
+.cp-page.guru .cp-columns{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:0;background:var(--cp-panel);border-radius:8px;overflow:hidden}
+.cp-page.guru .cp-summary{background:var(--cp-bg);color:#fff;padding:32px}
+.cp-page.guru .cp-form-card{border:0;border-radius:0;box-shadow:none;padding:32px}
+.cp-page.guru .cp-product-image{max-height:210px;object-fit:contain;margin:8px auto 24px}
+.cp-page.guru .cp-product-placeholder{background:#ffffff0a;border-color:#ffffff25;aspect-ratio:1.7}
+.cp-page.guru .cp-price{border-color:#ffffff35}
+.cp-page.guru .cp-brand,.cp-page.guru .cp-security,.cp-page.guru>.cp-footer,.cp-page.guru>.pc-notice{color:#fff}
+.cp-page.guru .cp-field>div{border:0;border-bottom:1px solid #c5c7cb;border-radius:0;padding:4px 0;min-height:40px}
+.cp-page.guru .cp-field input,.cp-page.guru .cp-field select{background:transparent;border:0;border-bottom:1px solid #c5c7cb;border-radius:0;padding:10px 0}
+.cp-page.guru .cp-field>div:has(input){border:0;padding:0}
+.cp-page.guru .cp-field>span{color:#6554cb}
+.cp-page.guru .cp-step>span{display:none}
+.cp-page.guru .cp-step h2,.cp-page.guru .cp-step h3{text-transform:uppercase;letter-spacing:.06em;font-size:15px}
+.cp-page.guru .cp-payment-tabs{gap:0;border-bottom:1px solid #dcdfe3}
+.cp-page.guru .cp-payment-tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent}
+.cp-page.guru .cp-payment-tabs button[aria-pressed=true]{border-bottom-color:var(--cp-accent);color:var(--cp-accent)}
+.cp-page.guru .pc-bump{border:1px solid #cdd5dc;border-radius:4px;background:#f8fafb}
+.cp-page.guru .pc-bump.is-selected{background:#d4edd5;border-color:var(--cp-accent)}
+.cp-page.banner .cp-columns{display:grid;grid-template-columns:1fr;gap:0;max-width:760px;margin:auto;background:var(--cp-panel);border:1px solid #e0e3e8;border-radius:10px;overflow:hidden}
+.cp-page.banner .cp-summary{display:grid;grid-template-columns:90px 1fr;gap:8px 20px;padding:24px 32px;border-bottom:1px solid #e5e7eb}
+.cp-page.banner .cp-kicker{display:none}
+.cp-page.banner .cp-product-image,.cp-page.banner .cp-product-placeholder{grid-column:1;grid-row:1/4;width:90px;height:90px;object-fit:cover;margin:0;border-radius:7px;padding:8px;aspect-ratio:auto}
+.cp-page.banner .cp-product-placeholder>strong{display:none}
+.cp-page.banner .cp-summary h1,.cp-page.banner .cp-summary h2{grid-column:2;font-size:21px;margin:0}
+.cp-page.banner .cp-description,.cp-page.banner .cp-price{grid-column:2;margin:0;padding:0;border:0}
+.cp-page.banner .cp-price>strong{font-size:25px}
+.cp-page.banner .cp-assurances{grid-column:1/-1;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:12px}
+.cp-page.banner .cp-assurances>div{margin:4px 0}
+.cp-page.banner .cp-assurances small{display:none}
+.cp-page.banner .cp-form-card{border:0;border-radius:0;box-shadow:none;padding:28px 32px}
+.cp-page.banner .cp-banner{max-width:760px;margin:0 auto 20px;border-radius:10px}
+.cp-page.banner .pc-bump{border:2px dashed var(--cp-accent);background:color-mix(in srgb,var(--cp-accent) 9%,white)}
+.cp-page.banner .pc-bump.is-selected{border-style:solid;background:color-mix(in srgb,var(--cp-accent) 17%,white)}
+.cp-model-headline{font-size:27px;font-weight:700;text-align:center;line-height:1.25;margin:10px 0 24px}
+.cp-model-headline span{display:block;color:var(--cp-accent)}
+.cp-page.guru .cp-model-headline{color:#fff}
+.cp-preview-address{margin-top:24px}.cp-preview-address h3{font-size:13px;margin-bottom:12px}
+.pc-company-note{margin:0;overflow-wrap:anywhere}
+.pc-checkout .cp-page.guru{max-width:1140px}
+.pc-checkout .cp-page.banner{max-width:900px}
+.pc-checkout .cp-page.guru .cp-summary{padding:36px}
+.pc-checkout .cp-page.guru .cp-form-card{padding:32px 36px}
+.cp-page.mobile.guru .cp-columns{grid-template-columns:1fr}
+.cp-page.mobile.guru .cp-summary,.cp-page.mobile.guru .cp-form-card,.cp-page.mobile.banner .cp-summary,.cp-page.mobile.banner .cp-form-card{padding:20px 16px}
+.cp-page.mobile.guru .cp-product-image{max-height:140px}
+.cp-page.mobile.banner .cp-summary{grid-template-columns:64px 1fr}
+.cp-page.mobile.banner .cp-product-image,.cp-page.mobile.banner .cp-product-placeholder{width:64px;height:64px}
+.cp-page.mobile.banner .cp-assurances{display:flex}
+@media(max-width:720px){
+ .pc-checkout .cp-page.guru .cp-columns{grid-template-columns:1fr}
+ .pc-checkout .cp-page.guru .cp-summary,.pc-checkout .cp-page.guru .cp-form-card,.pc-checkout .cp-page.banner .cp-summary,.pc-checkout .cp-page.banner .cp-form-card{padding:22px 18px}
+ .pc-checkout .cp-page.guru .cp-product-image{max-height:140px}
+ .pc-checkout .cp-page.guru .cp-assurances{display:flex;gap:14px;flex-wrap:wrap}
+ .pc-checkout .cp-page.guru .cp-assurances small{display:none}
+ .pc-checkout .cp-page.banner .cp-assurances{display:flex;font-size:12px}
+ .pc-checkout .cp-page.banner .cp-summary{grid-template-columns:64px 1fr;gap:8px 14px}
+ .pc-checkout .cp-page.banner .cp-product-image,.pc-checkout .cp-page.banner .cp-product-placeholder{width:64px;height:64px}
+ .pc-checkout .cp-page.banner .cp-summary h1{font-size:20px}
+}
+@container(max-width:560px){.cp-page.desktop.guru .cp-columns{grid-template-columns:1fr}.cp-page.desktop.banner .cp-summary{padding:20px}.cp-page.desktop.banner .cp-assurances{display:flex}}

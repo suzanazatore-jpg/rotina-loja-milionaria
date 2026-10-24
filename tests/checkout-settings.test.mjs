@@ -39,3 +39,10 @@ test('focused template keeps editable copy local and accepts an explicit fixed d
  assert.throws(()=>validateCheckoutForm({countdown_enabled:true,countdown_ends_at:'2000-01-01T00:00:00Z'},{}),/encerrado/)
  validateCheckoutForm({countdown_enabled:false,countdown_ends_at:'2000-01-01T00:00:00Z'},{})
 })
+test('offer form profiles stay independent from the account while seller identity inherits',()=>{
+ const config=resolveCheckoutSettings({appearance_mode:'inherit',layout:'guru',form_profile:'compact'},{layout:'banner',form_profile:'complete',company_name:'Empresa real',company_document:'12.345.678/0001-90',company_address:'Rua da empresa'})
+ assert.equal(config.layout,'banner');assert.equal(config.form_profile,'compact');assert.equal(config.company_name,'Empresa real');assert.equal(config.company_document,'12.345.678/0001-90')
+ assert.equal(normalizeCheckoutSettings({}).form_profile,'complete')
+ assert.equal(normalizeCheckoutSettings({layout:'guru'}).layout,'guru')
+ assert.throws(()=>normalizeCheckoutSettings({company_document:'123'}),/CNPJ/)
+})
