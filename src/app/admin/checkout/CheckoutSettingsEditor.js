@@ -4,8 +4,8 @@ import Link from 'next/link'
 import CheckoutPreview from './CheckoutPreview'
 import { useState } from 'react'
 import { checkoutSettingsDraft, SHARED_CHECKOUT_KEYS, REDIRECT_LABELS } from '@/lib/checkoutSettings'
-export default function CheckoutSettingsEditor({value,onChange,offer,product,globalConfig={},globalEditor=false}) {
-  const [tab,setTab] = useState('appearance')
+export default function CheckoutSettingsEditor({value,onChange,offer,product,globalConfig={},globalEditor=false,initialTab='appearance'}) {
+  const [tab,setTab] = useState(initialTab === 'content' ? 'content' : 'appearance')
   const [device,setDevice] = useState('desktop')
   const config=checkoutSettingsDraft(value,globalConfig)
   function change(key,next) {onChange({...config,[key]:next,...(SHARED_CHECKOUT_KEYS.includes(key)?{appearance_mode:'custom'}:{})})}
