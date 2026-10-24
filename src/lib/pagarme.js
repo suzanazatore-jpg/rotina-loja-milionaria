@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { totalParcelado } from './checkoutPricing.js'
 
 export class PaymentError extends Error {
   constructor(message, status = 400) { super(message); this.status = status }
@@ -39,13 +40,13 @@ export function calculatePayment(offer, product, method, installments = 1) {
   if (!Number.isSafeInteger(subtotal) || subtotal <= 0) throw new PaymentError('Preço inválido.')
   const discount = method === 'pix' ? Math.round(subtotal * Number(offer.pix_discount_pct || 0) / 100) : 0
   let total = subtotal - discount
-  const rate = Number(offer.monthly_interest_pct || 0) / 100
-  if (method === 'credit_card' && installments > offer.free_installments && rate > 0) {
-    const factor = (1 + rate) ** installments
-    total = Math.ceil(subtotal * rate * factor / (factor - 1)) * installments
-  }
+  if (method === 'credit_card') total = totalParcelado(subtotal, installments, offer.free_installments, offer.monthly_interest_pct, offer.interest_model)
   if (!Number.isSafeInteger(total) || total <= 0 || total > 2147483647) throw new PaymentError('Total inválido.')
   return { subtotal_cents: subtotal, discount_cents: discount, interest_cents: total - subtotal + discount, total_cents: total }
+}
+
+export function subscriptionPlanPayload(offer, product) {
+  return { name: `${product.name} — ${offer.name}`.slice(0,64), currency: 'BRL', interval: offer.billing_interval, interval_count: offer.billing_interval_count, billing_type: 'prepaid', payment_methods: ['credit_card'], installments: [1], trial_period_days: offer.trial_days || 0, items: [{ name: product.name.slice(0,64), quantity: 1, ...(offer.billing_cycles > 0 ? { cycles: offer.billing_cycles } : {}), pricing_scheme: { scheme_type: 'unit', price: offer.price_cents } }] }
 }
 
 export function normalizeCustomer(input) {

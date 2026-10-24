@@ -37,7 +37,7 @@ export function publicCheckoutData(loaded, env = process.env) {
   const test = checkoutTestConfiguration(env)
   // Nunca enviar o registro completo: contém vínculos internos e configuração administrativa.
   return {
-    offer: { id: offer.id, name: offer.name, slug: offer.slug, price_cents: offer.price_cents, payment_methods: offer.payment_methods, billing_interval: offer.billing_interval, billing_interval_count: offer.billing_interval_count, trial_days: offer.trial_days },
+    offer: { id: offer.id, name: offer.name, slug: offer.slug, price_cents: offer.price_cents, payment_methods: offer.payment_methods, default_installments: offer.default_installments || 1, billing_cycles: offer.billing_cycles || 0, billing_interval: offer.billing_interval, billing_interval_count: offer.billing_interval_count, trial_days: offer.trial_days },
     product: { id: product.id, name: product.name, type: product.type }, config, prices, test,
     analytics_enabled: env.VERCEL_ENV === 'production' && env.CHECKOUT_TRACKING_ENABLED === 'true' && env.PAGARME_BASE_URL === 'https://api.pagar.me/core/v5',
     bumps: bumps.map(bump => ({ offer_id: bump.offer.id, product_id: bump.product.id, product_name: bump.product.name, offer_name: bump.offer.name, headline: bump.headline, description: bump.description, prices: prices.filter(price => bump.offer.payment_methods?.includes(price.method)).map(price => ({ method: price.method, installments: price.installments, ...quoteBump(offer, bump, price.method, price.installments) })) })),

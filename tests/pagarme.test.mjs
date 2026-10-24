@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-const source = readFileSync(new URL('../src/lib/pagarme.js', import.meta.url), 'utf8')
+const pricingUrl = `data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/checkoutPricing.js',import.meta.url))).toString('base64')}`
+const source = readFileSync(new URL('../src/lib/pagarme.js', import.meta.url), 'utf8').replace("'./checkoutPricing.js'",JSON.stringify(pricingUrl))
 const { calculatePayment, gatewayConfiguration, cardReference, confirmedOrderState, orderPayload, normalizeCustomer } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const offer = { id: 'offer', active: true, price_cents: 4700, payment_methods: ['pix','credit_card'], pix_discount_pct: 10, max_installments: 12, free_installments: 3, monthly_interest_pct: 2 }
 const product = { id: 'product', active: true, type: 'one_time', name: 'Protocolo' }

@@ -5,7 +5,7 @@ import { loadGlobalCheckoutSettings } from '@/lib/checkoutSettings'
 
 const TIPOS_PRODUTO = new Set(['one_time', 'subscription'])
 const METODOS = new Set(['pix', 'credit_card'])
-const INTERVALOS = new Set(['month', 'year'])
+const INTERVALOS = new Set(['day', 'week', 'month', 'year'])
 
 function erro(mensagem, status = 400) {
   return NextResponse.json({ error: mensagem }, { status })
@@ -21,7 +21,7 @@ function numeroEntre(valor, min, max, padrao = 0) {
   if (valor === null || valor === undefined || valor === '') return padrao
   const numero = Number(String(valor).replace(',', '.'))
   if (!Number.isFinite(numero) || numero < min || numero > max) return NaN
-  return Math.round(numero * 100) / 100
+  return Math.round(numero * 10000) / 10000
 }
 
 function urlOuNulo(valor) {
@@ -78,7 +78,7 @@ async function montarOferta(supabase, dados) {
   if (!metodos.length) throw new Error('Selecione pelo menos uma forma de pagamento.')
 
   const maxParcelas = assinatura || !metodos.includes('credit_card') ? 1 : inteiroOuNulo(dados.max_installments) ?? 1
-  if (Number.isNaN(maxParcelas) || maxParcelas < 1 || maxParcelas > 12) throw new Error('Parcelas devem ficar entre 1 e 12.')
+  if (Number.isNaN(maxParcelas) || maxParcelas < 1 || maxParcelas > 18) throw new Error('Parcelas devem ficar entre 1 e 18.')
   const semJuros = Math.min(inteiroOuNulo(dados.free_installments) ?? maxParcelas, maxParcelas)
   if (Number.isNaN(semJuros) || semJuros < 1) throw new Error('Parcelas sem juros inválidas.')
   const juros = numeroEntre(dados.monthly_interest_pct, 0, 10)
@@ -88,10 +88,16 @@ async function montarOferta(supabase, dados) {
 
   const intervalo = assinatura ? (INTERVALOS.has(dados.billing_interval) ? dados.billing_interval : 'month') : null
   const qtdIntervalo = assinatura ? inteiroOuNulo(dados.billing_interval_count) ?? 1 : null
-  if (assinatura && (Number.isNaN(qtdIntervalo) || qtdIntervalo < 1 || qtdIntervalo > 12)) throw new Error('Período de cobrança inválido.')
+  if (assinatura && (Number.isNaN(qtdIntervalo) || qtdIntervalo < 1 || qtdIntervalo > 365)) throw new Error('Período de cobrança inválido.')
   const trial = assinatura ? inteiroOuNulo(dados.trial_days) ?? 0 : 0
   if (Number.isNaN(trial) || trial < 0) throw new Error('Dias de teste inválidos.')
 
+  const modelo = dados.interest_model || 'price'
+  if (!['price','simple'].includes(modelo)) throw new Error('Cálculo dos juros inválido.')
+  const parcelaPadrao = assinatura ? 1 : inteiroOuNulo(dados.default_installments) ?? 1
+  if (!Number.isInteger(parcelaPadrao) || parcelaPadrao < 1 || parcelaPadrao > maxParcelas) throw new Error('Parcela selecionada inválida.')
+  const ciclos = assinatura ? inteiroOuNulo(dados.billing_cycles) ?? 0 : 0
+  if (!Number.isInteger(ciclos) || ciclos < 0 || ciclos > 999) throw new Error('Máximo de cobranças inválido.')
   const obrigado = urlOuNulo(dados.thank_you_url)
   if (obrigado === undefined) throw new Error('Link da página de obrigado inválido.')
   if (dados.checkout_config) {
@@ -111,6 +117,9 @@ async function montarOferta(supabase, dados) {
     payment_methods: metodos,
     max_installments: maxParcelas,
     free_installments: semJuros,
+    interest_model: modelo,
+    default_installments: parcelaPadrao,
+    billing_cycles: ciclos,
     monthly_interest_pct: semJuros >= maxParcelas ? 0 : juros,
     pix_discount_pct: descontoPix,
     billing_interval: intervalo,

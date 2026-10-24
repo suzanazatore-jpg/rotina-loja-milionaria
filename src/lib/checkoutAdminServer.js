@@ -31,11 +31,4 @@ export function reaisParaCentavos(valor) {
   return Number.isFinite(numero) ? Math.round(numero * 100) : null
 }
 
-// Mesmo cálculo da função calc_installment_total do banco (Tabela Price)
-export function totalParcelado(precoCentavos, parcelas, semJuros, jurosMensalPct) {
-  const i = Number(jurosMensalPct || 0) / 100
-  if (parcelas <= semJuros || i === 0) return precoCentavos
-  const fator = Math.pow(1 + i, parcelas)
-  const parcela = precoCentavos * (i * fator) / (fator - 1)
-  return Math.ceil(parcela) * parcelas
-}
+export { totalParcelado } from './checkoutPricing.js'

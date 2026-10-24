@@ -32,7 +32,7 @@ export async function loadOrderBumps(db, mainOfferId) {
 
 // O parcelamento vem da oferta principal; cada adicional mantém seu preço e desconto Pix.
 export function quoteBump(mainOffer, bump, method, installments) {
-  return calculatePayment({ ...bump.offer, max_installments: mainOffer.max_installments, free_installments: mainOffer.free_installments, monthly_interest_pct: mainOffer.monthly_interest_pct }, bump.product, method, installments)
+  return calculatePayment({ ...bump.offer, max_installments: mainOffer.max_installments, free_installments: mainOffer.free_installments, monthly_interest_pct: mainOffer.monthly_interest_pct, interest_model: mainOffer.interest_model }, bump.product, method, installments)
 }
 
 export function buildCheckoutCart(offer, product, available, selection, method, installments = 1) {

@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
-const pagarme=`data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/pagarme.js',import.meta.url))).toString('base64')}`
+const pagarme=`data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/pagarme.js',import.meta.url),'utf8').replace("'./checkoutPricing.js'",JSON.stringify(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/checkoutPricing.js',import.meta.url))).toString('base64')}`))).toString('base64')}`
 const source=readFileSync(new URL('../src/lib/checkoutWebhookServer.js',import.meta.url),'utf8').replace('./pagarme.js',pagarme)
 const {reconcileWebhookResource}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const id='00000000-0000-4000-8000-000000000001'

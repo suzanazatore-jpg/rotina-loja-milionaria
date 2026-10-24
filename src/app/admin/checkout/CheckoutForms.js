@@ -1,4 +1,5 @@
 'use client'
+import { totalParcelado } from '@/lib/checkoutPricing'
 
 const ouro = 'var(--cv-gold)'
 const ouroGrad = 'linear-gradient(135deg, var(--cv-gold), var(--cv-gold))'
@@ -14,7 +15,7 @@ export const PRODUTO_VAZIO = { name: '', type: 'one_time', marketplace_id:'pagar
 export const OFERTA_VAZIA = {
   name: '', price: '', payment_methods: ['pix', 'credit_card'], max_installments: 12, free_installments: 1,
   monthly_interest_pct: '2.99', pix_discount_pct: '0', billing_interval: 'month', billing_interval_count: 1,
-  trial_days: 0, thank_you_url: '', active: true, bumps: [],
+  interest_model: 'price', default_installments: 1, billing_cycles: 0, trial_days: 0, thank_you_url: '', active: true, bumps: [],
 }
 
 function moeda(centavos) {
@@ -28,12 +29,6 @@ function paraCentavos(valor) {
   return Number.isFinite(numero) ? Math.round(numero * 100) : 0
 }
 
-function totalParcelado(preco, parcelas, semJuros, jurosPct) {
-  const i = Number(String(jurosPct || 0).replace(',', '.')) / 100
-  if (parcelas <= semJuros || !i) return preco
-  const f = Math.pow(1 + i, parcelas)
-  return Math.ceil(preco * (i * f) / (f - 1)) * parcelas
-}
 
 export function FormProduto({ dados, planos, editando, onChange, marketplaces=[{id:'pagarme',name:'Pagar.me',active:true}] }) {
   const set = (campoNome, valor) => onChange({ ...dados, [campoNome]: valor })
@@ -87,8 +82,8 @@ export function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange, s
   const simulacao = []
   if (preco > 0 && cartao && !assinatura) {
     for (const n of Array.from({ length: max }, (_, i) => i + 1)) {
-      const total = totalParcelado(preco, n, semJuros, dados.monthly_interest_pct)
-      simulacao.push({ n, parcela: Math.ceil(total / n), total })
+      const total = totalParcelado(preco, n, semJuros, dados.monthly_interest_pct, dados.interest_model)
+      simulacao.push({ n, parcela: Math.round(total / n), total })
     }
   }
 
@@ -113,8 +108,9 @@ export function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange, s
         <div style={{ background: 'var(--cv-field)', border: '1px solid var(--cv-border)', borderRadius: 10, padding: 12, fontSize: 13, color: 'var(--cv-muted)' }}>
           Assinatura cobra automaticamente no <strong>cartão de crédito</strong>.
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 12, marginTop: 10 }}>
-            <label style={rotulo}>Cobrar a cada<input type="number" min="1" max="12" value={dados.billing_interval_count} onChange={e => set('billing_interval_count', e.target.value)} style={campo} /></label>
-            <label style={rotulo}>Período<select value={dados.billing_interval} onChange={e => set('billing_interval', e.target.value)} style={campo}><option value="month">mês(es)</option><option value="year">ano(s)</option></select></label>
+            <label style={rotulo}>Cobrar a cada<input type="number" min="1" max="365" value={dados.billing_interval_count} onChange={e => set('billing_interval_count', e.target.value)} style={campo} /></label>
+            <label style={rotulo}>Período<select value={dados.billing_interval} onChange={e => set('billing_interval', e.target.value)} style={campo}><option value="day">dia(s)</option><option value="week">semana(s)</option><option value="month">mês(es)</option><option value="year">ano(s)</option></select></label>
+            <label style={rotulo}>Máximo de cobranças<input type="number" min="0" max="999" value={dados.billing_cycles || 0} onChange={e => set('billing_cycles', e.target.value)} style={campo} /><small style={dica}>0 = até cancelar.</small></label>
             <label style={rotulo}>Dias grátis<input type="number" min="0" value={dados.trial_days} onChange={e => set('trial_days', e.target.value)} style={campo} /></label>
           </div>
         </div>
@@ -122,9 +118,11 @@ export function FormOferta({ dados, produto, ofertasBump, produtoDe, onChange, s
 
       {!assinatura && cartao && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
-          <label style={rotulo}>Máximo de parcelas<select value={dados.max_installments} onChange={e => set('max_installments', Number(e.target.value))} style={campo}>{Array.from({ length: 12 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}x</option>)}</select></label>
+          <label style={rotulo}>Máximo de parcelas<select value={dados.max_installments} onChange={e => set('max_installments', Number(e.target.value))} style={campo}>{Array.from({ length: 18 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}x</option>)}</select></label>
           <label style={rotulo}>Sem juros até<select value={semJuros} onChange={e => set('free_installments', Number(e.target.value))} style={campo}>{Array.from({ length: max }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n === 1 ? 'à vista' : `${n}x`}</option>)}</select></label>
-          <label style={rotulo}>Juros ao mês (%)<input value={dados.monthly_interest_pct} disabled={semJuros >= max} onChange={e => set('monthly_interest_pct', e.target.value)} style={campo} /><small style={dica}>Repassado à cliente acima das parcelas sem juros.</small></label>
+          <label style={rotulo}>Cálculo dos juros<select value={dados.interest_model || 'price'} onChange={e => set('interest_model', e.target.value)} style={campo}><option value="price">Tabela Price</option><option value="simple">Taxa única — modelo Guru</option></select></label>
+          <label style={rotulo}>Parcela selecionada<select value={Math.min(Number(dados.default_installments) || 1,max)} onChange={e => set('default_installments',Number(e.target.value))} style={campo}>{Array.from({length:max},(_,i)=>i+1).map(n=><option key={n} value={n}>{n}x</option>)}</select></label>
+          <label style={rotulo}>Taxa de juros (%)<input value={dados.monthly_interest_pct} disabled={semJuros >= max} onChange={e => set('monthly_interest_pct', e.target.value)} style={campo} /><small style={dica}>Repassado à cliente acima das parcelas sem juros.</small></label>
         </div>
       )}
 

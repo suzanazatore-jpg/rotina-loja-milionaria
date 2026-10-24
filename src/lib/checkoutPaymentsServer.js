@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { PaymentError, normalizeCustomer, cardReference, orderPayload, confirmedOrderState, pagarme, digest } from './pagarme.js'
+import { PaymentError, normalizeCustomer, cardReference, orderPayload, confirmedOrderState, pagarme, digest, subscriptionPlanPayload } from './pagarme.js'
 
 import { loadOrderBumps, buildCheckoutCart, normalizeBumpSelection } from './checkoutCart.js'
 
@@ -74,7 +74,7 @@ export async function createPayment(db, input, key, tracking = null) {
   }
   const metadata = { local_order_id: order.id, offer_id: offer.id }
   if (product.type === 'subscription') {
-    const planBody = { name: `${product.name} — ${offer.name}`.slice(0,64), currency: 'BRL', interval: offer.billing_interval, interval_count: offer.billing_interval_count, billing_type: 'prepaid', payment_methods: ['credit_card'], installments: [1], trial_period_days: offer.trial_days || 0, items: [{ name: product.name.slice(0,64), quantity: 1, pricing_scheme: { scheme_type: 'unit', price: offer.price_cents } }] }
+    const planBody = subscriptionPlanPayload(offer, product)
     const plan = await pagarme('/plans', { method: 'POST', body: planBody, idempotencyKey: `plan-${digest(planBody)}` })
     const remote = await pagarme('/subscriptions', { method: 'POST', idempotencyKey: order.id, body: { code: order.id, plan_id: plan.id, payment_method: 'credit_card', customer_id: gatewayCustomer.id, ...gatewayCard, installments: 1, metadata } })
     const subscription = await result(db.from('subscriptions').upsert({ customer_id: order.customer_id, offer_id: offer.id, origin_order_id: order.id, pagarme_subscription_id: remote.id, status: remote.status === 'canceled' ? 'canceled' : 'active', current_period_end: remote.current_cycle?.end_at || null }, { onConflict: 'pagarme_subscription_id' }).select('*').single())
