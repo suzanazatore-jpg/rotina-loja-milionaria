@@ -109,3 +109,8 @@
  .pc-checkout .cp-page.guru .cp-assurances{display:flex;gap:8px 16px}
 }
 @container(max-width:560px){.cp-page.desktop.guru .cp-columns{grid-template-columns:1fr;gap:20px}.cp-page.desktop.guru .cp-summary{position:static}.cp-page.desktop.guru .cp-footer{max-width:100%}}
+.guru-security{display:flex;justify-content:center;align-items:center;gap:6px}
+.pc-checkout .cp-page.guru .cp-fields{gap:12px 22px}
+.pc-checkout .cp-page.guru .cp-field>span{font-size:12px;margin-bottom:2px}
+.pc-checkout .cp-page.guru .cp-field input,.pc-checkout .cp-page.guru .cp-field select{min-height:38px;padding:6px 0;font-size:15px}
+.cp-page.guru .pc-payment-body input[name=holder_name]{text-transform:uppercase}
