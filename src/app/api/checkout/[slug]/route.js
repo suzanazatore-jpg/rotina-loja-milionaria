@@ -8,6 +8,7 @@ import { createPayment } from '@/lib/checkoutPaymentsServer'
 import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'
 import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
+import { validateCheckoutForm } from '@/lib/checkoutSettings'
 
 export const runtime = 'nodejs'
 const secret = () => process.env.CHECKOUT_SESSION_SECRET
@@ -58,8 +59,13 @@ export async function POST(request, context) {
     }
     if (input.action !== 'pay' || !session) throw new PaymentError('Inicie uma sessão válida antes do pagamento.', 401)
     // Não permita alterar oferta nem aceitar dados abertos do cartão no endpoint público.
-    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps','marketing_consent'])
+    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps','marketing_consent','email_confirmation','terms_accepted','privacy_accepted'])
     if (Object.keys(input).some(key => !allowed.has(key))) throw new PaymentError('Dados de pagamento inválidos.')
+    try { validateCheckoutForm(loaded.config,input) } catch(error) { throw new PaymentError(error.message,400) }
+    if (loaded.config.require_terms || loaded.config.require_privacy) {
+      const {error} = await db.from('webhook_events').upsert({pagarme_event_id:`checkout-form:${session.key}`,type:'checkout.form.accepted',payload:{offer_id:loaded.offer.id,terms_url:loaded.config.terms_url,privacy_url:loaded.config.privacy_url,terms_accepted:input.terms_accepted===true,privacy_accepted:input.privacy_accepted===true},processed_at:new Date().toISOString()},{onConflict:'pagarme_event_id',ignoreDuplicates:true})
+      if(error) throw new PaymentError('Não foi possível registrar o aceite. Tente novamente.',503)
+    }
     const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, input.marketing_consent === true ? { consent: true, gateway_base: process.env.PAGARME_BASE_URL, pixel_id: loaded.config.meta_pixel_id, source_url: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}` } : null)
     if (payment.status === 'paid') {
       await fulfillPaidOrder(db, payment.order_id)

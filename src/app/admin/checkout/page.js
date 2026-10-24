@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { FormProduto } from './CheckoutForms'
+import ProductDelivery from './ProductDelivery'
+import CatalogAudit from './CatalogAudit'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -39,6 +41,10 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const [ofertas, setOfertas] = useState([])
   const [bumps, setBumps] = useState([])
   const [planos, setPlanos] = useState([])
+  const [delivery,setDelivery] = useState({})
+  const [statusFilter,setStatusFilter] = useState('all')
+  const [typeFilter,setTypeFilter] = useState('all')
+  const [accessFilter,setAccessFilter] = useState('all')
   const [mensagem, setMensagem] = useState('')
   const [formProduto, setFormProduto] = useState(null) // { id?, dados }
   const [salvando, setSalvando] = useState(false)
@@ -61,7 +67,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
     try {
       const dados = await api('GET', null, tk)
       setProdutos(dados.produtos || []); setOfertas(dados.ofertas || [])
-      setBumps(dados.bumps || []); setPlanos(dados.planos || [])
+      setBumps(dados.bumps || []); setPlanos(dados.planos || []); setDelivery(dados)
     } catch (e) { setMensagem(e.message) }
   }, [api])
 
@@ -110,6 +116,11 @@ export default function AdminCheckout({ initialProdutoId = null }) {
     return `${typeof window !== 'undefined' ? window.location.origin : ''}/checkout/${o.slug}`
   }
 
+  const visibleProducts = produtos.filter(p => `${p.name} ${p.slug} ${p.code}`.toLocaleLowerCase('pt-BR').includes(busca.trim().toLocaleLowerCase('pt-BR')) && (statusFilter === 'all' || p.active === (statusFilter === 'active')) && (typeFilter === 'all' || p.type === typeFilter) && (accessFilter === 'all' || Boolean(p.plan_id) === (accessFilter === 'linked')))
+  async function duplicarOferta(o) {
+    setSalvando(true); setMensagem('')
+    try {const result=await api('POST',{entidade:'oferta',id:o.id,action:'duplicate'}); router.push(`/admin/checkout/produtos/${o.product_id}/ofertas/${result.id}`)} catch(error){setMensagem(error.message)} finally{setSalvando(false)}
+  }
   const selecionado = produtos.find(p => p.id === produtoId)
 
   if (carregando) return <Bloqueio texto="Carregando..." />
@@ -133,11 +144,11 @@ export default function AdminCheckout({ initialProdutoId = null }) {
         {!produtos.length && !mensagem && <div style={{ background: 'var(--cv-panel)', border: '1px dashed var(--cv-border)', borderRadius: 14, padding: 30, textAlign: 'center', color: 'var(--cv-muted)' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
 
         {!selecionado ? <>
-          <div className="central-list-toolbar"><label>Buscar produto<input style={campo} value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome ou link do produto" /></label><span>{produtos.length} produto(s)</span></div>
-          <div className="central-table-wrap"><table className="central-table"><thead><tr><th>Produto</th><th>Código / ID</th><th>Tipo</th><th>Plano de acesso</th><th>Ofertas</th><th>Status</th><th /></tr></thead><tbody>{produtos.filter(p => `${p.name} ${p.slug}`.toLowerCase().includes(busca.toLowerCase())).map(p => <tr key={p.id}><td><button className="central-text-button" onClick={() => {router.push(`/admin/checkout/produtos/${encodeURIComponent(p.id)}`)}}>{p.name}</button><small>{p.slug}</small></td><td>{p.code || p.guru_product_id || p.id}</td><td>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</td><td>{nomePlano[p.plan_id] || '—'}</td><td>{ofertas.filter(o => o.product_id === p.id).length}</td><td><span className="central-badge">{p.active ? 'Ativo' : 'Inativo'}</span></td><td><button style={botaoSecundario} onClick={() => {router.push(`/admin/checkout/produtos/${encodeURIComponent(p.id)}`)}}>Abrir →</button></td></tr>)}{!produtos.some(p => `${p.name} ${p.slug}`.toLowerCase().includes(busca.toLowerCase())) && <tr><td colSpan={7}>Nenhum produto encontrado.</td></tr>}</tbody></table></div>
+          <div className="central-list-toolbar"><label>Buscar produto<input style={campo} value={busca} onChange={e => setBusca(e.target.value)} placeholder="Nome, código ou link do produto" /></label><label>Status<select style={campo} value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">Todos</option><option value="active">Ativos</option><option value="inactive">Inativos</option></select></label><label>Tipo<select style={campo} value={typeFilter} onChange={e=>setTypeFilter(e.target.value)}><option value="all">Todos</option><option value="one_time">Pagamento único</option><option value="subscription">Assinatura</option></select></label><label>Entrega<select style={campo} value={accessFilter} onChange={e=>setAccessFilter(e.target.value)}><option value="all">Todos</option><option value="linked">Com plano</option><option value="unlinked">Sem plano</option></select></label><span>{visibleProducts.length} de {produtos.length} produto(s)</span></div>
+          <div className="central-table-wrap"><table className="central-table"><thead><tr><th>Produto</th><th>Código / ID</th><th>Tipo</th><th>Plano de acesso</th><th>Ofertas</th><th>Status</th><th /></tr></thead><tbody>{visibleProducts.map(p => <tr key={p.id}><td><button className="central-text-button" onClick={() => {router.push(`/admin/checkout/produtos/${encodeURIComponent(p.id)}`)}}>{p.name}</button><small>{p.slug}</small></td><td>{p.code || p.guru_product_id || p.id}</td><td>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</td><td>{nomePlano[p.plan_id] || '—'}</td><td>{ofertas.filter(o => o.product_id === p.id).length}</td><td><span className="central-badge">{p.active ? 'Ativo' : 'Inativo'}</span></td><td><button style={botaoSecundario} onClick={() => {router.push(`/admin/checkout/produtos/${encodeURIComponent(p.id)}`)}}>Abrir →</button></td></tr>)}{!visibleProducts.length && <tr><td colSpan={7}>Nenhum produto encontrado.</td></tr>}</tbody></table></div>
         </> : <>
           <div className="central-breadcrumb"><button className="central-text-button" onClick={() => router.push('/admin/checkout')}>Produtos</button><span>/</span><strong>{selecionado.name}</strong></div>
-          <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhes'],['ofertas','Ofertas'],['vendas','Vendas']].map(([key,label]) => <button key={key} aria-current={aba === key ? 'page' : undefined} onClick={() => setAba(key)}>{label}</button>)}</nav>
+          <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhes'],['ofertas','Ofertas'],['entrega','Entrega e acesso'],['vendas','Vendas'],['auditoria','Auditoria']].map(([key,label]) => <button key={key} aria-current={aba === key ? 'page' : undefined} onClick={() => setAba(key)}>{label}</button>)}</nav>
         {produtos.filter(p => p.id === produtoId).map(p => {
           const lista = ofertas.filter(o => o.product_id === p.id)
           return (
@@ -158,6 +169,8 @@ export default function AdminCheckout({ initialProdutoId = null }) {
                 </div>
               </div>
               {aba === 'detalhes' && <div className="central-product-detail">{formProduto?.id === p.id ? <form onSubmit={salvarProduto}><FormProduto dados={formProduto.dados} planos={planos} editando onChange={dados => setFormProduto(f => ({...f,dados}))} /><div className="central-editor-actions"><button type="button" className="central-action" onClick={() => setFormProduto(null)}>Cancelar</button><button className="central-primary" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar produto'}</button></div></form> : <dl><div><dt>Código / ID</dt><dd>{p.code || p.guru_product_id || p.id}</dd></div><div><dt>Nome do produto</dt><dd>{p.name}</dd></div><div><dt>Tipo</dt><dd>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</dd></div><div><dt>Plano de acesso</dt><dd>{nomePlano[p.plan_id] || 'Sem plano vinculado'}</dd></div><div><dt>Prazo de acesso</dt><dd>{planos.find(plano => plano.id === p.plan_id)?.period_days ? `${planos.find(plano => plano.id === p.plan_id).period_days} dias — definido no plano` : p.plan_id ? 'Conforme configuração do plano no app' : 'Vincule um plano de acesso'}</dd></div><div><dt>Link amigável</dt><dd>{p.slug}</dd></div><div><dt>Status</dt><dd>{p.active ? 'Ativo' : 'Inativo'}</dd></div></dl>}</div>}
+              {aba === 'entrega' && <ProductDelivery product={p} plans={planos} courses={delivery.cursos} appContents={delivery.conteudos} mentorships={delivery.mentorias} fulfillmentEnabled={delivery.fulfillment_enabled} />}
+              {aba === 'auditoria' && <CatalogAudit productId={p.id} token={token} />}
               {aba === 'vendas' && <div className="central-product-detail"><p>Consulte os pedidos deste produto no painel de vendas.</p><Link className="central-primary" href={`/admin/checkout/vendas?produto=${encodeURIComponent(p.id)}`}>Ver vendas deste produto →</Link></div>}
               {aba === 'ofertas' && lista.map(o => {
                 const bumpsOferta = bumps.filter(b => b.offer_id === o.id)
@@ -179,6 +192,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                       <button onClick={async () => { try { await navigator.clipboard.writeText(linkCheckout(o)); setMensagem('✓ Link copiado.') } catch { setMensagem('Não foi possível copiar. Selecione o link da oferta.') } }} style={botaoSecundario}>Copiar link</button>
+                      <a href={linkCheckout(o)} target="_blank" rel="noopener noreferrer" style={botaoSecundario}>Visualizar</a><button disabled={salvando} onClick={() => duplicarOferta(o)} style={botaoSecundario}>Duplicar</button>
                       <button onClick={() => editarOferta(p, o)} style={botaoSecundario}>Editar</button>
                       <button onClick={() => alternar('oferta', o)} style={{ ...botaoSecundario, color: o.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{o.active ? 'Desativar' : 'Ativar'}</button>
                     </div>

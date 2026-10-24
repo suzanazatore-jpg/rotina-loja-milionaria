@@ -16,7 +16,7 @@ export function resolveTracking(offerConfig = {}, globalConfig = {}) {
   return { ...normalizeTracking(mode === 'off' ? {} : mode === 'custom' ? offerConfig : globalConfig), source: mode }
 }
 export async function loadGlobalTracking(db) {
-  const { data, error } = await db.from('checkout_settings').select('gtm_id,meta_pixel_id,updated_at').eq('id', 'global').maybeSingle()
+  const { data, error } = await db.from('checkout_settings').select('gtm_id,meta_pixel_id,updated_at,checkout_config').eq('id', 'global').maybeSingle()
   if (error) throw new Error('Não foi possível carregar o rastreamento global.')
-  return { ...normalizeTracking(data || {}), updated_at: data?.updated_at || null }
+  return { ...normalizeTracking(data || {}), updated_at: data?.updated_at || null, checkout_config: data?.checkout_config || {} }
 }

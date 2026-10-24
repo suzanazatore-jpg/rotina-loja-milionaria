@@ -1,6 +1,7 @@
 import { normalizeCheckoutSettings } from '@/lib/checkoutSettings'
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient, gerarSlug, reaisParaCentavos } from '@/lib/checkoutAdminServer'
+import { loadGlobalCheckoutSettings } from '@/lib/checkoutSettings'
 
 const TIPOS_PRODUTO = new Set(['one_time', 'subscription'])
 const METODOS = new Set(['pix', 'credit_card'])
@@ -85,6 +86,14 @@ async function montarOferta(supabase, dados) {
 
   const obrigado = urlOuNulo(dados.thank_you_url)
   if (obrigado === undefined) throw new Error('Link da página de obrigado inválido.')
+  if (dados.checkout_config) {
+    const config = dados.checkout_config
+    // A validação final considera também as URLs herdadas da central.
+    const global = await loadGlobalCheckoutSettings(supabase)
+    const urls = config.appearance_mode === 'inherit' ? global : config
+    if (config.require_terms && !urls.terms_url) throw new Error('Informe a URL dos termos antes de exigir o aceite.')
+    if (config.require_privacy && !urls.privacy_url) throw new Error('Informe a URL da política de privacidade antes de exigir o aceite.')
+  }
 
   return {
     product_id: produto.id,
@@ -132,24 +141,39 @@ function traduzirErro(mensagem) {
 export async function GET(request) {
   const supabase = checkoutAdminClient()
   if (!(await autorizarAdmin(request, supabase))) return erro('Acesso restrito ao administrador.', 401)
-  const [produtos, ofertas, bumps, planos] = await Promise.all([
+  const [produtos, ofertas, bumps, planos, cursos, conteudos, mentorias, globalConfig] = await Promise.all([
     supabase.from('products').select('*').order('created_at'),
     supabase.from('offers').select('*').order('created_at'),
     supabase.from('order_bumps').select('*').order('position'),
-    supabase.from('plans').select('id,name,commercial_name,period_days').not('offer_id', 'like', '__individual_%').order('name'),
+    supabase.from('plans').select('id,name,commercial_name,period_days,offer_id').not('offer_id', 'like', '__individual_%').order('name'),
+    supabase.from('plan_courses').select('plan_id,course_id,courses(id,title)'),
+    supabase.from('plan_app_contents').select('plan_id,content_key'),
+    supabase.from('plan_mentorships').select('plan_id,mentorship_type'),
+    loadGlobalCheckoutSettings(supabase),
   ])
-  const falha = produtos.error || ofertas.error || bumps.error || planos.error
+  const falha = produtos.error || ofertas.error || bumps.error || planos.error || cursos.error || conteudos.error || mentorias.error
   if (falha) return erro(falha.message, 500)
-  return NextResponse.json({ produtos: produtos.data, ofertas: ofertas.data, bumps: bumps.data, planos: planos.data })
+  return NextResponse.json({ produtos: produtos.data, ofertas: ofertas.data, bumps: bumps.data, planos: planos.data, cursos: cursos.data, conteudos: conteudos.data, mentorias: mentorias.data, global_config: globalConfig, fulfillment_enabled: process.env.CHECKOUT_FULFILLMENT_ENABLED === 'true' }, {headers:{'Cache-Control':'no-store'}})
 }
 
 export async function POST(request) {
   const supabase = checkoutAdminClient()
   if (!(await autorizarAdmin(request, supabase))) return erro('Acesso restrito ao administrador.', 401)
   try {
-    const { entidade, id, dados = {} } = await request.json()
+    const { entidade, id, dados = {}, action } = await request.json()
+    if (action === 'duplicate' && entidade === 'oferta') {
+      if (!/^[0-9a-f-]{36}$/i.test(id || '')) throw new Error('Oferta inválida.')
+      const { data, error } = await supabase.rpc('checkout_duplicate_offer', { source_id: id })
+      if (error) throw new Error('Não foi possível duplicar a oferta.')
+      return NextResponse.json({ok:true,id:data})
+    }
     if (entidade === 'produto') {
       const registro = await montarProduto(dados)
+      if (id) {
+        const {data: current, error} = await supabase.from('products').select('type').eq('id',id).single()
+        if (error || !current) throw new Error('Produto não encontrado.')
+        if (registro.type !== current.type) throw new Error('O tipo do produto não pode ser alterado.')
+      }
       const consulta = id
         ? supabase.from('products').update(registro).eq('id', id)
         : supabase.from('products').insert(registro)

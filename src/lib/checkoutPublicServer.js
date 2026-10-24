@@ -1,6 +1,6 @@
 import { loadGlobalTracking, resolveTracking } from './checkoutTracking.js'
 import { checkoutAdminClient } from './checkoutAdminServer.js'
-import { normalizeCheckoutSettings } from './checkoutSettings.js'
+import { resolveCheckoutSettings } from './checkoutSettings.js'
 import { loadOrderBumps, quoteBump } from './checkoutCart.js'
 import { calculatePayment, gatewayConfiguration } from './pagarme.js'
 
@@ -12,8 +12,9 @@ export async function loadCheckoutOffer(slug, db = checkoutAdminClient()) {
   const { data: product, error: productError } = await db.from('products').select('*').eq('id', offer.product_id).eq('active', true).maybeSingle()
   if (productError) throw new Error('Não foi possível carregar o produto.')
   if (!product) return null
-  const config = normalizeCheckoutSettings(offer.checkout_config || {})
-  const tracking = resolveTracking(config, await loadGlobalTracking(db))
+  const global = await loadGlobalTracking(db)
+  const config = resolveCheckoutSettings(offer.checkout_config || {}, global.checkout_config)
+  const tracking = resolveTracking(config, global)
   config.gtm_id = tracking.gtm_id
   config.meta_pixel_id = tracking.meta_pixel_id
   config.tracking_source = tracking.source

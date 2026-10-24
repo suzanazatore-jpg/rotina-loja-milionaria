@@ -3,15 +3,15 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CheckoutPreview from '../CheckoutPreview'
-import { CHECKOUT_DEFAULTS } from '@/lib/checkoutSettings'
+import { checkoutSettingsDraft } from '@/lib/checkoutSettings'
 import './checkouts.css'
 const money = value => (Number(value || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const editor = offer => `/admin/checkout/produtos/${offer.product_id}/ofertas/${offer.id}`
-function Preview({ offer, product, onClose }) {
+function Preview({ offer, product, globalConfig, onClose }) {
   const ref = useRef(null)
   const [device, setDevice] = useState('desktop')
   useEffect(() => { ref.current?.showModal() }, [])
-  return <dialog className="checkout-catalog-preview" ref={ref} aria-labelledby="checkout-preview-title" onCancel={event => { event.preventDefault(); onClose() }}><header><div><h2 id="checkout-preview-title">{offer.name}</h2><p>Prévia visual. Nenhum pagamento é realizado aqui.</p></div><button className="central-action" onClick={onClose} aria-label="Fechar prévia">× Fechar</button></header><div className="checkout-preview-controls" role="group" aria-label="Formato da prévia">{[['desktop','Computador'],['mobile','Celular']].map(([key,label]) => <button key={key} className="central-action" aria-pressed={device === key} onClick={() => setDevice(key)}>{label}</button>)}</div><CheckoutPreview config={{ ...CHECKOUT_DEFAULTS, ...offer.checkout_config }} offer={{ ...offer, price: (offer.price_cents / 100).toFixed(2) }} product={product} device={device} /></dialog>
+  return <dialog className="checkout-catalog-preview" ref={ref} aria-labelledby="checkout-preview-title" onCancel={event => { event.preventDefault(); onClose() }}><header><div><h2 id="checkout-preview-title">{offer.name}</h2><p>Prévia visual. Nenhum pagamento é realizado aqui.</p></div><button className="central-action" onClick={onClose} aria-label="Fechar prévia">× Fechar</button></header><div className="checkout-preview-controls" role="group" aria-label="Formato da prévia">{[['desktop','Computador'],['mobile','Celular']].map(([key,label]) => <button key={key} className="central-action" aria-pressed={device === key} onClick={() => setDevice(key)}>{label}</button>)}</div><CheckoutPreview config={checkoutSettingsDraft(offer.checkout_config,globalConfig)} offer={{ ...offer, price: (offer.price_cents / 100).toFixed(2) }} product={product} device={device} /></dialog>
 }
 export default function CheckoutCatalog() {
   const [catalog, setCatalog] = useState({ produtos: [], ofertas: [] })
@@ -34,7 +34,7 @@ export default function CheckoutCatalog() {
         const response = await fetch('/api/admin/checkout', { headers: { Authorization: `Bearer ${session.access_token}` }, cache: 'no-store', signal: controller.signal })
         const json = await response.json()
         if (!response.ok) throw new Error(json.error || 'Não foi possível carregar os checkouts.')
-        if (!controller.signal.aborted) setCatalog({ produtos: json.produtos || [], ofertas: json.ofertas || [] })
+        if (!controller.signal.aborted) setCatalog({ produtos: json.produtos || [], ofertas: json.ofertas || [], global_config:json.global_config || {} })
       } catch (failure) { if (!controller.signal.aborted) setError(failure.message) }
       finally { if (!controller.signal.aborted) setLoading(false) }
     }
@@ -55,6 +55,6 @@ export default function CheckoutCatalog() {
       <div className="central-table-wrap"><table className="central-table"><thead><tr><th>Produto / Oferta</th><th>Valor</th><th>Página</th><th>Ações</th></tr></thead><tbody>{!loading && visible.map(offer => <tr key={offer.id}><td>{offer.product.name}<small>{offer.name}</small><code className="checkout-catalog-link">/checkout/{offer.slug}</code></td><td>{money(offer.price_cents)}<small>{offer.product.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</small></td><td><span className="central-badge">{active(offer) ? 'Ativa' : 'Pausada'}</span>{!offer.product.active && <small>Produto inativo</small>}{!offer.active && <small>Oferta inativa</small>}</td><td><div className="checkout-catalog-actions"><button className="central-action" onClick={() => setPreview(offer)}>Ver prévia</button><Link className="central-action" href={`${editor(offer)}#checkout`}>Configurar página</Link><button className="central-action" onClick={() => copy(offer)}>Copiar link</button>{active(offer) && <Link className="central-action" href={`/checkout/${offer.slug}`} target="_blank" rel="noopener noreferrer">Abrir página ↗</Link>}<Link className="central-action" href={editor(offer)}>Editar oferta</Link></div></td></tr>)}{(loading || !visible.length) && <tr><td colSpan={4}>{loading ? 'Carregando checkouts…' : rows.length ? 'Nenhum checkout corresponde aos filtros.' : 'Nenhuma oferta cadastrada. Crie uma oferta para configurar seu checkout.'}</td></tr>}</tbody></table></div>
     </section>
     {!loading && withoutOffers.length > 0 && <section className="central-chart-panel checkout-catalog-pending"><h2>Produtos sem checkout</h2><p className="central-data-note">Crie a primeira oferta desses produtos para definir preço, pagamento e página.</p><ul>{withoutOffers.map(product => <li key={product.id}><span>{product.name}</span><Link className="central-action" href={`/admin/checkout/produtos/${product.id}/ofertas/nova`}>Criar oferta</Link></li>)}</ul></section>}
-    {preview && <Preview offer={preview} product={preview.product} onClose={() => setPreview(null)} />}
+    {preview && <Preview offer={preview} product={preview.product} globalConfig={catalog.global_config} onClose={() => setPreview(null)} />}
   </main>
 }

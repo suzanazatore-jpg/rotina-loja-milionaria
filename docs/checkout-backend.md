@@ -130,3 +130,14 @@ Validação: testes JavaScript com destinos simulados; teste SQL transacional co
 ### Organização do painel no padrão Guru
 
 A listagem de Webhooks separa Vendas e Assinaturas, com colunas Nome e URL, atalho de atividades e chave de ativação. Filtros ficam recolhidos até clicar em Filtros. Adicionar Webhook abre uma janela modal com nome, URL, seletor de status, Todos/Produtos e chave Ativo. Clicar no nome abre o cadastro com abas Detalhe, Atividades e Auditoria específicas daquele destino. A data de atualização vem da última alteração concluída na auditoria. Recebimentos Pagar.me fica em um acesso separado no rodapé da lista. Mantidos os temas da Central, inclusive preto e dourado. Nenhum destino é criado por essa reorganização.
+
+### Catálogo e configuração — 24/10/2026
+
+- Catálogo conferido contra os 25 produtos da Guru. Importação por `products.code`, sem substituir os vínculos e prazos já existentes; todos os produtos ativos no catálogo. O cadastro Teste foi mantido. Nenhuma oferta ou cobrança real foi ativada por essa operação.
+- Produtos: busca por nome/código/link, filtros de status/tipo/plano e aba Entrega e acesso com cursos, conteúdos e mentorias do plano. O código 1782473086 mantém o plano de 360 dias; divergência com o nome [6M] na Guru fica explícita para revisão.
+- Ofertas: duplicação transacional via RPC `checkout_duplicate_offer`, incluindo bumps. A cópia recebe novo slug, nasce inativa e conserva as condições comerciais.
+- Auditoria de produtos e ofertas por triggers invoker em `webhook_events` (`checkout.catalog.admin`), disponível apenas via API administrativa. Guarda nomes dos campos alterados, cadastro e executor; não copia URLs, configurações completas nem dados da compradora. Alterações anteriores à implantação não são reconstruídas. API direta registra executor técnico; duplicação registra a conta administrativa.
+- `checkout_settings.checkout_config` guarda identidade e aparência padrão. Novas ofertas herdam; ofertas existentes preservam o visual até opção explícita por herdar. Preço, descrição/imagem do produto, redirects, tracking e plano não são herdados por esse mecanismo. O rastreamento mantém sua configuração própria de herança.
+- Formulário: confirmação opcional do email e aceite obrigatório opcional de termos/privacidade. Validação no servidor antes de criar o pagamento e registro do aceite por sessão. Dados exigidos pelo gateway não podem ser ocultados por esse editor.
+- Emails de acesso/renovação continuam no fluxo existente do app. Pendência, recusa, abandono e reembolso ainda não têm sequência de email própria configurável. A aba Emails informa essa limitação; não há controles fictícios de ativação.
+- Verificação: testes Node do checkout/gateway, build, lint das alterações; duplicação, cópia de bump, auditoria e permissões verificados em transação revertida no banco. Nenhuma compra simulada nem envio de email foi realizado nesta etapa.
