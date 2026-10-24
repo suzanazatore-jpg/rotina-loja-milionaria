@@ -39,6 +39,8 @@ async function montarProduto(supabase,dados) {
   const marketplace = String(dados.marketplace_id || 'pagarme')
   const provider = await supabase.from('checkout_marketplaces').select('id').eq('id',marketplace).eq('active',true).maybeSingle()
   if (provider.error || !provider.data) throw new Error('Selecione um marketplace disponível.')
+  const image = urlOuNulo(dados.image_url)
+  if (image === undefined || image && (new URL(image).username || new URL(image).password || image.length > 2048)) throw new Error('Imagem do produto inválida.')
   const tipo = TIPOS_PRODUTO.has(dados.type) ? dados.type : 'one_time'
   const brevo = inteiroOuNulo(dados.brevo_list_id)
   if (Number.isNaN(brevo)) throw new Error('ID da lista do Brevo deve ser um número.')
@@ -48,6 +50,8 @@ async function montarProduto(supabase,dados) {
     ...(code !== undefined ? { code } : {}),
     name: nome,
     marketplace_id: marketplace,
+    image_url: image,
+    updated_at: new Date().toISOString(),
     slug: gerarSlug(dados.slug || nome),
     type: tipo,
     plan_id: dados.plan_id || null,

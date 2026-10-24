@@ -14,6 +14,7 @@ export async function loadCheckoutOffer(slug, db = checkoutAdminClient()) {
   if (!product || (product.marketplace_id || 'pagarme') !== 'pagarme') return null
   const global = await loadGlobalTracking(db)
   const config = resolveCheckoutSettings(offer.checkout_config || {}, global.checkout_config)
+  config.product_image_url ||= product.image_url || ''
   const tracking = resolveTracking(config, global)
   config.gtm_id = tracking.gtm_id
   config.meta_pixel_id = tracking.meta_pixel_id

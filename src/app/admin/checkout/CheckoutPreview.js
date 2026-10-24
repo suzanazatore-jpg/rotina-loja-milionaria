@@ -11,7 +11,7 @@ function PreviewImage({src,alt,className}) {
 }
 function Field({label,placeholder,wide}) {return <div className={`cp-field ${wide?'wide':''}`}><span>{label}</span><div>{placeholder}</div></div>}
 export default function CheckoutPreview({config:input,offer,product,device='desktop'}) {
-  const config={...CHECKOUT_DEFAULTS,...input}
+  const config={...CHECKOUT_DEFAULTS,...input,product_image_url:input?.product_image_url || product.image_url || ''}
   const [selected,setSelected]=useState('credit_card')
   const methods=offer.payment_methods || []
   const method=methods.includes(selected)?selected:methods[0]

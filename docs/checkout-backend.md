@@ -149,3 +149,11 @@ A listagem de Webhooks separa Vendas e Assinaturas, com colunas Nome e URL, atal
 - `checkout_marketplaces` permite cadastrar outros provedores no futuro; acesso somente por backend administrativo. `products.marketplace_id` é uma FK, com Pagar.me como padrão. Os produtos existentes foram preenchidos com esse padrão. A inclusão no catálogo não implementa uma integração de pagamentos.
 - Checkout público, cobrança administrativa e adicionais recusam produtos de outro marketplace, até implementação de seu adapter.
 - `checkout_duplicate_product` copia apenas o cadastro e vínculos. Gera código e slug novos, inicia inativo e não copia ofertas. RPC invoker exclusiva do service_role, com auditoria transacional.
+
+### Interior do produto — referência Guru
+
+- Abas: Detalhe, Ofertas, Vendas e Auditoria. A aba Entrega e acesso foi removida da interface; vínculos do plano e integrações permanecem em Configurações adicionais → Plano e integrações.
+- Detalhe abre como formulário, com imagem à direita, campos comerciais e datas. Domínio mostra o endereço real do ambiente atual. Campos sem integração equivalente na central não são exibidos como controles fictícios.
+- Imagens são enviadas apenas pelo administrador, com limite de 4 MB, validação de conteúdo e normalização por Sharp para WebP, até 1024 × 1024. Armazenamento em `panel-banners/checkout-products/`; a associação só é gravada ao salvar o produto. Remover uma imagem no formulário remove a associação, sem apagar imagens que possam estar em uso em ofertas.
+- `products.image_url` é o padrão para ofertas sem imagem própria; `updated_at` é preenchido nas novas edições. Datas de alterações antigas não são inventadas. Duplicação copia a imagem.
+- Ofertas: nome, quantidade fixa de uma unidade e valor; ações de copiar link, duplicar e ativar, com filtros recolhidos. Vendas usa a API administrativa já existente, filtrada pelo produto, com consulta de detalhes sem alterar o pedido.

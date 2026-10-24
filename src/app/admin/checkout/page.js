@@ -1,9 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { FormProduto } from './CheckoutForms'
-import ProductDelivery from './ProductDelivery'
+import ProductDetails from './ProductDetails'
+import ProductOffers from './ProductOffers'
+import ProductSales from './ProductSales'
+import interior from './ProductInterior.module.css'
 import CatalogAudit from './CatalogAudit'
 import productStyles from './ProductCatalog.module.css'
 import { useRouter } from 'next/navigation'
@@ -22,17 +25,6 @@ const botaoSecundario = { background: 'var(--cv-field)', color: ouro, border: '1
 
 const PRODUTO_VAZIO = { name: '', type: 'one_time', marketplace_id:'pagarme', plan_id: '', brevo_list_id: '', botconversa_tag: '', active: true }
 
-function moeda(centavos) {
-  return ((centavos || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function totalParcelado(preco, parcelas, semJuros, jurosPct) {
-  const i = Number(String(jurosPct || 0).replace(',', '.')) / 100
-  if (parcelas <= semJuros || !i) return preco
-  const f = Math.pow(1 + i, parcelas)
-  return Math.ceil(preco * (i * f) / (f - 1)) * parcelas
-}
-
 export default function AdminCheckout({ initialProdutoId = null }) {
   const router = useRouter()
   const [carregando, setCarregando] = useState(true)
@@ -40,9 +32,8 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const [token, setToken] = useState('')
   const [produtos, setProdutos] = useState([])
   const [ofertas, setOfertas] = useState([])
-  const [bumps, setBumps] = useState([])
   const [planos, setPlanos] = useState([])
-  const [delivery,setDelivery] = useState({})
+  const [extraOpen,setExtraOpen] = useState(false)
   const [statusFilter,setStatusFilter] = useState('all')
   const [typeFilter,setTypeFilter] = useState('all')
   const [marketplaceFilter,setMarketplaceFilter] = useState('all')
@@ -70,7 +61,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
     try {
       const dados = await api('GET', null, tk)
       setProdutos(dados.produtos || []); setOfertas(dados.ofertas || [])
-      setBumps(dados.bumps || []); setPlanos(dados.planos || []); setDelivery(dados); setMarketplaces(dados.marketplaces || [])
+      setPlanos(dados.planos || []); setMarketplaces(dados.marketplaces || [])
     } catch (e) { setMensagem(e.message) }
   }, [api])
 
@@ -86,7 +77,6 @@ export default function AdminCheckout({ initialProdutoId = null }) {
     iniciar()
   }, [router, carregar])
 
-  const nomePlano = useMemo(() => Object.fromEntries(planos.map(p => [p.id, p.commercial_name || p.name])), [planos])
 
   async function salvarProduto(e) {
     e.preventDefault(); setSalvando(true); setMensagem('')
@@ -98,26 +88,27 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   }
 
   async function alternar(entidade, item) {
+    setSalvando(true)
     try {
       await api('PATCH', { entidade, id: item.id, active: !item.active })
       await carregar()
-    } catch (err) { setMensagem(err.message) }
+    } catch (err) { setMensagem(err.message) } finally { setSalvando(false) }
   }
 
-  function editarProduto(p) {
-    setMensagem('')
-    setFormProduto({ id: p.id, dados: { ...PRODUTO_VAZIO, ...p, plan_id: p.plan_id || '', brevo_list_id: p.brevo_list_id ?? '', botconversa_tag: p.botconversa_tag || '' } })
+  async function salvarDetalhe(dados) {
+    setSalvando(true);setMensagem('')
+    try {await api('POST',{entidade:'produto',id:produtoId,dados});await carregar();setMensagem('✓ Produto salvo.')} finally{setSalvando(false)}
   }
 
   function novaOferta(produto) {
     router.push(`/admin/checkout/produtos/${encodeURIComponent(produto.id)}/ofertas/nova`)
   }
-  function editarOferta(produto, oferta) {
-    router.push(`/admin/checkout/produtos/${encodeURIComponent(produto.id)}/ofertas/${encodeURIComponent(oferta.id)}`)
-  }
+
   function linkCheckout(o) {
     return `${typeof window !== 'undefined' ? window.location.origin : ''}/checkout/${o.slug}`
   }
+
+  async function copiarLink(o) {try{await navigator.clipboard.writeText(linkCheckout(o));setMensagem('✓ Link copiado.')}catch{setMensagem('Não foi possível copiar o link.')}}
 
   const visibleProducts = produtos.filter(p => `${p.name} ${p.slug} ${p.code}`.toLocaleLowerCase('pt-BR').includes(busca.trim().toLocaleLowerCase('pt-BR')) && (statusFilter === 'all' || p.active === (statusFilter === 'active')) && (typeFilter === 'all' || p.type === typeFilter) && (marketplaceFilter === 'all' || (p.marketplace_id || 'pagarme') === marketplaceFilter)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
   async function duplicarOferta(o) {
@@ -138,14 +129,14 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   return (
     <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
   <main style={{ width: '100%', margin: 0, padding: '26px 18px 60px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '18px', marginBottom: '22px', flexWrap: 'wrap' }}>
+        {!selecionado && <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '18px', marginBottom: '22px', flexWrap: 'wrap' }}>
           <div>
             <p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>CHECKOUT</p>
             <h1 style={{ fontSize: '24px', margin: '5px 0' }}>{selecionado ? selecionado.name : 'Produtos'}</h1>
             {selecionado && <p style={{ color: 'var(--cv-muted)', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>}
           </div>
           <button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button>
-        </div>
+        </div>}
 
         {mensagem && <div style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
 
@@ -157,62 +148,13 @@ export default function AdminCheckout({ initialProdutoId = null }) {
           <div className={productStyles.tableWrap}><table className={productStyles.table}><thead><tr><th>Nome</th><th>Código</th><th>Marketplace</th><th><span className={productStyles.srOnly}>Ações</span></th></tr></thead><tbody>{visibleProducts.map(p=><tr key={p.id}><td><Link className={productStyles.productName} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`}>{p.name}</Link></td><td>{p.code || p.id}</td><td>{nomeMarketplace(p.marketplace_id)}</td><td><div className={productStyles.actions}><Link className={productStyles.productOpen} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`} title={p.type==='subscription'?'Abrir assinatura':'Abrir produto'} aria-label={`Abrir ${p.type==='subscription'?'assinatura':'produto'} ${p.name}`}><ProductIcon kind={p.type}/></Link><button className={productStyles.duplicate} disabled={salvando} title="Duplicar produto" aria-label={`Duplicar ${p.name}`} onClick={()=>duplicarProduto(p)}><ProductIcon kind="copy"/></button></div></td></tr>)}{!visibleProducts.length && <tr><td colSpan={4}>Nenhum produto encontrado.</td></tr>}</tbody></table></div>
 
         </> : <>
-          <div className="central-breadcrumb"><button className="central-text-button" onClick={() => router.push('/admin/checkout')}>Produtos</button><span>/</span><strong>{selecionado.name}</strong></div>
-          <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhes'],['ofertas','Ofertas'],['entrega','Entrega e acesso'],['vendas','Vendas'],['auditoria','Auditoria']].map(([key,label]) => <button key={key} aria-current={aba === key ? 'page' : undefined} onClick={() => setAba(key)}>{label}</button>)}</nav>
-        {produtos.filter(p => p.id === produtoId).map(p => {
-          const lista = ofertas.filter(o => o.product_id === p.id)
-          return (
-            <section key={p.id} style={{ background: 'var(--cv-panel)', border: '1px solid var(--cv-border)', borderRadius: 14, marginBottom: 16, opacity: p.active ? 1 : 0.55 }}>
-              <div style={{ padding: 16, display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid var(--cv-border)' }}>
-                <div>
-                  <strong style={{ fontSize: 16 }}>{p.name}</strong>
-                  {!p.active && <span style={{ marginLeft: 8, color: 'var(--cv-danger)', fontSize: 12 }}>inativo</span>}
-                  <p style={{ color: 'var(--cv-muted)', fontSize: 12, margin: '5px 0 0' }}>
-                    {p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'} · Plano liberado: <span style={{ color: p.plan_id ? ouro : 'var(--cv-danger)' }}>{p.plan_id ? nomePlano[p.plan_id] || 'plano removido' : 'nenhum (não libera acesso)'}</span>
-                    {planos.find(plano => plano.id === p.plan_id)?.period_days ? ` · ${planos.find(plano => plano.id === p.plan_id).period_days} dias (plano)` : ''}
-                  </p>
-                </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <button onClick={() => novaOferta(p)} style={botaoSecundario}>＋ Oferta</button>
-                  <button onClick={() => editarProduto(p)} style={botaoSecundario}>Editar</button>
-                  <button onClick={() => alternar('produto', p)} style={{ ...botaoSecundario, color: p.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{p.active ? 'Desativar' : 'Ativar'}</button>
-                </div>
-              </div>
-              {aba === 'detalhes' && <div className="central-product-detail">{formProduto?.id === p.id ? <form onSubmit={salvarProduto}><FormProduto dados={formProduto.dados} planos={planos} marketplaces={marketplaces} editando onChange={dados => setFormProduto(f => ({...f,dados}))} /><div className="central-editor-actions"><button type="button" className="central-action" onClick={() => setFormProduto(null)}>Cancelar</button><button className="central-primary" disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar produto'}</button></div></form> : <dl><div><dt>Código / ID</dt><dd>{p.code || p.guru_product_id || p.id}</dd></div><div><dt>Nome do produto</dt><dd>{p.name}</dd></div><div><dt>Marketplace</dt><dd>{nomeMarketplace(p.marketplace_id)}</dd></div><div><dt>Tipo</dt><dd>{p.type === 'subscription' ? 'Assinatura' : 'Pagamento único'}</dd></div><div><dt>Plano de acesso</dt><dd>{nomePlano[p.plan_id] || 'Sem plano vinculado'}</dd></div><div><dt>Prazo de acesso</dt><dd>{planos.find(plano => plano.id === p.plan_id)?.period_days ? `${planos.find(plano => plano.id === p.plan_id).period_days} dias — definido no plano` : p.plan_id ? 'Conforme configuração do plano no app' : 'Vincule um plano de acesso'}</dd></div><div><dt>Link amigável</dt><dd>{p.slug}</dd></div><div><dt>Status</dt><dd>{p.active ? 'Ativo' : 'Inativo'}</dd></div></dl>}</div>}
-              {aba === 'entrega' && <ProductDelivery product={p} plans={planos} courses={delivery.cursos} appContents={delivery.conteudos} mentorships={delivery.mentorias} fulfillmentEnabled={delivery.fulfillment_enabled} />}
-              {aba === 'auditoria' && <CatalogAudit productId={p.id} token={token} />}
-              {aba === 'vendas' && <div className="central-product-detail"><p>Consulte os pedidos deste produto no painel de vendas.</p><Link className="central-primary" href={`/admin/checkout/vendas?produto=${encodeURIComponent(p.id)}`}>Ver vendas deste produto →</Link></div>}
-              {aba === 'ofertas' && lista.map(o => {
-                const bumpsOferta = bumps.filter(b => b.offer_id === o.id)
-                const total = totalParcelado(o.price_cents, o.max_installments, o.free_installments, o.monthly_interest_pct)
-                return (
-                  <div key={o.id} style={{ padding: '13px 16px', display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', borderBottom: '1px solid var(--cv-border)', opacity: o.active ? 1 : 0.5 }}>
-                    <div style={{ minWidth: 0 }}>
-                      <span style={{ fontWeight: 700 }}>{o.name}</span> <span style={{ color: ouro, fontWeight: 800 }}>{moeda(o.price_cents)}</span>
-                      {!o.active && <span style={{ marginLeft: 8, color: 'var(--cv-danger)', fontSize: 12 }}>inativa</span>}
-                      <p style={{ color: 'var(--cv-muted)', fontSize: 12, margin: '4px 0 0' }}>
-                        {o.payment_methods.map(m => m === 'pix' ? 'Pix' : 'Cartão').join(' + ')}
-                        {o.max_installments > 1 && ` · até ${o.max_installments}x de ${moeda(Math.ceil(total / o.max_installments))}`}
-                        {o.free_installments > 1 && ` · ${o.free_installments}x sem juros`}
-                        {Number(o.pix_discount_pct) > 0 && ` · ${o.pix_discount_pct}% off no Pix`}
-                        {o.billing_interval && ` · cobra a cada ${o.billing_interval_count} ${o.billing_interval === 'month' ? 'mês(es)' : 'ano(s)'}`}
-                        {bumpsOferta.length > 0 && ` · ${bumpsOferta.length} order bump${bumpsOferta.length > 1 ? 's' : ''}`}
-                      </p>
-                      <p style={{ color: 'var(--cv-muted)', fontSize: 11, margin: '4px 0 0', wordBreak: 'break-all' }}>{linkCheckout(o)}</p>
-                    </div>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <button onClick={async () => { try { await navigator.clipboard.writeText(linkCheckout(o)); setMensagem('✓ Link copiado.') } catch { setMensagem('Não foi possível copiar. Selecione o link da oferta.') } }} style={botaoSecundario}>Copiar link</button>
-                      <a href={linkCheckout(o)} target="_blank" rel="noopener noreferrer" style={botaoSecundario}>Visualizar</a><button disabled={salvando} onClick={() => duplicarOferta(o)} style={botaoSecundario}>Duplicar</button>
-                      <button onClick={() => editarOferta(p, o)} style={botaoSecundario}>Editar</button>
-                      <button onClick={() => alternar('oferta', o)} style={{ ...botaoSecundario, color: o.active ? 'var(--cv-danger)' : 'var(--cv-success)' }}>{o.active ? 'Desativar' : 'Ativar'}</button>
-                    </div>
-                  </div>
-                )
-              })}
-              {aba === 'ofertas' && !lista.length && <p style={{ color: 'var(--cv-muted)', fontSize: 13, padding: '12px 16px', margin: 0 }}>Sem ofertas. Clique em ＋ Oferta para definir preço e link de venda.</p>}
-            </section>
-          )
-        })}
+          <div className={interior.topbar}><div className={interior.breadcrumb}><Link href="/admin/checkout">Produtos</Link><span>/</span><span>{selecionado.name}</span></div><details className={interior.additional}><summary>⚙ Configurações adicionais ⌄</summary><div><button onClick={()=>{setAba('detalhes');setExtraOpen(open=>!open)}}>Plano e integrações</button><Link href="/admin/checkout/configuracoes">Padrões de checkout</Link></div></details></div>
+          <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhe'],['ofertas','Ofertas'],['vendas','Vendas'],['auditoria','Auditoria']].map(([key,label])=><button key={key} aria-current={aba===key?'page':undefined} onClick={()=>setAba(key)}>{label}</button>)}</nav>
+          {<div hidden={aba!=='detalhes'}><ProductDetails key={`${selecionado.id}:${selecionado.updated_at || ''}`} product={selecionado} marketplaces={marketplaces} plans={planos} token={token} onSave={salvarDetalhe} saving={salvando} advanced={extraOpen}/></div>}
+          {aba==='ofertas' && <ProductOffers product={selecionado} offers={ofertas.filter(o=>o.product_id===produtoId)} onCreate={()=>novaOferta(selecionado)} onDuplicate={duplicarOferta} onToggle={o=>alternar('oferta',o)} onCopy={copiarLink} busy={salvando}/>}
+          {aba==='vendas' && <ProductSales productId={selecionado.id} token={token}/>}
+          {aba==='auditoria' && <CatalogAudit productId={selecionado.id} token={token}/>}
+
         </>}
       </main>
 
