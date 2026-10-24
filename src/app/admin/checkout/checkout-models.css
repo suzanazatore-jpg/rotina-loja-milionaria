@@ -61,3 +61,51 @@
  .pc-checkout .cp-page.banner .cp-summary h1{font-size:20px}
 }
 @container(max-width:560px){.cp-page.desktop.guru .cp-columns{grid-template-columns:1fr}.cp-page.desktop.banner .cp-summary{padding:20px}.cp-page.desktop.banner .cp-assurances{display:flex}}
+/* Guru reference: independent left summary, one white payment panel. */
+.cp-page.guru .cp-header{display:none}
+.cp-page.guru .cp-columns{grid-template-columns:minmax(0,.55fr) minmax(0,1fr);gap:48px;background:transparent;overflow:visible;border-radius:0}
+.cp-page.guru .cp-summary{padding:20px 0;position:sticky;top:24px}
+.cp-page.guru .cp-form-card{border-radius:16px 16px 0 0;padding:30px;background:var(--cp-panel)}
+.guru-seller{display:flex;align-items:center;gap:10px;margin:0 10px 20px;font-size:14px;line-height:1.4}
+.guru-seller-logo{width:32px;height:32px;object-fit:cover;border-radius:50%}
+.guru-seller-monogram{display:grid;place-items:center;width:32px;height:32px;flex-shrink:0;border-radius:50%;background:#ffffff20;font-size:12px}
+.guru-security{background:#fff;color:#464b50;text-align:center;text-transform:uppercase;border-radius:7px;padding:5px 10px;font-size:13px;margin-bottom:16px}
+.cp-page.guru .cp-kicker{display:none}
+.cp-page.guru .cp-product-image{width:180px;max-width:100%;height:180px;object-fit:contain;background:#fff;border:8px solid #fff;border-radius:8px}
+.cp-page.guru .cp-product-placeholder{max-width:180px;aspect-ratio:1;margin:16px auto;padding:16px}
+.cp-page.guru .cp-summary h1,.cp-page.guru .cp-summary h2{font-size:16px;line-height:1.4;margin:14px 0;font-weight:700}
+.guru-offer-headline{font-size:13px;opacity:.8;line-height:1.5;margin-bottom:12px}
+.cp-page.guru .cp-price{border:0;padding:0;margin:14px 0 20px}
+.cp-page.guru .cp-price>span,.cp-page.guru .cp-price>strong{display:none}
+.guru-price-rows>div{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-top:1px solid var(--cp-accent);font-size:14px}
+.cp-page.guru .guru-price-rows strong{font-size:16px}
+.cp-page.guru .cp-assurances p{font-size:12px}
+.cp-page.guru .cp-assurances small{font-size:11px}
+.cp-page.guru .cp-step p{display:none}
+.cp-page.guru .pc-address{border:0;padding:0;margin:22px 0}
+.cp-page.guru .pc-address>summary{font-size:12px;color:#6554cb;margin-bottom:16px}
+.cp-page.guru .cp-divider{margin:32px 0}
+.cp-page.guru .pc-payment-option{border:0;border-radius:0;border-bottom:1px solid #e7e8eb;background:transparent}
+.cp-page.guru .pc-payment-option>button{display:flex;gap:14px;align-items:center;width:100%;padding:17px 0;background:transparent;border:0;color:var(--cp-text);font:inherit;text-align:left;cursor:pointer}
+.cp-page.guru .pc-payment-option.is-open>button{color:var(--cp-accent);font-weight:700}
+.cp-page.guru .pc-payment-radio{display:inline-block;width:18px;height:18px;border:1.5px solid currentColor;border-radius:50%;flex-shrink:0}
+.cp-page.guru .is-open .pc-payment-radio{background:radial-gradient(circle,currentColor 0 4px,transparent 5px)}
+.cp-page.guru .pc-payment-body{border:1px solid #e7e8eb;border-radius:5px;padding:22px 15px;margin:5px 0 12px}
+.cp-page.guru .pc-bump{overflow:hidden;border:1px solid #cdd5dc}
+.cp-page.guru .pc-bump strong{display:block;background:var(--cp-bg);color:#fff;padding:10px;margin:-18px -18px 10px 0}
+.cp-page.guru .cp-footer{margin-left:auto;max-width:62%;text-align:left;border-top:1px solid var(--cp-accent);padding-top:18px;opacity:.85}
+.cp-page.guru .cp-footer>div{justify-content:flex-start;flex-wrap:wrap}
+.pc-checkout .cp-page.guru{max-width:1040px;padding-top:36px}
+.pc-checkout .cp-page.guru .cp-summary{padding:20px 0}
+.pc-checkout .cp-page.guru .cp-form-card{padding:30px}
+.cp-page.mobile.guru .cp-summary{position:static;padding:0}
+.cp-page.mobile.guru .cp-footer{max-width:100%}
+@media(max-width:720px){
+ .pc-checkout .cp-page.guru .cp-columns{grid-template-columns:1fr;gap:20px}
+ .pc-checkout .cp-page.guru .cp-summary{position:static;padding:0}
+ .pc-checkout .cp-page.guru .cp-form-card{padding:24px 20px;border-radius:12px}
+ .pc-checkout .cp-page.guru .cp-product-image{width:130px;height:130px}
+ .pc-checkout .cp-page.guru .cp-footer{max-width:100%;margin-top:24px}
+ .pc-checkout .cp-page.guru .cp-assurances{display:flex;gap:8px 16px}
+}
+@container(max-width:560px){.cp-page.desktop.guru .cp-columns{grid-template-columns:1fr;gap:20px}.cp-page.desktop.guru .cp-summary{position:static}.cp-page.desktop.guru .cp-footer{max-width:100%}}
