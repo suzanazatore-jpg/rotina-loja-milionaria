@@ -10,12 +10,12 @@
 .table td:first-child{border-radius:19px 0 0 19px;width:56%}
 .table td:last-child{border-radius:0 19px 19px 0;width:90px}
 .table td:nth-child(2),.table td:nth-child(3){white-space:nowrap}
-.productName{border:0;background:transparent;padding:0;text-align:left;color:var(--cv-text);font:inherit;cursor:pointer;line-height:1.5}
+.productName{border:0;background:transparent;padding:0;text-align:left;color:var(--cv-text);font:inherit;cursor:pointer;line-height:1.5;text-decoration:none}
 .productName:hover{text-decoration:underline;text-underline-offset:3px}
 .actions{display:flex;align-items:center;justify-content:flex-end;gap:14px;color:var(--cv-text)}
-.actions span{display:flex}
+.productOpen{display:grid;place-items:center;width:34px;height:34px;color:var(--cv-text);border-radius:50%;text-decoration:none}.productOpen:hover{background:var(--cv-field)}
 .duplicate{display:grid;place-items:center;width:34px;height:34px;background:var(--cv-field);color:var(--cv-text);border:0;border-radius:50%;cursor:pointer}
 .duplicate:disabled{opacity:.4;cursor:wait}
-.productName:focus-visible,.duplicate:focus-visible,.filterButton:focus-visible{outline:2px solid var(--cv-gold);outline-offset:4px}
+.productName:focus-visible,.productOpen:focus-visible,.duplicate:focus-visible,.filterButton:focus-visible{outline:2px solid var(--cv-gold);outline-offset:4px}
 .srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-width:650px){.table td,.table th{padding:14px 12px}.table{font-size:12px}.filters{padding:12px}.table td:first-child{width:auto}}
