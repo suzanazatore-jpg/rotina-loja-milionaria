@@ -8,7 +8,7 @@ import { createPayment } from '@/lib/checkoutPaymentsServer'
 import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'
 import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
-import { validateCheckoutForm } from '@/lib/checkoutSettings'
+import { validateCheckoutForm, checkoutExpired } from '@/lib/checkoutSettings'
 
 export const runtime = 'nodejs'
 const secret = () => process.env.CHECKOUT_SESSION_SECRET
@@ -50,6 +50,7 @@ export async function POST(request, context) {
     if (Buffer.byteLength(text) > 16384) throw new PaymentError('Dados excedem o limite.', 413)
     const input = JSON.parse(text)
     const { db, loaded, store, name, session, slug } = await checkout(request, context)
+    if (checkoutExpired(loaded.config)) throw new PaymentError('O prazo desta oferta foi encerrado.', 410)
     if (!checkoutTestConfiguration().ready) throw new PaymentError('Checkout em preparação. Pagamentos ainda não disponíveis.', 503)
     // Durante homologação só o administrador pode iniciar pagamentos sandbox.
     if (!(await autorizarAdmin(request, db))) throw new PaymentError('Este checkout está em teste administrativo.', 401)

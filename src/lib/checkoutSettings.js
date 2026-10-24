@@ -1,13 +1,13 @@
 import { trackingMode } from './checkoutTracking.js'
 export const CHECKOUT_DEFAULTS = {
-  confirm_email: false, require_terms: false, require_privacy: false,
-  button_text_color: '#17130a', subtitle: '', product_image_url: '', mobile_banner_url: '', favicon_url: '', support_email: '', support_phone: '', terms_url: '', privacy_url: '', layout: 'split',
+  confirm_email: false, require_terms: false, require_privacy: false, product_display_name: '', countdown_enabled: false, countdown_ends_at: '', countdown_message: 'Esta condição termina em:',
+  button_text_color: '#17130a', subtitle: '', product_image_url: '', mobile_banner_url: '', favicon_url: '', support_email: '', support_phone: '', terms_url: '', privacy_url: '', layout: 'split', headline: '', headline_highlight: '',
   background: '#f5f5f3', panel: '#ffffff', text: '#202020', accent: '#d4af37', button_text: 'Comprar agora', store_name: 'Suzana Zatorre', logo_url: '', banner_url: '', font: 'Arial', gtm_id: '', meta_pixel_id: '', redirects: { approved: '', declined: '', pending: '', pix: '', trial: '' },
 }
 export const REDIRECT_LABELS = { approved: 'Aprovada', declined: 'Negada', pending: 'Pendente', pix: 'Pix', trial: 'Trial' }
 // Somente identidade e aparência são herdadas. Preço, entrega e redirecionamentos
 // continuam exclusivos de cada oferta. Ofertas antigas preservam seu visual.
-export const SHARED_CHECKOUT_KEYS = ['background','panel','text','accent','button_text_color','store_name','logo_url','banner_url','mobile_banner_url','favicon_url','font','layout','support_email','support_phone','terms_url','privacy_url']
+export const SHARED_CHECKOUT_KEYS = ['background','panel','text','accent','button_text_color','store_name','logo_url','banner_url','mobile_banner_url','favicon_url','font','layout','support_email','support_phone','terms_url','privacy_url','countdown_enabled','countdown_ends_at','countdown_message']
 export function resolveCheckoutSettings(offer = {}, global = {}) {
   const resolved = { ...offer }
   if (offer.appearance_mode === 'inherit') {
@@ -40,7 +40,19 @@ export function normalizeCheckoutSettings(input) {
   result.support_email = String(input.support_email || '').trim().slice(0,254)
   if (result.support_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.support_email)) throw new Error('Email de suporte inválido.')
   result.support_phone = String(input.support_phone || '').trim().slice(0,40)
-  result.layout = input.layout === 'stacked' ? 'stacked' : 'split'
+  result.layout = ['split','stacked','focused'].includes(input.layout) ? input.layout : 'split'
+  result.headline = String(input.headline || '').trim().slice(0,180)
+  result.headline_highlight = String(input.headline_highlight || '').trim().slice(0,100)
+  result.product_display_name = String(input.product_display_name || '').trim().slice(0,150)
+  result.countdown_enabled = input.countdown_enabled === true
+  result.countdown_message = String(input.countdown_message || CHECKOUT_DEFAULTS.countdown_message).trim().slice(0,100)
+  result.countdown_ends_at = ''
+  if (input.countdown_ends_at) {
+    const deadline = new Date(input.countdown_ends_at)
+    if (!Number.isFinite(deadline.getTime())) throw new Error('Informe uma data válida para o relógio.')
+    result.countdown_ends_at = deadline.toISOString()
+  }
+  if (result.countdown_enabled && !result.countdown_ends_at) throw new Error('Defina a data e hora de encerramento para ativar o relógio.')
   result.font = ['Arial','Georgia','Verdana'].includes(input.font) ? input.font : 'Arial'
   function safeUrl(value) {
     const text = String(value || '').trim()
@@ -58,7 +70,11 @@ export function normalizeCheckoutSettings(input) {
   for (const key of ['confirm_email','require_terms','require_privacy']) result[key] = input[key] === true
   return result
 }
+export function checkoutExpired(config, now = Date.now()) {
+  return config.countdown_enabled === true && Number.isFinite(Date.parse(config.countdown_ends_at)) && Date.parse(config.countdown_ends_at) <= now
+}
 export function validateCheckoutForm(config, input) {
+  if (checkoutExpired(config)) throw new Error('O prazo desta oferta foi encerrado.')
   if (config.confirm_email && String(input.email_confirmation || '').trim().toLowerCase() !== String(input.customer?.email || '').trim().toLowerCase()) throw new Error('Os emails não conferem.')
   if (config.require_terms && (!config.terms_url || input.terms_accepted !== true)) throw new Error('Leia e aceite os termos de uso.')
   if (config.require_privacy && (!config.privacy_url || input.privacy_accepted !== true)) throw new Error('Leia e aceite a política de privacidade.')

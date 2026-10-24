@@ -29,3 +29,13 @@ test('mandatory acceptance rejects missing URLs, missing consent and truthy stri
  assert.throws(()=>validateCheckoutForm({require_privacy:true,privacy_url:'https://example.org/privacy'},{privacy_accepted:false}),/privacidade/)
  validateCheckoutForm({require_terms:true,terms_url:'https://example.org/terms',require_privacy:true,privacy_url:'https://example.org/privacy'},{terms_accepted:true,privacy_accepted:true})
 })
+test('focused template keeps editable copy local and accepts an explicit fixed deadline',()=>{
+ const config=normalizeCheckoutSettings({layout:'focused',product_display_name:'Curso da loja',headline:'Sua chamada',headline_highlight:'em 7 dias',countdown_enabled:true,countdown_ends_at:'2030-10-24T20:00:00-03:00'})
+ assert.equal(config.layout,'focused');assert.equal(config.product_display_name,'Curso da loja');assert.equal(config.countdown_ends_at,'2030-10-24T23:00:00.000Z')
+ assert.throws(()=>normalizeCheckoutSettings({countdown_enabled:true}),/data e hora/)
+ assert.throws(()=>normalizeCheckoutSettings({countdown_ends_at:'invalid'}),/data válida/)
+ const inherited=resolveCheckoutSettings({appearance_mode:'inherit',headline:'Chamada da oferta',product_display_name:'Nome da oferta'},{layout:'focused',headline:'Não substituir',product_display_name:'Não substituir'})
+ assert.equal(inherited.layout,'focused');assert.equal(inherited.headline,'Chamada da oferta');assert.equal(inherited.product_display_name,'Nome da oferta')
+ assert.throws(()=>validateCheckoutForm({countdown_enabled:true,countdown_ends_at:'2000-01-01T00:00:00Z'},{}),/encerrado/)
+ validateCheckoutForm({countdown_enabled:false,countdown_ends_at:'2000-01-01T00:00:00Z'},{})
+})
