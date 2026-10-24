@@ -10,7 +10,7 @@ const rotulo = { display: 'block', fontSize: 13, color: 'var(--cv-text)' }
 const dica = { display: 'block', color: 'var(--cv-muted)', fontSize: 11, marginTop: 5 }
 const botaoSecundario = { background: 'var(--cv-field)', color: ouro, border: '1px solid var(--cv-border)', borderRadius: '7px', padding: '7px 10px', cursor: 'pointer', fontSize: 13 }
 
-export const PRODUTO_VAZIO = { name: '', type: 'one_time', plan_id: '', brevo_list_id: '', botconversa_tag: '', active: true }
+export const PRODUTO_VAZIO = { name: '', type: 'one_time', marketplace_id:'pagarme', plan_id: '', brevo_list_id: '', botconversa_tag: '', active: true }
 export const OFERTA_VAZIA = {
   name: '', price: '', payment_methods: ['pix', 'credit_card'], max_installments: 12, free_installments: 1,
   monthly_interest_pct: '2.99', pix_discount_pct: '0', billing_interval: 'month', billing_interval_count: 1,
@@ -35,21 +35,16 @@ function totalParcelado(preco, parcelas, semJuros, jurosPct) {
   return Math.ceil(preco * (i * f) / (f - 1)) * parcelas
 }
 
-export function FormProduto({ dados, planos, editando, onChange }) {
+export function FormProduto({ dados, planos, editando, onChange, marketplaces=[{id:'pagarme',name:'Pagar.me',active:true}] }) {
   const set = (campoNome, valor) => onChange({ ...dados, [campoNome]: valor })
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <label style={rotulo}>Código do produto<input inputMode="numeric" pattern="[0-9]{10}" value={dados.code || ''} onChange={e => set('code', e.target.value)} style={campo} placeholder="Gerado automaticamente" /><small style={dica}>Para um produto vindo do Guru, informe o mesmo código de 10 dígitos.</small></label>
-      <label style={rotulo}>Nome do produto<input value={dados.name} onChange={e => set('name', e.target.value)} style={campo} placeholder="Ex.: EVS — Equipe que Vende Sozinha" /></label>
-      <div>
-        <span style={rotulo}>Tipo</span>
-        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-          {[['one_time', 'Pagamento único'], ['subscription', 'Assinatura recorrente']].map(([valor, texto]) => (
-            <button key={valor} type="button" disabled={editando} onClick={() => set('type', valor)} style={{ flex: 1, border: dados.type === valor ? `1px solid ${ouro}` : '1px solid var(--cv-border)', background: dados.type === valor ? 'var(--cv-selected)' : 'var(--cv-field)', color: 'var(--cv-text)', borderRadius: 10, padding: 11, cursor: editando ? 'not-allowed' : 'pointer' }}>{dados.type === valor ? '✓ ' : ''}{texto}</button>
-          ))}
-        </div>
-        {editando && <small style={dica}>O tipo não pode ser alterado depois de criado.</small>}
-      </div>
+      <label style={rotulo}>Nome *<input required value={dados.name} onChange={e => set('name', e.target.value)} style={campo} placeholder="Ex.: EVS — Equipe que Vende Sozinha" /></label>
+      <label style={rotulo}>Marketplace *<select required value={dados.marketplace_id || 'pagarme'} onChange={e=>set('marketplace_id',e.target.value)} style={campo}>{marketplaces.filter(m=>m.active || m.id===dados.marketplace_id).map(m=><option key={m.id} value={m.id} disabled={!m.active}>{m.name}{!m.active?' (indisponível)':''}</option>)}</select></label>
+      <label style={rotulo}>Tipo *<select value={dados.type} disabled={editando} onChange={e=>set('type',e.target.value)} style={campo}><option value="one_time">Produto — pagamento único</option><option value="subscription">Assinatura</option></select></label>
+      <label style={rotulo}>Produtor<input readOnly value="Suzana Zatorre Educacional" style={campo}/></label>
+      <details><summary style={{...rotulo,cursor:'pointer',padding:'8px 0'}}>Entrega e integrações (opcional)</summary><div style={{display:'grid',gap:14,paddingTop:12}}>
       <label style={rotulo}>Plano da Rotina liberado na compra
         <select value={dados.plan_id} onChange={e => set('plan_id', e.target.value)} style={campo}>
           <option value="">Nenhum (produto não libera acesso no app)</option>
@@ -61,6 +56,7 @@ export function FormProduto({ dados, planos, editando, onChange }) {
         <label style={rotulo}>Lista do Brevo (ID)<input type="number" value={dados.brevo_list_id} onChange={e => set('brevo_list_id', e.target.value)} style={campo} placeholder="Opcional" /></label>
         <label style={rotulo}>Tag no BotConversa<input value={dados.botconversa_tag} onChange={e => set('botconversa_tag', e.target.value)} style={campo} placeholder="Opcional" /></label>
       </div>
+      </div></details>
     </div>
   )
 }

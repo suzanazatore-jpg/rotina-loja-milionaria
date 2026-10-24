@@ -167,3 +167,9 @@ test('creation response cannot overwrite an order already linked by an early web
  try{const value=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'early-request-123456');assert.equal(value.status,'paid');assert.equal(gets,1);assert.equal(steps.length,0)}
  finally{globalThis.fetch=original;delete process.env.PAGARME_SECRET_KEY}
 })
+
+test('a product assigned to a future marketplace cannot be charged through Pagar.me',async()=>{
+ const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local',marketplace_id:'future_provider'}}]
+ await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',payment_method:'pix'},'request-marketplace-123'),/Marketplace ainda não disponível/)
+ assert.equal(steps.length,0)
+})

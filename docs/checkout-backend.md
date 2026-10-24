@@ -141,3 +141,11 @@ A listagem de Webhooks separa Vendas e Assinaturas, com colunas Nome e URL, atal
 - Formulário: confirmação opcional do email e aceite obrigatório opcional de termos/privacidade. Validação no servidor antes de criar o pagamento e registro do aceite por sessão. Dados exigidos pelo gateway não podem ser ocultados por esse editor.
 - Emails de acesso/renovação continuam no fluxo existente do app. Pendência, recusa, abandono e reembolso ainda não têm sequência de email própria configurável. A aba Emails informa essa limitação; não há controles fictícios de ativação.
 - Verificação: testes Node do checkout/gateway, build, lint das alterações; duplicação, cópia de bump, auditoria e permissões verificados em transação revertida no banco. Nenhuma compra simulada nem envio de email foi realizado nesta etapa.
+
+### Cadastro simplificado de produtos e Marketplace
+
+- Lista baseada na Guru: Nome, Código, Marketplace; ícones para tipo e duplicação; filtros recolhidos e ordenação alfabética. Plano, status e condições ficam no detalhe.
+- Cadastro com código, nome, marketplace, tipo e produtor da conta. Entrega e integrações ficam recolhidas. O prazo continua definido pelo plano existente.
+- `checkout_marketplaces` permite cadastrar outros provedores no futuro; acesso somente por backend administrativo. `products.marketplace_id` é uma FK, com Pagar.me como padrão. Os produtos existentes foram preenchidos com esse padrão. A inclusão no catálogo não implementa uma integração de pagamentos.
+- Checkout público, cobrança administrativa e adicionais recusam produtos de outro marketplace, até implementação de seu adapter.
+- `checkout_duplicate_product` copia apenas o cadastro e vínculos. Gera código e slug novos, inicia inativo e não copia ofertas. RPC invoker exclusiva do service_role, com auditoria transacional.

@@ -33,9 +33,12 @@ function urlOuNulo(valor) {
   } catch { return undefined }
 }
 
-async function montarProduto(dados) {
+async function montarProduto(supabase,dados) {
   const nome = String(dados.name || '').trim()
   if (!nome) throw new Error('Informe o nome do produto.')
+  const marketplace = String(dados.marketplace_id || 'pagarme')
+  const provider = await supabase.from('checkout_marketplaces').select('id').eq('id',marketplace).eq('active',true).maybeSingle()
+  if (provider.error || !provider.data) throw new Error('Selecione um marketplace disponível.')
   const tipo = TIPOS_PRODUTO.has(dados.type) ? dados.type : 'one_time'
   const brevo = inteiroOuNulo(dados.brevo_list_id)
   if (Number.isNaN(brevo)) throw new Error('ID da lista do Brevo deve ser um número.')
@@ -44,6 +47,7 @@ async function montarProduto(dados) {
   return {
     ...(code !== undefined ? { code } : {}),
     name: nome,
+    marketplace_id: marketplace,
     slug: gerarSlug(dados.slug || nome),
     type: tipo,
     plan_id: dados.plan_id || null,
@@ -141,7 +145,7 @@ function traduzirErro(mensagem) {
 export async function GET(request) {
   const supabase = checkoutAdminClient()
   if (!(await autorizarAdmin(request, supabase))) return erro('Acesso restrito ao administrador.', 401)
-  const [produtos, ofertas, bumps, planos, cursos, conteudos, mentorias, globalConfig] = await Promise.all([
+  const [produtos, ofertas, bumps, planos, cursos, conteudos, mentorias, globalConfig, marketplaces] = await Promise.all([
     supabase.from('products').select('*').order('created_at'),
     supabase.from('offers').select('*').order('created_at'),
     supabase.from('order_bumps').select('*').order('position'),
@@ -150,10 +154,11 @@ export async function GET(request) {
     supabase.from('plan_app_contents').select('plan_id,content_key'),
     supabase.from('plan_mentorships').select('plan_id,mentorship_type'),
     loadGlobalCheckoutSettings(supabase),
+    supabase.from('checkout_marketplaces').select('id,name,active').order('name'),
   ])
-  const falha = produtos.error || ofertas.error || bumps.error || planos.error || cursos.error || conteudos.error || mentorias.error
+  const falha = produtos.error || ofertas.error || bumps.error || planos.error || cursos.error || conteudos.error || mentorias.error || marketplaces.error
   if (falha) return erro(falha.message, 500)
-  return NextResponse.json({ produtos: produtos.data, ofertas: ofertas.data, bumps: bumps.data, planos: planos.data, cursos: cursos.data, conteudos: conteudos.data, mentorias: mentorias.data, global_config: globalConfig, fulfillment_enabled: process.env.CHECKOUT_FULFILLMENT_ENABLED === 'true' }, {headers:{'Cache-Control':'no-store'}})
+  return NextResponse.json({ produtos: produtos.data, ofertas: ofertas.data, bumps: bumps.data, planos: planos.data, cursos: cursos.data, conteudos: conteudos.data, mentorias: mentorias.data, global_config: globalConfig, marketplaces: marketplaces.data, fulfillment_enabled: process.env.CHECKOUT_FULFILLMENT_ENABLED === 'true' }, {headers:{'Cache-Control':'no-store'}})
 }
 
 export async function POST(request) {
@@ -161,14 +166,14 @@ export async function POST(request) {
   if (!(await autorizarAdmin(request, supabase))) return erro('Acesso restrito ao administrador.', 401)
   try {
     const { entidade, id, dados = {}, action } = await request.json()
-    if (action === 'duplicate' && entidade === 'oferta') {
-      if (!/^[0-9a-f-]{36}$/i.test(id || '')) throw new Error('Oferta inválida.')
-      const { data, error } = await supabase.rpc('checkout_duplicate_offer', { source_id: id })
-      if (error) throw new Error('Não foi possível duplicar a oferta.')
+    if (action === 'duplicate' && ['oferta','produto'].includes(entidade)) {
+      if (!/^[0-9a-f-]{36}$/i.test(id || '')) throw new Error('Cadastro inválido.')
+      const { data, error } = await supabase.rpc(entidade === 'produto' ? 'checkout_duplicate_product' : 'checkout_duplicate_offer', { source_id: id })
+      if (error) throw new Error(entidade === 'produto' ? 'Não foi possível duplicar o produto.' : 'Não foi possível duplicar a oferta.')
       return NextResponse.json({ok:true,id:data})
     }
     if (entidade === 'produto') {
-      const registro = await montarProduto(dados)
+      const registro = await montarProduto(supabase,dados)
       if (id) {
         const {data: current, error} = await supabase.from('products').select('type').eq('id',id).single()
         if (error || !current) throw new Error('Produto não encontrado.')

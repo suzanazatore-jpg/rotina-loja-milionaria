@@ -11,7 +11,7 @@ export async function loadCheckoutOffer(slug, db = checkoutAdminClient()) {
   if (!offer) return null
   const { data: product, error: productError } = await db.from('products').select('*').eq('id', offer.product_id).eq('active', true).maybeSingle()
   if (productError) throw new Error('Não foi possível carregar o produto.')
-  if (!product) return null
+  if (!product || (product.marketplace_id || 'pagarme') !== 'pagarme') return null
   const global = await loadGlobalTracking(db)
   const config = resolveCheckoutSettings(offer.checkout_config || {}, global.checkout_config)
   const tracking = resolveTracking(config, global)

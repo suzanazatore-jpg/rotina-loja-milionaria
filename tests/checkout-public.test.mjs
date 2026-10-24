@@ -41,4 +41,6 @@ test('offer lookup filters active records and exposes only public product/offer 
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'preview'}).analytics_enabled,false)
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'production'}).analytics_enabled,true)
  assert.equal(await loadCheckoutOffer('../invalid',db),null)
+ product.marketplace_id='future_provider'
+ assert.equal(await loadCheckoutOffer('offer',db),null)
 })

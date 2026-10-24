@@ -113,3 +113,8 @@ test('paid main and additional grant both plans once, preserving the longest sha
     assert.deepEqual(await fulfillPaidOrder(database(duplicate),'order'),{fulfillment:'completed'});assert.equal(duplicate.length,0)
   }finally{if(previous===undefined)delete process.env.CHECKOUT_FULFILLMENT_ENABLED;else process.env.CHECKOUT_FULFILLMENT_ENABLED=previous;if(brevo!==undefined)process.env.BREVO_API_KEY=brevo}
 })
+
+test('additional offers from another marketplace are not offered by the Pagar.me checkout',async()=>{
+ const rows=await loadOrderBumps(database([{table:'order_bumps',data:[{bump_offer_id:bump.offer.id,position:0}]},{table:'offers',data:[bump.offer]},{table:'products',data:[{...bump.product,marketplace_id:'future_provider'}]}]),main.id)
+ assert.deepEqual(rows,[])
+})

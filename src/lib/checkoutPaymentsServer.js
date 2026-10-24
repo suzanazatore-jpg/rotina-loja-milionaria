@@ -22,6 +22,7 @@ export async function createPayment(db, input, key, tracking = null) {
   const selection = normalizeBumpSelection(input.bumps)
   const offer = await result(db.from('offers').select('*').eq('id', input.offer_id).single())
   const product = await result(db.from('products').select('*').eq('id', offer.product_id).single())
+  if ((product.marketplace_id || 'pagarme') !== 'pagarme') throw new PaymentError('Marketplace ainda não disponível para pagamentos.')
   if (!product.plan_id) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
   const customer = normalizeCustomer(input.customer)
   const installments = input.installments ?? 1

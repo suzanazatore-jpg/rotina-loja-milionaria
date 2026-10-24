@@ -13,4 +13,13 @@ begin
   if not exists(select 1 from public.order_bumps where offer_id=copied_id and bump_offer_id=bump_id and headline='Verificação') then raise exception 'Adicional não copiado'; end if;
   if not exists(select 1 from public.webhook_events where type='checkout.catalog.admin' and payload->>'target_id'=copied_id::text and payload->>'actor'='suporte@suzanazatorre.com.br') then raise exception 'Auditoria ausente'; end if;
 end $$;
+do $$
+declare source public.products; copy public.products; copied uuid;
+begin
+  select * into source from public.products where code=1790286704;
+  copied:=public.checkout_duplicate_product(source.id);
+  select * into copy from public.products where id=copied;
+  if copy.code=source.code or copy.slug=source.slug or copy.active or copy.marketplace_id<>source.marketplace_id or copy.plan_id<>source.plan_id then raise exception 'Produto duplicado incorretamente'; end if;
+  if exists(select 1 from public.offers where product_id=copied) then raise exception 'Produto duplicado não deve copiar ofertas'; end if;
+end $$;
 rollback;
