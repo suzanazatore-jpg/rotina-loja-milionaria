@@ -1,7 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-const load = name => import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL(`../src/lib/${name}.js`,import.meta.url))).toString('base64')}`)
+const payloadURL = `data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/checkoutWebhookPayload.js', import.meta.url))).toString('base64')}`
+const load = name => import(`data:text/javascript;base64,${Buffer.from(readFileSync(new URL(`../src/lib/${name}.js`,import.meta.url),'utf8').replace("'./checkoutWebhookPayload.js'", JSON.stringify(payloadURL))).toString('base64')}`)
 const { normalizeWebhook } = await load('checkoutWebhookSettings')
 const { publicIPv4, sendWebhook, processOutboundWebhooks } = await load('checkoutOutboundServer')
 const valid = { name:'BotConversa',url:'https://example.com/hook',events:['order.paid'],product_ids:null,active:false }
@@ -40,6 +41,7 @@ test('admin API rejects unauthorized access before data reads and writes',async(
  const shared=readFileSync(new URL('../src/lib/checkoutWebhookSettings.js',import.meta.url),'utf8')
  const sharedURL=`data:text/javascript;base64,${Buffer.from(shared).toString('base64')}`
  const source=readFileSync(new URL('../src/app/api/admin/checkout/webhooks/route.js',import.meta.url),'utf8')
+ .replace("'@/lib/checkoutWebhookPayload'",JSON.stringify(payloadURL))
  .replace("import { after } from 'next/server'",'const after = () => {}')
  .replace("import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'",'const processOutboundWebhooks = () => {}')
  .replace("import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const autorizarAdmin = async () => false; const checkoutAdminClient = () => ({from(){throw new Error("must not access data")}})')
@@ -55,6 +57,7 @@ test('detail audit and last update stay scoped to the selected webhook',async()=
  const calls=[]
  globalThis.__webhookScopeDB={from(table){const ops=[];calls.push({table,ops});const q=new Proxy({}, {get(_target,key){if(key==='then')return resolve=>resolve({data:[],count:0,error:null});return(...args)=>{ops.push([key,...args]);return q}}});return q}}
  const source=readFileSync(new URL('../src/app/api/admin/checkout/webhooks/route.js',import.meta.url),'utf8')
+ .replace("'@/lib/checkoutWebhookPayload'",JSON.stringify(payloadURL))
  .replace("import { after } from 'next/server'",'const after = () => {}')
  .replace("import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'",'const processOutboundWebhooks = () => {}')
  .replace("import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const autorizarAdmin = async () => true; const checkoutAdminClient = () => globalThis.__webhookScopeDB')
@@ -69,4 +72,17 @@ test('detail audit and last update stay scoped to the selected webhook',async()=
   assert.ok(calls.some(call=>call.ops.some(op=>op[0]==='eq'&&op[1]==='payload->>target_id'&&op[2]===id)))
   assert.ok(calls.every(call=>call.ops.every(op=>op[0]!=='select'||!String(op[1]).includes('secret'))))
  } finally {delete globalThis.__webhookScopeDB}
+})
+test('self access callback never reaches sender or claims a delivery',async()=>{
+ const steps=[{table:'webhook_deliveries',data:[row]},{table:'outbound_webhooks',data:{...hook,url:'https://rotina.suzanazatorre.com.br/api/webhook-guru'}}]
+ assert.equal((await processOutboundWebhooks(db(steps),{env,sender:()=>assert.fail('self callback')})).sent,0)
+ assert.equal(steps.length,0)
+})
+test('worker converts only Guru destinations and injects server token at delivery time',async()=>{
+ const payload={id:'delivery',event:'order.paid',environment:'test',order:{id:'order',status:'paid',paid_at:'2026-10-24T12:00:00Z',total_cents:4700,subtotal_cents:4700,discount_cents:0,interest_cents:0,installments:1},customer:{email:'test@example.invalid',phone:'5599999999999'},items:[{product_id:'product',product_code:'1790286704',price_cents:4700}]}
+ const steps=[{table:'webhook_deliveries',data:[{...row,payload}]},{table:'outbound_webhooks',data:{...hook,payload_format:'guru',product_ids:['product']}},{table:'webhook_deliveries',data:[{id:'delivery'}]},{table:'webhook_deliveries',data:null}]
+ let body
+ await processOutboundWebhooks(db(steps),{env:{...env,GURU_ACCOUNT_TOKEN:'server-test-token'},sender:async(_url,value)=>{body=value;return 204}})
+ assert.equal(body.contact.email,'test@example.invalid');assert.equal(body.product.id,'1790286704');assert.equal(body.payment.total,47)
+ assert.equal(body.api_token,'server-test-token');assert.equal(payload.api_token,undefined);assert.equal(steps.length,0)
 })

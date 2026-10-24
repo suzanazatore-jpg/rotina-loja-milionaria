@@ -5,6 +5,7 @@ export const WEBHOOK_EVENTS = {
   'order.refunded': 'Reembolso',
   'order.chargedback': 'Contestação',
   'subscription.created': 'Assinatura criada',
+  'subscription.active': 'Assinatura ativa',
   'subscription.renewed': 'Assinatura renovada',
   'subscription.past_due': 'Assinatura em atraso',
   'subscription.canceled': 'Assinatura cancelada',
@@ -22,5 +23,9 @@ export function normalizeWebhook(input) {
   if (!events.length || events.some(event => !Object.hasOwn(WEBHOOK_EVENTS, event))) throw new Error('Selecione pelo menos um evento válido.')
   const products = input.product_ids === null ? null : [...new Set(Array.isArray(input.product_ids) ? input.product_ids : [])]
   if (products !== null && (!products.length || products.length > 100 || products.some(id => !UUID.test(id)))) throw new Error('Selecione os produtos ou marque Todos os produtos.')
-  return { name, url: url.href, events, product_ids: products, active: input.active === true }
+  const format = input.payload_format || 'native'
+  if (!['native', 'guru'].includes(format)) throw new Error('Formato de integração inválido.')
+  const normalized = { name, url: url.href, events, product_ids: products, active: input.active === true }
+  if (input.payload_format !== undefined) normalized.payload_format = format
+  return normalized
 }

@@ -25,6 +25,11 @@ export async function createPayment(db, input, key, tracking = null) {
   if ((product.marketplace_id || 'pagarme') !== 'pagarme') throw new PaymentError('Marketplace ainda não disponível para pagamentos.')
   if (!product.plan_id) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
   const customer = normalizeCustomer(input.customer)
+  const billingAddress = { ...customer.address }
+  for (const [field, limit] of [['street', 128], ['number', 32], ['district', 64]]) {
+    const value = input.customer?.address?.[field]
+    if (typeof value === 'string' && value.trim()) billingAddress[field] = value.trim().slice(0, limit)
+  }
   const installments = input.installments ?? 1
   const available = selection.length ? await loadOrderBumps(db, offer.id) : []
   const { items, amount } = buildCheckoutCart(offer, product, available, selection, input.payment_method, installments)
@@ -47,7 +52,7 @@ export async function createPayment(db, input, key, tracking = null) {
       if (sub) return { order_id: order.id, subscription: sub, status: order.status }
     }
   } else {
-    await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}` }, { onConflict: 'email', ignoreDuplicates: true }))
+    await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}`, billing_address: billingAddress }, { onConflict: 'email' }))
     const localCustomer = await result(db.from('customers').select('id').eq('email', customer.email).single())
     // A chave única no banco e a idempotência do gateway protegem tentativas concorrentes.
     const inserted = await db.from('orders').insert({ id: randomUUID(), event_id: eventId, customer_id: localCustomer.id, offer_id: offer.id, payment_method: input.payment_method, installments, ...amount }).select('*').single()
@@ -68,7 +73,7 @@ export async function createPayment(db, input, key, tracking = null) {
       await result(db.from('customers').update({ pagarme_customer_id: customerId }).eq('id', local.id))
     }
     // Carteira do gateway aceita o token com endereço; PAN e CVV nunca chegam aqui.
-    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, billing_address: customer.address } })
+    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, billing_address: billingAddress } })
     gatewayCard = { card_id: walletCard.id }
     gatewayCustomer = { id: customerId }
   }

@@ -3,11 +3,12 @@ import { after } from 'next/server'
 import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'
 import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { normalizeWebhook, UUID } from '@/lib/checkoutWebhookSettings'
+import { isInternalAccessWebhook } from '@/lib/checkoutWebhookPayload'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const reply = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } })
-const fields = 'id,name,url,events,product_ids,active,created_at'
+const fields = 'id,name,url,events,product_ids,active,created_at,payload_format'
 async function checked(query) {
   const result = await query
   if (result.error) throw new Error('Não foi possível consultar ou salvar os webhooks.')
@@ -62,12 +63,17 @@ export async function POST(request) {
     let record
     if (action === 'save') {
       try { record = normalizeWebhook(input.dados || {}) } catch (error) { return reply({ error: error.message }, 400) }
+      if (record.active && isInternalAccessWebhook(record.url)) return reply({ error: 'O acesso neste aplicativo já é processado internamente. Este destino deve permanecer pausado.' }, 400)
       if (record.product_ids) {
         const products = await checked(db.from('products').select('id').in('id', record.product_ids))
         if (products.data.length !== record.product_ids.length) return reply({ error: 'Produto não encontrado.' }, 400)
       }
     }
     if (action === 'toggle' && typeof input.active !== 'boolean') return reply({ error: 'Status inválido.' }, 400)
+    if (action === 'toggle' && input.active) {
+      const hook = await checked(db.from('outbound_webhooks').select('url').eq('id', id).single())
+      if (isInternalAccessWebhook(hook.data.url)) return reply({ error: 'O acesso neste aplicativo já é processado internamente. Este destino deve permanecer pausado.' }, 400)
+    }
     // Auditoria nunca armazena URL, segredo ou dados pessoais da compradora.
     auditId = `webhook-admin:${randomUUID()}`
     await checked(db.from('webhook_events').insert({ pagarme_event_id: auditId, type: 'checkout.webhook.admin', payload: { action, target_id: id || null, name: record?.name || null }, error: 'processing' }))
