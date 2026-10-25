@@ -19,7 +19,7 @@ const menu = [
   ['Vendas', '/admin/checkout/vendas', 'sales'],
   ['Assinaturas', '/admin/checkout/assinaturas', 'subscriptions'],
   ['Produtos', '/admin/checkout', 'products'],
-  ['Clientes', '/admin/alunas', 'customers'],
+  ['Clientes', '/admin/checkout/clientes', 'customers'],
   ['Configurações', '/admin/checkout/configuracoes', 'settings'],
 ]
 export default function CentralShell({ children }) {

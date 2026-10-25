@@ -1,5 +1,6 @@
 'use client'
 
+import ExportButton from '../ExportButton'
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -65,7 +66,7 @@ function AdminVendasCheckout() {
   return <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: 'Arial, sans-serif', paddingBottom: 70 }}>
 <main style={{ width: '100%', margin: 0, padding: '24px 16px' }}>
       <div style={{ color: OURO, fontWeight: 800, fontSize: 12, letterSpacing: 2 }}>VENDAS E CHECKOUT</div>
-      <h1 style={{ margin: '8px 0' }}>Pedidos e Vendas</h1>
+      <h1 style={{ margin: '8px 0' }}>Pedidos e Vendas</h1><ExportButton section="vendas" filters={filtros} label="Baixar vendas · Excel"/>
       <p style={{ color: 'var(--cv-muted)' }}>Consulte pagamentos, dados da cliente e produtos vendidos. Somente leitura: status vem do gateway.</p>
       {filtros.oferta && <p className="central-data-note">Filtrando os pedidos da oferta selecionada.</p>}
       <section style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '22px 0', alignItems: 'end' }}>

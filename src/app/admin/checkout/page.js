@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import ExportButton from './ExportButton'
 import { FormProduto } from './CheckoutForms'
 import ProductDetails from './ProductDetails'
 import ProductOffers from './ProductOffers'
@@ -135,7 +136,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
             <h1 style={{ fontSize: '24px', margin: '5px 0' }}>{selecionado ? selecionado.name : 'Produtos'}</h1>
             {selecionado && <p style={{ color: 'var(--cv-muted)', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>}
           </div>
-          <button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button>
+          <ExportButton section="produtos" label="Baixar produtos · Excel"/><ExportButton section="ofertas" label="Baixar ofertas · Excel"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button>
         </div>}
 
         {mensagem && <div style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}

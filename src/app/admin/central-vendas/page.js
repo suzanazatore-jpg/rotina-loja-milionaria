@@ -1,4 +1,5 @@
 'use client'
+import ExportButton from '../checkout/ExportButton'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 const money = value => (Number(value || 0) / 100).toLocaleString('pt-BR', { style:'currency', currency:'BRL' })
@@ -36,7 +37,7 @@ export default function CentralVendas() {
   const max = Math.max(1,...(data?.daily || []).map(day=>day.revenue))
   const cards = data ? [['Faturamento aprovado',money(data.revenue)],['Vendas pagas',data.sales],['Clientes compradores',data.customers],['Ticket médio',money(data.ticket)],['Reembolsos',data.refunds]] : []
   return <main className="central-home">
-    <div className="central-dashboard-heading"><div><span className="central-eyebrow">VISÃO GERAL</span><h1>Dashboard de vendas</h1><p>{data ? `${dateLabel(data.start)} a ${dateLabel(data.end)} · Pedidos criados no período` : 'Acompanhe os resultados do seu checkout.'}</p></div><button className="central-action" onClick={()=>setRefresh(value=>value+1)} disabled={loading}>↻ Atualizar</button></div>
+    <div className="central-dashboard-heading"><div><span className="central-eyebrow">VISÃO GERAL</span><h1>Dashboard de vendas</h1><p>{data ? `${dateLabel(data.start)} a ${dateLabel(data.end)} · Pedidos criados no período` : 'Acompanhe os resultados do seu checkout.'}</p></div><ExportButton section="vendas" filters={data?{inicio:data.start,fim:data.end}:{}} label="Baixar vendas do período · Excel" disabled={!data}/><button className="central-action" onClick={()=>setRefresh(value=>value+1)} disabled={loading}>↻ Atualizar</button></div>
     <form className="central-filter-bar" onSubmit={e=>{e.preventDefault();setPeriod({...filters})}}><label>De<input type="date" value={filters.inicio} onChange={e=>setFilters({...filters,inicio:e.target.value})} /></label><label>Até<input type="date" value={filters.fim} onChange={e=>setFilters({...filters,fim:e.target.value})} /></label><button className="central-action" type="submit" disabled={loading}>Aplicar filtros</button><button className="central-action" type="button" onClick={()=>{setFilters({inicio:'',fim:''});setPeriod({inicio:'',fim:''})}}>Últimos 30 dias</button></form>
     {loading && <p role="status">Carregando resultados…</p>}{error && <p role="alert" className="central-error">{error}</p>}
     {data && <>

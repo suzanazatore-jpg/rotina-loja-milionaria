@@ -1,4 +1,5 @@
 'use client'
+import ExportButton from '../ExportButton'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
@@ -41,7 +42,7 @@ export default function Subscriptions() {
     finally { setPending('') }
   }
   const visible = rows.filter(row => filter === 'all' || row.status === filter)
-  return <main className="central-home"><div className="central-dashboard-heading"><div><span className="central-eyebrow">RECORRÊNCIA</span><h1>Assinaturas</h1><p>Acompanhe as cobranças recorrentes do checkout próprio.</p></div></div>
+  return <main className="central-home"><div className="central-dashboard-heading"><div><span className="central-eyebrow">RECORRÊNCIA</span><h1>Assinaturas</h1><p>Acompanhe as cobranças recorrentes do checkout próprio.</p></div><ExportButton section="assinaturas" filters={{status:filter}}/></div>
     {error && <p role="alert" className="central-editor-message">{error}</p>}
     {confirmation && <section className="central-chart-panel" role="dialog" aria-modal="false" aria-labelledby="cancel-subscription-title"><h2 id="cancel-subscription-title">Cancelar a assinatura de {confirmation.customer?.name || 'esta cliente'}?</h2><p>O cancelamento interrompe as próximas cobranças. O período de acesso já comprado será mantido.</p><p>Oferta: {confirmation.offer_name || '—'}</p><button className="central-action" disabled={Boolean(pending)} onClick={() => setConfirmation(null)}>Voltar</button>{' '}<button className="central-primary" disabled={Boolean(pending)} onClick={() => change(confirmation, 'cancel')}>{pending ? 'Cancelando…' : 'Confirmar cancelamento'}</button></section>}
     <section className="central-chart-panel"><div className="central-section-heading"><h2>Assinaturas cadastradas</h2><label>Status <select value={filter} onChange={event => setFilter(event.target.value)} style={{ padding: 8, borderRadius: 6, background: 'var(--cv-field)', color: 'var(--cv-text)' }}><option value="all">Todos</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div><div className="central-table-wrap"><table className="central-table"><thead><tr><th>Cliente</th><th>Oferta</th><th>Status</th><th>Fim do ciclo</th><th>Criada em</th><th>Ações</th></tr></thead><tbody>
