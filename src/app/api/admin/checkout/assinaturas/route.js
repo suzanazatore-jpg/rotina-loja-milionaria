@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
-import {subscriptionFilters,subscriptionQuery,subscriptionDetails} from '@/lib/checkoutSubscriptions'
+import {subscriptionFilters,subscriptionFilteredRows} from '@/lib/checkoutSubscriptions'
 import { manageSubscription } from '@/lib/checkoutPaymentsServer'
 
 export const runtime = 'nodejs'
@@ -11,11 +11,10 @@ export async function GET(request) {
     const params=new URL(request.url).searchParams
     try {subscriptionFilters(params)} catch(error){return NextResponse.json({error:error.message},{status:400})}
     const page=Math.max(1,Math.min(100000,parseInt(params.get('page') || '1',10) || 1))
-    const {data,count,error}=await subscriptionQuery(db,params,{count:true}).order('created_at',{ascending:false}).order('id').range((page-1)*30,page*30-1)
-    if(error)throw error
-    const [subscriptions,products]=await Promise.all([subscriptionDetails(db,data || []),db.from('products').select('id,name').order('name')])
+    const [all,products]=await Promise.all([subscriptionFilteredRows(db,params),db.from('products').select('id,name').order('name')])
     if(products.error)throw products.error
-    return NextResponse.json({subscriptions,total:count || 0,page,products:products.data || []},{headers:{'Cache-Control':'no-store'}})
+    const subscriptions=all.slice((page-1)*30,page*30)
+    return NextResponse.json({subscriptions,total:all.length,page,products:products.data || []},{headers:{'Cache-Control':'no-store'}})
   } catch {return NextResponse.json({error:'Falha ao consultar assinaturas.'},{status:500,headers:{'Cache-Control':'no-store'}})}
 }
 export async function POST(request) {

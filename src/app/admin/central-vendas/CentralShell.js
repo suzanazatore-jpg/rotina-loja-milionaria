@@ -1,12 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import {Inter,Urbanist} from 'next/font/google'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
 import AppIcon from '@/app/components/AppIcon'
 import './central.css'
 
+const inter=Inter({subsets:['latin'],display:'swap',variable:'--central-inter'})
+const urbanist=Urbanist({subsets:['latin'],display:'swap',variable:'--central-urbanist'})
 const THEME_KEY = 'sz-central-vendas-tema'
 function subscribe(callback) {
   window.addEventListener('storage', callback)
@@ -43,7 +46,7 @@ export default function CentralShell({ children }) {
     window.dispatchEvent(new Event('sz-central-theme'))
   }
   const title = pathname.startsWith('/admin/checkout/produtos/') ? 'Produtos' : menu.find(([, href]) => href === pathname)?.[0] || 'Central de Vendas'
-  return <div className={`central ${collapsed ? 'central-collapsed' : ''}`} data-theme={theme}>
+  return <div className={`central ${inter.variable} ${urbanist.variable} ${collapsed ? 'central-collapsed' : ''}`} data-theme={theme}>
     <aside className={`central-sidebar ${menuOpen ? 'is-open' : ''}`}>
       <Link href="/admin/central-vendas" className="central-brand" onClick={() => setMenuOpen(false)}><span className="central-monogram">SZ</span><span>Central de Vendas<small>Suzana Zatorre</small></span></Link>
       <p className="central-nav-caption">GESTÃO COMERCIAL</p>

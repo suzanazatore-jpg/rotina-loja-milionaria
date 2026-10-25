@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs'
+import {readSales} from './centralRecords.js'
 import {subscriptionExportRows} from './checkoutSubscriptions.js'
 import { contactFilters, filterContacts } from './checkoutContacts.js'
 const amount = value => Number(value || 0)/100
@@ -26,6 +27,7 @@ function applyFilters(query,key,params) {
 }
 export async function exportRows(db,key,params=new URLSearchParams()) {
  const spec=EXPORT_SECTIONS[key];if(!spec)throw new Error('Exportação inválida.')
+ if(key==='vendas')return (await readSales(db,params)).map(spec.row)
  if(key==='assinaturas')return (await subscriptionExportRows(db,params)).map(spec.row)
  let productOffers=null
  if(key==='vendas' && params.get('produto')){const {data,error}=await db.from('offers').select('id').eq('product_id',params.get('produto'));if(error)throw error;productOffers=(data || []).map(r=>r.id);if(!productOffers.length)return []}
