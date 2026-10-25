@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import ExportButton from './ExportButton'
+import { FilterDialog, FilterSection } from './CentralUI'
 import { FormProduto } from './CheckoutForms'
 import ProductDetails from './ProductDetails'
 import ProductOffers from './ProductOffers'
@@ -46,6 +47,11 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const produtoId = initialProdutoId
   const [aba, setAba] = useState('detalhes')
   const [busca, setBusca] = useState('')
+  const [codigo, setCodigo] = useState('')
+  const [filterDraft, setFilterDraft] = useState({name:'',code:'',type:'all',marketplace:'all',visibility:'all'})
+  function openFilters(){setFilterDraft({name:busca,code:codigo,type:typeFilter,marketplace:marketplaceFilter,visibility:statusFilter});setFiltersOpen(true)}
+  function applyFilters(){setBusca(filterDraft.name);setCodigo(filterDraft.code);setTypeFilter(filterDraft.type);setMarketplaceFilter(filterDraft.marketplace);setStatusFilter(filterDraft.visibility);setFiltersOpen(false)}
+  function draftField(key,value){setFilterDraft(current=>({...current,[key]:value}))}
 
   const api = useCallback(async (metodo, corpo, tk = token) => {
     const resposta = await fetch('/api/admin/checkout', {
@@ -111,7 +117,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
 
   async function copiarLink(o) {try{await navigator.clipboard.writeText(linkCheckout(o));setMensagem('✓ Link copiado.')}catch{setMensagem('Não foi possível copiar o link.')}}
 
-  const visibleProducts = produtos.filter(p => `${p.name} ${p.slug} ${p.code}`.toLocaleLowerCase('pt-BR').includes(busca.trim().toLocaleLowerCase('pt-BR')) && (statusFilter === 'all' || p.active === (statusFilter === 'active')) && (typeFilter === 'all' || p.type === typeFilter) && (marketplaceFilter === 'all' || (p.marketplace_id || 'pagarme') === marketplaceFilter)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
+  const visibleProducts = produtos.filter(p => `${p.name} ${p.slug}`.toLocaleLowerCase('pt-BR').includes(busca.trim().toLocaleLowerCase('pt-BR')) && String(p.code || p.id).includes(codigo.trim()) && (statusFilter === 'all' || p.active === (statusFilter === 'active')) && (typeFilter === 'all' || p.type === typeFilter) && (marketplaceFilter === 'all' || (p.marketplace_id || 'pagarme') === marketplaceFilter)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
   async function duplicarOferta(o) {
     setSalvando(true); setMensagem('')
     try {const result=await api('POST',{entidade:'oferta',id:o.id,action:'duplicate'}); router.push(`/admin/checkout/produtos/${o.product_id}/ofertas/${result.id}`)} catch(error){setMensagem(error.message)} finally{setSalvando(false)}
@@ -128,15 +134,15 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   if (produtoId && !selecionado) return <div className="central-error" role="alert">{mensagem || 'Produto não encontrado.'}<p><Link href="/admin/checkout">Voltar para Produtos</Link></p></div>
 
   return (
-    <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+    <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: 'inherit' }}>
   <main style={{ width: '100%', margin: 0, padding: '26px 18px 60px' }}>
         {!selecionado && <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '18px', marginBottom: '22px', flexWrap: 'wrap' }}>
           <div>
-            <p style={{ color: ouro, fontSize: '11px', fontWeight: 800, letterSpacing: '.12em', margin: 0 }}>CHECKOUT</p>
+
             <h1 style={{ fontSize: '24px', margin: '5px 0' }}>{selecionado ? selecionado.name : 'Produtos'}</h1>
             {selecionado && <p style={{ color: 'var(--cv-muted)', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>}
           </div>
-          <ExportButton section="catalogo" label="Baixar Excel"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button>
+          <div className={productStyles.headerActions}><ExportButton section="catalogo" label="XLS"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button></div>
         </div>}
 
         {mensagem && <div style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
@@ -144,8 +150,19 @@ export default function AdminCheckout({ initialProdutoId = null }) {
         {!produtos.length && !mensagem && <div style={{ background: 'var(--cv-panel)', border: '1px dashed var(--cv-border)', borderRadius: 14, padding: 30, textAlign: 'center', color: 'var(--cv-muted)' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
 
         {!selecionado ? <>
-          <div className={productStyles.toolbar}><span className={productStyles.count}>{visibleProducts.length} de {produtos.length}</span><button type="button" className={productStyles.filterButton} aria-expanded={filtersOpen} aria-controls="product-filters" onClick={()=>setFiltersOpen(open=>!open)}>▽ Filtros</button></div>
-          {filtersOpen && <div id="product-filters" className={productStyles.filters}><label>Nome ou código<input style={campo} value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar produto"/></label><label>Marketplace<select style={campo} value={marketplaceFilter} onChange={e=>setMarketplaceFilter(e.target.value)}><option value="all">Todos</option>{marketplaces.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label><label>Tipo<select style={campo} value={typeFilter} onChange={e=>setTypeFilter(e.target.value)}><option value="all">Todos</option><option value="one_time">Produto</option><option value="subscription">Assinatura</option></select></label><label>Status<select style={campo} value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">Todos</option><option value="active">Ativos</option><option value="inactive">Inativos</option></select></label><button className="central-action" onClick={()=>{setBusca('');setMarketplaceFilter('all');setTypeFilter('all');setStatusFilter('all')}}>Limpar</button></div>}
+          <div className={productStyles.toolbar}><span className={productStyles.count}>{visibleProducts.length} de {produtos.length}</span><button type="button" className={productStyles.filterButton} aria-expanded={filtersOpen} aria-haspopup="dialog" onClick={openFilters}>▽ Filtros</button></div>
+          {filtersOpen && <FilterDialog title="Filtros de produtos" onClose={()=>setFiltersOpen(false)} onApply={applyFilters} onClear={()=>setFilterDraft({name:'',code:'',type:'all',marketplace:'all',visibility:'all'})}>
+            <div className={productStyles.filterBody}>
+              <FilterSection title="Tipo"><div className={productStyles.radios}>{[['all','Todos'],['subscription','Assinatura'],['one_time','Produto']].map(([value,label])=><label key={value}><input type="radio" name="product-type" value={value} checked={filterDraft.type===value} onChange={()=>draftField('type',value)}/>{label}</label>)}</div></FilterSection>
+              <FilterSection title="Características"><div className={productStyles.characteristics}>
+                <label>Código<input value={filterDraft.code} onChange={e=>draftField('code',e.target.value)} placeholder="Código do produto"/></label>
+                <label>Nome<input value={filterDraft.name} onChange={e=>draftField('name',e.target.value)} placeholder="Nome do produto"/></label>
+                <label>Marketplace<select value={filterDraft.marketplace} onChange={e=>draftField('marketplace',e.target.value)}><option value="all">Todos</option>{marketplaces.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
+              </div></FilterSection>
+              <FilterSection title="Visibilidade"><div className={productStyles.radios}>{[['all','Todos'],['active','Visível'],['inactive','Oculto']].map(([value,label])=><label key={value}><input type="radio" name="product-visibility" value={value} checked={filterDraft.visibility===value} onChange={()=>draftField('visibility',value)}/>{label}</label>)}</div><p className={productStyles.filterHint}>Produtos ativos ficam disponíveis no checkout. Produtos inativos ficam ocultos.</p></FilterSection>
+            </div>
+          </FilterDialog>}
+
           <div className={productStyles.tableWrap}><table className={productStyles.table}><thead><tr><th>Nome</th><th>Código</th><th>Marketplace</th><th><span className={productStyles.srOnly}>Ações</span></th></tr></thead><tbody>{visibleProducts.map(p=><tr key={p.id}><td><Link className={productStyles.productName} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`}>{p.name}</Link></td><td>{p.code || p.id}</td><td>{nomeMarketplace(p.marketplace_id)}</td><td><div className={productStyles.actions}><Link className={productStyles.productOpen} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`} title={p.type==='subscription'?'Abrir assinatura':'Abrir produto'} aria-label={`Abrir ${p.type==='subscription'?'assinatura':'produto'} ${p.name}`}><ProductIcon kind={p.type}/></Link><button className={productStyles.duplicate} disabled={salvando} title="Duplicar produto" aria-label={`Duplicar ${p.name}`} onClick={()=>duplicarProduto(p)}><ProductIcon kind="copy"/></button></div></td></tr>)}{!visibleProducts.length && <tr><td colSpan={4}>Nenhum produto encontrado.</td></tr>}</tbody></table></div>
 
         </> : <>
