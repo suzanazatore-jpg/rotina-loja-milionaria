@@ -136,7 +136,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
             <h1 style={{ fontSize: '24px', margin: '5px 0' }}>{selecionado ? selecionado.name : 'Produtos'}</h1>
             {selecionado && <p style={{ color: 'var(--cv-muted)', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>}
           </div>
-          <ExportButton section="produtos" label="Baixar produtos · Excel"/><ExportButton section="ofertas" label="Baixar ofertas · Excel"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button>
+          <ExportButton section="catalogo" label="Baixar Excel"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button>
         </div>}
 
         {mensagem && <div style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
@@ -151,7 +151,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
         </> : <>
           <div className={interior.topbar}><div className={interior.breadcrumb}><Link href="/admin/checkout">Produtos</Link><span>/</span><span>{selecionado.name}</span></div><details className={interior.additional}><summary>⚙ Configurações adicionais ⌄</summary><div><button onClick={()=>{setAba('detalhes');setExtraOpen(open=>!open)}}>Plano e integrações</button><Link href="/admin/checkout/configuracoes">Padrões de checkout</Link></div></details></div>
           <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhe'],['ofertas','Ofertas'],['vendas','Vendas'],['auditoria','Auditoria']].map(([key,label])=><button key={key} aria-current={aba===key?'page':undefined} onClick={()=>setAba(key)}>{label}</button>)}</nav>
-          {<div hidden={aba!=='detalhes'}><ProductDetails key={`${selecionado.id}:${selecionado.updated_at || ''}`} product={selecionado} marketplaces={marketplaces} plans={planos} token={token} onSave={salvarDetalhe} saving={salvando} advanced={extraOpen}/></div>}
+          {<div hidden={aba!=='detalhes'}><ProductDetails key={`${selecionado.id}:${selecionado.updated_at || ''}`} product={selecionado} offers={ofertas.filter(o=>o.product_id===selecionado.id)} marketplaces={marketplaces} plans={planos} token={token} onSave={salvarDetalhe} saving={salvando} advanced={extraOpen}/></div>}
           {aba==='ofertas' && <ProductOffers product={selecionado} offers={ofertas.filter(o=>o.product_id===produtoId)} onCreate={()=>novaOferta(selecionado)} onDuplicate={duplicarOferta} onToggle={o=>alternar('oferta',o)} onCopy={copiarLink} busy={salvando}/>}
           {aba==='vendas' && <ProductSales productId={selecionado.id} token={token}/>}
           {aba==='auditoria' && <CatalogAudit productId={selecionado.id} token={token}/>}

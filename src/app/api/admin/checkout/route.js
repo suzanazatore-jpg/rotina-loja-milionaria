@@ -109,6 +109,8 @@ async function montarOferta(supabase, dados) {
     if (config.require_privacy && !urls.privacy_url) throw new Error('Informe a URL da política de privacidade antes de exigir o aceite.')
   }
 
+  if(dados.checkout_config?.payment_alias){const alias=normalizeCheckoutSettings(dados.checkout_config).payment_alias;const existing=await supabase.from('offers').select('id').eq('checkout_config->>payment_alias',alias);if(existing.error)throw new Error('Não foi possível verificar o link curto.');if(existing.data?.some(o=>o.id!==dados.id))throw new Error('Este link curto já está em uso. Escolha outro.')}
+
   return {
     product_id: produto.id,
     name: nome,
@@ -200,7 +202,7 @@ export async function POST(request) {
       return NextResponse.json({ ok: true, id: data.id })
     }
     if (entidade === 'oferta') {
-      const registro = await montarOferta(supabase, dados)
+      const registro = await montarOferta(supabase, {...dados,id})
       const consulta = id
         ? supabase.from('offers').update(registro).eq('id', id)
         : supabase.from('offers').insert(registro)
