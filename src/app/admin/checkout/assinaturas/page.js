@@ -1,53 +1,28 @@
 'use client'
-import ExportButton from '../ExportButton'
-import { useEffect, useState } from 'react'
+import {useEffect,useRef,useState} from 'react'
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
-
-const statuses = { active: 'Ativa', past_due: 'Pagamento atrasado', canceled: 'Cancelada', expired: 'Expirada' }
-const date = value => value ? new Date(value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'
-export default function Subscriptions() {
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [pending, setPending] = useState('')
-  const [confirmation, setConfirmation] = useState(null)
-  const [filter, setFilter] = useState('all')
-  async function headers() {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { Authorization: `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' }
-  }
-  useEffect(() => {
-    let active = true
-    async function load() {
-      try {
-        const response = await fetch('/api/admin/checkout/assinaturas', { headers: await headers(), cache: 'no-store' })
-        const json = await response.json()
-        if (!response.ok) throw new Error(json.error)
-        if (active) setRows(json.subscriptions || [])
-      } catch (failure) { if (active) setError(failure.message) }
-      finally { if (active) setLoading(false) }
-    }
-    load(); return () => { active = false }
-  }, [])
-  async function change(row, action) {
-    setPending(row.id); setError('')
-    try {
-      const response = await fetch('/api/admin/checkout/assinaturas', { method: 'POST', headers: await headers(), body: JSON.stringify({ id: row.id, action }) })
-      const json = await response.json()
-      if (!response.ok) throw new Error(json.error)
-      setRows(current => current.map(item => item.id === row.id ? { ...item, ...json.subscription } : item))
-      setConfirmation(null)
-    } catch (failure) { setError(failure.message) }
-    finally { setPending('') }
-  }
-  const visible = rows.filter(row => filter === 'all' || row.status === filter)
-  return <main className="central-home"><div className="central-dashboard-heading"><div><span className="central-eyebrow">RECORRÊNCIA</span><h1>Assinaturas</h1><p>Acompanhe as cobranças recorrentes do checkout próprio.</p></div><ExportButton section="assinaturas" filters={{status:filter}}/></div>
-    {error && <p role="alert" className="central-editor-message">{error}</p>}
-    {confirmation && <section className="central-chart-panel" role="dialog" aria-modal="false" aria-labelledby="cancel-subscription-title"><h2 id="cancel-subscription-title">Cancelar a assinatura de {confirmation.customer?.name || 'esta cliente'}?</h2><p>O cancelamento interrompe as próximas cobranças. O período de acesso já comprado será mantido.</p><p>Oferta: {confirmation.offer_name || '—'}</p><button className="central-action" disabled={Boolean(pending)} onClick={() => setConfirmation(null)}>Voltar</button>{' '}<button className="central-primary" disabled={Boolean(pending)} onClick={() => change(confirmation, 'cancel')}>{pending ? 'Cancelando…' : 'Confirmar cancelamento'}</button></section>}
-    <section className="central-chart-panel"><div className="central-section-heading"><h2>Assinaturas cadastradas</h2><label>Status <select value={filter} onChange={event => setFilter(event.target.value)} style={{ padding: 8, borderRadius: 6, background: 'var(--cv-field)', color: 'var(--cv-text)' }}><option value="all">Todos</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div><div className="central-table-wrap"><table className="central-table"><thead><tr><th>Cliente</th><th>Oferta</th><th>Status</th><th>Fim do ciclo</th><th>Criada em</th><th>Ações</th></tr></thead><tbody>
-      {visible.map(row => <tr key={row.id}><td>{row.customer?.name || '—'}<small>{row.customer?.email}</small></td><td>{row.offer_name || '—'}</td><td><span className="central-badge">{statuses[row.status] || row.status}</span></td><td>{date(row.current_period_end)}</td><td>{date(row.created_at)}</td><td><button className="central-action" disabled={Boolean(pending)} onClick={() => change(row, 'sync')}>{pending === row.id ? 'Atualizando…' : 'Atualizar status'}</button>{' '}{row.status !== 'canceled' && <button className="central-action" disabled={Boolean(pending)} onClick={() => setConfirmation(row)}>Cancelar</button>}{row.origin_order_id && <Link className="central-action" href={`/admin/checkout/vendas?id=${row.origin_order_id}`}>Pedido</Link>}</td></tr>)}
-      {!visible.length && <tr><td colSpan={6}>{loading ? 'Carregando assinaturas…' : 'Nenhuma assinatura encontrada.'}</td></tr>}
-    </tbody></table></div><p className="central-data-note">Exibe as 100 assinaturas mais recentes. O status financeiro vem do Pagar.me.</p></section>
-  </main>
+import ExportButton from '../ExportButton'
+import {supabase} from '@/lib/supabase'
+import {SUBSCRIPTION_STATUSES as statuses} from '@/lib/checkoutSubscriptions'
+import styles from './Subscriptions.module.css'
+const empty={status:'all',code:'',contact:'',produto:'',inicio:'',fim:''}
+const date=value=>value?new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'}):'—'
+async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
+function Status({value}){return <span className={`${styles.status} ${styles[value] || ''}`} title={statuses[value] || value} role="img" aria-label={statuses[value] || value}>{value==='active'?'✓':value==='canceled'?'×':value==='past_due'?'!':'−'}</span>}
+export default function Subscriptions(){
+ const [data,setData]=useState({subscriptions:[],total:0,products:[]}),[loading,setLoading]=useState(true),[error,setError]=useState('')
+ const [filters,setFilters]=useState(empty),[applied,setApplied]=useState(empty),[showFilters,setShowFilters]=useState(false),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[detail,setDetail]=useState(null),[pending,setPending]=useState(''),[confirmation,setConfirmation]=useState(false)
+ useEffect(()=>{const controller=new AbortController();async function load(){setLoading(true);setError('');try{const qs=new URLSearchParams({...applied,page:String(page)});const response=await fetch(`/api/admin/checkout/assinaturas?${qs}`,{headers:await headers(),cache:'no-store',signal:controller.signal});const json=await response.json();if(!response.ok)throw new Error(json.error);if(!controller.signal.aborted)setData(current=>({...json,subscriptions:page===1?json.subscriptions:[...current.subscriptions,...json.subscriptions]}))}catch(error){if(!controller.signal.aborted)setError(error.message)}finally{if(!controller.signal.aborted)setLoading(false)}}load();return()=>controller.abort()},[applied,page,refresh])
+ async function change(row,action){setPending(row.id);setError('');try{const response=await fetch('/api/admin/checkout/assinaturas',{method:'POST',headers:await headers(),body:JSON.stringify({id:row.id,action})});const json=await response.json();if(!response.ok)throw new Error(json.error);setDetail(current=>({...current,...json.subscription}));setConfirmation(false);setPage(1);setRefresh(v=>v+1)}catch(error){setError(error.message)}finally{setPending('')}}
+ function reload(){setPage(1);setRefresh(v=>v+1)}
+ const period=applied.inicio || applied.fim?`${applied.inicio?applied.inicio.split('-').reverse().join('/'):'Início'} – ${applied.fim?applied.fim.split('-').reverse().join('/'):'Hoje'}`:'Todo o período'
+ return <main className="central-home"><header className={styles.heading}><h1>Assinaturas</h1><div className={styles.actions}><ExportButton section="assinaturas" filters={applied} label="Excel"/><button type="button" className="central-action" onClick={reload} disabled={loading || Boolean(pending)} aria-label="Atualizar lista de assinaturas" title="Atualizar lista">↻</button></div></header>
+ <div className={styles.toolbar}><div className={styles.badges}><span>{data.subscriptions.length} de {data.total}</span><span>◷ {period}</span></div><button type="button" className="central-action" aria-expanded={showFilters} onClick={()=>setShowFilters(v=>!v)}>Filtros</button></div>
+ {showFilters && <form className="central-filter-bar" onSubmit={e=>{e.preventDefault();setPage(1);setApplied({...filters})}}><label>Código<input value={filters.code} onChange={e=>setFilters({...filters,code:e.target.value})}/></label><label>Contato (nome)<input value={filters.contact} onChange={e=>setFilters({...filters,contact:e.target.value})}/></label><label>Produto<select value={filters.produto} onChange={e=>setFilters({...filters,produto:e.target.value})}><option value="">Todos</option>{data.products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Status<select value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}><option value="all">Todos</option>{Object.entries(statuses).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label><label>Iniciada desde<input type="date" value={filters.inicio} onChange={e=>setFilters({...filters,inicio:e.target.value})}/></label><label>Iniciada até<input type="date" value={filters.fim} onChange={e=>setFilters({...filters,fim:e.target.value})}/></label><button className="central-action" disabled={loading}>Aplicar filtros</button><button type="button" className="central-action" onClick={()=>{setFilters(empty);setApplied(empty);setPage(1)}}>Limpar</button></form>}
+ {error && <p role="alert" className="central-editor-message">{error}</p>}{loading && <p role="status">Carregando assinaturas…</p>}
+ <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Código</th><th>Contato</th><th>Produto</th><th>Iniciada em</th><th>Atualizada em</th><th>Qtd. cobranças</th><th>Cobrada a cada</th><th><span className={styles.srOnly}>Detalhes</span></th></tr></thead><tbody>{data.subscriptions.map(row=><tr key={row.id}><td><div className={styles.code}><Status value={row.status}/><button type="button" className={styles.textButton} onClick={()=>{setDetail(row);setConfirmation(false)}} title={row.pagarme_subscription_id || row.id}>{row.pagarme_subscription_id || row.id}</button></div></td><td title={row.customer?.email}>{row.customer?.name || '—'}</td><td title={row.product_name || row.offer_name}><span className={styles.product}>{row.product_name || row.offer_name || '—'}</span></td><td>{date(row.created_at)}</td><td>{date(row.updated_at)}</td><td className={styles.center}>{row.charge_count}</td><td className={styles.center}>{row.billing_frequency}</td><td><button type="button" className={styles.detailButton} aria-label={`Ver detalhes da assinatura de ${row.customer?.name || row.id}`} onClick={()=>{setDetail(row);setConfirmation(false)}}><svg width="18" height="16" viewBox="0 0 24 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="2" y="2" width="20" height="16" rx="2"/><path d="M2 7h20M6 13h4"/></svg></button></td></tr>)}{!loading && !data.subscriptions.length && <tr><td colSpan={8} className={styles.empty}>Nenhuma assinatura encontrada.</td></tr>}</tbody></table></div>
+ {data.subscriptions.length<data.total && <div className={styles.more}><button type="button" className="central-action" disabled={loading} onClick={()=>setPage(p=>p+1)}>Ver mais</button></div>}
+ {detail && <SubscriptionDetails row={detail} pending={pending} confirmation={confirmation} error={error} onClose={()=>{if(!pending){setDetail(null);setConfirmation(false)}}} onConfirm={setConfirmation} onChange={change}/>}
+ </main>
 }
+function SubscriptionDetails({row,pending,confirmation,error,onClose,onConfirm,onChange}){const dialog=useRef(null);useEffect(()=>{dialog.current.showModal()},[]);return <dialog ref={dialog} className={styles.dialog} aria-labelledby="subscription-details-title" onCancel={e=>{e.preventDefault();onClose()}}><header className={styles.heading}><h2 id="subscription-details-title">Detalhes da assinatura</h2><button type="button" className="central-action" disabled={Boolean(pending)} onClick={onClose}>Fechar</button></header><p className={styles.code}><Status value={row.status}/>{statuses[row.status] || row.status}</p><dl>{[['Código',row.pagarme_subscription_id || row.id],['Contato',row.customer?.name],['Email',row.customer?.email],['Produto',row.product_name],['Oferta',row.offer_name],['Iniciada em',date(row.created_at)],['Atualizada em',date(row.updated_at)],['Cobranças registradas',row.charge_count],['Cobrada a cada',row.billing_frequency],['Fim do ciclo',date(row.current_period_end)]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value ?? '—'}</dd></div>)}</dl><p className="central-data-note">A atualização registra quando a central recebeu ou consultou a assinatura. A quantidade conta cobranças registradas no checkout, sem duplicar o mesmo identificador.</p>{error && <p role="alert">{error}</p>}{confirmation?<section className={styles.confirmation}><h3>Cancelar esta assinatura?</h3><p>O cancelamento interrompe as próximas cobranças. O período de acesso já comprado será mantido.</p><div className={styles.actions}><button type="button" className="central-action" disabled={Boolean(pending)} onClick={()=>onConfirm(false)}>Voltar</button><button type="button" className="central-primary" disabled={Boolean(pending)} onClick={()=>onChange(row,'cancel')}>{pending?'Cancelando…':'Confirmar cancelamento'}</button></div></section>:<div className={styles.actions}><button type="button" className="central-action" disabled={Boolean(pending)} onClick={()=>onChange(row,'sync')}>{pending?'Atualizando…':'Atualizar status no Pagar.me'}</button>{row.status!=='canceled' && <button type="button" className="central-action" disabled={Boolean(pending)} onClick={()=>onConfirm(true)}>Cancelar assinatura</button>}{row.origin_order_id && <Link className="central-action" href={`/admin/checkout/vendas?id=${row.origin_order_id}`}>Ver pedido</Link>}</div>}</dialog>}

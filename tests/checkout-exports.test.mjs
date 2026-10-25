@@ -8,7 +8,8 @@ const dataUrl=source=>`data:text/javascript;base64,${Buffer.from(source).toStrin
 const contactsSource=readFileSync(new URL('../src/lib/checkoutContacts.js',import.meta.url),'utf8')
 const contactsUrl=dataUrl(contactsSource)
 const {normalizeContact}=await import(contactsUrl)
-const exportsUrl=dataUrl(readFileSync(new URL('../src/lib/checkoutExports.js',import.meta.url),'utf8').replace("'exceljs'",JSON.stringify(pathToFileURL(require.resolve('exceljs')).href)).replace("'./checkoutContacts.js'",JSON.stringify(contactsUrl)))
+const subscriptionsUrl=dataUrl(readFileSync(new URL('../src/lib/checkoutSubscriptions.js',import.meta.url),'utf8'))
+const exportsUrl=dataUrl(readFileSync(new URL('../src/lib/checkoutExports.js',import.meta.url),'utf8').replace("'exceljs'",JSON.stringify(pathToFileURL(require.resolve('exceljs')).href)).replace("'./checkoutContacts.js'",JSON.stringify(contactsUrl)).replace("'./checkoutSubscriptions.js'",JSON.stringify(subscriptionsUrl)))
 const {workbookBuffer,exportRows,EXPORT_SECTIONS}=await import(exportsUrl)
 const ExcelJS=require('exceljs')
 test('contact registration whitelists identity and rejects invalid or oversized inputs',()=>{
