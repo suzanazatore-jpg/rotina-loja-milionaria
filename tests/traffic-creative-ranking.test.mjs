@@ -9,3 +9,9 @@ test('ranking never compares different campaigns or conversion events',()=>{
 })
 test('ties do not manufacture a worst creative and unknown cost is excluded',()=>{const g=creativeGroups([{id:'a',campaign_id:'1',result_label:'lead',cost:2,results:5,spend:10},{id:'b',campaign_id:'1',result_label:'lead',cost:2,results:10,spend:20}])[0];assert.equal(g.best.id,'b');assert.equal(g.worst,null)})
 test('awareness cost is correctly expressed per thousand reached, including import roundtrip',()=>{const a=normalizeEntity({campaign_name:'Awareness',amount_spent:20,results:{indicator:'reach',values:[{value:'10000'}]}});assert.equal(a.cost,2);assert.match(a.cost_label,/1.000/);assert.equal(a.campaign_name,'Awareness');assert.equal(normalizeEntity(a).cost_label,a.cost_label)})
+
+test('technical and readable labels for the same message event share a ranking',()=>{
+ const make=(id,result_label)=>normalizeEntity({id,campaign_id:'c',result_label,spend:10,results:2,cost:5})
+ const groups=creativeGroups([make('a','Conversas por mensagem iniciadas'),make('b','actions:onsite_conversion.messaging_conversation_started_7d')])
+ assert.equal(groups.length,1);assert.equal(groups[0].rows.length,2)
+})
