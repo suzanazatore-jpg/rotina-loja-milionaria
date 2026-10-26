@@ -13,7 +13,7 @@ const format=(v,type,currency)=>v==null?'—':type==='money'?money(v,currency):t
 function Compare({current,previous,inverse=false}){
  if(current==null||previous==null)return <span className="tr-muted">Sem comparação disponível</span>
  const change=previous===0?null:(current/previous-1)*100
- return <><span className={'tr-change '+(current===previous?'neutral':(current>previous)!==inverse?'positive':'negative')}>{change==null?(current===0?'Sem variação':'Novo resultado'):`${change>0?'▲':'▼'} ${num(Math.abs(change))}%`}</span><span className="tr-muted">{num(previous)} no período anterior</span></>
+ return <><span className={'tr-change '+(current===previous?'neutral':(current>previous)!==inverse?'positive':'negative')}>{current===previous?'Sem variação':change==null?'Novo resultado':`${change>0?'▲':'▼'} ${num(Math.abs(change))}%`}</span><span className="tr-muted">{num(previous)} no período anterior</span></>
 }
 function Trend({rows,field,label}){
  const data=rows.filter(r=>numeric(r[field])!=null), max=Math.max(1,...data.map(r=>Number(r[field])))

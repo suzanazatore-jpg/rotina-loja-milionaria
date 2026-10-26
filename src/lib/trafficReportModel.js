@@ -11,6 +11,16 @@ export function safeMedia(value) {
 export function selectTrafficSnapshot(snapshots, accountId, from, to) {
   const matching = snapshots.filter(s => s.meta_account_id === accountId)
   const exact = from && to ? matching.filter(s => s.period_start === from && s.period_end === to) : []
+  if (from && from === to) {
+    const daily = matching.flatMap(s => {
+      if (!(s.payload?.entity_daily_dates || []).includes(from) || !['campaigns','adsets','ads'].every(k => Array.isArray(s.payload?.['daily_' + k]))) return []
+      const total = s.payload?.daily?.find(r => (r.metric_date || r.date_start) === from)
+      if (!total) return []
+      return [{...s, period_start:from, period_end:to, payload:{totals:total, daily:[total], ...Object.fromEntries(['campaigns','adsets','ads'].map(k => [k,s.payload['daily_' + k].filter(r => (r.metric_date || r.date_start) === from)]))}}]
+    })
+    const newest = [...exact, ...daily].sort((a,b) => String(b.collected_at || '').localeCompare(String(a.collected_at || '')))[0]
+    if (newest) return newest
+  }
   return (exact.length ? exact : matching).slice().sort((a,b) =>
     String(b.period_end || '').localeCompare(String(a.period_end || '')) ||
     String(a.period_start || '').localeCompare(String(b.period_start || '')) ||

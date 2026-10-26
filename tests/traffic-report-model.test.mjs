@@ -41,3 +41,13 @@ test('period ratios use the displayed totals and duplicate dates are not added t
  assert.equal(t.days,1);assert.equal(t.spend,20);assert.equal(t.ctr,2);assert.equal(t.cpc,5);assert.equal(t.cpm,100)
  assert.equal(rangeTotals([row,row],'2026-10-25','2026-10-25').spend,10)
 })
+
+test('a newer verified daily collection supersedes an older single-day snapshot consistently',()=>{
+ const from='2026-10-25'
+ const old={meta_account_id:'a',period_start:from,period_end:from,collected_at:'2026-10-26T08:00:00Z',payload:{totals:{impressions:100},campaigns:[],adsets:[],ads:[]}}
+ const newer={meta_account_id:'a',period_start:'2026-10-01',period_end:from,collected_at:'2026-10-26T09:00:00Z',payload:{totals:{impressions:9999},daily:[{metric_date:from,impressions:101}],entity_daily_dates:[from],daily_campaigns:[{id:'c',metric_date:from,impressions:101}],daily_adsets:[],daily_ads:[]}}
+ const result=selectTrafficSnapshot([old,newer],'a',from,from)
+ assert.equal(result.payload.totals.impressions,101);assert.equal(result.payload.campaigns[0].impressions,101);assert.equal(result.period_start,from)
+ assert.equal(selectTrafficSnapshot([old,{...newer,collected_at:'2026-10-26T07:00:00Z'}],'a',from,from).payload.totals.impressions,100)
+ assert.equal(selectTrafficSnapshot([old,{...newer,payload:{...newer.payload,entity_daily_dates:[]}}],'a',from,from).payload.totals.impressions,100)
+})
