@@ -1,0 +1,6 @@
+.fields{display:grid;gap:20px;margin:22px 0;min-width:0}
+.fields label{display:grid;gap:9px;font-size:15px;min-width:0}
+.fields input:not([type=checkbox]),.fields select,.fields textarea{width:100%;min-width:0;padding:12px 14px;border:1px solid var(--cv-border);border-radius:8px;background:var(--cv-field);color:var(--cv-text);font:inherit}
+.fields textarea{font-family:monospace;font-size:14px;line-height:1.65;resize:vertical;min-height:340px}
+.fields input:focus-visible,.fields select:focus-visible,.fields textarea:focus-visible{outline:2px solid var(--cv-gold);outline-offset:2px}
+.fields label:has(input[type=checkbox]){display:flex;align-items:center;gap:10px}

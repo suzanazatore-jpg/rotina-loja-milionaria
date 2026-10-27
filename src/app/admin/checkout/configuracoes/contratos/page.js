@@ -1,6 +1,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import styles from '../../ContractFields.module.css'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -91,8 +92,10 @@ export default function ContratosPage() {
 
     {tab === 'modelos' && data.templates.map(t => <section key={t.slug} className="central-chart-panel">
       <div className="central-section-heading"><h2>{t.name}</h2><small>Versão {t.version} · atualizado {when(t.updated_at)}</small></div>
-      <label>Nome<input value={draft[t.slug]?.name || ''} onChange={e => setDraft({ ...draft, [t.slug]: { ...draft[t.slug], name: e.target.value } })} /></label>
-      <label>Texto do contrato<textarea rows={22} style={{ width: '100%', fontFamily: 'monospace', fontSize: 13 }} value={draft[t.slug]?.body || ''} onChange={e => setDraft({ ...draft, [t.slug]: { ...draft[t.slug], body: e.target.value } })} /></label>
+      <div className={styles.fields}>
+        <label>Nome<input value={draft[t.slug]?.name || ''} onChange={e => setDraft({ ...draft, [t.slug]: { ...draft[t.slug], name: e.target.value } })} /></label>
+        <label>Texto do contrato<textarea rows={22} value={draft[t.slug]?.body || ''} onChange={e => setDraft({ ...draft, [t.slug]: { ...draft[t.slug], body: e.target.value } })} /></label>
+      </div>
       <p className="central-data-note">Use <code># Título</code> e <code>## Cláusula</code> para títulos. Campos automáticos: {data.fields.map(f => <code key={f} style={{ marginRight: 6 }}>{`{${f}}`}</code>)}</p>
       <button type="button" className="central-primary" onClick={() => act({ action: 'save_template', slug: t.slug, ...draft[t.slug] })}>Salvar nova versão</button>
     </section>)}
