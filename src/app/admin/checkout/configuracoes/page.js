@@ -15,6 +15,7 @@ const groups = [
     {id:'emails',name:'Emails transacionais',description:'Consulte o que o aplicativo envia e o que ainda está em preparação.',icon:'broadcast'},
   ]},
   {name:'Organização',items:[
+    {id:'contracts',name:'Contratos',description:'Edite os modelos, acompanhe assinaturas e consulte o histórico dos contratos.',icon:'plans',href:'/admin/checkout/configuracoes/contratos'},
     {id:'products',name:'Produtos e ofertas',description:'Organize produtos, preços, parcelamentos e links de pagamento.',icon:'courses',href:'/admin/checkout'},
     {id:'plans',name:'Planos e acessos',description:'Gerencie os planos, cursos e períodos de acesso do aplicativo.',icon:'routine',href:'/admin/planos'},
     {id:'subscriptions',name:'Assinaturas',description:'Consulte as assinaturas e acompanhe suas cobranças recorrentes.',icon:'calendar',href:'/admin/checkout/assinaturas'},

@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { retryConversions } from '@/lib/checkoutConversionsServer'
 import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'
+import { processContractReminders } from '@/lib/contractsServer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,6 +19,8 @@ export async function GET(request) {
     const access = await expireOrderAccess(db)
     let outbound
     try { outbound = await processOutboundWebhooks(db) } catch { outbound = { error: 'queue_pending' } }
-    return Response.json({ ...await retryConversions(db), access, outbound }, { headers: { 'Cache-Control': 'no-store' } })
+    let contracts
+    try { contracts = await processContractReminders(db) } catch { contracts = { error: 'reminders_pending' } }
+    return Response.json({ ...await retryConversions(db), access, outbound, contracts }, { headers: { 'Cache-Control': 'no-store' } })
   } catch { return Response.json({ error: 'Não foi possível processar conversões.' }, { status: 503 }) }
 }

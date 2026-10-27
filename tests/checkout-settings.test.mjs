@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const tracking=readFileSync(new URL('../src/lib/checkoutTracking.js',import.meta.url),'utf8')
 const trackingUrl=`data:text/javascript;base64,${Buffer.from(tracking).toString('base64')}`
-const source=readFileSync(new URL('../src/lib/checkoutSettings.js',import.meta.url),'utf8').replace("'./checkoutTracking.js'",JSON.stringify(trackingUrl))
+const source=readFileSync(new URL('../src/lib/checkoutSettings.js',import.meta.url),'utf8').replace("'./contractTemplates.js'",JSON.stringify(new URL('../src/lib/contractTemplates.js',import.meta.url).href)).replace("'./checkoutTracking.js'",JSON.stringify(trackingUrl))
 const {normalizeCheckoutSettings,resolveCheckoutSettings,checkoutSettingsDraft,validateCheckoutForm}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 test('legacy offer preserves identity and does not inherit a changed global appearance',()=>{
  const config=resolveCheckoutSettings({background:'#101010',store_name:'Oferta antiga'},{background:'#ffffff',store_name:'Novo padrão'})
@@ -45,4 +45,13 @@ test('offer form profiles stay independent from the account while seller identit
  assert.equal(normalizeCheckoutSettings({}).form_profile,'complete')
  assert.equal(normalizeCheckoutSettings({layout:'guru'}).layout,'guru')
  assert.throws(()=>normalizeCheckoutSettings({company_document:'123'}),/CNPJ/)
+})
+
+test('offer contract survives normalization and appearance inheritance without becoming a global default',()=>{
+ const contract={required:true,template:'evs',term_months:3,gate_access:true,platform_months:12,program_name:'Equipe Vendendo Sozinha'}
+ const offer={appearance_mode:'inherit',contract}
+ assert.deepEqual(normalizeCheckoutSettings(offer).contract,contract)
+ assert.deepEqual(resolveCheckoutSettings(offer,{contract:{...contract,template:'trafego'}}).contract,contract)
+ assert.deepEqual(resolveCheckoutSettings({}, {contract}).contract,{required:false})
+ assert.throws(()=>normalizeCheckoutSettings({contract:{...contract,term_months:0}}),/prazo/)
 })

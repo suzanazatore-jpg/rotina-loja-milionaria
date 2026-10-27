@@ -108,6 +108,7 @@ test('cron rejects missing or wrong secret and accepts authenticated disabled ru
   .replace("import { checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const checkoutAdminClient = () => ({})')
   .replace("import { retryConversions } from '@/lib/checkoutConversionsServer'",'const retryConversions = async () => ({disabled:true,checked:0,sent:0})')
   .replace("import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'",'const processOutboundWebhooks = async () => ({disabled:true,sent:0})')
+  .replace("import { processContractReminders } from '@/lib/contractsServer'",'const processContractReminders = async () => ({disabled:true,sent:0})')
  const {GET}=await import(`data:text/javascript;base64,${Buffer.from(routeSource).toString('base64')}`)
  const saved=process.env.CRON_SECRET
  try{

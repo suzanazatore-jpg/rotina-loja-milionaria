@@ -1,0 +1,24 @@
+.sz-sign{--wine:#5b1a26;--gold:#c9a24a;--ink:#1f1f1f;--muted:#6b6b6b;--line:#e7e1d8;min-height:100vh;background:#f6f2ec;color:var(--ink);padding:16px 16px 48px;max-width:760px;margin:0 auto;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.sz-head{display:flex;justify-content:space-between;align-items:center;padding:8px 2px 16px;color:var(--wine)}
+.sz-head span{font-size:13px;color:var(--muted)}
+.sz-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+.sz-card h2{font-weight:700;font-size:16px;margin:0 0 12px;color:var(--wine)}
+.sz-title{font-size:19px;margin:0 0 4px;color:var(--wine)}
+.sz-doc{max-height:55vh;overflow-y:auto;border-top:1px solid var(--line);margin-top:12px;padding-top:12px;font-size:14px;line-height:1.55}
+.sz-doc h1{font-size:16px;margin:8px 0;font-weight:700}.sz-doc h2{font-size:14.5px;margin:14px 0 6px;color:var(--ink);font-weight:700}.sz-doc p{margin:0 0 6px}
+.sz-label{display:block;font-size:13px;color:var(--muted);margin-top:12px}
+.sz-label input{display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:13px;font-size:17px;border:1px solid #cfc6b8;border-radius:10px;letter-spacing:.5px}
+.sz-checkbox{display:flex;gap:10px;align-items:flex-start;margin-top:14px;font-size:14px}
+.sz-checkbox input{width:20px;height:20px;margin-top:1px;accent-color:var(--wine)}
+.sz-row{display:flex;flex-direction:column;gap:8px}
+.sz-btn{display:inline-block;text-align:center;border:0;border-radius:10px;padding:14px 18px;font-size:15px;font-weight:600;background:var(--wine);color:#fff;text-decoration:none;cursor:pointer}
+.sz-btn:disabled{opacity:.45;cursor:not-allowed}
+.sz-btn-outline{background:#fff;color:var(--wine);border:1.5px solid var(--wine)}
+.sz-btn-main{width:100%;font-size:17px;padding:16px;background:linear-gradient(90deg,var(--wine),#7a2434)}
+.sz-pad canvas{width:100%;height:170px;border:1.5px dashed #cfc6b8;border-radius:10px;touch-action:none;background:#fffdf9;display:block}
+.sz-pad-line{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px}
+.sz-pad-line button{background:none;border:0;color:var(--wine);font-weight:600;cursor:pointer}
+.sz-small{font-size:12px;color:var(--muted);word-break:break-all}
+.sz-center{text-align:center}
+.sz-error{background:#fdecec;color:#9b1c1c;border-radius:10px;padding:12px;font-size:14px}
+.sz-success h2{color:var(--wine)}.sz-check{width:64px;height:64px;border-radius:50%;background:var(--gold);color:#fff;font-size:34px;line-height:64px;margin:8px auto 12px}

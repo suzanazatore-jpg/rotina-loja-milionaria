@@ -1,4 +1,5 @@
 import { trackingMode } from './checkoutTracking.js'
+import { normalizeContractConfig } from './contractTemplates.js'
 export const CHECKOUT_DEFAULTS = {
   form_profile: 'complete', company_name: 'Suzana Zatorre Educacional Ltda', company_document: '', company_address: '', confirm_email: false, require_terms: false, require_privacy: false, product_display_name: '', countdown_enabled: false, countdown_ends_at: '', countdown_message: 'Esta condição termina em:',
   button_text_color: '#17130a', subtitle: '', product_image_url: '', mobile_banner_url: '', favicon_url: '', support_email: '', support_phone: '', terms_url: '', privacy_url: '', layout: 'split', headline: '', headline_highlight: '',
@@ -30,6 +31,7 @@ export async function loadGlobalCheckoutSettings(db) {
 export function normalizeCheckoutSettings(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Configuração de checkout inválida.')
   const result = { ...CHECKOUT_DEFAULTS, redirects: {} }
+  result.contract = normalizeContractConfig(input.contract)
   result.appearance_mode = input.appearance_mode === 'inherit' ? 'inherit' : 'custom'
   for (const key of ['background','panel','text','accent','button_text_color']) {
     const value = input[key] ?? CHECKOUT_DEFAULTS[key]
