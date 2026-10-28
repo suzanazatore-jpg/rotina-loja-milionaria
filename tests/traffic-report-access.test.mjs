@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises'
 // Load the actual server query function with only external auth/client dependencies replaced.
 let source=await readFile(new URL('../src/lib/trafficReportServer.js',import.meta.url),'utf8')
 source=source.replace("import { createClient } from '@supabase/supabase-js'",'const createClient=()=>{throw Error("unused")}').replace("import { loadTrafficAccess } from './trafficAccess'",'const loadTrafficAccess=async(db,id)=>db.eligible.includes(id)')
-source=source.replace("import { normalizeEntity } from './trafficReportModel.js'", 'const normalizeEntity=row=>row')
+source=source.replace("'./trafficReportModel.js'", JSON.stringify(new URL("../src/lib/trafficReportModel.js",import.meta.url).href))
 const {reportData,allRows}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
 function fixture(){
  const tables={traffic_client_users:[{client_id:'a',user_id:'alice'},{client_id:'b',user_id:'bob'},{client_id:'c',user_id:'alice'}],traffic_clients:[{id:'a',name:'A',meta_account_id:'1',active:true},{id:'b',name:'B',meta_account_id:'2',active:true},{id:'c',name:'C',meta_account_id:'3',active:false}],traffic_daily_metrics:[{client_id:'a',metric_date:'2026-10-20',spend:10},{client_id:'b',metric_date:'2026-10-20',spend:999}],traffic_reports:[{id:'r1',client_id:'a',published_at:'2026-10-20',period_end:'2026-10-19'},{id:'draft',client_id:'a',published_at:null},{id:'future',client_id:'a',published_at:'2099-01-01'},{id:'r2',client_id:'b',published_at:'2026-10-20'}],traffic_metric_snapshots:[{meta_account_id:'1',payload:{ads:[{id:'ad-a'}]}},{meta_account_id:'2',payload:{ads:[{id:'ad-b'}]}}],profiles:[]}

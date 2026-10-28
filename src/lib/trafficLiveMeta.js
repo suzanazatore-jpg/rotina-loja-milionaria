@@ -93,7 +93,7 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
     const common = { time_range: { since: from, until: to }, use_account_attribution_setting: true }
     const insight = (level, daily = false) => list(`act_${accountId}/insights`, {
       ...common, level, fields: fields + (level === 'account' ? '' : ',campaign_id,campaign_name,objective,results,cost_per_result' + (level !== 'campaign' ? ',adset_id,adset_name' : '') + (level === 'ad' ? ',ad_id,ad_name,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions' : '')),
-      ...(level === 'account' ? {} : { filtering: [{ field: 'ad.effective_status', operator: 'IN', value: ['ACTIVE', 'ADSET_PAUSED', 'ARCHIVED', 'CAMPAIGN_PAUSED', 'DELETED', 'DISAPPROVED', 'IN_PROCESS', 'PAUSED', 'PENDING_BILLING_INFO', 'PENDING_REVIEW', 'PREAPPROVED', 'WITH_ISSUES'] }] }),
+      ...(level === 'account' ? {} : { filtering: [{ field: 'spend', operator: 'GREATER_THAN', value: 0 }, { field: 'ad.effective_status', operator: 'IN', value: ['ACTIVE', 'ADSET_PAUSED', 'ARCHIVED', 'CAMPAIGN_PAUSED', 'DELETED', 'DISAPPROVED', 'IN_PROCESS', 'PAUSED', 'PENDING_BILLING_INFO', 'PENDING_REVIEW', 'PREAPPROVED', 'WITH_ISSUES'] }] }),
       ...(daily ? { time_increment: 1 } : {}),
     })
     // One day has the same deduplicated total and daily row; avoid computing it twice.
@@ -125,7 +125,7 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
     const payload = { totals: totals.length ? metaInsight(totals[0], info.currency) : zero(from), daily: rows, campaigns: [], adsets: [], ads: [] }
     const warnings = []
     if (details) {
-      // Include every delivery status; no ACTIVE-only filter that drops paused historical ads.
+      // Include every delivery status, but let Meta exclude zero-spend objects before pagination.
       const levels = [['campaign', 'campaigns'], ['adset', 'adsets'], ['ad', 'ads']]
       const detailsByLevel = await Promise.all(levels.map(([level]) => insight(level)))
       for (let index = 0; index < levels.length; index++) {

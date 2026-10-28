@@ -16,6 +16,11 @@ function fixture({ fail, empty = false, missing = false, pagination = false } = 
       return Response.json({ id: 'act_' + accountId, currency: 'BRL' })
     }
     const level = url.searchParams.get('level')
+    if (level !== 'account') {
+      const filters = JSON.parse(url.searchParams.get('filtering'))
+      assert.ok(filters.some(filter => filter.field === 'spend' && filter.operator === 'GREATER_THAN' && filter.value === 0))
+      assert.ok(filters.find(filter => filter.field === 'ad.effective_status').value.includes('DELETED'))
+    }
     assert.ok(url.searchParams.get('fields').includes('date_start'))
     assert.ok(url.searchParams.get('fields').includes('date_stop'))
     if (fail === level) return Response.json({ error: { code: 190, message: 'contains test-token' } }, { status: 400 })
