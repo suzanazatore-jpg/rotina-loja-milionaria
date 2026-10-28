@@ -16,6 +16,8 @@ function fixture({ fail, empty = false, missing = false, pagination = false } = 
       return Response.json({ id: 'act_' + accountId, currency: 'BRL' })
     }
     const level = url.searchParams.get('level')
+    assert.ok(url.searchParams.get('fields').includes('date_start'))
+    assert.ok(url.searchParams.get('fields').includes('date_stop'))
     if (fail === level) return Response.json({ error: { code: 190, message: 'contains test-token' } }, { status: 400 })
     const daily = url.searchParams.has('time_increment')
     const range = JSON.parse(url.searchParams.get('time_range'))

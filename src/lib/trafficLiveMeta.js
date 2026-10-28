@@ -83,7 +83,7 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
   try {
     const info = await get(`act_${accountId}`, { fields: 'id,currency' })
     if (String(info.id) !== `act_${accountId}`) throw new TrafficLiveError('A Meta retornou uma conta diferente da solicitada.')
-    const fields = 'account_id,spend,impressions,reach,frequency,inline_link_clicks,clicks,ctr,cpc,actions,action_values'
+    const fields = 'account_id,date_start,date_stop,spend,impressions,reach,frequency,inline_link_clicks,clicks,ctr,cpc,actions,action_values'
     const common = { time_range: { since: from, until: to }, use_account_attribution_setting: true }
     const insight = (level, daily = false) => list(`act_${accountId}/insights`, {
       ...common, level, fields: fields + (level === 'account' ? '' : ',campaign_id,campaign_name,objective,results,cost_per_result' + (level !== 'campaign' ? ',adset_id,adset_name' : '') + (level === 'ad' ? ',ad_id,ad_name,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions' : '')),
@@ -98,16 +98,21 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
     const days = []
     for (let date = from; date <= to; date = new Date(Date.parse(date + 'T12:00:00Z') + 86400000).toISOString().slice(0, 10)) days.push(date)
     const rows = daily.map(row => metaInsight(row, info.currency))
+    if (rows.some(row => !row.metric_date || row.date_start !== row.date_stop)) throw new TrafficLiveError('A Meta não informou as datas do diário corretamente. A coleta anterior foi mantida.')
     if (!totals.length && daily.length) throw new TrafficLiveError('Os totais da Meta ficaram incompletos.')
     if (!totals.length) rows.push(...days.map(zero))
     else {
       const dailySpend = rows.reduce((n, row) => n + (row.spend ?? 0), 0)
       if (Math.abs(dailySpend - Number(totals[0].spend)) > .05) throw new TrafficLiveError('O diário da Meta ainda não confere com o total. Tente novamente em instantes.')
       // Confirm any absent day individually instead of assuming a zero from a partial response.
-      for (const date of days.filter(date => !rows.some(row => row.metric_date === date))) {
-        const confirmed = await list(`act_${accountId}/insights`, { ...common, time_range: { since: date, until: date }, fields, level: 'account' })
-        if (confirmed.length > 1 || confirmed.some(row => row.account_id !== accountId)) throw new TrafficLiveError('Resposta diária inesperada da Meta.')
-        rows.push(confirmed.length ? metaInsight(confirmed[0], info.currency) : zero(date))
+      const missing = days.filter(date => !rows.some(row => row.metric_date === date))
+      for (let offset = 0; offset < missing.length; offset += 3) {
+        const confirmedDays = await Promise.all(missing.slice(offset, offset + 3).map(async date => {
+          const confirmed = await list(`act_${accountId}/insights`, { ...common, time_range: { since: date, until: date }, fields, level: 'account' })
+          if (confirmed.length > 1 || confirmed.some(row => row.account_id !== accountId || row.date_start !== date || row.date_stop !== date)) throw new TrafficLiveError('Resposta diária inesperada da Meta.')
+          return confirmed.length ? metaInsight(confirmed[0], info.currency) : zero(date)
+        }))
+        rows.push(...confirmedDays)
       }
     }
     const payload = { totals: totals.length ? metaInsight(totals[0], info.currency) : zero(from), daily: rows, campaigns: [], adsets: [], ads: [] }
