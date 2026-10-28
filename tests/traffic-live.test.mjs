@@ -64,6 +64,14 @@ test('a successful no-delivery result can show zero spend for the requested days
   const result = await run(fixture({ empty: true }).fetcher)
   assert.equal(result.snapshot.payload.daily.length, 2); assert.equal(result.snapshot.payload.totals.spend, 0)
 })
+test('single-day reports reuse the exact account total without a duplicate daily query', async () => {
+  const { calls, fetcher } = fixture()
+  const result = await run(fetcher, { from, to: from })
+  assert.equal(result.snapshot.payload.daily.length, 1)
+  assert.equal(result.snapshot.payload.daily[0].metric_date, from)
+  assert.equal(result.snapshot.payload.daily[0].spend, result.snapshot.payload.totals.spend)
+  assert.equal(calls.filter(c => c.url.searchParams.get('level') === 'account').length, 1)
+})
 test('invalid/future/oversized ranges and absent credentials are rejected', async () => {
   for (const range of [['2026-02-30', '2026-03-01'], ['2026-01-01', '2026-10-01'], ['2099-01-01', '2099-01-02']]) assert.throws(() => livePeriod(...range))
   await assert.rejects(run(fixture().fetcher, { token: '' }), /configurada/)
