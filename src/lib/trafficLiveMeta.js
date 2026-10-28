@@ -23,7 +23,7 @@ export function metaInsight(row, currency = 'BRL') {
   const revenue = ['omni_purchase', 'offsite_conversion.fb_pixel_purchase'].map(key => numeric(row.action_values?.find(a => a.action_type === key)?.value)).find(value => value != null)
   return {
     ...normalizeEntity({ ...row, results, cost_per_result: costValue, result_event: event, result_label: event,
-      link_click: row.inline_link_clicks, clicks_all: row.clicks, ctr_all: row.ctr, cpc_all: row.cpc, revenue }),
+      link_click: row.inline_link_clicks, clicks: row.inline_link_clicks, clicks_all: row.clicks, ctr_all: row.ctr, cpc_all: row.cpc, revenue }),
     metric_date: row.date_start, date_start: row.date_start, date_stop: row.date_stop,
     amount_spent: { value: numeric(row.spend), unit: currency },
   }
@@ -48,6 +48,7 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 50000)
   const root = `https://graph.facebook.com/${version}/`
+  let expectedSpend = null
   async function get(path, params = {}) {
     const started = Date.now()
     const query = { level: params.level || 'metadata', daily: params.time_increment === 1, page: Boolean(params.after) }
@@ -68,7 +69,7 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
       if ([10, 190, 200, 294].includes(code) || [401, 403].includes(response.status)) throw new TrafficLiveError('A conexão Meta não tem acesso a esta conta ou precisa renovar a autorização.', 502)
       throw new TrafficLiveError('A Meta não conseguiu devolver o relatório completo. Os dados anteriores foram mantidos.')
     }
-    if (params.level) console.info('traffic-meta-page', { ...query, duration_ms: Date.now() - started, rows: Array.isArray(body.data) ? body.data.length : null, next: Boolean(body.paging?.next) })
+    if (params.level) console.info('traffic-meta-page', { ...query, duration_ms: Date.now() - started, rows: Array.isArray(body.data) ? body.data.length : null, next: Boolean(body.paging?.next), first_start: body.data?.[0]?.date_start, first_stop: body.data?.[0]?.date_stop, spend_sum: Array.isArray(body.data) ? body.data.reduce((sum, row) => sum + (numeric(row.spend) || 0), 0) : null })
     return body
   }
   async function list(path, params) {
@@ -77,7 +78,16 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
     for (let page = 0; page < 50; page++) {
       const body = await get(path, { ...params, limit: 500, ...(after ? { after } : {}) })
       if (!Array.isArray(body.data)) throw new TrafficLiveError('Resposta incompleta da Meta.')
+      // Validate each page before asking for another. Never accept another account or interval.
+      if (body.data.some(row => String(row.account_id) !== accountId || row.date_start < params.time_range.since || row.date_stop > params.time_range.until || !row.date_start || !row.date_stop)) throw new TrafficLiveError('A Meta devolveu registros fora da conta ou do período solicitado. Os dados anteriores foram mantidos.')
       rows.push(...body.data)
+      if (params.level !== 'account' && expectedSpend != null) {
+        const receivedSpend = rows.reduce((sum, row) => sum + (numeric(row.spend) || 0), 0)
+        if (receivedSpend > expectedSpend + .05) {
+          console.warn('traffic-meta-total-mismatch', { level: params.level, expected: expectedSpend, received: receivedSpend, rows: rows.length })
+          throw new TrafficLiveError('O detalhamento da Meta ainda não confere com o investimento total. Os dados anteriores foram mantidos.')
+        }
+      }
       if (rows.length > 20000) throw new TrafficLiveError('O relatório é muito grande. Selecione um período menor.', 422)
       if (!body.paging?.next) return rows
       after = body.paging?.cursors?.after
@@ -99,6 +109,7 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
     // One day has the same deduplicated total and daily row; avoid computing it twice.
     const [totals, daily] = from === to ? await insight('account').then(rows => [rows, rows]) : await Promise.all([insight('account'), insight('account', true)])
     if (totals.length > 1) throw new TrafficLiveError('A Meta retornou totais inesperados.')
+    expectedSpend = totals.length ? numeric(totals[0].spend) : 0
     for (const row of [...totals, ...daily]) if (String(row.account_id) !== accountId) throw new TrafficLiveError('Resposta de outra conta bloqueada.')
     // A successful empty account insight means no delivery in this exact interval. Failures never become zero.
     const zero = date => ({ id: accountId, metric_date: date, date_start: date, date_stop: date, spend: 0, impressions: 0, clicks: 0, amount_spent: { value: 0, unit: info.currency || 'BRL' } })
