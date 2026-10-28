@@ -1,6 +1,7 @@
 import { lookup } from 'node:dns/promises'
 import { request } from 'node:https'
 import { createHmac } from 'node:crypto'
+import { isInternalAccessWebhook, webhookBody } from './checkoutWebhookPayload.js'
 
 export function publicIPv4(address) {
   const parts = String(address).split('.').map(Number)
@@ -38,8 +39,9 @@ export async function processOutboundWebhooks(db, { sender = sendWebhook, env = 
   if (result.error) throw new Error('outbound_queue_unavailable')
   let sent = 0
   for (const row of result.data || []) {
-    const hook = await db.from('outbound_webhooks').select('url,secret,active').eq('id', row.webhook_id).maybeSingle()
+    const hook = await db.from('outbound_webhooks').select('url,secret,active,payload_format,product_ids').eq('id', row.webhook_id).maybeSingle()
     if (hook.error || !hook.data?.active) continue
+    if (isInternalAccessWebhook(hook.data.url)) continue
     // Nunca entrega um evento de teste a um destino real, nem um evento antigo de origem desconhecida.
     const mode = row.payload?.environment
     const live = mode === 'live' && env.VERCEL_ENV === 'production' && env.PAGARME_BASE_URL === 'https://api.pagar.me/core/v5'
@@ -48,7 +50,7 @@ export async function processOutboundWebhooks(db, { sender = sendWebhook, env = 
     const claimed = await db.from('webhook_deliveries').update({ status: 'processing', attempts: row.attempts + 1 }).eq('id', row.id).eq('status', row.status).eq('attempts', row.attempts).select('id')
     if (claimed.error || !claimed.data?.length) continue
     let code = null
-    try { code = await sender(hook.data.url, row.payload, hook.data.secret, row.id) } catch { /* Não salva respostas, URLs ou segredos em logs. */ }
+    try { code = await sender(hook.data.url, webhookBody(row.payload, hook.data.payload_format || 'native', env.GURU_ACCOUNT_TOKEN, hook.data.product_ids), hook.data.secret, row.id) } catch { /* Não salva respostas, URLs ou segredos em logs. */ }
     const ok = code >= 200 && code < 300
     const attempts = row.attempts + 1
     const update = ok ? { status: 'delivered', delivered_at: new Date(now).toISOString(), response_status: code, response_body: null } : { status: attempts >= 8 ? 'failed' : 'retry', response_status: code, response_body: null, next_attempt_at: new Date(now + Math.min(86400, 300 * 2 ** Math.min(attempts - 1, 9)) * 1000).toISOString() }

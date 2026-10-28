@@ -1,0 +1,28 @@
+'use client'
+import {FilterDialog,FilterSection} from '../CentralUI'
+import {useEffect,useRef,useState} from 'react'
+import Link from 'next/link'
+import {supabase} from '@/lib/supabase'
+import ExportButton from '../ExportButton'
+import styles from './Contacts.module.css'
+const empty={name:'',email:'',phone:'',document:''}
+const labels={name:'Nome',email:'Email',phone:'Celular',document:'Documento'}
+async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
+export default function Contacts(){
+ const [data,setData]=useState({contacts:[],total:0}),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('')
+ const [filters,setFilters]=useState(empty),[applied,setApplied]=useState(empty),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[showFilters,setShowFilters]=useState(false)
+ const [draft,setDraft]=useState(empty),[saving,setSaving]=useState(false),[modalOpen,setModalOpen]=useState(false)
+ const dialog=useRef(null)
+ useEffect(()=>{const controller=new AbortController();async function load(){setLoading(true);setError('');try{const qs=new URLSearchParams({page:String(page),...applied});const response=await fetch(`/api/admin/checkout/clientes?${qs}`,{headers:await headers(),signal:controller.signal,cache:'no-store'});const json=await response.json();if(!response.ok)throw new Error(json.error);setData(json)}catch(error){if(!controller.signal.aborted)setError(error.message)}finally{if(!controller.signal.aborted)setLoading(false)}}load();return()=>controller.abort()},[applied,page,refresh])
+ async function save(event){event.preventDefault();setSaving(true);setError('');try{const response=await fetch('/api/admin/checkout/clientes',{method:'POST',headers:await headers(),body:JSON.stringify(draft)});const json=await response.json();if(!response.ok)throw new Error(json.error);dialog.current.close();setModalOpen(false);setDraft(empty);setPage(1);setRefresh(v=>v+1);setMessage('Contato cadastrado. O cadastro não cria acesso ao aplicativo.')}catch(error){setError(error.message)}finally{setSaving(false)}}
+ return <main className="central-home"><header className="central-dashboard-heading"><div><span className="central-eyebrow">CADASTRO COMERCIAL</span><h1>Clientes</h1><p>Contatos da sua Central de Vendas.</p></div><div className={styles.actions}><ExportButton section="clientes" filters={applied}/><button type="button" className="central-action" disabled={loading} aria-label="Atualizar clientes" onClick={()=>setRefresh(v=>v+1)}>↻ Atualizar</button><button type="button" className="central-primary" onClick={()=>{setError('');setModalOpen(true);dialog.current.showModal()}}>＋ Adicionar contato</button></div></header>
+ <div className={styles.toolbar}><span>{data.contacts.length} de {data.total}</span><button type="button" className="central-action" aria-expanded={showFilters} onClick={()=>setShowFilters(v=>!v)}>Filtros</button></div>
+ {showFilters && <FilterDialog onClose={()=>setShowFilters(false)} onApply={()=>{setPage(1);setApplied({...filters});setShowFilters(false)}} onClear={()=>setFilters(empty)}><FilterSection title="Contato">{Object.entries(labels).map(([key,label])=><label key={key}>{label}<input value={filters[key]} onChange={e=>setFilters({...filters,[key]:e.target.value})}/></label>)}</FilterSection></FilterDialog>}
+
+ {message && <p role="status">{message}</p>}{error && !modalOpen && <p role="alert" className="central-error">{error}</p>}{loading && <p role="status">Carregando contatos…</p>}
+ <div className={styles.tableWrap}><table className={styles.table}><thead><tr>{Object.values(labels).map(label=><th key={label}>{label}</th>)}</tr></thead><tbody>{data.contacts.map(row=><tr key={row.id}><td><Link className="cv-link" href={`/admin/checkout/clientes/${row.id}`}>{row.name}</Link></td><td>{row.email}</td><td>{row.phone || '—'}</td><td>{row.document || '—'}</td></tr>)}{!loading && !data.contacts.length && <tr><td colSpan={4}>Nenhum contato encontrado. Os compradores do checkout aparecerão aqui.</td></tr>}</tbody></table></div>
+ <div className={styles.pagination}><button className="central-action" disabled={page===1 || loading} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Página {page}</span><button className="central-action" disabled={page*30>=data.total || loading} onClick={()=>setPage(p=>p+1)}>Próxima</button></div>
+ <dialog ref={dialog} className={styles.dialog} aria-labelledby="contact-title" onCancel={e=>{if(saving)e.preventDefault();else setModalOpen(false)}}><form onSubmit={save}><h2 id="contact-title">Adicionar contato</h2><p>O contato não recebe acesso ao app nem mensagens por este cadastro.</p>{Object.entries(labels).map(([key,label])=><label key={key}>{label}{['name','email'].includes(key)?' *':' (opcional)'}<input required={['name','email'].includes(key)} type={key==='email'?'email':'text'} maxLength={key==='email'?254:128} value={draft[key]} onChange={e=>setDraft({...draft,[key]:e.target.value})}/></label>)}{error && <p role="alert">{error}</p>}<div className={styles.actions}><button type="button" className="central-action" disabled={saving} onClick={()=>{dialog.current.close();setModalOpen(false)}}>Cancelar</button><button className="central-primary" disabled={saving}>{saving?'Salvando…':'Cadastrar contato'}</button></div></form></dialog>
+
+ </main>
+}

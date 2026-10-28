@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { PaymentError, normalizeCustomer, cardReference, orderPayload, confirmedOrderState, pagarme, digest } from './pagarme.js'
+import { PaymentError, normalizeCustomer, cardReference, orderPayload, confirmedOrderState, pagarme, digest, subscriptionPlanPayload } from './pagarme.js'
 
 import { loadOrderBumps, buildCheckoutCart, normalizeBumpSelection } from './checkoutCart.js'
 
@@ -17,13 +17,19 @@ function orderItemRecords(orderId, items) {
   })
 }
 
-export async function createPayment(db, input, key, tracking = null) {
+export async function createPayment(db, input, key, tracking = null, { requireAddress = true } = {}) {
   if (!/^[a-zA-Z0-9_-]{16,100}$/.test(key || '')) throw new PaymentError('Informe uma chave única de idempotência (16–100 caracteres).')
   const selection = normalizeBumpSelection(input.bumps)
   const offer = await result(db.from('offers').select('*').eq('id', input.offer_id).single())
   const product = await result(db.from('products').select('*').eq('id', offer.product_id).single())
+  if ((product.marketplace_id || 'pagarme') !== 'pagarme') throw new PaymentError('Marketplace ainda não disponível para pagamentos.')
   if (!product.plan_id) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
-  const customer = normalizeCustomer(input.customer)
+  const customer = normalizeCustomer(input.customer, { requireAddress: input.payment_method !== 'pix' || requireAddress })
+  const billingAddress = { ...customer.address }
+  for (const [field, limit] of [['street', 128], ['number', 32], ['district', 64]]) {
+    const value = input.customer?.address?.[field]
+    if (typeof value === 'string' && value.trim()) billingAddress[field] = value.trim().slice(0, limit)
+  }
   const installments = input.installments ?? 1
   const available = selection.length ? await loadOrderBumps(db, offer.id) : []
   const { items, amount } = buildCheckoutCart(offer, product, available, selection, input.payment_method, installments)
@@ -46,7 +52,7 @@ export async function createPayment(db, input, key, tracking = null) {
       if (sub) return { order_id: order.id, subscription: sub, status: order.status }
     }
   } else {
-    await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}` }, { onConflict: 'email', ignoreDuplicates: true }))
+    await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}`, billing_address: billingAddress }, { onConflict: 'email' }))
     const localCustomer = await result(db.from('customers').select('id').eq('email', customer.email).single())
     // A chave única no banco e a idempotência do gateway protegem tentativas concorrentes.
     const inserted = await db.from('orders').insert({ id: randomUUID(), event_id: eventId, customer_id: localCustomer.id, offer_id: offer.id, payment_method: input.payment_method, installments, ...amount }).select('*').single()
@@ -67,13 +73,13 @@ export async function createPayment(db, input, key, tracking = null) {
       await result(db.from('customers').update({ pagarme_customer_id: customerId }).eq('id', local.id))
     }
     // Carteira do gateway aceita o token com endereço; PAN e CVV nunca chegam aqui.
-    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, billing_address: customer.address } })
+    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, billing_address: billingAddress } })
     gatewayCard = { card_id: walletCard.id }
     gatewayCustomer = { id: customerId }
   }
   const metadata = { local_order_id: order.id, offer_id: offer.id }
   if (product.type === 'subscription') {
-    const planBody = { name: `${product.name} — ${offer.name}`.slice(0,64), currency: 'BRL', interval: offer.billing_interval, interval_count: offer.billing_interval_count, billing_type: 'prepaid', payment_methods: ['credit_card'], installments: [1], trial_period_days: offer.trial_days || 0, items: [{ name: product.name.slice(0,64), quantity: 1, pricing_scheme: { scheme_type: 'unit', price: offer.price_cents } }] }
+    const planBody = subscriptionPlanPayload(offer, product)
     const plan = await pagarme('/plans', { method: 'POST', body: planBody, idempotencyKey: `plan-${digest(planBody)}` })
     const remote = await pagarme('/subscriptions', { method: 'POST', idempotencyKey: order.id, body: { code: order.id, plan_id: plan.id, payment_method: 'credit_card', customer_id: gatewayCustomer.id, ...gatewayCard, installments: 1, metadata } })
     const subscription = await result(db.from('subscriptions').upsert({ customer_id: order.customer_id, offer_id: offer.id, origin_order_id: order.id, pagarme_subscription_id: remote.id, status: remote.status === 'canceled' ? 'canceled' : 'active', current_period_end: remote.current_cycle?.end_at || null }, { onConflict: 'pagarme_subscription_id' }).select('*').single())

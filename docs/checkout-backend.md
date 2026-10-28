@@ -130,3 +130,30 @@ Validação: testes JavaScript com destinos simulados; teste SQL transacional co
 ### Organização do painel no padrão Guru
 
 A listagem de Webhooks separa Vendas e Assinaturas, com colunas Nome e URL, atalho de atividades e chave de ativação. Filtros ficam recolhidos até clicar em Filtros. Adicionar Webhook abre uma janela modal com nome, URL, seletor de status, Todos/Produtos e chave Ativo. Clicar no nome abre o cadastro com abas Detalhe, Atividades e Auditoria específicas daquele destino. A data de atualização vem da última alteração concluída na auditoria. Recebimentos Pagar.me fica em um acesso separado no rodapé da lista. Mantidos os temas da Central, inclusive preto e dourado. Nenhum destino é criado por essa reorganização.
+
+### Catálogo e configuração — 24/10/2026
+
+- Catálogo conferido contra os 25 produtos da Guru. Importação por `products.code`, sem substituir os vínculos e prazos já existentes; todos os produtos ativos no catálogo. O cadastro Teste foi mantido. Nenhuma oferta ou cobrança real foi ativada por essa operação.
+- Produtos: busca por nome/código/link, filtros de status/tipo/plano e aba Entrega e acesso com cursos, conteúdos e mentorias do plano. O código 1782473086 mantém o plano de 360 dias; divergência com o nome [6M] na Guru fica explícita para revisão.
+- Ofertas: duplicação transacional via RPC `checkout_duplicate_offer`, incluindo bumps. A cópia recebe novo slug, nasce inativa e conserva as condições comerciais.
+- Auditoria de produtos e ofertas por triggers invoker em `webhook_events` (`checkout.catalog.admin`), disponível apenas via API administrativa. Guarda nomes dos campos alterados, cadastro e executor; não copia URLs, configurações completas nem dados da compradora. Alterações anteriores à implantação não são reconstruídas. API direta registra executor técnico; duplicação registra a conta administrativa.
+- `checkout_settings.checkout_config` guarda identidade e aparência padrão. Novas ofertas herdam; ofertas existentes preservam o visual até opção explícita por herdar. Preço, descrição/imagem do produto, redirects, tracking e plano não são herdados por esse mecanismo. O rastreamento mantém sua configuração própria de herança.
+- Formulário: confirmação opcional do email e aceite obrigatório opcional de termos/privacidade. Validação no servidor antes de criar o pagamento e registro do aceite por sessão. Dados exigidos pelo gateway não podem ser ocultados por esse editor.
+- Emails de acesso/renovação continuam no fluxo existente do app. Pendência, recusa, abandono e reembolso ainda não têm sequência de email própria configurável. A aba Emails informa essa limitação; não há controles fictícios de ativação.
+- Verificação: testes Node do checkout/gateway, build, lint das alterações; duplicação, cópia de bump, auditoria e permissões verificados em transação revertida no banco. Nenhuma compra simulada nem envio de email foi realizado nesta etapa.
+
+### Cadastro simplificado de produtos e Marketplace
+
+- Lista baseada na Guru: Nome, Código, Marketplace; ícones para tipo e duplicação; filtros recolhidos e ordenação alfabética. Plano, status e condições ficam no detalhe.
+- Cadastro com código, nome, marketplace, tipo e produtor da conta. Entrega e integrações ficam recolhidas. O prazo continua definido pelo plano existente.
+- `checkout_marketplaces` permite cadastrar outros provedores no futuro; acesso somente por backend administrativo. `products.marketplace_id` é uma FK, com Pagar.me como padrão. Os produtos existentes foram preenchidos com esse padrão. A inclusão no catálogo não implementa uma integração de pagamentos.
+- Checkout público, cobrança administrativa e adicionais recusam produtos de outro marketplace, até implementação de seu adapter.
+- `checkout_duplicate_product` copia apenas o cadastro e vínculos. Gera código e slug novos, inicia inativo e não copia ofertas. RPC invoker exclusiva do service_role, com auditoria transacional.
+
+### Interior do produto — referência Guru
+
+- Abas: Detalhe, Ofertas, Vendas e Auditoria. A aba Entrega e acesso foi removida da interface; vínculos do plano e integrações permanecem em Configurações adicionais → Plano e integrações.
+- Detalhe abre como formulário, com imagem à direita, campos comerciais e datas. Domínio mostra o endereço real do ambiente atual. Campos sem integração equivalente na central não são exibidos como controles fictícios.
+- Imagens são enviadas apenas pelo administrador, com limite de 4 MB, validação de conteúdo e normalização por Sharp para WebP, até 1024 × 1024. Armazenamento em `panel-banners/checkout-products/`; a associação só é gravada ao salvar o produto. Remover uma imagem no formulário remove a associação, sem apagar imagens que possam estar em uso em ofertas.
+- `products.image_url` é o padrão para ofertas sem imagem própria; `updated_at` é preenchido nas novas edições. Datas de alterações antigas não são inventadas. Duplicação copia a imagem.
+- Ofertas: nome, quantidade fixa de uma unidade e valor; ações de copiar link, duplicar e ativar, com filtros recolhidos. Vendas usa a API administrativa já existente, filtrada pelo produto, com consulta de detalhes sem alterar o pedido.

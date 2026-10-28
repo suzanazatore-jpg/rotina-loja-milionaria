@@ -1,5 +1,13 @@
 # Coleta da Central de Tráfego
 
+## Consulta online no aplicativo
+
+O dashboard administrativo e a área `/trafego` consultam diretamente a Marketing API pelo servidor em `/api/trafego/online` ao abrir, trocar conta/datas, retornar à tela e a cada cinco minutos com a tela visível. A credencial `META_ADS_ACCESS_TOKEN` é um Secret de Production na Vercel; nunca vai para o navegador ou para o Git. A versão usa `TRAFFIC_META_GRAPH_VERSION`, com padrão `v25.0`.
+
+A rota valida login, plano vigente e vínculo da conta ativa antes de qualquer consulta Meta. Busca o intervalo exato (até 93 dias), totais deduplicados, diário, campanhas, conjuntos, anúncios e imagens por ID. Consulta o comparativo separadamente. Sem confirmação da fonte, uma falha não vira zero. Paginação incompleta e valores inconsistentes mantêm a coleta anterior com aviso. São apenas leituras: não altera anúncios e não publica análises ou avisos.
+
+Os resultados online são apresentados na sessão aberta, com horário real da consulta; não sobrescrevem o histórico agendado no banco. O procedimento abaixo continua responsável pelo histórico persistido e pelos relatórios editoriais. O funcionamento online de uma conta exige que a credencial tenha acesso a ela; a habilitação no MCP não comprova esse acesso direto.
+
 A coleta é executada por tarefa do ChatGPT com os conectores Meta Ads e Supabase. Não é uma conexão direta da API Meta no servidor Vercel e não depende de o Chrome estar aberto. Falhas de conexão, limite de execução ou autorização devem ser registradas; nunca considerar uma execução futura garantida.
 
 ## Escopo e segurança

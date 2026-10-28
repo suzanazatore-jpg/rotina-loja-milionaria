@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { totalParcelado } from './checkoutPricing.js'
 
 export class PaymentError extends Error {
   constructor(message, status = 400) { super(message); this.status = status }
@@ -39,16 +40,16 @@ export function calculatePayment(offer, product, method, installments = 1) {
   if (!Number.isSafeInteger(subtotal) || subtotal <= 0) throw new PaymentError('Preço inválido.')
   const discount = method === 'pix' ? Math.round(subtotal * Number(offer.pix_discount_pct || 0) / 100) : 0
   let total = subtotal - discount
-  const rate = Number(offer.monthly_interest_pct || 0) / 100
-  if (method === 'credit_card' && installments > offer.free_installments && rate > 0) {
-    const factor = (1 + rate) ** installments
-    total = Math.ceil(subtotal * rate * factor / (factor - 1)) * installments
-  }
+  if (method === 'credit_card') total = totalParcelado(subtotal, installments, offer.free_installments, offer.monthly_interest_pct, offer.interest_model)
   if (!Number.isSafeInteger(total) || total <= 0 || total > 2147483647) throw new PaymentError('Total inválido.')
   return { subtotal_cents: subtotal, discount_cents: discount, interest_cents: total - subtotal + discount, total_cents: total }
 }
 
-export function normalizeCustomer(input) {
+export function subscriptionPlanPayload(offer, product) {
+  return { name: `${product.name} — ${offer.name}`.slice(0,64), currency: 'BRL', interval: offer.billing_interval, interval_count: offer.billing_interval_count, billing_type: 'prepaid', payment_methods: ['credit_card'], installments: [1], trial_period_days: offer.trial_days || 0, items: [{ name: product.name.slice(0,64), quantity: 1, ...(offer.billing_cycles > 0 ? { cycles: offer.billing_cycles } : {}), pricing_scheme: { scheme_type: 'unit', price: offer.price_cents } }] }
+}
+
+export function normalizeCustomer(input, { requireAddress = true } = {}) {
   const email = String(input?.email || '').trim().toLowerCase()
   const name = String(input?.name || '').trim()
   const document = String(input?.document || '').replace(/\D/g, '')
@@ -56,8 +57,9 @@ export function normalizeCustomer(input) {
   if (phone.startsWith('55') && phone.length > 11) phone = phone.slice(2)
   const address = input?.address || {}
   if (!name || name.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || ![11,14].includes(document.length) || ![10,11].includes(phone.length)) throw new PaymentError('Informe nome, email, CPF/CNPJ e telefone válidos.')
-  if (!address.line_1 || !address.zip_code || !address.city || !/^[A-Z]{2}$/.test(address.state || '')) throw new PaymentError('Informe o endereço de cobrança completo.')
-  return { name, email, document, type: document.length === 11 ? 'individual' : 'company', document_type: document.length === 11 ? 'CPF' : 'CNPJ', phones: { mobile_phone: { country_code: '55', area_code: phone.slice(0,2), number: phone.slice(2) } }, address: { country: 'BR', state: address.state, city: String(address.city).slice(0,64), zip_code: String(address.zip_code).replace(/\D/g, ''), line_1: String(address.line_1).slice(0,256), ...(address.line_2 ? { line_2: String(address.line_2).slice(0,128) } : {}) } }
+  const hasAddress = Object.values(address).some(value => String(value || '').trim())
+  if ((requireAddress || hasAddress) && (!address.line_1 || !address.zip_code || !address.city || !/^[A-Z]{2}$/.test(address.state || ''))) throw new PaymentError('Informe o endereço de cobrança completo.')
+  return { name, email, document, type: document.length === 11 ? 'individual' : 'company', document_type: document.length === 11 ? 'CPF' : 'CNPJ', phones: { mobile_phone: { country_code: '55', area_code: phone.slice(0,2), number: phone.slice(2) } }, ...(requireAddress || hasAddress ? { address: { country: 'BR', state: address.state, city: String(address.city).slice(0,64), zip_code: String(address.zip_code).replace(/\D/g, ''), line_1: String(address.line_1).slice(0,256), ...(address.line_2 ? { line_2: String(address.line_2).slice(0,128) } : {}) } } : {}) }
 }
 
 export function cardReference(input) {

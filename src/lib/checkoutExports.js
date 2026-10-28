@@ -1,0 +1,42 @@
+import ExcelJS from 'exceljs'
+import {readSales} from './centralRecords.js'
+import {subscriptionExportRows} from './checkoutSubscriptions.js'
+import { contactFilters, filterContacts } from './checkoutContacts.js'
+const amount = value => Number(value || 0)/100
+const date = value => value ? new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'}) : ''
+const status = value => ({paid:'Pago',pending:'Pendente',waiting_payment:'Aguardando pagamento',failed:'Recusado',canceled:'Cancelado',refunded:'Reembolsado',chargedback:'Contestado',active:'Ativa',past_due:'Em atraso',expired:'Expirada',authorized:'Autorizado',processing:'Processando'})[value] || value
+const column=(key,header,width=24,money=false)=>({key,header,width,...(money?{style:{numFmt:'"R$" #,##0.00'}}:{})})
+export const EXPORT_SECTIONS = {
+ clientes:{name:'Clientes',table:'customers',select:'id,name,email,phone,document,created_at,billing_address',columns:[column('id','Código',38),column('name','Nome',36),column('email','Email',38),column('phone','Celular'),column('document','Documento'),column('address','Endereço',55),column('created','Cadastrado em')],row:r=>({...r,address:[r.billing_address?.line_1,r.billing_address?.line_2,r.billing_address?.city,r.billing_address?.state,r.billing_address?.zip_code].filter(Boolean).join(' · '),created:date(r.created_at)})},
+ produtos:{name:'Produtos',table:'products',select:'id,code,name,slug,type,marketplace_id,plan_id,access_days,active,created_at',columns:[column('id','ID',38),column('code','Código'),column('name','Produto',45),column('type','Tipo'),column('marketplace_id','Marketplace'),column('plan_id','Plano do app',38),column('access_days','Dias de acesso'),column('active','Ativo'),column('slug','Slug',45),column('created','Cadastrado em')],row:r=>({...r,code:String(r.code),type:r.type==='subscription'?'Assinatura':'Pagamento único',active:r.active?'Sim':'Não',created:date(r.created_at)})},
+ ofertas:{name:'Ofertas',table:'offers',select:'id,name,slug,product_id,price_cents,payment_methods,max_installments,free_installments,monthly_interest_pct,pix_discount_pct,interest_model,default_installments,billing_interval,billing_interval_count,billing_cycles,trial_days,active,created_at,product:products(name)',columns:[column('id','ID',38),column('name','Oferta',45),column('product','Produto',45),column('price','Preço (R$)',20,true),column('methods','Meios de pagamento',30),column('max_installments','Máximo de parcelas'),column('free_installments','Parcelas sem juros'),column('monthly_interest_pct','Juros mensais (%)'),column('interest_model','Modelo de juros'),column('default_installments','Parcela padrão'),column('pix_discount_pct','Desconto Pix (%)'),column('billing_interval','Recorrência'),column('billing_interval_count','Intervalo'),column('billing_cycles','Cobranças'),column('trial_days','Dias de trial'),column('active','Ativa'),column('slug','Slug',45),column('created','Cadastrada em')],row:r=>({...r,product:r.product?.name || '',price:amount(r.price_cents),methods:(r.payment_methods || []).join(', '),active:r.active?'Sim':'Não',created:date(r.created_at)})},
+ vendas:{name:'Vendas',table:'orders',select:'id,customer_id,offer_id,status,payment_method,installments,subtotal_cents,interest_cents,discount_cents,total_cents,created_at,paid_at,refusal_reason,utm_source,utm_medium,utm_campaign,utm_content,utm_term,pagarme_order_id,pagarme_charge_id,customer:customers(name,email,phone,document),offer:offers(name,product:products(name))',columns:[column('id','Pedido',38),column('customer','Cliente',35),column('email','Email',38),column('phone','Celular'),column('document','Documento'),column('product','Produto',40),column('offer','Oferta',40),column('status','Status'),column('payment_method','Pagamento'),column('installments','Parcelas'),...['subtotal','interest','discount','total'].map((key,i)=>column(key,['Subtotal (R$)','Juros (R$)','Desconto (R$)','Total (R$)'][i],20,true)),column('created','Criado em'),column('paid','Pago em'),column('refusal_reason','Motivo da recusa',40),...['utm_source','utm_medium','utm_campaign','utm_content','utm_term','pagarme_order_id','pagarme_charge_id'].map(key=>column(key,key,30))],row:r=>({...r,customer:r.customer?.name || '',email:r.customer?.email || '',phone:r.customer?.phone || '',document:r.customer?.document || '',product:r.offer?.product?.name || '',offer:r.offer?.name || '',status:status(r.status),payment_method:r.payment_method==='pix'?'Pix':'Cartão de crédito',subtotal:amount(r.subtotal_cents),interest:amount(r.interest_cents),discount:amount(r.discount_cents),total:amount(r.total_cents),created:date(r.created_at),paid:date(r.paid_at)})},
+ assinaturas:{name:'Assinaturas',table:'subscriptions',select:'id,status,offer_id,customer_id,current_period_end,canceled_at,created_at,pagarme_subscription_id,customer:customers(name,email,phone),offer:offers(name,product:products(name))',columns:[column('id','ID',38),column('customer','Cliente',35),column('email','Email',38),column('phone','Celular'),column('product','Produto',40),column('offer','Oferta',40),column('status','Status'),column('updated','Atualizada em'),column('charge_count','Qtd. cobranças'),column('billing_frequency','Cobrada a cada'),column('period','Fim do ciclo'),column('canceled','Cancelada em'),column('created','Criada em'),column('pagarme_subscription_id','ID Pagar.me',38)],row:r=>({...r,customer:r.customer?.name || '',email:r.customer?.email || '',phone:r.customer?.phone || '',product:r.product_name || r.offer?.product?.name || '',offer:r.offer_name || r.offer?.name || '',status:status(r.status),updated:date(r.updated_at),period:date(r.current_period_end),canceled:date(r.canceled_at),created:date(r.created_at)})},
+}
+function applyFilters(query,key,params) {
+ if(key==='clientes')return filterContacts(query,contactFilters(params))
+ if(['vendas','assinaturas'].includes(key)){
+  const state=params.get('status');if(state && !['todos','all'].includes(state))query=query.eq('status',state)
+  if(params.get('oferta'))query=query.eq('offer_id',params.get('oferta'))
+ }
+ if(key==='ofertas' && params.get('produto'))query=query.eq('product_id',params.get('produto'))
+ if(key==='vendas')for(const [name,operator,suffix] of [['inicio','gte','T00:00:00-03:00'],['fim','lt','T00:00:00-03:00']]){
+  const value=params.get(name);if(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value)))throw new Error('Período inválido.');const next=name==='fim'?new Date(Date.parse(value+'T12:00:00Z')+86400000).toISOString().slice(0,10):value;query=query[operator]('created_at',next+suffix)}
+ }
+ return query
+}
+export async function exportRows(db,key,params=new URLSearchParams()) {
+ const spec=EXPORT_SECTIONS[key];if(!spec)throw new Error('Exportação inválida.')
+ if(key==='vendas')return (await readSales(db,params)).map(spec.row)
+ if(key==='assinaturas')return (await subscriptionExportRows(db,params)).map(spec.row)
+ let productOffers=null
+ if(key==='vendas' && params.get('produto')){const {data,error}=await db.from('offers').select('id').eq('product_id',params.get('produto'));if(error)throw error;productOffers=(data || []).map(r=>r.id);if(!productOffers.length)return []}
+ const rows=[]
+ for(let offset=0;offset<=50000;offset+=1000){let query=applyFilters(db.from(spec.table).select(spec.select),key,params);if(productOffers)query=query.in('offer_id',productOffers);const {data,error}=await query.order('id').range(offset,offset+999);if(error)throw error;rows.push(...(data || []).map(spec.row));if(rows.length>50000)throw new Error('Mais de 50 mil registros. Aplique filtros para reduzir a exportação.');if(!data || data.length<1000)break}
+ return rows
+}
+export async function workbookBuffer(sheets){
+ const workbook=new ExcelJS.Workbook();workbook.creator='Suzana Zatorre · Central de Vendas';workbook.created=new Date()
+ for(const {key,rows} of sheets){const spec=EXPORT_SECTIONS[key],sheet=workbook.addWorksheet(spec.name,{views:[{state:'frozen',ySplit:1}]});sheet.columns=spec.columns;for(const row of rows)sheet.addRow(Object.fromEntries(spec.columns.map(c=>[c.key,row[c.key] ?? ''])));sheet.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};sheet.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF242424'}};sheet.getRow(1).height=26;sheet.autoFilter={from:{row:1,column:1},to:{row:Math.max(1,sheet.rowCount),column:spec.columns.length}}}
+ return workbook.xlsx.writeBuffer()
+}

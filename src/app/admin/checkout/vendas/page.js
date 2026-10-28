@@ -1,90 +1,17 @@
 'use client'
-
-import { Suspense, useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-
-const OURO = 'var(--cv-gold)'
-const campo = { background: 'var(--cv-field)', color: 'var(--cv-text)', border: '1px solid var(--cv-border)', borderRadius: 8, padding: '10px 12px', minWidth: 150 }
-const moeda = n => (Number(n || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const dataBR = d => d ? new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' }) : '—'
-const statusPT = { paid: 'Pago', pending: 'Pendente', failed: 'Falhou', canceled: 'Cancelado', refunded: 'Reembolsado', authorized: 'Autorizado', processing: 'Processando', expired: 'Expirado', chargeback: 'Contestação', chargedback: 'Contestação' }
-
-function AdminVendasCheckout() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const [token, setToken] = useState('')
-  const [data, setData] = useState({ orders: [], products: [], count: 0, page: 1, limit: 25 })
-  const [filtros, setFiltros] = useState({ status: 'todos', oferta: searchParams.get('oferta') || '', produto: searchParams.get('produto') || '', inicio: '', fim: '' })
-  const [pagina, setPagina] = useState(1)
-  const [detalhe, setDetalhe] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [erro, setErro] = useState('')
-
-  useEffect(() => {
-    let ativo = true
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!ativo) return
-      if (!session) { router.push('/login'); return }
-      if (session.user.email?.toLowerCase() !== 'suporte@suzanazatorre.com.br') { setErro('Acesso restrito ao administrador.'); setLoading(false); return }
-      setToken(session.access_token)
-    })
-    return () => { ativo = false }
-  }, [router])
-
-  useEffect(() => {
-    if (!token) return
-    let ativo = true
-    async function carregar() {
-      setLoading(true); setErro('')
-      try {
-        const qs = new URLSearchParams({ ...filtros, page: String(pagina) })
-        const resposta = await fetch(`/api/admin/checkout/vendas?${qs}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
-        const json = await resposta.json()
-        if (!resposta.ok) throw new Error(json.error || 'Erro ao buscar vendas')
-        if (ativo) setData(json)
-      } catch (e) { if (ativo) setErro(e.message) }
-      finally { if (ativo) setLoading(false) }
-    }
-    carregar()
-    return () => { ativo = false }
-  }, [token, filtros, pagina])
-
-  async function abrir(id) {
-    setErro('')
-    try {
-      const resposta = await fetch(`/api/admin/checkout/vendas?id=${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
-      const json = await resposta.json()
-      if (!resposta.ok) throw new Error(json.error || 'Não foi possível abrir o pedido')
-      setDetalhe(json.order)
-    } catch (e) { setErro(e.message) }
-  }
-  function mudar(chave, valor) { setFiltros(a => ({ ...a, [chave]: valor })); setPagina(1) }
-  const paginas = Math.max(1, Math.ceil(data.count / data.limit))
-
-  return <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: 'Arial, sans-serif', paddingBottom: 70 }}>
-<main style={{ width: '100%', margin: 0, padding: '24px 16px' }}>
-      <div style={{ color: OURO, fontWeight: 800, fontSize: 12, letterSpacing: 2 }}>VENDAS E CHECKOUT</div>
-      <h1 style={{ margin: '8px 0' }}>Pedidos e Vendas</h1>
-      <p style={{ color: 'var(--cv-muted)' }}>Consulte pagamentos, dados da cliente e produtos vendidos. Somente leitura: status vem do gateway.</p>
-      {filtros.oferta && <p className="central-data-note">Filtrando os pedidos da oferta selecionada.</p>}
-      <section style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '22px 0', alignItems: 'end' }}>
-        <label style={{ display: 'grid', gap: 6 }}>Status<select style={campo} value={filtros.status} onChange={e => mudar('status', e.target.value)}>{[['todos','Todos'],['pending','Pendente'],['paid','Pago'],['failed','Falhou'],['canceled','Cancelado'],['refunded','Reembolsado'],['authorized','Autorizado'],['processing','Processando'],['expired','Expirado'],['chargeback','Contestação']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-        <label style={{ display: 'grid', gap: 6 }}>Produto<select style={campo} value={filtros.produto} onChange={e => mudar('produto', e.target.value)}><option value="">Todos os produtos</option>{data.products.map(p => <option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
-        <label style={{ display: 'grid', gap: 6 }}>De<input style={campo} type="date" value={filtros.inicio} onChange={e => mudar('inicio', e.target.value)} /></label>
-        <label style={{ display: 'grid', gap: 6 }}>Até<input style={campo} type="date" value={filtros.fim} onChange={e => mudar('fim', e.target.value)} /></label>
-        <button style={{ ...campo, cursor: 'pointer' }} onClick={() => { setFiltros({ status: 'todos', produto: '', inicio: '', fim: '' }); setPagina(1) }}>Limpar</button>
-      </section>
-      {erro && <p role="alert" style={{ color: 'var(--cv-danger)', background: 'var(--cv-error-bg)', padding: 12, borderRadius: 8 }}>{erro}</p>}
-      <p style={{ color: 'var(--cv-muted)' }}>{loading ? 'Carregando pedidos...' : `${data.count} pedido(s) encontrado(s)`}</p>
-      <div style={{ overflowX: 'auto', border: '1px solid var(--cv-border)', borderRadius: 12 }}><table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 850, textAlign: 'left' }}>
-        <thead style={{ background: 'var(--cv-field)', color: OURO }}><tr>{['Data','Cliente','Produto','Total','Pagamento','Status',''].map(h => <th key={h} style={{ padding: 13 }}>{h}</th>)}</tr></thead>
-        <tbody>{data.orders.map(o => <tr key={o.id} style={{ borderTop: '1px solid var(--cv-border)' }}><td style={{ padding: 13 }}>{dataBR(o.created_at)}</td><td style={{ padding: 13 }}><strong>{o.customer?.name || '—'}</strong><div style={{ color: 'var(--cv-muted)', fontSize: 12 }}>{o.customer?.email || ''}</div></td><td style={{ padding: 13 }}>{o.product_name}</td><td style={{ padding: 13 }}>{moeda(o.total_cents)}</td><td style={{ padding: 13 }}>{o.payment_method === 'pix' ? 'Pix' : 'Cartão'}{o.installments > 1 ? ` · ${o.installments}x` : ''}</td><td style={{ padding: 13 }}>{statusPT[o.status] || o.status}</td><td style={{ padding: 13 }}><button style={{ ...campo, color: OURO, cursor: 'pointer' }} onClick={() => abrir(o.id)}>Detalhes</button></td></tr>)}{!loading && data.orders.length === 0 && <tr><td colSpan={7} style={{ padding: 26, color: 'var(--cv-muted)', textAlign: 'center' }}>Nenhum pedido encontrado.</td></tr>}</tbody>
-      </table></div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}><button disabled={pagina === 1} style={campo} onClick={() => setPagina(p => p - 1)}>Anterior</button><span>Página {pagina} de {paginas}</span><button disabled={pagina >= paginas} style={campo} onClick={() => setPagina(p => p + 1)}>Próxima</button></div>
-    </main>
-    {detalhe && <div role="presentation" onMouseDown={e => { if (e.target === e.currentTarget) setDetalhe(null) }} style={{ position: 'fixed', inset: 0, background: '#000c', display: 'grid', placeItems: 'center', zIndex: 100, padding: 16 }}><section role="dialog" aria-modal="true" aria-label="Detalhes do pedido" style={{ background: 'var(--cv-panel)', border: '1px solid #555', borderRadius: 14, maxWidth: 720, width: '100%', padding: 23, maxHeight: '85vh', overflowY: 'auto' }}><button style={{ ...campo, float: 'right', cursor: 'pointer' }} onClick={() => setDetalhe(null)}>Fechar ×</button><h2 style={{ color: OURO }}>Detalhes do pedido</h2><p style={{ overflowWrap: 'anywhere' }}><strong>ID:</strong> {detalhe.id}</p><p><strong>Cliente:</strong> {detalhe.customer?.name || '—'} · {detalhe.customer?.email || '—'} · {detalhe.customer?.phone || '—'}</p><p><strong>Status:</strong> {statusPT[detalhe.status] || detalhe.status} · <strong>Pagamento:</strong> {detalhe.payment_method || '—'} · {detalhe.installments || 1}x</p><p><strong>Criado:</strong> {dataBR(detalhe.created_at)} · <strong>Pago:</strong> {dataBR(detalhe.paid_at)}</p><p><strong>Subtotal:</strong> {moeda(detalhe.subtotal_cents)} · <strong>Juros:</strong> {moeda(detalhe.interest_cents)} · <strong>Desconto:</strong> {moeda(detalhe.discount_cents)}</p><h3 style={{ color: OURO }}>Total: {moeda(detalhe.total_cents)}</h3><h3>Itens</h3>{detalhe.items?.map(i => <p key={i.id}>{i.product_name} ({i.kind}) — {moeda(i.price_cents)}</p>)}<h3>Acesso da compra</h3><p>{detalhe.access?.review_required ? 'Revisão necessária: os outros acessos foram preservados.' : detalhe.access?.grant?.revoked_at ? ({ refunded: 'Acesso retirado por reembolso', chargedback: 'Acesso retirado por contestação', expired: 'Período de acesso encerrado' }[detalhe.access.grant.reason] || 'Acesso encerrado') : detalhe.access?.grant ? `Prazo máximo desta compra: ${dataBR(detalhe.access.grant.expires_at)}` : 'Sem liberação rastreada por compra.'}</p><h3>Conversão Meta</h3><p>{detalhe.conversion ? ({ sent: 'Recebida pela Meta', retry: 'Reenvio agendado', processing: 'Envio em andamento ou aguardando revisão', review_required: 'Revisão necessária', ineligible: 'Pedido fora dos critérios de envio' }[detalhe.conversion.status] || 'Pendente') : 'Sem envio registrado'}</p>{detalhe.conversion && <p>Ambiente: {detalhe.conversion.mode === 'test' ? 'Teste' : 'Produção'} · Tentativas: {detalhe.conversion.attempts}{detalhe.conversion.status === 'retry' && detalhe.conversion.next_attempt_at && <> · Próxima tentativa a partir de: {dataBR(detalhe.conversion.next_attempt_at)}</>}</p>}<h3>Rastreamento</h3><p>Origem: {detalhe.utm_source || '—'} · Mídia: {detalhe.utm_medium || '—'} · Campanha: {detalhe.utm_campaign || '—'}</p><p style={{ overflowWrap: 'anywhere', color: 'var(--cv-muted)', fontSize: 12 }}>Pagar.me: {detalhe.pagarme_order_id || '—'} · Cobrança: {detalhe.pagarme_charge_id || '—'} · Pedido de origem: {detalhe.parent_order_id || '—'}</p>{detalhe.refusal_reason && <p style={{ color: 'var(--cv-danger)' }}>Motivo da recusa: {detalhe.refusal_reason}</p>}</section></div>}
-  </div>
+import {Suspense,useEffect,useState} from 'react'
+import Link from 'next/link'
+import {useSearchParams} from 'next/navigation'
+import {supabase} from '@/lib/supabase'
+import ExportButton from '../ExportButton'
+import {FilterDialog,FilterSection,Status,money,date,statusLabels} from '../CentralUI'
+const defaults={status:'todos',oferta:'',produto:'',inicio:'',fim:'',date_by:'created_at',method:'',marketplace:'',code:'',name:'',email:'',document:''}
+function Sales(){const search=useSearchParams();const [filters,setFilters]=useState({...defaults,oferta:search.get('oferta') || '',produto:search.get('produto') || ''}),[applied,setApplied]=useState({...defaults,oferta:search.get('oferta') || '',produto:search.get('produto') || ''}),[open,setOpen]=useState(false),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[data,setData]=useState({orders:[],products:[],count:0,limit:25}),[loading,setLoading]=useState(true),[error,setError]=useState('')
+ useEffect(()=>{if(search.get('id'))window.location.replace(`/admin/checkout/vendas/${encodeURIComponent(search.get('id'))}`)},[search])
+ useEffect(()=>{const controller=new AbortController();async function load(){setLoading(true);setError('');try{const {data:{session}}=await supabase.auth.getSession(),response=await fetch(`/api/admin/checkout/vendas?${new URLSearchParams({...applied,page:String(page)})}`,{headers:{Authorization:`Bearer ${session?.access_token || ''}`},cache:'no-store',signal:controller.signal}),json=await response.json();if(!response.ok)throw new Error(json.error);if(!controller.signal.aborted)setData(json)}catch(error){if(!controller.signal.aborted)setError(error.message)}finally{if(!controller.signal.aborted)setLoading(false)}}load();return()=>controller.abort()},[applied,page,refresh])
+ const change=(key,value)=>setFilters(f=>({...f,[key]:value}))
+ return <main className="central-home"><header className="cv-heading"><h1>Vendas</h1><div className="cv-actions"><ExportButton section="vendas" filters={applied} label="Excel"/><button className="central-action" disabled={loading} onClick={()=>setRefresh(v=>v+1)} aria-label="Atualizar vendas">↻ Atualizar</button></div></header><div className="cv-toolbar"><div className="cv-chips"><span className="cv-chip">{data.orders.length} de {data.count}</span><span className="cv-chip">{applied.inicio || 'Início'} – {applied.fim || 'Hoje'}</span><button className="cv-link" onClick={()=>{setApplied(defaults);setFilters(defaults);setPage(1)}}>Limpar filtros</button></div><button className="central-action" aria-expanded={open} onClick={()=>setOpen(true)}>⌕ Filtros</button></div>
+ {open&&<FilterDialog onClose={()=>setOpen(false)} onClear={()=>setFilters(defaults)} onApply={()=>{setApplied({...filters});setPage(1);setOpen(false)}}><FilterSection title="Datas"><div className="cv-radios">{[['created_at','Criada em'],['paid_at','Aprovada em']].map(([key,label])=><label key={key}><input type="radio" checked={filters.date_by===key} onChange={()=>change('date_by',key)}/>{label}</label>)}</div><label>De<input type="date" value={filters.inicio} onChange={e=>change('inicio',e.target.value)}/></label><label>Até<input type="date" value={filters.fim} onChange={e=>change('fim',e.target.value)}/></label></FilterSection><FilterSection title="Características"><label>Código da cobrança<input value={filters.code} onChange={e=>change('code',e.target.value)}/></label><label>Marketplace<select value={filters.marketplace} onChange={e=>change('marketplace',e.target.value)}><option value="">Todos</option><option value="pagarme">Pagar.me</option></select></label><label>Forma de pagamento<select value={filters.method} onChange={e=>change('method',e.target.value)}><option value="">Todas</option><option value="pix">Pix</option><option value="credit_card">Cartão de crédito</option></select></label><label>Status<select value={filters.status} onChange={e=>change('status',e.target.value)}><option value="todos">Todos</option>{Object.entries(statusLabels).filter(([key])=>!['active','past_due'].includes(key)).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></FilterSection><FilterSection title="Comprador">{[['name','Nome'],['email','Email'],['document','Documento']].map(([key,label])=><label key={key}>{label}<input value={filters[key]} onChange={e=>change(key,e.target.value)}/></label>)}</FilterSection><FilterSection title="Produto"><label>Produto<select value={filters.produto} onChange={e=>change('produto',e.target.value)}><option value="">Todos</option>{data.products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label></FilterSection></FilterDialog>}
+ {error&&<p role="alert" className="central-error">{error}</p>}{loading&&<p role="status">Carregando vendas…</p>}<div className="cv-table-wrap"><table className="cv-table"><thead><tr><th>Código</th><th>Contato</th><th>Produto</th><th>Criada em</th><th>Valor</th><th>Pagamento</th></tr></thead><tbody>{data.orders.map(o=><tr key={o.id}><td><div className="cv-code"><Status value={o.status}/><Link className="cv-link" href={`/admin/checkout/vendas/${o.id}`}>{o.pagarme_charge_id || o.pagarme_order_id || o.id}</Link></div></td><td><Link className="cv-link" href={`/admin/checkout/clientes/${o.customer_id}`}>{o.customer?.name || '—'}</Link></td><td><span className="cv-truncate" title={o.product_name}>1 × {o.product_name}</span></td><td>{date(o.created_at)}</td><td>{money(o.total_cents)}</td><td><Link className="cv-link" href={`/admin/checkout/vendas/${o.id}`} aria-label={`Ver pagamento de ${o.customer?.name || o.id}`}>{o.payment_method==='pix'?'◇ Pix':'▭ Cartão'}</Link></td></tr>)}{!loading&&!data.orders.length&&<tr><td colSpan={6}>Nenhuma venda encontrada.</td></tr>}</tbody></table></div><div className="cv-more"><button className="central-action" disabled={page===1||loading} onClick={()=>setPage(p=>p-1)}>Anterior</button><span>Página {page}</span><button className="central-action" disabled={page*data.limit>=data.count||loading} onClick={()=>setPage(p=>p+1)}>Próxima</button></div></main>
 }
-
-export default function Page() { return <Suspense fallback={<p>Carregando vendas…</p>}><AdminVendasCheckout /></Suspense> }
+export default function Page(){return <Suspense fallback={<p>Carregando vendas…</p>}><Sales/></Suspense>}

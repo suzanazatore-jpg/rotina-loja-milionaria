@@ -1,52 +1,29 @@
 'use client'
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import {useEffect,useState} from 'react'
+import ExportButton from '../ExportButton'
+import {supabase} from '@/lib/supabase'
+import {FilterDialog,FilterSection} from '../CentralUI'
+import {useRouter} from 'next/navigation'
+import {SUBSCRIPTION_STATUSES as statuses} from '@/lib/checkoutSubscriptions'
+import styles from './Subscriptions.module.css'
+const empty={status:'all',code:'',contact:'',produto:'',inicio:'',fim:'',date_by:'created_at',email:'',document:'',charge_min:'',charge_max:''}
+const date=value=>value?new Date(value).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'}):'—'
+async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
+function Status({value}){return <span className={`${styles.status} ${styles[value] || ''}`} title={statuses[value] || value} role="img" aria-label={statuses[value] || value}>{value==='active'?'✓':value==='canceled'?'×':value==='past_due'?'!':'−'}</span>}
+export default function Subscriptions(){
+ const router=useRouter()
+ const [data,setData]=useState({subscriptions:[],total:0,products:[]}),[loading,setLoading]=useState(true),[error,setError]=useState('')
+ const [filters,setFilters]=useState(empty),[applied,setApplied]=useState(empty),[showFilters,setShowFilters]=useState(false),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0)
+ useEffect(()=>{const controller=new AbortController();async function load(){setLoading(true);setError('');try{const qs=new URLSearchParams({...applied,page:String(page)});const response=await fetch(`/api/admin/checkout/assinaturas?${qs}`,{headers:await headers(),cache:'no-store',signal:controller.signal});const json=await response.json();if(!response.ok)throw new Error(json.error);if(!controller.signal.aborted)setData(current=>({...json,subscriptions:page===1?json.subscriptions:[...current.subscriptions,...json.subscriptions]}))}catch(error){if(!controller.signal.aborted)setError(error.message)}finally{if(!controller.signal.aborted)setLoading(false)}}load();return()=>controller.abort()},[applied,page,refresh])
+ function reload(){setPage(1);setRefresh(v=>v+1)}
+ const period=applied.inicio || applied.fim?`${applied.inicio?applied.inicio.split('-').reverse().join('/'):'Início'} – ${applied.fim?applied.fim.split('-').reverse().join('/'):'Hoje'}`:'Todo o período'
+ return <main className="central-home"><header className={styles.heading}><h1>Assinaturas</h1><div className={styles.actions}><ExportButton section="assinaturas" filters={applied} label="Excel"/><button type="button" className="central-action" onClick={reload} disabled={loading} aria-label="Atualizar lista de assinaturas" title="Atualizar lista">↻</button></div></header>
+ <div className={styles.toolbar}><div className={styles.badges}><span>{data.subscriptions.length} de {data.total}</span><span>◷ {period}</span></div><button type="button" className="central-action" aria-expanded={showFilters} onClick={()=>setShowFilters(v=>!v)}>Filtros</button></div>
+ {showFilters && <FilterDialog onClose={()=>setShowFilters(false)} onClear={()=>setFilters(empty)} onApply={()=>{setPage(1);setApplied({...filters});setShowFilters(false)}}><FilterSection title="Datas"><div className="cv-radios">{[['updated_at','Atualizada em'],['created_at','Iniciada em'],['canceled_at','Cancelada em'],['current_period_end','Próximo ciclo em']].map(([key,label])=><label key={key}><input type="radio" checked={filters.date_by===key} onChange={()=>setFilters({...filters,date_by:key})}/>{label}</label>)}</div><label>De<input type="date" value={filters.inicio} onChange={e=>setFilters({...filters,inicio:e.target.value})}/></label><label>Até<input type="date" value={filters.fim} onChange={e=>setFilters({...filters,fim:e.target.value})}/></label></FilterSection><FilterSection title="Características"><label>Código<input value={filters.code} onChange={e=>setFilters({...filters,code:e.target.value})}/></label><label>Qtd. cobranças inicial<input type="number" min="0" value={filters.charge_min} onChange={e=>setFilters({...filters,charge_min:e.target.value})}/></label><label>Qtd. cobranças final<input type="number" min="0" value={filters.charge_max} onChange={e=>setFilters({...filters,charge_max:e.target.value})}/></label><label>Status<select value={filters.status} onChange={e=>setFilters({...filters,status:e.target.value})}><option value="all">Todos</option>{Object.entries(statuses).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label></FilterSection><FilterSection title="Assinante">{[['contact','Nome'],['email','Email'],['document','Documento']].map(([key,label])=><label key={key}>{label}<input value={filters[key]} onChange={e=>setFilters({...filters,[key]:e.target.value})}/></label>)}</FilterSection><FilterSection title="Produto"><label>Produto<select value={filters.produto} onChange={e=>setFilters({...filters,produto:e.target.value})}><option value="">Todos</option>{data.products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label></FilterSection></FilterDialog>}
 
-const statuses = { active: 'Ativa', past_due: 'Pagamento atrasado', canceled: 'Cancelada', expired: 'Expirada' }
-const date = value => value ? new Date(value).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'
-export default function Subscriptions() {
-  const [rows, setRows] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [pending, setPending] = useState('')
-  const [confirmation, setConfirmation] = useState(null)
-  const [filter, setFilter] = useState('all')
-  async function headers() {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { Authorization: `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' }
-  }
-  useEffect(() => {
-    let active = true
-    async function load() {
-      try {
-        const response = await fetch('/api/admin/checkout/assinaturas', { headers: await headers(), cache: 'no-store' })
-        const json = await response.json()
-        if (!response.ok) throw new Error(json.error)
-        if (active) setRows(json.subscriptions || [])
-      } catch (failure) { if (active) setError(failure.message) }
-      finally { if (active) setLoading(false) }
-    }
-    load(); return () => { active = false }
-  }, [])
-  async function change(row, action) {
-    setPending(row.id); setError('')
-    try {
-      const response = await fetch('/api/admin/checkout/assinaturas', { method: 'POST', headers: await headers(), body: JSON.stringify({ id: row.id, action }) })
-      const json = await response.json()
-      if (!response.ok) throw new Error(json.error)
-      setRows(current => current.map(item => item.id === row.id ? { ...item, ...json.subscription } : item))
-      setConfirmation(null)
-    } catch (failure) { setError(failure.message) }
-    finally { setPending('') }
-  }
-  const visible = rows.filter(row => filter === 'all' || row.status === filter)
-  return <main className="central-home"><div className="central-dashboard-heading"><div><span className="central-eyebrow">RECORRÊNCIA</span><h1>Assinaturas</h1><p>Acompanhe as cobranças recorrentes do checkout próprio.</p></div></div>
-    {error && <p role="alert" className="central-editor-message">{error}</p>}
-    {confirmation && <section className="central-chart-panel" role="dialog" aria-modal="false" aria-labelledby="cancel-subscription-title"><h2 id="cancel-subscription-title">Cancelar a assinatura de {confirmation.customer?.name || 'esta cliente'}?</h2><p>O cancelamento interrompe as próximas cobranças. O período de acesso já comprado será mantido.</p><p>Oferta: {confirmation.offer_name || '—'}</p><button className="central-action" disabled={Boolean(pending)} onClick={() => setConfirmation(null)}>Voltar</button>{' '}<button className="central-primary" disabled={Boolean(pending)} onClick={() => change(confirmation, 'cancel')}>{pending ? 'Cancelando…' : 'Confirmar cancelamento'}</button></section>}
-    <section className="central-chart-panel"><div className="central-section-heading"><h2>Assinaturas cadastradas</h2><label>Status <select value={filter} onChange={event => setFilter(event.target.value)} style={{ padding: 8, borderRadius: 6, background: 'var(--cv-field)', color: 'var(--cv-text)' }}><option value="all">Todos</option>{Object.entries(statuses).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div><div className="central-table-wrap"><table className="central-table"><thead><tr><th>Cliente</th><th>Oferta</th><th>Status</th><th>Fim do ciclo</th><th>Criada em</th><th>Ações</th></tr></thead><tbody>
-      {visible.map(row => <tr key={row.id}><td>{row.customer?.name || '—'}<small>{row.customer?.email}</small></td><td>{row.offer_name || '—'}</td><td><span className="central-badge">{statuses[row.status] || row.status}</span></td><td>{date(row.current_period_end)}</td><td>{date(row.created_at)}</td><td><button className="central-action" disabled={Boolean(pending)} onClick={() => change(row, 'sync')}>{pending === row.id ? 'Atualizando…' : 'Atualizar status'}</button>{' '}{row.status !== 'canceled' && <button className="central-action" disabled={Boolean(pending)} onClick={() => setConfirmation(row)}>Cancelar</button>}{row.origin_order_id && <Link className="central-action" href={`/admin/checkout/vendas?id=${row.origin_order_id}`}>Pedido</Link>}</td></tr>)}
-      {!visible.length && <tr><td colSpan={6}>{loading ? 'Carregando assinaturas…' : 'Nenhuma assinatura encontrada.'}</td></tr>}
-    </tbody></table></div><p className="central-data-note">Exibe as 100 assinaturas mais recentes. O status financeiro vem do Pagar.me.</p></section>
-  </main>
+ {error && <p role="alert" className="central-editor-message">{error}</p>}{loading && <p role="status">Carregando assinaturas…</p>}
+ <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Código</th><th>Contato</th><th>Produto</th><th>Iniciada em</th><th>Atualizada em</th><th>Qtd. cobranças</th><th>Cobrada a cada</th><th><span className={styles.srOnly}>Detalhes</span></th></tr></thead><tbody>{data.subscriptions.map(row=><tr key={row.id}><td><div className={styles.code}><Status value={row.status}/><button type="button" className={styles.textButton} onClick={()=>router.push(`/admin/checkout/assinaturas/${row.id}`)} title={row.pagarme_subscription_id || row.id}>{row.pagarme_subscription_id || row.id}</button></div></td><td title={row.customer?.email}>{row.customer?.name || '—'}</td><td title={row.product_name || row.offer_name}><span className={styles.product}>{row.product_name || row.offer_name || '—'}</span></td><td>{date(row.created_at)}</td><td>{date(row.updated_at)}</td><td className={styles.center}>{row.charge_count}</td><td className={styles.center}>{row.billing_frequency}</td><td><button type="button" className={styles.detailButton} aria-label={`Ver detalhes da assinatura de ${row.customer?.name || row.id}`} onClick={()=>router.push(`/admin/checkout/assinaturas/${row.id}`)}><svg width="18" height="16" viewBox="0 0 24 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="2" y="2" width="20" height="16" rx="2"/><path d="M2 7h20M6 13h4"/></svg></button></td></tr>)}{!loading && !data.subscriptions.length && <tr><td colSpan={8} className={styles.empty}>Nenhuma assinatura encontrada.</td></tr>}</tbody></table></div>
+ {data.subscriptions.length<data.total && <div className={styles.more}><button type="button" className="central-action" disabled={loading} onClick={()=>setPage(p=>p+1)}>Ver mais</button></div>}
+
+ </main>
 }

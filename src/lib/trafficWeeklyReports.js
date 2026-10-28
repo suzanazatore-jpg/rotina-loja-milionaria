@@ -1,4 +1,5 @@
 import {lastClosedWeek,rangeTotals} from './trafficReportModel.js'
+import {groupWeeklyReports,weeklyDigestNotice,weeklyDeliveryKey} from './trafficReportDigest.js'
 import {allRows,trafficDb} from './trafficReportServer'
 import {loadTrafficAccess} from './trafficAccess'
 import {trafficChannels,sendTrafficChannel} from './trafficNotificationChannels'
@@ -12,8 +13,8 @@ export function weeklySummary(account,rows,range){
 }
 async function checked(result){if(result.error)throw result.error;return result.data}
 export async function deliverTraffic(db,report,user,channel,send){
- const key={...(report.test_id?{test_id:report.test_id}:{report_id:report.id}),user_id:user.id,channel}
- const inserted=await db.from('traffic_report_deliveries').insert(key)
+ const key={...(report.test_id?{test_id:report.test_id}:report.batch_key?{batch_key:report.batch_key}:{report_id:report.id}),user_id:user.id,channel}
+ const inserted=await db.from('traffic_report_deliveries').insert({...key,...(report.batch_key?{report_ids:report.report_ids}: {})})
  if(inserted.error&&inserted.error.code!=='23505')throw inserted.error
  // A processing/unknown delivery is never retried automatically: the provider may have received it.
  const claimed=await checked(await db.from('traffic_report_deliveries').update({status:'processing',attempted_at:new Date().toISOString()}).match(key).eq('status','pending').select('id'))
@@ -28,6 +29,7 @@ export async function runTrafficWeekly(now=new Date(),{notify=true}={}){
  if(!settings.weekly_enabled)return {enabled:false,reason:'Avisos semanais aguardam ativação.'}
  const range=lastClosedWeek(now),links=await allRows(()=>db.from('traffic_client_users').select('client_id,user_id').order('client_id').order('user_id'))
  const accounts=await allRows(()=>db.from('traffic_clients').select('id,name,active,mcp_status').eq('active',true).order('id'))
+ const prepared=[]
  let published=0,skipped=0
  for(const account of accounts){
   const members=links.filter(l=>l.client_id===account.id);if(!members.length){skipped++;continue}
@@ -39,19 +41,20 @@ export async function runTrafficWeekly(now=new Date(),{notify=true}={}){
   if(report&&!report.published_at){skipped++;continue} // Preserve drafts under editorial review.
   if(!report){const result=await db.from('traffic_reports').insert({client_id:account.id,period_type:'weekly',period_start:range.from,period_end:range.to,summary:content.summary,recommendations:content.recommendations,published_at:now.toISOString()}).select('id,published_at').single();if(result.error?.code==='23505')report=await checked(await db.from('traffic_reports').select('id,published_at').eq('client_id',account.id).eq('period_type','weekly').eq('period_start',range.from).eq('period_end',range.to).single());else report=await checked(result);published++}
   if(!report?.published_at||new Date(report.published_at)>now)continue
-  if(!notify)continue
-  for(const membership of members){
-   if(!await loadTrafficAccess(db,membership.user_id)){skipped++;continue}
-   const profile=await checked(await db.from('profiles').select('id,name,email,phone').eq('id',membership.user_id).single())
-   const legacy=await checked(await db.from('perfis').select('whatsapp').eq('id',membership.user_id).maybeSingle())
-   const body=`Seu relatório de campanhas de ${account.name} está pronto. Acesse a plataforma para consultar os resultados.`.slice(0,240)
-   const notice={title:'Seu relatório de campanhas está pronto',body,path:'/trafego?report='+report.id,ruleId:'traffic-'+report.id,period:range.from.split('-').reverse().join('/')+' a '+range.to.split('-').reverse().join('/')}
+  prepared.push({...report, client_id:account.id, account_name:account.name})
+ }
+ if(notify)for(const group of groupWeeklyReports(prepared,links)){
+   if(!await loadTrafficAccess(db,group.user_id)){skipped++;continue}
+   const profile=await checked(await db.from('profiles').select('id,name,email,phone').eq('id',group.user_id).single())
+   const legacy=await checked(await db.from('perfis').select('whatsapp').eq('id',group.user_id).maybeSingle())
    const recipient={...profile,phone:profile.phone||legacy?.whatsapp}
+   const notice=weeklyDigestNotice(range,group.reports)
+   const batch={batch_key:weeklyDeliveryKey(range),report_ids:group.reports.map(r=>r.id)}
    for(const channel of ['app','push','email','whatsapp']){
     if(channel!=='app'&&!settings[channel+'_enabled'])continue
-    await deliverTraffic(db,report,recipient,channel,id=>sendTrafficChannel(db,recipient,channel,notice,id))
+    await deliverTraffic(db,batch,recipient,channel,id=>sendTrafficChannel(db,recipient,channel,notice,id))
    }
-  }
  }
+
  return {enabled:true,published,skipped,period:range,notifications:notify}
 }

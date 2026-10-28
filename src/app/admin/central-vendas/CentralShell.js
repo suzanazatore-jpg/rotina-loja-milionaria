@@ -1,12 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import {Inter,Urbanist} from 'next/font/google'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
 import AppIcon from '@/app/components/AppIcon'
 import './central.css'
 
+const inter=Inter({subsets:['latin'],display:'swap',variable:'--central-inter'})
+const urbanist=Urbanist({subsets:['latin'],display:'swap',variable:'--central-urbanist'})
 const THEME_KEY = 'sz-central-vendas-tema'
 function subscribe(callback) {
   window.addEventListener('storage', callback)
@@ -16,11 +19,10 @@ function subscribe(callback) {
 const snapshot = () => window.localStorage.getItem(THEME_KEY) === 'claro' ? 'claro' : 'preto'
 const menu = [
   ['Dashboard', '/admin/central-vendas', 'overview'],
-  ['Produtos e Ofertas', '/admin/checkout', 'products'],
   ['Vendas', '/admin/checkout/vendas', 'sales'],
   ['Assinaturas', '/admin/checkout/assinaturas', 'subscriptions'],
-  ['Checkouts', '/admin/checkout/checkouts', 'checkouts'],
-  ['Webhooks', '/admin/checkout/webhooks', 'integrations'],
+  ['Produtos', '/admin/checkout', 'products'],
+  ['Clientes', '/admin/checkout/clientes', 'customers'],
   ['Configurações', '/admin/checkout/configuracoes', 'settings'],
 ]
 export default function CentralShell({ children }) {
@@ -43,12 +45,12 @@ export default function CentralShell({ children }) {
     window.localStorage.setItem(THEME_KEY, value)
     window.dispatchEvent(new Event('sz-central-theme'))
   }
-  const title = pathname.startsWith('/admin/checkout/produtos/') ? 'Produtos e Ofertas' : menu.find(([, href]) => href === pathname)?.[0] || 'Central de Vendas'
-  return <div className={`central ${collapsed ? 'central-collapsed' : ''}`} data-theme={theme}>
+  const title = pathname.startsWith('/admin/checkout/configuracoes/') ? 'Configurações' : pathname.startsWith('/admin/checkout/produtos/') ? 'Produtos' : menu.find(([, href]) => href === pathname)?.[0] || 'Central de Vendas'
+  return <div className={`central ${inter.variable} ${urbanist.variable} ${collapsed ? 'central-collapsed' : ''}`} data-theme={theme}>
     <aside className={`central-sidebar ${menuOpen ? 'is-open' : ''}`}>
       <Link href="/admin/central-vendas" className="central-brand" onClick={() => setMenuOpen(false)}><span className="central-monogram">SZ</span><span>Central de Vendas<small>Suzana Zatorre</small></span></Link>
       <p className="central-nav-caption">GESTÃO COMERCIAL</p>
-      <nav aria-label="Central de Vendas">{menu.map(([label, href, icon]) => href ? <Link key={icon} href={href} aria-current={(pathname === href || (href === '/admin/checkout' && pathname.startsWith('/admin/checkout/produtos/'))) ? 'page' : undefined} title={label} className="central-nav-item" onClick={() => setMenuOpen(false)}><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',checkouts:'banners',integrations:'broadcast',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span></Link> : <div key={icon} className="central-nav-item disabled" aria-disabled="true"><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',checkouts:'banners',integrations:'broadcast',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span><small>Em breve</small></div>)}</nav>
+      <nav aria-label="Central de Vendas">{menu.map(([label, href, icon]) => href ? <Link key={icon} href={href} aria-current={(pathname === href || (href === '/admin/checkout/configuracoes' && pathname.startsWith(href + '/')) || (href === '/admin/checkout' && pathname.startsWith('/admin/checkout/produtos/'))) ? 'page' : undefined} title={label} className="central-nav-item" onClick={() => setMenuOpen(false)}><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span></Link> : <div key={icon} className="central-nav-item disabled" aria-disabled="true"><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span><small>Em breve</small></div>)}</nav>
       <Link href="/admin" className="central-office">← Meu Escritório</Link>
       <div className="central-sidebar-footer">Seu negócio. Sua central.</div>
     </aside>

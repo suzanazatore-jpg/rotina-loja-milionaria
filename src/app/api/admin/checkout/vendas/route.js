@@ -1,3 +1,4 @@
+import {readSales} from '@/lib/centralRecords'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
@@ -19,11 +20,6 @@ export async function GET(request) {
 
   const url = new URL(request.url)
   const id = url.searchParams.get('id')
-  const oferta = url.searchParams.get('oferta')
-  const status = url.searchParams.get('status')
-  const produto = url.searchParams.get('produto')
-  const inicio = url.searchParams.get('inicio')
-  const fim = url.searchParams.get('fim')
   const page = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get('page') || '1', 10) || 1))
   const limit = 25
 
@@ -37,7 +33,7 @@ export async function GET(request) {
     const mapaOfertas = new Map((ofertas || []).map(o => [o.id, o]))
     const detalhar = async (pedido) => {
       const [{ data: cliente, error: errCliente }, { data: itens, error: errItens }] = await Promise.all([
-        db.from('customers').select('id,name,email,phone').eq('id', pedido.customer_id).maybeSingle(),
+        db.from('customers').select('id,name,email,phone,document,billing_address').eq('id', pedido.customer_id).maybeSingle(),
         db.from('order_items').select('id,kind,product_id,offer_id,price_cents').eq('order_id', pedido.id),
       ])
       if (errCliente) throw errCliente
@@ -62,42 +58,9 @@ export async function GET(request) {
       return NextResponse.json({ order: await detalhar(data) })
     }
 
-    let query = db.from('orders').select('id,customer_id,offer_id,parent_order_id,status,payment_method,installments,subtotal_cents,interest_cents,discount_cents,total_cents,pagarme_order_id,created_at,paid_at', { count: 'exact' })
-    if (oferta) query = query.eq('offer_id', oferta)
-    if (status && status !== 'todos') query = query.eq('status', status)
-    if (inicio && /^\d{4}-\d{2}-\d{2}$/.test(inicio)) query = query.gte('created_at', `${inicio}T00:00:00.000Z`)
-    if (fim && /^\d{4}-\d{2}-\d{2}$/.test(fim)) {
-      const diaSeguinte = new Date(`${fim}T00:00:00.000Z`)
-      if (!Number.isNaN(diaSeguinte.getTime())) {
-        diaSeguinte.setUTCDate(diaSeguinte.getUTCDate() + 1)
-        query = query.lt('created_at', diaSeguinte.toISOString())
-      }
-    }
-    if (produto) {
-      if (!nomes.has(produto)) return NextResponse.json({ orders: [], count: 0, page, limit, products: produtos })
-      const ofertasDoProduto = (ofertas || []).filter(o => o.product_id === produto).map(o => o.id)
-      const { data: itensProduto, error: errItens } = await db.from('order_items').select('order_id').eq('product_id', produto)
-      if (errItens) throw errItens
-      const { data: pedidosOferta, error: errPedidosOferta } = ofertasDoProduto.length
-        ? await db.from('orders').select('id').in('offer_id', ofertasDoProduto)
-        : { data: [], error: null }
-      if (errPedidosOferta) throw errPedidosOferta
-      const ids = [...new Set([...(itensProduto || []).map(i => i.order_id), ...(pedidosOferta || []).map(i => i.id)])]
-      if (!ids.length) return NextResponse.json({ orders: [], count: 0, page, limit, products: produtos })
-      query = query.in('id', ids)
-    }
-    const { data, error, count } = await query.order('created_at', { ascending: false }).range((page - 1) * limit, page * limit - 1)
-    if (error) throw error
-    const customerIds = [...new Set((data || []).map(o => o.customer_id).filter(Boolean))]
-    const { data: clientes, error: errClientes } = customerIds.length
-      ? await db.from('customers').select('id,name,email').in('id', customerIds)
-      : { data: [], error: null }
-    if (errClientes) throw errClientes
-    const mapaClientes = new Map((clientes || []).map(c => [c.id, c]))
-    return NextResponse.json({
-      orders: (data || []).map(o => ({ ...o, customer: mapaClientes.get(o.customer_id) || null, product_name: nomes.get(mapaOfertas.get(o.offer_id)?.product_id) || '—', offer_name: mapaOfertas.get(o.offer_id)?.name || '—' })),
-      count: count || 0, page, limit, products: produtos,
-    })
+    const all=await readSales(db,url.searchParams)
+    const data=all.slice((page-1)*limit,page*limit)
+    return NextResponse.json({orders:data,count:all.length,page,limit,products:produtos},{headers:{'Cache-Control':'no-store'}})
   } catch (error) {
     console.error('checkout vendas admin', error)
     return NextResponse.json({ error: 'Não foi possível consultar os pedidos.' }, { status: 500 })

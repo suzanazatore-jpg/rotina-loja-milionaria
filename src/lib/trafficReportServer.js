@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { loadTrafficAccess } from './trafficAccess'
-import { normalizeEntity } from './trafficReportModel.js'
+import { normalizeEntity, campaignConversionTotals } from './trafficReportModel.js'
 export const TRAFFIC_ADMIN = 'suporte@suzanazatorre.com.br'
 export const trafficDb = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL,process.env.SUPABASE_SERVICE_ROLE_KEY,{auth:{persistSession:false,autoRefreshToken:false}})
 export async function trafficUser(request,db) {
@@ -46,9 +46,18 @@ export async function reportData(db,user) {
       const date=raw.metric_date||raw.date_start
       if(!date||raw.date_stop&&raw.date_stop!==date||date<snapshot.period_start||date>snapshot.period_end)continue
       const key=account.id+':'+date,existing=combined.get(key)
-      if(existing?.pulled_at&&new Date(existing.pulled_at)>new Date(snapshot.collected_at))continue
+      const newer=existing?.pulled_at&&new Date(existing.pulled_at)>new Date(snapshot.collected_at)
       const normalized=normalizeEntity(raw),values={}
-      for(const key of ['spend','impressions','clicks','leads','messages','purchases','revenue','reach','frequency'])if(normalized[key]!=null)values[key]=normalized[key]
+      const campaigns=snapshot.payload?.daily_campaigns?.filter(c=>(c.metric_date||c.date_start)===date) || (snapshot.period_start===date&&snapshot.period_end===date?snapshot.payload?.campaigns:[])
+      const conversions=campaignConversionTotals(campaigns || [])
+      for(const key of ['spend','impressions','clicks','revenue','reach','frequency'])if(normalized[key]!=null)values[key]=normalized[key]
+      for(const key of ['leads','messages','purchases'])values[key]=normalized[key]??conversions[key]
+      if(newer){
+        const missing={}
+        for(const key of ['leads','messages','purchases'])if(existing[key]==null&&values[key]!=null)missing[key]=values[key]
+        combined.set(key,{...existing,...missing})
+        continue
+      }
       combined.set(key,{...existing,...values,client_id:account.id,metric_date:date,data_status:'ok',pulled_at:snapshot.collected_at})
     }
   }

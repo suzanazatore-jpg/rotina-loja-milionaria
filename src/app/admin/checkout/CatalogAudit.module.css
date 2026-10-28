@@ -1,0 +1,24 @@
+.audit{padding:24px;color:var(--cv-text)}
+.audit h2{font-size:17px;font-weight:600;margin:0 0 22px}
+.audit h2:before{content:"";display:block;width:24px;height:2px;background:var(--cv-gold);margin-bottom:10px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
+.period{background:var(--cv-field);color:var(--cv-muted);padding:6px 10px;border-radius:30px;font-size:12px}
+.filterButton{display:flex;align-items:center;gap:8px;border:1px solid var(--cv-gold);color:var(--cv-gold);border-radius:24px;padding:8px 15px;background:transparent;cursor:pointer;font-size:13px}
+.filters{display:flex;align-items:end;flex-wrap:wrap;gap:12px;padding:16px;border:1px solid var(--cv-border);border-radius:12px;margin-bottom:22px}
+.filters label{display:grid;gap:6px;font-size:12px;color:var(--cv-muted)}
+.filters input{background:var(--cv-field);border:1px solid var(--cv-border);border-radius:7px;padding:9px;color:var(--cv-text);font:inherit}
+.timeline{list-style:none;margin:0;padding:0 0 0 24px}
+.item{position:relative;padding:0 0 20px 60px;min-height:82px}
+.item:not(:last-child):before{content:"";position:absolute;left:0;top:35px;bottom:-15px;width:1px;background:var(--cv-gold);opacity:.5}
+.marker{position:absolute;left:-20px;top:15px;width:40px;height:40px;border:1px solid var(--cv-gold);border-radius:50%;display:grid;place-items:center;color:var(--cv-gold);background:var(--cv-panel);z-index:1}
+.item:after{content:"";position:absolute;left:20px;top:35px;width:40px;height:1px;background:var(--cv-gold);opacity:.5}
+.card{border-radius:18px;border:1px solid var(--cv-border);background:var(--cv-field);overflow:hidden}
+.card summary{min-height:68px;padding:20px 18px;display:flex;align-items:center;justify-content:space-between;gap:20px;list-style:none;cursor:pointer;font-size:14px}
+.card summary::-webkit-details-marker{display:none}
+.card summary time{font-size:13px;color:var(--cv-muted);white-space:nowrap}
+.card summary:focus-visible,.filterButton:focus-visible{outline:2px solid var(--cv-gold);outline-offset:3px}
+.card[open] summary{border-bottom:1px solid var(--cv-border)}
+.details{padding:6px 18px 14px;font-size:12px;color:var(--cv-muted);overflow-wrap:anywhere}
+.details p{margin:10px 0}.details strong{color:var(--cv-text);font-weight:500}
+.empty{color:var(--cv-muted);font-size:13px;padding:24px 0}
+@media(max-width:600px){.audit{padding:18px 12px}.timeline{padding-left:20px}.item{padding-left:34px}.item:after{width:14px}.card summary{align-items:flex-start;flex-direction:column;gap:9px;padding:15px}.card summary time{font-size:11px}.toolbar{gap:8px}.period{font-size:10px}.filterButton{font-size:12px;padding:8px 11px}}

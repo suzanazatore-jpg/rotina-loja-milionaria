@@ -20,7 +20,7 @@ test('public checkout denies real payments, incomplete configuration and acciden
 })
 test('offer lookup filters active records and exposes only public product/offer fields',async()=>{
  const offer={id:'offer',slug:'offer',name:'Oferta',product_id:'product',price_cents:4700,active:true,max_installments:3,free_installments:3,payment_methods:['pix','credit_card'],pix_discount_pct:10,checkout_config:{},internal_flag:'private'}
- const product={id:'product',name:'Produto',type:'one_time',active:true,plan_id:'internal-plan',botconversa_tag:'private'}
+ const product={id:'product',name:'Produto',type:'one_time',active:true,plan_id:'internal-plan',botconversa_tag:'private',image_url:'https://example.org/product.png'}
  let calls=0
  const db={from(table){
   const data=table==='order_bumps'?[]:table==='offers'?offer:product
@@ -30,6 +30,7 @@ test('offer lookup filters active records and exposes only public product/offer 
  }}
  const loaded=await loadCheckoutOffer('offer',db)
  assert.equal(calls,4)
+ assert.equal(loaded.config.product_image_url,product.image_url)
  assert.equal(loaded.prices.find(p=>p.method==='pix').total_cents,4230)
  assert.equal(loaded.prices.find(p=>p.installments===3).total_cents,4700)
  const exposed=publicCheckoutData(loaded,env)
@@ -41,4 +42,6 @@ test('offer lookup filters active records and exposes only public product/offer 
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'preview'}).analytics_enabled,false)
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'production'}).analytics_enabled,true)
  assert.equal(await loadCheckoutOffer('../invalid',db),null)
+ product.marketplace_id='future_provider'
+ assert.equal(await loadCheckoutOffer('offer',db),null)
 })

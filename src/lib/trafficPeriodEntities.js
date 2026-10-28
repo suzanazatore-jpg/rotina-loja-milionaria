@@ -1,4 +1,4 @@
-import {normalizeEntity, previousRange, safeMedia} from './trafficReportModel.js'
+import {normalizeEntity, previousRange, safeMedia, selectTrafficSnapshot} from './trafficReportModel.js'
 
 const kinds = ['campaigns', 'adsets', 'ads']
 const additive = ['spend','impressions','clicks','clicks_all','results','leads','messages','purchases','revenue','landing_page_views','follows','video_25','video_50','video_75','video_100']
@@ -41,7 +41,8 @@ export function trafficPeriodEntities(snapshots, accountId, from, to) {
     if (!media.get(normalized.id).includes(url)) media.get(normalized.id).push(url)
   }
   const withMedia = rows => rows.map(r => ({...r, image_url: media.get(r.id)?.[0] || r.image_url, image_urls: media.get(r.id) || (r.image_url ? [r.image_url] : [])}))
-  const exact = matching.find(s => s.period_start === from && s.period_end === to)
+  const selected = selectTrafficSnapshot(matching, accountId, from, to)
+  const exact = selected?.period_start === from && selected?.period_end === to ? selected : null
   if (exact) return {complete:true, days:expected, expected, ...Object.fromEntries(kinds.map(kind => [kind, withMedia((exact.payload?.[kind] || []).map(normalizeEntity))]))}
   const dates = new Map()
   for (const s of matching) {

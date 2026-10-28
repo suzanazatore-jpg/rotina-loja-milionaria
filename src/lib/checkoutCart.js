@@ -19,12 +19,12 @@ export async function loadOrderBumps(db, mainOfferId) {
   const offers = await checked(db.from('offers').select('*').in('id', ids).eq('active', true))
   const productIds = [...new Set(offers.map(offer => offer.product_id))]
   if (!productIds.length) return []
-  const products = await checked(db.from('products').select('id,name,type,active,plan_id').in('id', productIds).eq('active', true).eq('type', 'one_time'))
+  const products = await checked(db.from('products').select('id,name,type,active,plan_id,marketplace_id').in('id', productIds).eq('active', true).eq('type', 'one_time'))
   const seen = new Set()
   return links.flatMap(link => {
     const offer = offers.find(item => item.id === link.bump_offer_id)
     const product = products.find(item => item.id === offer?.product_id)
-    if (!offer || !product?.plan_id || seen.has(offer.id)) return []
+    if (!offer || !product?.plan_id || (product.marketplace_id || 'pagarme') !== 'pagarme' || seen.has(offer.id)) return []
     seen.add(offer.id)
     return [{ offer, product, headline: link.headline || 'Adicione também', description: link.description || '', position: link.position }]
   })
@@ -32,7 +32,7 @@ export async function loadOrderBumps(db, mainOfferId) {
 
 // O parcelamento vem da oferta principal; cada adicional mantém seu preço e desconto Pix.
 export function quoteBump(mainOffer, bump, method, installments) {
-  return calculatePayment({ ...bump.offer, max_installments: mainOffer.max_installments, free_installments: mainOffer.free_installments, monthly_interest_pct: mainOffer.monthly_interest_pct }, bump.product, method, installments)
+  return calculatePayment({ ...bump.offer, max_installments: mainOffer.max_installments, free_installments: mainOffer.free_installments, monthly_interest_pct: mainOffer.monthly_interest_pct, interest_model: mainOffer.interest_model }, bump.product, method, installments)
 }
 
 export function buildCheckoutCart(offer, product, available, selection, method, installments = 1) {

@@ -1,0 +1,5 @@
+export const CHECKOUT_ORIGIN='https://rotina.suzanazatorre.com.br'
+const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+export function offerCode(id){if(!/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id || ''))return '';const bytes=id.replace(/-/g,'').match(/../g).map(h=>parseInt(h,16));let bits=0,value=0,result='';for(const byte of bytes){value=(value<<8)|byte;bits+=8;while(bits>=6){bits-=6;result+=alphabet[(value>>bits)&63]}}if(bits)result+=alphabet[(value<<(6-bits))&63];return result}
+export function offerId(code){if(!/^[A-Za-z0-9_-]{22}$/.test(code || ''))return null;let bits=0,value=0,hex='';for(const char of code){value=(value<<6)|alphabet.indexOf(char);bits+=6;if(bits>=8){bits-=8;hex+=((value>>bits)&255).toString(16).padStart(2,'0')}}const id=hex.replace(/^(\w{8})(\w{4})(\w{4})(\w{4})(\w{12})$/,'$1-$2-$3-$4-$5');return offerCode(id)===code?id:null}
+export function paymentLink(offer){return `${CHECKOUT_ORIGIN}/p/${offer.checkout_config?.payment_alias || offerCode(offer.id)}`}

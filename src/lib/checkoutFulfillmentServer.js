@@ -55,6 +55,13 @@ export async function fulfillPaidOrder(db, orderId) {
   if (process.env.CHECKOUT_FULFILLMENT_ENABLED !== 'true') return { fulfillment: 'disabled' }
   const order = await checked(db.from('orders').select('*').eq('id', orderId).single())
   if (order.status !== 'paid' || !order.paid_at) return { fulfillment: 'waiting_payment' }
+  // Ofertas com contrato: o acesso só é liberado depois da assinatura (o próprio fluxo de assinatura chama esta função).
+  if (process.env.CONTRACTS_ENABLED === 'true') {
+    const { contractGate } = await import('./contractsServer.js')
+    let gate
+    try { gate = await contractGate(db, order) } catch { return { fulfillment: 'contract_pending', error: 'contract_unavailable' } }
+    if (gate.blocked) return { fulfillment: 'awaiting_contract', contract_id: gate.contract_id }
+  }
   const marker = `access:${order.id}`
   const created = await db.from('webhook_events').insert({ pagarme_event_id: marker, type: 'checkout.access', payload: { order_id: order.id }, error: 'ready' })
   if (created.error && created.error.code !== '23505') throw new PaymentError('Falha ao registrar liberação.', 500)
