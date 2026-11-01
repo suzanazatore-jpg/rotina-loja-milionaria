@@ -73,9 +73,8 @@ export default function Settings({initialView=null}) {
   const filtered=groups.map(group=>({...group,items:group.items.filter(item=>searchText(`${item.name} ${item.description}`).includes(searchText(search.trim())))})).filter(group=>group.items.length)
   const notices=message && <p role="status" className="central-editor-message">{message}</p>
   if(!selected)return <main className="central-home">
-    <header className={styles.heading}><div><h1>Configurações</h1><p>Escolha o assunto que deseja configurar.</p></div><label className={styles.search}><span aria-hidden="true">⌕</span><input type="search" aria-label="Pesquisar configurações" placeholder="Pesquisar configurações" value={search} onChange={event=>setSearch(event.target.value)} /></label></header>
+    <header className={styles.heading}><div><h1>Configurações</h1><p>Escolha o assunto que deseja configurar.</p></div><div className={styles.headingActions}><label className={styles.search}><span aria-hidden="true">⌕</span><input type="search" aria-label="Pesquisar configurações" placeholder="Pesquisar configurações" value={search} onChange={event=>setSearch(event.target.value)} /></label><ExportButton section="tudo" label="Baixar tudo · Excel"/></div></header>
     {notices}
-    <section className="central-chart-panel"><h2>Exportação de dados</h2><p>Baixe os dados comerciais da central em Excel: Clientes, Produtos, Ofertas, Vendas e Assinaturas, cada um em sua aba. Inclui todos os registros cadastrados na central.</p><ExportButton section="tudo" label="Baixar tudo · Excel"/></section>
     {dirty && <p className={styles.note}>Você tem alterações ainda não salvas. Abra o assunto novamente para revisar e salvar.</p>}
     {filtered.map(group=><section key={group.name} className={styles.section} aria-label={group.name}><h2>{group.name}</h2><div className={styles.grid}>{group.items.map(item=>{
       const content=<><span className={styles.icon} aria-hidden="true"><AppIcon name={item.icon} size={25}/></span><span><strong>{item.name}</strong><small>{item.description}</small></span></>
