@@ -16,6 +16,13 @@ function fixture({ fail, empty = false, missing = false, pagination = false } = 
       return Response.json({ id: 'act_' + accountId, currency: 'BRL' })
     }
     const level = url.searchParams.get('level')
+    if (level !== 'account') {
+      const filters = JSON.parse(url.searchParams.get('filtering'))
+      assert.ok(filters.some(filter => filter.field === 'spend' && filter.operator === 'GREATER_THAN' && filter.value === 0))
+      assert.ok(filters.find(filter => filter.field === 'ad.effective_status').value.includes('DELETED'))
+    }
+    assert.ok(url.searchParams.get('fields').includes('date_start'))
+    assert.ok(url.searchParams.get('fields').includes('date_stop'))
     if (fail === level) return Response.json({ error: { code: 190, message: 'contains test-token' } }, { status: 400 })
     const daily = url.searchParams.has('time_increment')
     const range = JSON.parse(url.searchParams.get('time_range'))
@@ -36,6 +43,8 @@ test('real result indicator is preserved, link clicks are separate, no conversio
   const row = metaInsight({ campaign_id: 'c', objective: 'OUTCOME_SALES', spend: '20', clicks: '60', inline_link_clicks: '10', impressions: '200', results: [{ indicator: 'actions:lead', values: [{ value: '4' }] }], cost_per_result: [{ indicator: 'actions:lead', values: [{ value: '5' }] }] })
   assert.equal(row.results, 4); assert.equal(row.result_event, 'lead'); assert.equal(row.leads, 4); assert.equal(row.purchases, null); assert.equal(row.cost, 5); assert.equal(row.clicks, 10); assert.equal(row.clicks_all, 60)
   assert.equal(metaInsight({ objective: 'OUTCOME_SALES', spend: '10' }).purchases, null)
+  assert.equal(metaInsight({ clicks: '25', impressions: '100' }).clicks, null)
+  assert.equal(metaInsight({ clicks: '25', impressions: '100' }).clicks_all, 25)
 })
 test('exact period, daily data and every entity level use live Graph reads with exact creative ID', async () => {
   const { calls, fetcher } = fixture(); const data = await run(fetcher)
@@ -52,6 +61,19 @@ test('pagination keeps trusted origin and original query, never follows arbitrar
   assert.ok(calls.some(c => c.url.searchParams.get('after') === 'next-page'))
   assert.ok(calls.every(c => c.url.hostname === 'graph.facebook.com'))
 })
+test('a detail page that exceeds the account total stops before further pagination', async () => {
+  const { fetcher, calls } = fixture()
+  const invalid = async (url, options) => {
+    const response = await fetcher(url, options)
+    if (url.searchParams.get('level') !== 'campaign') return response
+    const body = await response.json()
+    body.data[0].spend = '11'
+    body.paging = { next: 'https://graph.facebook.com/next', cursors: { after: 'must-not-read' } }
+    return Response.json(body)
+  }
+  await assert.rejects(run(invalid), /não confere/)
+  assert.equal(calls.filter(c => c.url.searchParams.get('level') === 'campaign').length, 1)
+})
 test('missing days are confirmed separately; failure is never zero or an empty complete snapshot', async () => {
   const missing = fixture({ missing: true }); const result = await run(missing.fetcher)
   assert.equal(result.snapshot.payload.daily.find(r => r.metric_date === to).spend, 0)
@@ -61,6 +83,14 @@ test('missing days are confirmed separately; failure is never zero or an empty c
 test('a successful no-delivery result can show zero spend for the requested days', async () => {
   const result = await run(fixture({ empty: true }).fetcher)
   assert.equal(result.snapshot.payload.daily.length, 2); assert.equal(result.snapshot.payload.totals.spend, 0)
+})
+test('single-day reports reuse the exact account total without a duplicate daily query', async () => {
+  const { calls, fetcher } = fixture()
+  const result = await run(fetcher, { from, to: from })
+  assert.equal(result.snapshot.payload.daily.length, 1)
+  assert.equal(result.snapshot.payload.daily[0].metric_date, from)
+  assert.equal(result.snapshot.payload.daily[0].spend, result.snapshot.payload.totals.spend)
+  assert.equal(calls.filter(c => c.url.searchParams.get('level') === 'account').length, 1)
 })
 test('invalid/future/oversized ranges and absent credentials are rejected', async () => {
   for (const range of [['2026-02-30', '2026-03-01'], ['2026-01-01', '2026-10-01'], ['2099-01-01', '2099-01-02']]) assert.throws(() => livePeriod(...range))

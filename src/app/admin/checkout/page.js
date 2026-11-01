@@ -36,7 +36,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const [ofertas, setOfertas] = useState([])
   const [planos, setPlanos] = useState([])
   const [extraOpen,setExtraOpen] = useState(false)
-  const [statusFilter,setStatusFilter] = useState('all')
+  const [statusFilter,setStatusFilter] = useState('active')
   const [typeFilter,setTypeFilter] = useState('all')
   const [marketplaceFilter,setMarketplaceFilter] = useState('all')
   const [marketplaces,setMarketplaces] = useState([])
@@ -48,7 +48,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const [aba, setAba] = useState('detalhes')
   const [busca, setBusca] = useState('')
   const [codigo, setCodigo] = useState('')
-  const [filterDraft, setFilterDraft] = useState({name:'',code:'',type:'all',marketplace:'all',visibility:'all'})
+  const [filterDraft, setFilterDraft] = useState({name:'',code:'',type:'all',marketplace:'all',visibility:'active'})
   function openFilters(){setFilterDraft({name:busca,code:codigo,type:typeFilter,marketplace:marketplaceFilter,visibility:statusFilter});setFiltersOpen(true)}
   function applyFilters(){setBusca(filterDraft.name);setCodigo(filterDraft.code);setTypeFilter(filterDraft.type);setMarketplaceFilter(filterDraft.marketplace);setStatusFilter(filterDraft.visibility);setFiltersOpen(false)}
   function draftField(key,value){setFilterDraft(current=>({...current,[key]:value}))}
@@ -95,10 +95,18 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   }
 
   async function alternar(entidade, item) {
+    if (salvando) return
     setSalvando(true)
+    setMensagem('')
     try {
-      await api('PATCH', { entidade, id: item.id, active: !item.active })
-      await carregar()
+      const active = !item.active
+      await api('PATCH', { entidade, id: item.id, active })
+      if (entidade === 'produto') {
+        setProdutos(current => current.map(product => product.id === item.id ? { ...product, active } : product))
+        setMensagem(active ? `✓ ${item.name}: produto visível e disponível para compra nas ofertas ativas.` : `✓ ${item.name}: produto oculto e novas compras desativadas. Para reativar, abra Filtros → Visibilidade → Ocultos.`)
+      } else {
+        await carregar()
+      }
     } catch (err) { setMensagem(err.message) } finally { setSalvando(false) }
   }
 
@@ -145,13 +153,14 @@ export default function AdminCheckout({ initialProdutoId = null }) {
           <div className={productStyles.headerActions}><ExportButton section="catalogo" label="XLS"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button></div>
         </div>}
 
-        {mensagem && <div style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
+        {mensagem && <div role="status" aria-live="polite" style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}
 
         {!produtos.length && !mensagem && <div style={{ background: 'var(--cv-panel)', border: '1px dashed var(--cv-border)', borderRadius: 14, padding: 30, textAlign: 'center', color: 'var(--cv-muted)' }}>Nenhum produto ainda. Comece cadastrando o primeiro.</div>}
 
         {!selecionado ? <>
           <div className={productStyles.toolbar}><span className={productStyles.count}>{visibleProducts.length} de {produtos.length}</span><button type="button" className={productStyles.filterButton} aria-expanded={filtersOpen} aria-haspopup="dialog" onClick={openFilters}>▽ Filtros</button></div>
-          {filtersOpen && <FilterDialog title="Filtros de produtos" onClose={()=>setFiltersOpen(false)} onApply={applyFilters} onClear={()=>setFilterDraft({name:'',code:'',type:'all',marketplace:'all',visibility:'all'})}>
+          <p className={productStyles.visibilityHint}>Desligue a chave para ocultar o produto e desativar novas compras. Encontre os produtos ocultos em Filtros → Visibilidade.</p>
+          {filtersOpen && <FilterDialog title="Filtros de produtos" onClose={()=>setFiltersOpen(false)} onApply={applyFilters} onClear={()=>setFilterDraft({name:'',code:'',type:'all',marketplace:'all',visibility:'active'})}>
             <div className={productStyles.filterBody}>
               <FilterSection title="Tipo"><div className={productStyles.radios}>{[['all','Todos'],['subscription','Assinatura'],['one_time','Produto']].map(([value,label])=><label key={value}><input type="radio" name="product-type" value={value} checked={filterDraft.type===value} onChange={()=>draftField('type',value)}/>{label}</label>)}</div></FilterSection>
               <FilterSection title="Características"><div className={productStyles.characteristics}>
@@ -159,11 +168,11 @@ export default function AdminCheckout({ initialProdutoId = null }) {
                 <label>Nome<input value={filterDraft.name} onChange={e=>draftField('name',e.target.value)} placeholder="Nome do produto"/></label>
                 <label>Marketplace<select value={filterDraft.marketplace} onChange={e=>draftField('marketplace',e.target.value)}><option value="all">Todos</option>{marketplaces.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
               </div></FilterSection>
-              <FilterSection title="Visibilidade"><div className={productStyles.radios}>{[['all','Todos'],['active','Visível'],['inactive','Oculto']].map(([value,label])=><label key={value}><input type="radio" name="product-visibility" value={value} checked={filterDraft.visibility===value} onChange={()=>draftField('visibility',value)}/>{label}</label>)}</div><p className={productStyles.filterHint}>Produtos ativos ficam disponíveis no checkout. Produtos inativos ficam ocultos.</p></FilterSection>
+              <FilterSection title="Visibilidade"><div className={productStyles.radios}>{[['all','Todos'],['active','Visíveis'],['inactive','Ocultos']].map(([value,label])=><label key={value}><input type="radio" name="product-visibility" value={value} checked={filterDraft.visibility===value} onChange={()=>draftField('visibility',value)}/>{label}</label>)}</div><p className={productStyles.filterHint}>Produtos ocultos não permitem novas compras pelo checkout. Selecione Ocultos ou Todos para encontrá-los e reativá-los.</p></FilterSection>
             </div>
           </FilterDialog>}
 
-          <div className={productStyles.tableWrap}><table className={productStyles.table}><thead><tr><th>Nome</th><th>Código</th><th>Marketplace</th><th><span className={productStyles.srOnly}>Ações</span></th></tr></thead><tbody>{visibleProducts.map(p=><tr key={p.id}><td><Link className={productStyles.productName} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`}>{p.name}</Link></td><td>{p.code || p.id}</td><td>{nomeMarketplace(p.marketplace_id)}</td><td><div className={productStyles.actions}><Link className={productStyles.productOpen} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`} title={p.type==='subscription'?'Abrir assinatura':'Abrir produto'} aria-label={`Abrir ${p.type==='subscription'?'assinatura':'produto'} ${p.name}`}><ProductIcon kind={p.type}/></Link><button className={productStyles.duplicate} disabled={salvando} title="Duplicar produto" aria-label={`Duplicar ${p.name}`} onClick={()=>duplicarProduto(p)}><ProductIcon kind="copy"/></button></div></td></tr>)}{!visibleProducts.length && <tr><td colSpan={4}>Nenhum produto encontrado.</td></tr>}</tbody></table></div>
+          <div className={productStyles.tableWrap}><table className={productStyles.table}><thead><tr><th>Nome</th><th>Código</th><th>Marketplace</th><th><span className={productStyles.srOnly}>Ações</span></th></tr></thead><tbody>{visibleProducts.map(p=><tr key={p.id}><td><div className={productStyles.nameWithVisibility}><label className={productStyles.visibilitySwitch} title={p.active ? 'Ocultar e desativar novas compras' : 'Reativar produto'}><input type="checkbox" role="switch" aria-label={`Disponível para compra: ${p.name}`} checked={p.active === true} disabled={salvando} onChange={()=>alternar('produto',p)}/><span className={productStyles.switchTrack} aria-hidden="true"/></label><Link className={productStyles.productName} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`}>{p.name}</Link></div></td><td>{p.code || p.id}</td><td>{nomeMarketplace(p.marketplace_id)}</td><td><div className={productStyles.actions}><Link className={productStyles.productOpen} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`} title={p.type==='subscription'?'Abrir assinatura':'Abrir produto'} aria-label={`Abrir ${p.type==='subscription'?'assinatura':'produto'} ${p.name}`}><ProductIcon kind={p.type}/></Link><button className={productStyles.duplicate} disabled={salvando} title="Duplicar produto" aria-label={`Duplicar ${p.name}`} onClick={()=>duplicarProduto(p)}><ProductIcon kind="copy"/></button></div></td></tr>)}{!visibleProducts.length && <tr><td colSpan={4}>Nenhum produto encontrado. Use Filtros → Visibilidade para consultar os ocultos.</td></tr>}</tbody></table></div>
 
         </> : <>
           <div className={interior.topbar}><div className={interior.breadcrumb}><Link href="/admin/checkout">Produtos</Link><span>/</span><span>{selecionado.name}</span></div><details className={interior.additional}><summary>⚙ Configurações adicionais ⌄</summary><div><button onClick={()=>{setAba('detalhes');setExtraOpen(open=>!open)}}>Plano e integrações</button><Link href="/admin/checkout/configuracoes">Padrões de checkout</Link></div></details></div>
