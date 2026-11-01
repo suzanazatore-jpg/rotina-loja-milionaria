@@ -23,7 +23,7 @@ export function metaInsight(row, currency = 'BRL') {
   const revenue = ['omni_purchase', 'offsite_conversion.fb_pixel_purchase'].map(key => numeric(row.action_values?.find(a => a.action_type === key)?.value)).find(value => value != null)
   return {
     ...normalizeEntity({ ...row, results, cost_per_result: costValue, result_event: event, result_label: event,
-      link_click: row.inline_link_clicks, clicks_all: row.clicks, ctr_all: row.ctr, cpc_all: row.cpc, revenue }),
+      link_click: row.inline_link_clicks, clicks: row.inline_link_clicks, clicks_all: row.clicks, ctr_all: row.ctr, cpc_all: row.cpc, revenue }),
     metric_date: row.date_start, date_start: row.date_start, date_stop: row.date_stop,
     amount_spent: { value: numeric(row.spend), unit: currency },
   }
@@ -48,14 +48,20 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 50000)
   const root = `https://graph.facebook.com/${version}/`
+  let expectedSpend = null
   async function get(path, params = {}) {
+    const started = Date.now()
+    const query = { level: params.level || 'metadata', daily: params.time_increment === 1, page: Boolean(params.after) }
     const url = new URL(path, root)
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, typeof value === 'object' ? JSON.stringify(value) : String(value))
     let response, body
     try {
       response = await fetcher(url, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store', signal: controller.signal })
       body = await response.json()
-    } catch { throw new TrafficLiveError('A Meta demorou a responder. Os dados anteriores foram mantidos.') }
+    } catch {
+      console.warn('traffic-meta-timeout', { ...query, duration_ms: Date.now() - started })
+      throw new TrafficLiveError('A Meta demorou a responder. Os dados anteriores foram mantidos.')
+    }
     if (!response.ok || body.error) {
       const code = Number(body.error?.code)
       console.warn('traffic-meta-read', { code, subcode: Number(body.error?.error_subcode) || null, status: response.status, level: params.level || 'metadata' })
@@ -63,6 +69,7 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
       if ([10, 190, 200, 294].includes(code) || [401, 403].includes(response.status)) throw new TrafficLiveError('A conexão Meta não tem acesso a esta conta ou precisa renovar a autorização.', 502)
       throw new TrafficLiveError('A Meta não conseguiu devolver o relatório completo. Os dados anteriores foram mantidos.')
     }
+    if (params.level) console.info('traffic-meta-page', { ...query, duration_ms: Date.now() - started, rows: Array.isArray(body.data) ? body.data.length : null, next: Boolean(body.paging?.next), first_start: body.data?.[0]?.date_start, first_stop: body.data?.[0]?.date_stop, spend_sum: Array.isArray(body.data) ? body.data.reduce((sum, row) => sum + (numeric(row.spend) || 0), 0) : null })
     return body
   }
   async function list(path, params) {
@@ -71,7 +78,16 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
     for (let page = 0; page < 50; page++) {
       const body = await get(path, { ...params, limit: 500, ...(after ? { after } : {}) })
       if (!Array.isArray(body.data)) throw new TrafficLiveError('Resposta incompleta da Meta.')
+      // Validate each page before asking for another. Never accept another account or interval.
+      if (body.data.some(row => String(row.account_id) !== accountId || row.date_start < params.time_range.since || row.date_stop > params.time_range.until || !row.date_start || !row.date_stop)) throw new TrafficLiveError('A Meta devolveu registros fora da conta ou do período solicitado. Os dados anteriores foram mantidos.')
       rows.push(...body.data)
+      if (params.level !== 'account' && expectedSpend != null) {
+        const receivedSpend = rows.reduce((sum, row) => sum + (numeric(row.spend) || 0), 0)
+        if (receivedSpend > expectedSpend + .05) {
+          console.warn('traffic-meta-total-mismatch', { level: params.level, expected: expectedSpend, received: receivedSpend, rows: rows.length })
+          throw new TrafficLiveError('O detalhamento da Meta ainda não confere com o investimento total. Os dados anteriores foram mantidos.')
+        }
+      }
       if (rows.length > 20000) throw new TrafficLiveError('O relatório é muito grande. Selecione um período menor.', 422)
       if (!body.paging?.next) return rows
       after = body.paging?.cursors?.after
@@ -83,39 +99,48 @@ async function collect({ accountId, from, to, details, token, version, fetcher }
   try {
     const info = await get(`act_${accountId}`, { fields: 'id,currency' })
     if (String(info.id) !== `act_${accountId}`) throw new TrafficLiveError('A Meta retornou uma conta diferente da solicitada.')
-    const fields = 'account_id,spend,impressions,reach,frequency,inline_link_clicks,clicks,ctr,cpc,actions,action_values'
+    const fields = 'account_id,date_start,date_stop,spend,impressions,reach,frequency,inline_link_clicks,clicks,ctr,cpc,actions,action_values'
     const common = { time_range: { since: from, until: to }, use_account_attribution_setting: true }
     const insight = (level, daily = false) => list(`act_${accountId}/insights`, {
       ...common, level, fields: fields + (level === 'account' ? '' : ',campaign_id,campaign_name,objective,results,cost_per_result' + (level !== 'campaign' ? ',adset_id,adset_name' : '') + (level === 'ad' ? ',ad_id,ad_name,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions' : '')),
-      ...(level === 'account' ? {} : { filtering: [{ field: 'ad.effective_status', operator: 'IN', value: ['ACTIVE', 'ADSET_PAUSED', 'ARCHIVED', 'CAMPAIGN_PAUSED', 'DELETED', 'DISAPPROVED', 'IN_PROCESS', 'PAUSED', 'PENDING_BILLING_INFO', 'PENDING_REVIEW', 'PREAPPROVED', 'WITH_ISSUES'] }] }),
+      ...(level === 'account' ? {} : { filtering: [{ field: 'spend', operator: 'GREATER_THAN', value: 0 }, { field: 'ad.effective_status', operator: 'IN', value: ['ACTIVE', 'ADSET_PAUSED', 'ARCHIVED', 'CAMPAIGN_PAUSED', 'DELETED', 'DISAPPROVED', 'IN_PROCESS', 'PAUSED', 'PENDING_BILLING_INFO', 'PENDING_REVIEW', 'PREAPPROVED', 'WITH_ISSUES'] }] }),
       ...(daily ? { time_increment: 1 } : {}),
     })
-    const [totals, daily] = await Promise.all([insight('account'), insight('account', true)])
+    // One day has the same deduplicated total and daily row; avoid computing it twice.
+    const [totals, daily] = from === to ? await insight('account').then(rows => [rows, rows]) : await Promise.all([insight('account'), insight('account', true)])
     if (totals.length > 1) throw new TrafficLiveError('A Meta retornou totais inesperados.')
+    expectedSpend = totals.length ? numeric(totals[0].spend) : 0
     for (const row of [...totals, ...daily]) if (String(row.account_id) !== accountId) throw new TrafficLiveError('Resposta de outra conta bloqueada.')
     // A successful empty account insight means no delivery in this exact interval. Failures never become zero.
     const zero = date => ({ id: accountId, metric_date: date, date_start: date, date_stop: date, spend: 0, impressions: 0, clicks: 0, amount_spent: { value: 0, unit: info.currency || 'BRL' } })
     const days = []
     for (let date = from; date <= to; date = new Date(Date.parse(date + 'T12:00:00Z') + 86400000).toISOString().slice(0, 10)) days.push(date)
     const rows = daily.map(row => metaInsight(row, info.currency))
+    if (rows.some(row => !row.metric_date || row.date_start !== row.date_stop)) throw new TrafficLiveError('A Meta não informou as datas do diário corretamente. A coleta anterior foi mantida.')
     if (!totals.length && daily.length) throw new TrafficLiveError('Os totais da Meta ficaram incompletos.')
     if (!totals.length) rows.push(...days.map(zero))
     else {
       const dailySpend = rows.reduce((n, row) => n + (row.spend ?? 0), 0)
       if (Math.abs(dailySpend - Number(totals[0].spend)) > .05) throw new TrafficLiveError('O diário da Meta ainda não confere com o total. Tente novamente em instantes.')
       // Confirm any absent day individually instead of assuming a zero from a partial response.
-      for (const date of days.filter(date => !rows.some(row => row.metric_date === date))) {
-        const confirmed = await list(`act_${accountId}/insights`, { ...common, time_range: { since: date, until: date }, fields, level: 'account' })
-        if (confirmed.length > 1 || confirmed.some(row => row.account_id !== accountId)) throw new TrafficLiveError('Resposta diária inesperada da Meta.')
-        rows.push(confirmed.length ? metaInsight(confirmed[0], info.currency) : zero(date))
+      const missing = days.filter(date => !rows.some(row => row.metric_date === date))
+      for (let offset = 0; offset < missing.length; offset += 3) {
+        const confirmedDays = await Promise.all(missing.slice(offset, offset + 3).map(async date => {
+          const confirmed = await list(`act_${accountId}/insights`, { ...common, time_range: { since: date, until: date }, fields, level: 'account' })
+          if (confirmed.length > 1 || confirmed.some(row => row.account_id !== accountId || row.date_start !== date || row.date_stop !== date)) throw new TrafficLiveError('Resposta diária inesperada da Meta.')
+          return confirmed.length ? metaInsight(confirmed[0], info.currency) : zero(date)
+        }))
+        rows.push(...confirmedDays)
       }
     }
     const payload = { totals: totals.length ? metaInsight(totals[0], info.currency) : zero(from), daily: rows, campaigns: [], adsets: [], ads: [] }
     const warnings = []
     if (details) {
-      // Include every delivery status; no ACTIVE-only filter that drops paused historical ads.
-      for (const [level, kind] of [['campaign', 'campaigns'], ['adset', 'adsets'], ['ad', 'ads']]) {
-        const raw = await insight(level)
+      // Include every delivery status, but let Meta exclude zero-spend objects before pagination.
+      const levels = [['campaign', 'campaigns'], ['adset', 'adsets'], ['ad', 'ads']]
+      const detailsByLevel = await Promise.all(levels.map(([level]) => insight(level)))
+      for (let index = 0; index < levels.length; index++) {
+        const [, kind] = levels[index], raw = detailsByLevel[index]
         if (raw.some(row => row.account_id !== accountId)) throw new TrafficLiveError('Resposta de outra conta bloqueada.')
         if (raw.some(row => numeric(row.spend) == null) || Math.abs(raw.reduce((n, row) => n + Number(row.spend), 0) - Number(payload.totals.spend)) > .05) throw new TrafficLiveError('O detalhamento da Meta ainda não confere com o investimento total. Os dados anteriores foram mantidos.')
         payload[kind] = raw.map(row => metaInsight(row, info.currency)).filter(row => row.spend > 0 || row.impressions > 0)
