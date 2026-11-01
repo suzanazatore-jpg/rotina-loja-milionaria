@@ -9,6 +9,8 @@ import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'
 import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
 import { validateCheckoutForm, checkoutExpired } from '@/lib/checkoutSettings'
+import { signingUrl } from '@/lib/contractsServer'
+import { contractCheckoutStatus } from '@/lib/contractCheckoutStatus'
 
 export const runtime = 'nodejs'
 const secret = () => process.env.CHECKOUT_SESSION_SECRET
@@ -29,11 +31,16 @@ async function readStatus(db, loaded, session) {
   if (error) throw new PaymentError('Não foi possível consultar o pagamento.', 503)
   if (!order) return { status: 'not_started' }
   let purchase = null
+  let progress = { contract_required: false, contract: null, blocked: false }
   if (order.status === 'paid') {
     const { data, error } = await db.from('webhook_events').select('payload').eq('pagarme_event_id', `request:${session.key}`).maybeSingle()
-    if (!error) purchase = purchaseAnalytics(order, data?.payload?.items)
+    if (error) throw new PaymentError('Não foi possível consultar os dados da compra.', 503)
+    purchase = purchaseAnalytics(order, data?.payload?.items)
+    const stored = await db.from('contracts').select('id,status,fields,fulfillment_status,signed_pdf_path').eq('order_id', order.id).maybeSingle()
+    if (stored.error) throw new PaymentError('Não foi possível consultar a próxima etapa da compra.', 503)
+    progress = contractCheckoutStatus(stored.data, data?.payload?.contract_policy?.contract || loaded.config.contract, stored.data ? signingUrl(stored.data.id) : null)
   }
-  return { purchase, status: order.status, total_cents: order.total_cents, payment_method: order.payment_method, installments: order.installments, pix_code: order.pix_qr_code, pix_expires_at: order.pix_expires_at, redirect_url: safeCheckoutRedirect(loaded.config, order.status, order.payment_method) }
+  return { purchase, status: order.status, contract_required: progress.contract_required, contract: progress.contract, total_cents: order.total_cents, payment_method: order.payment_method, installments: order.installments, pix_code: order.pix_qr_code, pix_expires_at: order.pix_expires_at, redirect_url: progress.blocked ? null : safeCheckoutRedirect(loaded.config, order.status, order.payment_method) }
 }
 export async function GET(request, context) {
   try {

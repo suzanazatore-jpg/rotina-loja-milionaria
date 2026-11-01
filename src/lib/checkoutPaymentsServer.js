@@ -59,7 +59,8 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
     if (inserted.error?.code === '23505') throw new PaymentError('Pedido em processamento. Repita com a mesma chave.', 409)
     if (inserted.error) throw new PaymentError('Não foi possível registrar o pedido.', 500)
     order = inserted.data
-    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items, tracking, gateway_base: process.env.PAGARME_BASE_URL || 'https://sdx-api.pagar.me/core/v5' }, processed_at: new Date().toISOString() }))
+    const contract_policy = { version: 1, offer_id: offer.id, name: offer.name, billing_interval: offer.billing_interval || null, contract: offer.checkout_config?.contract || { required: false } }
+    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items, tracking, contract_policy, gateway_base: process.env.PAGARME_BASE_URL || 'https://sdx-api.pagar.me/core/v5' }, processed_at: new Date().toISOString() }))
     await result(db.from('order_items').upsert(orderItemRecords(order.id, items), { onConflict: 'id', ignoreDuplicates: true }))
   }
   let gatewayCustomer = customer

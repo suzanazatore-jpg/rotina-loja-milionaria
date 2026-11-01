@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
-import { ContractError, viewContract, requestContractCode, signContract, finalizeSignedContract, downloadSignedPdf, logContractEvent } from '@/lib/contractsServer'
-import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
+import { ContractError, viewContract, requestContractCode, signContract, downloadSignedPdf } from '@/lib/contractsServer'
+import { scheduleContractCompletion } from '@/lib/contractCompletionServer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,18 +34,8 @@ export async function POST(request, context) {
     if (body?.action === 'code') return json(await requestContractCode(db, token, body.channel, meta(request)))
     if (body?.action !== 'sign') return json({ error: 'Ação inválida.' }, 400)
     const result = await signContract(db, token, body, meta(request))
-    if (!result.already) {
-      // A assinatura já está gravada; PDF e liberação podem ser refeitos pelo painel se falharem aqui.
-      try { await finalizeSignedContract(db, result.contract_id) } catch { await logContractEvent(db, result.contract_id, 'pdf_failed') }
-      try {
-        const access = await fulfillPaidOrder(db, result.order_id)
-        await db.from('contracts').update({ fulfillment_status: access.fulfillment }).eq('id', result.contract_id)
-        await logContractEvent(db, result.contract_id, 'access_released', { detail: { fulfillment: access.fulfillment, email: access.email_status || null } })
-      } catch {
-        await db.from('contracts').update({ fulfillment_status: 'retry' }).eq('id', result.contract_id)
-        await logContractEvent(db, result.contract_id, 'access_failed')
-      }
-    }
-    return json({ signed: true, already: result.already })
+    await scheduleContractCompletion(db, result.contract_id)
+    const state = await viewContract(db, token, meta(request))
+    return json({ signed: true, already: result.already, has_pdf: state.has_pdf, access_status: state.access_status })
   } catch (error) { return fail(error) }
 }

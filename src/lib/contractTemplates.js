@@ -181,8 +181,8 @@ export function buildContractFields({ order, customer, offer, config }) {
 
 export function renderContract(body, fields) {
   const missing = new Set()
-  const text = String(body).replace(/\{([a-z_]+)\}/g, (all, key) => {
-    if (!(key in fields)) { missing.add(key); return all }
+  const text = String(body).replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, (all, key) => {
+    if (!Object.hasOwn(fields, key) || fields[key] == null || fields[key] === '') { missing.add(key); return all }
     return String(fields[key] ?? '')
   })
   return { text, missing: [...missing] }
