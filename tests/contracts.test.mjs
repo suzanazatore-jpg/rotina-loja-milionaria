@@ -110,7 +110,10 @@ test('pedido pago gera um único contrato, envia link e bloqueia o acesso', asyn
   assert.equal(c.template_version, 2)
   assert.equal(calls.length, 2) // e-mail + WhatsApp, só na primeira vez
   assert.ok(calls.some(x => x.body.evento === 'contrato_enviado' && x.body.link.startsWith('https://app.test/assinar/')))
-  assert.deepEqual(await S.contractGate(db, { ...order, id: 'r', event_id: 'cycle:x', parent_order_id: 'order-1' }, deps), { required: false })
+  db.tables.orders = [{ ...order, status: 'paid' }]
+  const renewal = await S.contractGate(db, { ...order, id: 'r', event_id: 'cycle:x', parent_order_id: 'order-1' }, deps)
+  assert.equal(renewal.blocked, true)
+  assert.equal(renewal.contract_id, gate.contract_id)
   assert.deepEqual(await S.contractGate(db, order, { ...deps, env: { ...deps.env, CONTRACTS_ENABLED: 'false' } }), { required: false })
 })
 
@@ -135,6 +138,54 @@ test('assinatura exige CPF da compra, código válido e desenho; libera a trava'
   const gate = await S.contractGate(db, order, deps)
   assert.equal(gate.blocked, false); assert.equal(gate.signed, true)
   assert.ok(db.tables.contract_events.some(e => e.type === 'signed'))
+})
+
+test('editar a oferta não remove a exigência de um contrato emitido', async () => {
+  const db = fixture()
+  const gate = await S.contractGate(db, order, { env })
+  db.tables.offers[0].checkout_config.contract.required = false
+  assert.equal((await S.contractGate(db, order, { env })).blocked, true)
+  db.tables.contracts[0].status = 'signed'
+  assert.equal((await S.contractGate(db, order, { env })).blocked, false)
+  assert.equal(db.tables.contracts[0].id, gate.contract_id)
+})
+
+test('snapshot da compra prevalece mesmo se a oferta mudar antes de emitir o contrato', async () => {
+  const db = fixture()
+  const policy = { version: 1, offer_id: order.offer_id, name: 'Nome original', billing_interval: null, contract: { required: true, template: 'cvm', term_months: 3 } }
+  db.tables.webhook_events = [{ pagarme_event_id: 'request:k', payload: { contract_policy: policy } }]
+  db.tables.offers[0].checkout_config.contract.required = false
+  assert.equal((await S.contractGate(db, order, { env })).blocked, true)
+  assert.equal(db.tables.contracts[0].fields.programa, 'Nome original')
+  const without = fixture()
+  without.tables.webhook_events = [{ pagarme_event_id: 'request:k', payload: { contract_policy: { ...policy, contract: { required: false } } } }]
+  assert.deepEqual(await S.contractGate(without, order, { env }), { required: false })
+})
+
+test('renovação reutiliza contrato assinado e rejeita vínculo inválido ou compra reembolsada', async () => {
+  const db = fixture()
+  const gate = await S.contractGate(db, order, { env })
+  db.tables.orders = [{ ...order, status: 'paid' }]
+  const renewal = { ...order, id: 'cycle', event_id: 'cycle:x', parent_order_id: order.id }
+  db.tables.contracts[0].status = 'signed'
+  assert.equal((await S.contractGate(db, renewal, { env })).blocked, false)
+  assert.equal(db.tables.contracts.length, 1)
+  assert.equal(db.tables.contracts[0].id, gate.contract_id)
+  await assert.rejects(S.contractGate(db, { ...renewal, customer_id: 'other' }, { env }), /requer revisão/)
+  db.tables.orders[0].status = 'refunded'
+  await assert.rejects(S.contractGate(db, renewal, { env }), /requer revisão/)
+})
+
+test('modelo incompleto ou configuração obrigatória inválida não emite nem envia', async () => {
+  for (const field of ['inexistente', 'Nome', 'constructor']) {
+    const db = fixture()
+    db.tables.contract_templates[0].body += ` {${field}}`
+    await assert.rejects(S.contractGate(db, order, { env, fetcher: () => assert.fail('sem envio') }), /campos não preenchidos/)
+    assert.equal(db.tables.contracts.length, 0)
+  }
+  const db = fixture()
+  db.tables.offers[0].checkout_config.contract.template = 'invalid'
+  await assert.rejects(S.contractGate(db, order, { env }), /configuração válida/)
 })
 
 test('lembretes: no máximo três, só para pendentes vencidos', async () => {

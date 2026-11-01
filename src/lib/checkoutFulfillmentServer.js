@@ -59,7 +59,7 @@ export async function fulfillPaidOrder(db, orderId) {
   if (process.env.CONTRACTS_ENABLED === 'true') {
     const { contractGate } = await import('./contractsServer.js')
     let gate
-    try { gate = await contractGate(db, order) } catch { return { fulfillment: 'contract_pending', error: 'contract_unavailable' } }
+    try { gate = await contractGate(db, order) } catch { throw new PaymentError('Contrato pendente de processamento. Repita a conciliação sem criar outra cobrança.', 503) }
     if (gate.blocked) return { fulfillment: 'awaiting_contract', contract_id: gate.contract_id }
   }
   const marker = `access:${order.id}`

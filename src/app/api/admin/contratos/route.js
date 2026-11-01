@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { ContractError, sendContractInvite, finalizeSignedContract, logContractEvent, signingUrl, contractsEnabled } from '@/lib/contractsServer'
-import { CONTRACT_FIELDS, CONTRACT_TEMPLATES } from '@/lib/contractTemplates'
+import { CONTRACT_FIELDS, CONTRACT_TEMPLATES, renderContract } from '@/lib/contractTemplates'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
+import { contractWhatsappConfiguration } from '@/lib/contractWhatsapp'
+import { contractQueueEnabled } from '@/lib/contractTaskQueue'
+import { scheduleContractCompletion } from '@/lib/contractCompletionServer'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -40,8 +43,15 @@ export async function GET(request) {
       offerIds.length ? db.from('offers').select('id,name').in('id', offerIds) : { data: [] },
     ])
     const cMap = new Map((customers || []).map(c => [c.id, c])), oMap = new Map((offers || []).map(o => [o.id, o]))
+    let whatsapp
+    try { const config = contractWhatsappConfiguration(); whatsapp = { provider: config.provider, ready: config.ready } } catch { whatsapp = { provider: 'invalid', ready: false } }
+    const contractIds = (contracts || []).map(contract => contract.id)
+    const tasks = contractIds.length ? await db.from('webhook_events').select('pagarme_event_id,payload,error,processed_at,received_at').eq('type', 'contract.task').in('payload->>contract_id', contractIds).order('received_at', { ascending: false }).limit(1000) : { data: [] }
+    if (tasks.error) throw tasks.error
     return json({
       enabled: contractsEnabled(),
+      delivery: { queue_enabled: contractQueueEnabled(), whatsapp, email_ready: Boolean(process.env.BREVO_API_KEY) },
+      tasks: (tasks.data || []).map(task => ({ id: task.pagarme_event_id, contract_id: task.payload.contract_id, kind: task.payload.kind, channel: task.payload.channel, provider: task.payload.target, state: task.payload.state || task.error, attempts: task.payload.attempts, next_attempt_at: task.processed_at ? null : task.payload.next_attempt_at })),
       fields: CONTRACT_FIELDS,
       templates,
       contracts: (contracts || []).map(c => ({ ...c, customer: cMap.get(c.customer_id) || null, offer: oMap.get(c.offer_id)?.name || null, link: c.status === 'signed' || c.status === 'canceled' ? null : signingUrl(c.id), has_pdf: Boolean(c.signed_pdf_path) })),
@@ -62,6 +72,8 @@ export async function POST(request) {
       const text = String(body.body || '')
       if (text.trim().length < 200) return json({ error: 'O texto do contrato está muito curto.' }, 400)
       if (text.length > 200000) return json({ error: 'O texto do contrato está muito longo.' }, 400)
+      const { missing } = renderContract(text, Object.fromEntries(CONTRACT_FIELDS.map(field => [field, 'prévia'])))
+      if (missing.length) return json({ error: `Campos desconhecidos no modelo: ${missing.join(', ')}.` }, 400)
       const { data: current, error } = await db.from('contract_templates').select('id,version,body,name').eq('slug', body.slug).single()
       if (error) throw error
       const name = String(body.name || current.name).trim().slice(0, 120) || current.name
@@ -75,17 +87,21 @@ export async function POST(request) {
     const { data: contract, error } = await db.from('contracts').select('*').eq('id', body.id).maybeSingle()
     if (error) throw error
     if (!contract) return json({ error: 'Contrato não encontrado.' }, 404)
+    if (body.action === 'retry_completion') {
+      if (contract.status !== 'signed') return json({ error: 'O contrato ainda não foi assinado.' }, 409)
+      return json(await scheduleContractCompletion(db, contract.id, { occurrence: `manual:${crypto.randomUUID()}` }))
+    }
     if (body.action === 'resend') {
       if (!['pending', 'viewed'].includes(contract.status)) return json({ error: 'Só é possível reenviar contratos aguardando assinatura.' }, 409)
       const { data: customer } = await db.from('customers').select('name,email,phone').eq('id', contract.customer_id).single()
       return json({ sent: await sendContractInvite(db, contract, customer, 'reminder') })
     }
-    if (body.action === 'regenerate_pdf') return json(await finalizeSignedContract(db, contract.id, { sendCopy: body.send_copy === true }))
+    if (body.action === 'regenerate_pdf') return json(await finalizeSignedContract(db, contract.id, { sendCopy: body.send_copy === true, occurrence: `manual:${crypto.randomUUID()}` }))
     if (body.action === 'release_access') {
       if (contract.status !== 'signed') return json({ error: 'O contrato ainda não foi assinado.' }, 409)
       const access = await fulfillPaidOrder(db, contract.order_id)
       await db.from('contracts').update({ fulfillment_status: access.fulfillment }).eq('id', contract.id)
-      await logContractEvent(db, contract.id, 'access_released', { detail: { fulfillment: access.fulfillment, manual: true } })
+      await logContractEvent(db, contract.id, access.fulfillment === 'completed' ? 'access_released' : 'access_pending', { detail: { fulfillment: access.fulfillment, manual: true } })
       return json(access)
     }
     if (body.action === 'cancel') {

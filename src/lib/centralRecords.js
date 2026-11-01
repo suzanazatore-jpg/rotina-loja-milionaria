@@ -33,6 +33,20 @@ export async function readSales(db,params=new URLSearchParams()){
  return rows.filter(r=>(!f.marketplace||r.offer?.product?.marketplace_id===f.marketplace)&&(!f.produto||r.offer?.product_id===f.produto||matchingItems.has(r.id))).map(r=>({...r,offer_name:r.offer?.name || '',product_name:r.offer?.product?.name || '',marketplace:r.offer?.product?.marketplace_id || 'pagarme'}))
 }
 export async function relatedItems(db,ids){const rows=[];for(let i=0;i<ids.length;i+=200)rows.push(...await allRows(()=>db.from('order_items').select('id,order_id,kind,price_cents,product_id,offer_id,product:products(id,name,code,marketplace_id),offer:offers(id,name)').in('order_id',ids.slice(i,i+200)).order('id')));return rows}
+export async function readContractDelivery(db, order) {
+ const {data:contract,error}=await db.from('contracts').select('id,status,signed_at,fulfillment_status,signed_pdf_path').eq('order_id',order.parent_order_id || order.id).maybeSingle()
+ if(error)throw error
+ if(!contract)return null
+ const tasks=await db.from('webhook_events').select('payload,error,processed_at,received_at').eq('type','contract.task').eq('payload->>contract_id',contract.id).order('received_at',{ascending:false}).limit(20)
+ if(tasks.error)throw tasks.error
+ const channels={}
+ for(const task of tasks.data || []){
+  const channel=task.payload?.channel
+  if(!['email','whatsapp'].includes(channel)||channels[channel])continue
+  channels[channel]={state:task.payload.state || task.error,attempts:task.payload.attempts || 0,provider:task.payload.target}
+ }
+ return {id:contract.id,status:contract.status,signed_at:contract.signed_at,access_status:contract.fulfillment_status,has_pdf:Boolean(contract.signed_pdf_path),channels}
+}
 const eventName=type=>({'order.paid':'Pagamento aprovado','charge.paid':'Cobrança aprovada','charge.payment_failed':'Cobrança recusada','order.payment_failed':'Pagamento recusado','subscription.created':'Assinatura criada','subscription.updated':'Assinatura atualizada','subscription.canceled':'Assinatura cancelada','subscription.admin_canceled':'Assinatura cancelada pelo administrador','subscription.admin_synced':'Status consultado no Pagar.me','charge.refunded':'Reembolso registrado','order.canceled':'Pedido cancelado','charge.chargedback':'Contestação registrada'})[type] || `Evento: ${type}`
 export async function recordActivity(db,{entity,id,orders=[],subscriptions=[]}){
  const resourceIds=[...new Set([...orders.flatMap(o=>[o.pagarme_order_id,o.pagarme_charge_id]),...subscriptions.map(s=>s.pagarme_subscription_id)].filter(Boolean))]

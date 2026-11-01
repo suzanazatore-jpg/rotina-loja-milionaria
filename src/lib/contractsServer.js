@@ -1,6 +1,10 @@
 import { createHash, createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 import { contractConfig, buildContractFields, renderContract, sameDocument, maskDocument, maskEmail, maskPhone, formatDocument, REMINDER_HOURS } from './contractTemplates.js'
 import { buildContractPdf } from './contractPdf.js'
+import { contractPhone, contractWhatsappReady, sendContractWhatsapp } from './contractWhatsapp.js'
+import { contractQueueEnabled, enqueueContractTask, runContractTask } from './contractTaskQueue.js'
+
+export { contractPhone } from './contractWhatsapp.js'
 
 export class ContractError extends Error {
   constructor(message, status = 400) { super(message); this.status = status }
@@ -35,12 +39,6 @@ export function signingUrl(contractId, env = process.env) { return `${appUrl(env
 export function validationUrl(contractId, env = process.env) { return `${appUrl(env)}/contrato/validar/${contractId}` }
 function otpHash(contractId, code, env = process.env) { return createHmac('sha256', secret(env)).update(`otp:${contractId}:${code}`).digest('hex') }
 
-export function contractPhone(value) {
-  const n = String(value || '').replace(/\D/g, '')
-  const result = n.length === 10 || n.length === 11 ? '55' + n : n
-  return /^55\d{10,11}$/.test(result) ? result : null
-}
-
 async function must(query, message = 'Falha no módulo de contratos.', status = 500) {
   const { data, error } = await query
   if (error) throw new ContractError(message, status)
@@ -64,11 +62,7 @@ async function sendEmail({ to, name, subject, html, text, attachment, tag }, env
 }
 
 async function sendWhatsapp(payload, env = process.env, fetcher = fetch) {
-  const phone = contractPhone(payload.phone)
-  if (!env.CONTRACT_WHATSAPP_WEBHOOK_URL || !phone) return { status: 'skipped' }
-  const response = await fetcher(env.CONTRACT_WHATSAPP_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ ...payload, phone }) })
-  if (!response.ok) throw new Error(`WhatsApp HTTP ${response.status}`)
-  return { status: 'sent' }
+  return sendContractWhatsapp(payload, env, fetcher)
 }
 
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -82,6 +76,26 @@ const MESSAGES = {
 }
 
 export async function sendContractInvite(db, contract, customer, kind = 'invite', deps = {}) {
+  const env = deps.env || process.env
+  if (contractQueueEnabled(env)) {
+    const occurrence = deps.occurrence || (kind === 'invite' ? 'initial' : randomUUID())
+    const tasks = []
+    for (const channel of ['email', 'whatsapp']) {
+      if (channel === 'email' ? !customer.email : !contractPhone(customer.phone)) continue
+      const key = await enqueueContractTask(db, { contractId: contract.id, kind, channel, occurrence }, deps)
+      if (key) tasks.push([channel, key])
+    }
+    const results = {}
+    for (const [channel, key] of tasks) {
+      const result = deps.defer ? { status: 'queued' } : await runContractTask(db, key, (task, deliveryId) => deliverContractNotification(db, task, deliveryId, deps), deps)
+      results[channel] = result.status
+    }
+    return results
+  }
+  return deliverContractInvite(db, contract, customer, kind, deps)
+}
+
+async function deliverContractInvite(db, contract, customer, kind, deps = {}) {
   const env = deps.env || process.env, fetcher = deps.fetcher || fetch
   const url = signingUrl(contract.id, env)
   const first = String(customer.name || '').trim().split(/\s+/)[0] || 'tudo bem'
@@ -90,10 +104,11 @@ export async function sendContractInvite(db, contract, customer, kind = 'invite'
   const results = {}
   for (const [channel, run] of [
     ['email', () => sendEmail({ to: customer.email, name: customer.name, subject: msg.subject, html: emailLayout(msg.subject, [msg.lead], { url, label: 'Ler e assinar o contrato' }), text: `${msg.lead}\n\n${url}`, tag: `contract-${kind}:${contract.id}` }, env, fetcher)],
-    ['whatsapp', () => sendWhatsapp({ evento: kind === 'invite' ? 'contrato_enviado' : 'contrato_lembrete', contract_id: contract.id, name: customer.name, phone: customer.phone, link: url, message: `${msg.lead}\n\n👉 ${url}` }, env, fetcher)],
+    ['whatsapp', () => sendWhatsapp({ evento: kind === 'invite' ? 'contrato_enviado' : 'contrato_lembrete', contract_id: contract.id, name: customer.name, phone: customer.phone, link: url, message: `${msg.lead}\n\n👉 ${url}`, delivery_id: deps.deliveryId }, env, fetcher)],
   ]) {
+    if (deps.channel && deps.channel !== channel) continue
     try { results[channel] = (await run()).status } catch { results[channel] = 'failed' }
-    await logContractEvent(db, contract.id, kind === 'invite' ? 'sent' : 'reminder_sent', { channel, detail: { status: results[channel] } })
+    await logContractEvent(db, contract.id, kind === 'invite' ? 'sent' : 'reminder_sent', { channel, detail: { status: results[channel], ...(deps.deliveryId ? { delivery_id: deps.deliveryId, delivery_state: results[channel] === 'sent' ? 'accepted' : results[channel] } : {}) } })
   }
   return results
 }
@@ -108,9 +123,10 @@ export async function createContractForOrder(db, order, offer, config, deps = {}
   const customer = await must(db.from('customers').select('*').eq('id', order.customer_id).single())
   const fields = buildContractFields({ order, customer, offer, config })
   const { text, missing } = renderContract(template.body, fields)
+  if (missing.length) throw new ContractError(`Modelo com campos não preenchidos: ${missing.join(', ')}. Revise o contrato antes de emitir.`, 409)
   const id = randomUUID()
   const now = new Date(deps.now || Date.now())
-  const row = { id, order_id: order.id, customer_id: customer.id, offer_id: offer.id, template_id: template.id, template_version: template.version, status: 'pending', token_hash: sha256(contractToken(id, deps.env)), fields, body: text, original_sha256: sha256(text), next_reminder_at: new Date(now.getTime() + REMINDER_HOURS[0] * 3600e3).toISOString(), fulfillment_status: config.gate_access ? 'awaiting_signature' : 'not_gated' }
+  const row = { id, order_id: order.id, customer_id: customer.id, offer_id: offer.id, template_id: template.id, template_version: template.version, status: 'pending', token_hash: sha256(contractToken(id, deps.env)), fields: { ...fields, _gate_access: config.gate_access }, body: text, original_sha256: sha256(text), next_reminder_at: new Date(now.getTime() + REMINDER_HOURS[0] * 3600e3).toISOString(), fulfillment_status: config.gate_access ? 'awaiting_signature' : 'not_gated' }
   const inserted = await db.from('contracts').insert(row).select('*').single()
   if (inserted.error) {
     // Corrida entre webhook e conciliação: o outro processo já criou o contrato.
@@ -129,14 +145,42 @@ export async function createContractForOrder(db, order, offer, config, deps = {}
 export async function contractGate(db, order, deps = {}) {
   const env = deps.env || process.env
   if (!contractsEnabled(env)) return { required: false }
-  if (order.event_id?.startsWith('cycle:') || order.parent_order_id) return { required: false } // renovações usam o contrato da compra original
-  const offer = await must(db.from('offers').select('*').eq('id', order.offer_id).single())
+  let purchase = order
+  if (order.event_id?.startsWith('cycle:') || order.parent_order_id) {
+    if (!order.parent_order_id) throw new ContractError('Renovação sem compra original.', 409)
+    purchase = await must(db.from('orders').select('*').eq('id', order.parent_order_id).single())
+    if (!purchase || purchase.parent_order_id || purchase.customer_id !== order.customer_id || purchase.offer_id !== order.offer_id || purchase.status !== 'paid') throw new ContractError('Compra original da renovação requer revisão.', 409)
+  }
+  let contract = await must(db.from('contracts').select('*').eq('order_id', purchase.id).maybeSingle())
+  if (contract) {
+    if (contractQueueEnabled(env) && ['pending', 'viewed'].includes(contract.status)) {
+      const customer = await must(db.from('customers').select('name,email,phone').eq('id', contract.customer_id).single())
+      await sendContractInvite(db, contract, customer, 'invite', { ...deps, defer: true })
+    }
+    return contractDecision(contract)
+  }
+  let offer
+  if (purchase.event_id?.startsWith('checkout:')) {
+    const snapshot = await must(db.from('webhook_events').select('payload').eq('pagarme_event_id', `request:${purchase.event_id.slice(9)}`).maybeSingle())
+    const policy = snapshot?.payload?.contract_policy
+    if (policy) {
+      if (policy.version !== 1 || policy.offer_id !== purchase.offer_id || !policy.contract || typeof policy.contract.required !== 'boolean') throw new ContractError('Regra de contrato da compra inválida.', 409)
+      offer = { id: purchase.offer_id, name: policy.name, billing_interval: policy.billing_interval, checkout_config: { contract: policy.contract } }
+    }
+  }
+  // Pedidos anteriores ao snapshot mantêm compatibilidade pela configuração atual da oferta.
+  offer ||= await must(db.from('offers').select('*').eq('id', purchase.offer_id).single())
   const config = contractConfig(offer)
+  if (offer.checkout_config?.contract?.required === true && !config) throw new ContractError('Oferta com contrato obrigatório sem configuração válida.', 409)
   if (!config) return { required: false }
-  const { contract } = await createContractForOrder(db, order, offer, config, deps)
-  if (contract.status === 'canceled') return { required: true, signed: false, blocked: true, contract_id: contract.id }
+  ;({ contract } = await createContractForOrder(db, purchase, offer, config, deps))
+  return contractDecision(contract)
+}
+
+function contractDecision(contract) {
   const signed = contract.status === 'signed'
-  return { required: true, signed, blocked: config.gate_access && !signed, contract_id: contract.id }
+  const gated = contract.fields?._gate_access ?? contract.fulfillment_status !== 'not_gated'
+  return { required: true, signed, blocked: contract.status === 'canceled' || gated && !signed, contract_id: contract.id }
 }
 
 // ---------------------------------------------------------------- página pública
@@ -163,9 +207,10 @@ export async function viewContract(db, token, meta = {}) {
     body: contract.body,
     original_sha256: contract.original_sha256,
     signer: { name: customer.name, document: maskDocument(customer.document), email: maskEmail(customer.email), phone: maskPhone(customer.phone) },
-    channels: { whatsapp: Boolean(contractPhone(customer.phone) && process.env.CONTRACT_WHATSAPP_WEBHOOK_URL), email: Boolean(customer.email && process.env.BREVO_API_KEY) },
+    channels: { whatsapp: Boolean(contractPhone(customer.phone) && contractWhatsappReady()), email: Boolean(customer.email && process.env.BREVO_API_KEY) },
     signed_at: contract.signed_at,
     has_pdf: Boolean(contract.signed_pdf_path),
+    access_status: contract.fulfillment_status || 'awaiting_signature',
     validation_url: validationUrl(contract.id),
   }
 }
@@ -228,9 +273,13 @@ const EVENT_LABELS = { created: 'Contrato gerado a partir do pedido', sent: 'Lin
 const fmtWhen = value => new Date(value).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
 
 export async function finalizeSignedContract(db, contractId, deps = {}) {
-  const env = deps.env || process.env, fetcher = deps.fetcher || fetch
+  const env = deps.env || process.env
   const contract = await must(db.from('contracts').select('*').eq('id', contractId).single())
   if (contract.status !== 'signed') throw new ContractError('Contrato ainda não assinado.', 409)
+  if (contract.signed_pdf_path) {
+    if (deps.sendCopy !== false) await sendSignedContractCopies(db, contractId, deps)
+    return { path: contract.signed_pdf_path, sha256: contract.signed_pdf_sha256 }
+  }
   const customer = await must(db.from('customers').select('name,email,phone,document').eq('id', contract.customer_id).single())
   const events = await must(db.from('contract_events').select('type,channel,ip,detail,created_at').eq('contract_id', contract.id).order('created_at'))
   const pdf = await buildContractPdf({
@@ -247,21 +296,48 @@ export async function finalizeSignedContract(db, contractId, deps = {}) {
   const pdfHash = sha256(pdf)
   await must(db.from('contracts').update({ signed_pdf_path: path, signed_pdf_sha256: pdfHash, updated_at: new Date().toISOString() }).eq('id', contract.id))
   await logContractEvent(db, contract.id, 'pdf_generated', { detail: { sha256: pdfHash } })
-  if (deps.sendCopy !== false) {
-    const first = String(customer.name || '').trim().split(/\s+/)[0] || ''
-    const download = `${appUrl(env)}/api/contratos/${contractToken(contract.id, env)}?pdf=1`
-    const subject = `Contrato assinado — ${contract.fields?.programa || 'Suzana Zatorre'}`
-    const lead = `Oi, ${first}! Seu contrato foi assinado com sucesso e o seu acesso está sendo liberado. A cópia assinada segue em anexo.`
-    for (const [channel, run] of [
-      ['email', () => sendEmail({ to: customer.email, name: customer.name, subject, html: emailLayout(subject, [lead], { url: download, label: 'Baixar contrato assinado' }), text: `${lead}\n\n${download}`, attachment: { name: 'contrato-assinado.pdf', content: pdf.toString('base64') }, tag: `contract-signed:${contract.id}` }, env, fetcher)],
-      ['whatsapp', () => sendWhatsapp({ evento: 'contrato_assinado', contract_id: contract.id, name: customer.name, phone: customer.phone, link: download, message: `Contrato assinado com sucesso! ✅\nSeu acesso está sendo liberado.\n\nBaixe sua cópia: ${download}` }, env, fetcher)],
-    ]) {
-      let status
-      try { status = (await run()).status } catch { status = 'failed' }
-      await logContractEvent(db, contract.id, 'signed_copy_sent', { channel, detail: { status } })
-    }
-  }
+  if (deps.sendCopy !== false) await sendSignedContractCopies(db, contractId, deps)
   return { path, sha256: pdfHash }
+}
+
+export async function sendSignedContractCopies(db, contractId, deps = {}) {
+  const env = deps.env || process.env
+  if (contractQueueEnabled(env)) {
+    for (const channel of ['email', 'whatsapp']) await enqueueContractTask(db, { contractId, kind: 'signed_copy', channel, occurrence: deps.occurrence || 'initial' }, deps)
+    return { status: 'queued' }
+  }
+  const results = {}
+  for (const channel of ['email', 'whatsapp']) results[channel] = (await deliverContractNotification(db, { contract_id: contractId, kind: 'signed_copy', channel }, null, deps)).status
+  return results
+}
+
+// Cada tarefa é de um único canal. Reenvios não recriam o PDF nem geram OTP.
+export async function deliverContractNotification(db, task, deliveryId, deps = {}) {
+  const env = deps.env || process.env, fetcher = deps.fetcher || fetch
+  const contract = await must(db.from('contracts').select('*').eq('id', task.contract_id).single())
+  if (contract.status === 'canceled' || task.kind !== 'signed_copy' && contract.status === 'signed') return { status: 'canceled' }
+  const customer = await must(db.from('customers').select('name,email,phone').eq('id', contract.customer_id).single())
+  if (['invite', 'reminder'].includes(task.kind)) {
+    const results = await deliverContractInvite(db, contract, customer, task.kind, { ...deps, channel: task.channel, deliveryId })
+    return { status: results[task.channel] || 'retry' }
+  }
+  if (task.kind !== 'signed_copy' || contract.status !== 'signed' || !contract.signed_pdf_path) return { status: 'retry' }
+  const download = `${appUrl(env)}/api/contratos/${contractToken(contract.id, env)}?pdf=1`
+  const subject = `Contrato assinado — ${contract.fields?.programa || 'Suzana Zatorre'}`
+  const lead = `Seu contrato foi assinado com sucesso. Acompanhe a liberação do acesso na página de assinatura. Sua cópia está disponível no link abaixo.`
+  let result
+  try {
+    if (task.channel === 'email') {
+      const file = await db.storage.from('contracts').download(contract.signed_pdf_path)
+      if (file.error) throw file.error
+      const pdf = Buffer.from(await file.data.arrayBuffer())
+      result = await sendEmail({ to: customer.email, name: customer.name, subject, html: emailLayout(subject, [lead], { url: download, label: 'Baixar contrato assinado' }), text: `${lead}\n\n${download}`, attachment: { name: 'contrato-assinado.pdf', content: pdf.toString('base64') }, tag: `contract-signed:${contract.id}` }, env, fetcher)
+    } else {
+      result = await sendWhatsapp({ evento: 'contrato_assinado', contract_id: contract.id, name: customer.name, phone: customer.phone, link: download, message: `${lead}\n\n${download}`, delivery_id: deliveryId }, env, fetcher)
+    }
+  } catch { result = { status: 'failed' } }
+  await logContractEvent(db, contract.id, 'signed_copy_sent', { channel: task.channel, detail: { status: result.status, ...(deliveryId ? { delivery_id: deliveryId, delivery_state: result.status === 'sent' ? 'accepted' : result.status } : {}) } })
+  return result
 }
 
 export async function downloadSignedPdf(db, token) {
@@ -289,11 +365,13 @@ export async function processContractReminders(db, deps = {}) {
   for (const contract of due || []) {
     const next = contract.reminders_sent + 1
     const nextAt = next < REMINDER_HOURS.length ? new Date(new Date(contract.created_at).getTime() + REMINDER_HOURS[next] * 3600e3).toISOString() : null
+    const customer = await must(db.from('customers').select('name,email,phone').eq('id', contract.customer_id).single())
+    // Persiste a ocorrência antes de avançar. Falhas de entrega serão retomadas por canal.
+    if (contractQueueEnabled(env)) await sendContractInvite(db, contract, customer, 'reminder', { ...deps, occurrence: `reminder:${next}`, defer: true })
     const claimed = await must(db.from('contracts').update({ reminders_sent: next, next_reminder_at: nextAt }).eq('id', contract.id).eq('reminders_sent', contract.reminders_sent).select('id'))
     if (!claimed?.length) continue
-    const customer = await must(db.from('customers').select('name,email,phone').eq('id', contract.customer_id).single())
-    await sendContractInvite(db, contract, customer, 'reminder', deps)
+    if (!contractQueueEnabled(env)) await sendContractInvite(db, contract, customer, 'reminder', deps)
     sent++
   }
-  return { disabled: false, sent }
+  return { disabled: false, sent: contractQueueEnabled(env) ? 0 : sent, scheduled: contractQueueEnabled(env) ? sent : 0 }
 }

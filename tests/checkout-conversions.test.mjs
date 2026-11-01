@@ -109,6 +109,7 @@ test('cron rejects missing or wrong secret and accepts authenticated disabled ru
   .replace("import { retryConversions } from '@/lib/checkoutConversionsServer'",'const retryConversions = async () => ({disabled:true,checked:0,sent:0})')
   .replace("import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'",'const processOutboundWebhooks = async () => ({disabled:true,sent:0})')
   .replace("import { processContractReminders } from '@/lib/contractsServer'",'const processContractReminders = async () => ({disabled:true,sent:0})')
+  .replace("import { processContractTasks } from '@/lib/contractCompletionServer'",'const processContractTasks = async () => ({disabled:true,checked:0})')
  const {GET}=await import(`data:text/javascript;base64,${Buffer.from(routeSource).toString('base64')}`)
  const saved=process.env.CRON_SECRET
  try{
@@ -117,7 +118,7 @@ test('cron rejects missing or wrong secret and accepts authenticated disabled ru
   process.env.CRON_SECRET='test-only-secret'
   assert.equal((await GET(new Request('https://example.com/api/cron/checkout-conversoes',{headers:{authorization:'Bearer wrong'}}))).status,401)
   const result=await GET(new Request('https://example.com/api/cron/checkout-conversoes',{headers:{authorization:'Bearer test-only-secret'}}))
-  assert.equal(result.status,200);assert.equal((await result.json()).disabled,true)
+  assert.equal(result.status,200);const output=await result.json();assert.equal(output.disabled,true);assert.equal(output.contract_tasks.disabled,true)
  }finally{if(saved===undefined)delete process.env.CRON_SECRET;else process.env.CRON_SECRET=saved}
 })
 test('scheduler stays within 100 jobs and each conversion expression runs once daily',()=>{

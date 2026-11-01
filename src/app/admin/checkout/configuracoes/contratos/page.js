@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 
 const STATUS = { pending: 'Enviado', viewed: 'Visualizado', signed: 'Assinado', canceled: 'Cancelado' }
 const ACCESS = { completed: 'Liberado', awaiting_signature: 'Aguardando assinatura', not_gated: 'Liberado no pagamento', retry: 'Falhou — liberar', awaiting_contract: 'Aguardando assinatura', disabled: 'Liberação desligada' }
+const TASK_STATE = { ready: 'Na fila', retry: 'Nova tentativa pendente', processing: 'Processando', accepted: 'Aceito pelo serviço', completed: 'Concluído', canceled: 'Cancelado', failed: 'Falhou — revisar' }
 const EVENTS = { created: 'Contrato gerado', sent: 'Link enviado', reminder_sent: 'Lembrete enviado', viewed: 'Visualizado', otp_sent: 'Código enviado', otp_failed: 'Código incorreto', document_mismatch: 'CPF divergente', signed: 'Assinado', pdf_generated: 'PDF gerado', pdf_failed: 'Falha no PDF', signed_copy_sent: 'Cópia enviada', access_released: 'Acesso liberado', access_failed: 'Falha ao liberar acesso', canceled: 'Cancelado' }
 const when = v => v ? new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }) : '—'
 
@@ -40,7 +41,7 @@ export default function ContratosPage() {
     setMessage('Processando…')
     const r = await fetch('/api/admin/contratos', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(payload) })
     const body = await r.json()
-    setMessage(r.ok ? '✓ Feito.' : body.error)
+    setMessage(r.ok ? payload.action === 'resend' ? 'Solicitação registrada. Confira as tentativas e o histórico.' : payload.action === 'retry_completion' ? 'Conclusão solicitada. Confira o estado do PDF e do acesso.' : payload.action === 'release_access' && body.fulfillment !== 'completed' ? 'O acesso continua pendente. Confira a configuração e o histórico.' : '✓ Feito.' : body.error)
     if (r.ok) load()
   }
   async function openPdf(id) {
@@ -58,6 +59,11 @@ export default function ContratosPage() {
   return <main className="central-home">
     <div className="central-breadcrumb"><Link href="/admin/checkout/configuracoes">Configurações</Link><span>/</span><strong>Contratos</strong></div>
     <div className="central-dashboard-heading"><div><span className="central-eyebrow">CONTRATOS</span><h1>Contratos e assinaturas</h1><p>{data.enabled ? 'Módulo ativo: compras de ofertas com contrato aguardam a assinatura para liberar o acesso.' : 'Envio automático desativado. Você já pode revisar e editar os modelos de contrato.'}</p></div></div>
+    {data.delivery && <section className="central-chart-panel" aria-label="Estado dos envios">
+      <h2>Envios e processamento</h2>
+      <p>Fila: {data.delivery.queue_enabled ? 'habilitada' : 'pausada'} · WhatsApp: {({ botconversa: 'BotConversa', papo_reto: 'Papo_reto', disabled: 'pausado', invalid: 'configuração inválida' })[data.delivery.whatsapp.provider]}{data.delivery.whatsapp.provider !== 'disabled' && ` (${data.delivery.whatsapp.ready ? 'configurado' : 'configuração pendente'})`} · Brevo: {data.delivery.email_ready ? 'chave cadastrada' : 'configuração pendente'}</p>
+      <p className="central-data-note">Configuração e aceite pelo serviço ainda precisam de validação de entrega. Os envios automáticos dependem também da ativação do módulo.</p>
+    </section>}
     <nav className="central-product-tabs">{[['contratos', 'Contratos'], ['modelos', 'Modelos']].map(([k, l]) => <button key={k} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>{l}</button>)}</nav>
     {message && <p role="status" className="central-editor-message">{message}</p>}
 
@@ -78,8 +84,11 @@ export default function ContratosPage() {
             {c.link && <button type="button" className="central-action" onClick={async () => { try { await navigator.clipboard.writeText(c.link); setMessage('✓ Link copiado.') } catch { setMessage(c.link) } }}>Copiar link</button>}
             {c.link && <button type="button" className="central-action" onClick={() => act({ action: 'resend', id: c.id })}>Reenviar</button>}
             {c.has_pdf && <button type="button" className="central-action" onClick={() => openPdf(c.id)}>PDF</button>}
+            {c.has_pdf && c.status === 'signed' && <button type="button" className="central-action" onClick={() => act({ action: 'regenerate_pdf', id: c.id, send_copy: true })}>Reenviar cópia</button>}
             {c.status === 'signed' && !c.has_pdf && <button type="button" className="central-action" onClick={() => act({ action: 'regenerate_pdf', id: c.id, send_copy: true })}>Gerar PDF</button>}
             {c.status === 'signed' && c.fulfillment_status !== 'completed' && <button type="button" className="central-action" onClick={() => act({ action: 'release_access', id: c.id })}>Liberar acesso</button>}
+            {c.status === 'signed' && (!c.has_pdf || c.fulfillment_status !== 'completed') && <button type="button" className="central-action" onClick={() => act({ action: 'retry_completion', id: c.id })}>Retomar conclusão</button>}
+            {(data.tasks || []).filter(task => task.contract_id === c.id).slice(0, 4).map(task => <small key={task.id}>{task.channel === 'internal' ? 'Conclusão' : task.channel === 'email' ? 'E-mail' : 'WhatsApp'}: {TASK_STATE[task.state] || task.state} · {task.attempts} tentativa(s)</small>)}
             {c.link && <button type="button" className="central-action" onClick={() => act({ action: 'cancel', id: c.id }, 'Cancelar este contrato? O link deixa de funcionar e o acesso não será liberado.')}>Cancelar</button>}
           </td>
         </tr>)}

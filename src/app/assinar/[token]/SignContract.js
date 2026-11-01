@@ -48,6 +48,19 @@ export default function SignContract({ token }) {
     fetch(api, { cache: 'no-store' }).then(async r => { const body = await r.json(); if (!r.ok) throw new Error(body.error); setData(body); if (body.status === 'signed') setDone(true) }).catch(e => setError(e.message || 'Não foi possível abrir o contrato.'))
   }, [api])
 
+  useEffect(() => {
+    if (!done || data?.has_pdf && data?.access_status === 'completed') return
+    let active = true, attempts = 0
+    const timer = setInterval(async () => {
+      if (++attempts > 24) { clearInterval(timer); return }
+      try {
+        const response = await fetch(api, { cache: 'no-store' })
+        if (response.ok && active) setData(await response.json())
+      } catch { /* O estado permanece pendente; a página pode ser recarregada. */ }
+    }, 5000)
+    return () => { active = false; clearInterval(timer) }
+  }, [api, done, data?.has_pdf, data?.access_status])
+
   async function post(payload) {
     setBusy(true); setError('')
     try {
@@ -58,7 +71,7 @@ export default function SignContract({ token }) {
     } catch (e) { setError(e.message); return null } finally { setBusy(false) }
   }
   const sendCode = async channel => { const r = await post({ action: 'code', channel }); if (r) setCodeInfo(r) }
-  const sign = async () => { const r = await post({ action: 'sign', accepted, document: documentNumber, code, signature }); if (r) { setDone(true); setData(d => ({ ...d, status: 'signed' })) } }
+  const sign = async () => { const r = await post({ action: 'sign', accepted, document: documentNumber, code, signature }); if (r) { setDone(true); setData(d => ({ ...d, status: 'signed', has_pdf: r.has_pdf, access_status: r.access_status })) } }
 
   if (!data && !error) return <main className="sz-sign"><div className="sz-card sz-center">Carregando contrato…</div></main>
   if (!data) return <main className="sz-sign"><div className="sz-card sz-center"><h2>Não foi possível abrir</h2><p>{error}</p></div></main>
@@ -66,8 +79,9 @@ export default function SignContract({ token }) {
   if (done) return <main className="sz-sign"><div className="sz-card sz-center sz-success">
     <div className="sz-check">✓</div>
     <h2>Contrato assinado!</h2>
-    <p>Obrigada, {data.signer.name.split(' ')[0]}. Seu acesso está sendo liberado e você vai receber os dados de entrada por e-mail e WhatsApp.</p>
-    <a className="sz-btn" href={`${api}?pdf=1`}>Baixar contrato assinado</a>
+    <p>Obrigada, {data.signer.name.split(' ')[0]}.</p>
+    <p role="status">{data.access_status === 'completed' ? 'Seu acesso foi liberado. Consulte seu e-mail para as orientações de entrada.' : 'Sua assinatura foi registrada. A liberação do acesso ainda está pendente. Se demorar, entre em contato com o suporte.'}</p>
+    {data.has_pdf ? <a className="sz-btn" href={`${api}?pdf=1`}>Baixar contrato assinado</a> : <p role="status">A cópia do contrato está sendo preparada. Ela aparecerá aqui quando estiver disponível.</p>}
     <p className="sz-small">Validação: {data.validation_url}</p>
   </div></main>
 
