@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AppIcon from '@/app/components/AppIcon'
+import RoutinePdfButton from '@/app/components/RoutinePdfButton'
 import { DIAS_PLANO, modeloDaRotina, normalizarPlanoDias } from '@/lib/dailyPlan'
 import { supabase } from '@/lib/supabase'
 
@@ -132,6 +133,8 @@ export default function WeeklyRoutineCard({ item, userId, cores, ouro, ouroGrad,
       <div className="routine-week-mark" style={{ background: ouroGrad }}><AppIcon name="routine" size={30} strokeWidth={1.7} /></div>
       <div><small>ROTINA DE {rotuloSemana(item.semana_inicio)}</small><h3>{item.titulo}</h3><p>{item.descricao || 'Ações organizadas para manter a loja e a equipe em movimento.'}</p></div>
     </header>
+
+    <div style={{ padding: '0 20px 18px' }}><RoutinePdfButton item={item} style={{ background: ouroGrad, color: '#111', border: 0, borderRadius: 9, padding: '12px 16px', fontWeight: 800, cursor: 'pointer' }} /></div>
 
     <section className="routine-week-progress" aria-label={`${totalConcluidas} de ${todasTarefas.length} ações concluídas`}>
       <div><strong>{percentual}% concluída</strong><span>{totalConcluidas} de {todasTarefas.length} ações</span></div>
