@@ -55,7 +55,13 @@ export default function Integrations() {
     </>:<>
       <div className={styles.toolbar}><nav aria-label="Categorias de integração" className={styles.categories}>{INTEGRATION_CATEGORIES.map(([key,label])=><button key={key} aria-pressed={category===key} onClick={()=>setCategory(key)}>{label}</button>)}</nav><button className="central-action" disabled={loading} onClick={refresh}>{loading?'Consultando…':'↻ Atualizar'}</button></div>
       <p className={styles.footnote} role="status" aria-live="polite">{loading?'Consultando as configurações deste ambiente…':`${filtered.length} ${filtered.length===1?'ferramenta encontrada':'ferramentas encontradas'}. Configuração encontrada não confirma conexão ou entrega.`}</p>
-      {groups.map(group=><section className={styles.section} key={group.id} aria-label={group.name}><h2 className={group.id==='configured'?styles.configured:styles.pending}>{group.name}<span>{group.items.length}</span></h2><div className={styles.grid}>{group.items.map(item=><button type="button" className={styles.card} key={item.id} onClick={()=>setSelected(item)}><span className={styles.cardTop}><span className={styles.icon}><AppIcon name={item.icon} size={25}/></span><span className={styles.arrow} aria-hidden="true">↗</span></span><strong>{item.name}</strong><span className={styles.description}>{item.description}</span><span className={styles.badge}>{item.planned?'Planejada':loading?'Consultando…':error?'Não verificado':statuses?.[item.id]?.label || 'Não verificado'}</span><span className={styles.open}>Ver integração →</span></button>)}</div></section>)}
+      {groups.map(group=><section className={styles.section} key={group.id} aria-label={group.name}>
+        <h2 className={group.id==='configured'?styles.configured:styles.pending}>{group.name}<span>{group.items.length}</span></h2>
+        <div className={styles.grid}>{group.items.map(item=><button type="button" className={styles.card} key={item.id} title={item.description} onClick={()=>setSelected(item)}>
+          <span className={styles.brand}><span className={styles.icon}><AppIcon name={item.icon} size={24}/></span><strong>{item.name}</strong></span>
+          <span className={styles.badge}>{item.planned?'Planejada':loading?'Consultando…':error?'Não verificado':statuses?.[item.id]?.label || 'Não verificado'}</span>
+        </button>)}</div>
+      </section>)}
       {!filtered.length && <section className={styles.detail}><h2>Nenhuma ferramenta encontrada</h2><p>Experimente outra pesquisa ou categoria.</p><button className="central-action" onClick={()=>{setSearch('');setCategory('all')}}>Limpar filtros</button></section>}
     </>}
   </main>
