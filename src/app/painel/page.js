@@ -9,6 +9,7 @@ import { registerContentAccess } from '@/lib/contentAccess'
 import CampaignJourney from './CampaignJourney'
 import InteractiveCalendar from './InteractiveCalendar'
 import WeeklyRoutineCard from './WeeklyRoutineCard'
+import RoutinePdfButton from '@/app/components/RoutinePdfButton'
 import AppIcon from '@/app/components/AppIcon'
 import NotificationCenter from '@/app/components/NotificationCenter'
 import NotificationPreference from './NotificationPreference'
@@ -621,7 +622,7 @@ export default function Painel() {
                   </BlocoCascata>
 
                   <BlocoCascata titulo="Rotina" subtitulo="Execução da semana" cores={cores} ouro={ouro}>
-                    {rotinaSemanal ? <ItemCascata titulo={rotinaSemanal.titulo} descricao={rotinaSemanal.descricao || rotuloSemana(rotinaSemanal.semana_inicio)} url={rotinaSemanal.arquivo_url} textoLink="Visualizar rotina" onDownload={() => baixarPdf(rotinaSemanal)} cores={cores} ouroGrad={ouroGrad} /> : <VazioCascata texto="A rotina ainda não foi publicada." cores={cores} />}
+                    {rotinaSemanal ? <ItemCascata rotinaPdf={rotinaSemanal} titulo={rotinaSemanal.titulo} descricao={rotinaSemanal.descricao || rotuloSemana(rotinaSemanal.semana_inicio)} url={rotinaSemanal.arquivo_url} textoLink="Visualizar rotina" onDownload={() => baixarPdf(rotinaSemanal)} cores={cores} ouroGrad={ouroGrad} /> : <VazioCascata texto="A rotina ainda não foi publicada." cores={cores} />}
                   </BlocoCascata>
 
                   {metasLiberadas && <BlocoCascata titulo="Calculadora de Metas" subtitulo="Metas, ranking e histórico da equipe" cores={cores} ouro={ouro}>
@@ -946,10 +947,10 @@ function BlocoCascata({ titulo, subtitulo, cores, ouro, children }) {
   </section>
 }
 
-function ItemCascata({ titulo, descricao, url, textoLink, onDownload, cores, ouroGrad }) {
+function ItemCascata({ titulo, descricao, url, textoLink, onDownload, cores, ouroGrad, rotinaPdf }) {
   return <article className="premium-cascade-item" style={{ background: cores.card2, border: `1px solid ${cores.borda}` }}>
     <div><strong style={{ color: cores.tx }}>{titulo}</strong><p style={{ color: cores.tx2 }}>{descricao}</p></div>
-    <aside>{url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: cores.tx, border: `1px solid ${cores.borda}` }}>{textoLink}</a>}{url && <button onClick={onDownload} style={{ background: ouroGrad }}>Baixar</button>}</aside>
+    <aside>{url && <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: cores.tx, border: `1px solid ${cores.borda}` }}>{textoLink}</a>}{rotinaPdf ? <RoutinePdfButton item={rotinaPdf} style={{ background: ouroGrad, border: 0, borderRadius: 9, padding: '10px 14px', color: '#111', fontWeight: 800, cursor: 'pointer' }} /> : url && <button onClick={onDownload} style={{ background: ouroGrad }}>Baixar</button>}</aside>
   </article>
 }
 
