@@ -21,17 +21,18 @@ const groups = [
     {id:'subscriptions',name:'Assinaturas',description:'Consulte as assinaturas e acompanhe suas cobranças recorrentes.',icon:'calendar',href:'/admin/checkout/assinaturas'},
   ]},
   {name:'Técnicas',items:[
-    {id:'tracking',name:'Pixels e rastreamento',description:'Cadastre o Google Tag Manager e o Meta Pixel usados como padrão.',icon:'goals'},
+    {id:'integrations',name:'Integrações',description:'Organize anunciantes, área de membros, automações, email, WhatsApp e pagamentos.',icon:'settings',href:'/admin/checkout/configuracoes/integracoes'},
+    {id:'tracking',name:'Pixels e rastreamento',description:'Cadastre o Google Tag Manager e o Meta Pixel usados como padrão.',icon:'goals',href:'/admin/checkout/configuracoes/integracoes/rastreamento'},
     {id:'webhooks',name:'Webhooks',description:'Acompanhe os eventos, os recebimentos e as tentativas de entrega.',icon:'settings',href:'/admin/checkout/webhooks'},
   ]},
 ]
 const searchText = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
-export default function Settings() {
+export default function Settings({initialView=null}) {
   const [settings,setSettings] = useState({gtm_id:'',meta_pixel_id:'',checkout_config:{...CHECKOUT_DEFAULTS}})
   const [loading,setLoading] = useState(true)
   const [saving,setSaving] = useState(false)
   const [message,setMessage] = useState('')
-  const [view,setView] = useState(null)
+  const [view,setView] = useState(initialView)
   const [search,setSearch] = useState('')
   const [baseline,setBaseline] = useState('')
   const dirty = Boolean(baseline) && JSON.stringify(settings)!==baseline
@@ -83,7 +84,7 @@ export default function Settings() {
     {!filtered.length && <div className={styles.empty}><p>Nenhuma configuração encontrada.</p><button type="button" className="central-action" onClick={()=>setSearch('')}>Limpar pesquisa</button></div>}
   </main>
   return <main className="central-home">
-    <div className={styles.back}><button type="button" className="central-action" onClick={()=>setView(null)}>← Configurações</button></div>
+    <div className={styles.back}>{initialView?<Link className="central-action" href="/admin/checkout/configuracoes/integracoes">← Integrações</Link>:<button type="button" className="central-action" onClick={()=>setView(null)}>← Configurações</button>}</div>
     <header className={styles.editorHeader}><div><h1>{selected.name}</h1><p>{selected.description}</p></div></header>
     {notices}
     {view==='emails'?<section className={`central-chart-panel ${styles.info}`}><h2>Envios do aplicativo</h2><p>Os emails de acesso e renovação são gerenciados pelo aplicativo. A edição dos modelos transacionais ainda não está disponível nesta central.</p><p>As mensagens de pagamento pendente, recusa, abandono e reembolso ainda precisam ser conectadas. Esta tela não ativa novos envios.</p><Link href="/admin/comunicacao" className="central-action">Abrir campanhas e comunicação →</Link></section>:<>
