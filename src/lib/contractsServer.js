@@ -52,13 +52,15 @@ export async function logContractEvent(db, contractId, type, { channel = null, i
 
 // ---------------------------------------------------------------- envios
 
-async function sendEmail({ to, name, subject, html, text, attachment, tag }, env = process.env, fetcher = fetch) {
+export async function sendEmail({ to, name, subject, html, text, attachment, tag }, env = process.env, fetcher = fetch) {
   if (!env.BREVO_API_KEY || !to) return { status: 'skipped' }
   const body = { sender: { name: 'Suzana Zatorre', email: 'suporte@suzanazatorre.com.br' }, to: [{ email: to, name: name || undefined }], subject, htmlContent: html, textContent: text, headers: { 'X-Mailin-custom': tag } }
   if (attachment) body.attachment = [attachment]
   const response = await fetcher('https://api.brevo.com/v3/smtp/email', { method: 'POST', headers: { 'Content-Type': 'application/json', 'api-key': env.BREVO_API_KEY }, signal: AbortSignal.timeout(15000), body: JSON.stringify(body) })
   if (!response.ok) throw new Error(`Brevo HTTP ${response.status}`)
-  return { status: 'sent' }
+  let receipt
+  try { receipt = await response.json() } catch { /* O aceite HTTP não depende da leitura do recibo. */ }
+  return { status: 'sent', ...(receipt?.messageId ? { message_id: receipt.messageId } : {}) }
 }
 
 async function sendWhatsapp(payload, env = process.env, fetcher = fetch, db) {
@@ -66,7 +68,7 @@ async function sendWhatsapp(payload, env = process.env, fetcher = fetch, db) {
 }
 
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
-function emailLayout(title, paragraphs, button) {
+export function emailLayout(title, paragraphs, button) {
   return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#222;line-height:1.5"><h2 style="color:#5b1a26">${escapeHtml(title)}</h2>${paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('')}${button ? `<p style="margin:28px 0"><a href="${escapeHtml(button.url)}" style="background:#5b1a26;color:#fff;padding:14px 26px;border-radius:8px;text-decoration:none;font-weight:bold">${escapeHtml(button.label)}</a></p><p style="font-size:12px;color:#777">Se o botão não abrir, copie o link: ${escapeHtml(button.url)}</p>` : ''}<p style="font-size:12px;color:#777">Suzana Zatorre Educacional</p></div>`
 }
 

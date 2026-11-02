@@ -94,7 +94,7 @@ async function smallJson(request) {
 
 // Uma única etapa do Pabbly chama este endpoint. Toda reexecução, inclusive isolada,
 // passa pela mesma reserva antes do HTTP ao BotConversa. Não há lease que reabra envios incertos.
-export async function handleContractWhatsappRelay(request, { getDb, env = process.env, now = Date.now(), fetcher = fetch } = {}) {
+export async function handleContractWhatsappRelay(request, { getDb, env = process.env, now = Date.now(), fetcher = fetch, resolveContract } = {}) {
   if (request.method !== 'POST') return response({ error: 'Método inválido.' }, 405)
   if (!active(env)) return response({ error: 'Receptor pausado.' }, 503)
   try {
@@ -112,7 +112,7 @@ export async function handleContractWhatsappRelay(request, { getDb, env = proces
     if (!claimed?.length) return result('review', true)
     let state = 'review'
     try {
-      const contract = await checked(db.from('contracts').select('status,signed_pdf_path').eq('id', body.contract_id).maybeSingle())
+      const contract = resolveContract ? await resolveContract(db, body) : await checked(db.from('contracts').select('status,signed_pdf_path').eq('id', body.contract_id).maybeSingle())
       if (!contract) throw new RelayError(409)
       const eligible = body.evento === 'contrato_assinado' ? contract.status === 'signed' && Boolean(contract.signed_pdf_path) : ['pending', 'viewed'].includes(contract.status)
       if (!eligible) state = 'canceled'

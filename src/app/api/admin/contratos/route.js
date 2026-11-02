@@ -52,6 +52,7 @@ export async function GET(request) {
     if (tasks.error) throw tasks.error
     return json({
       enabled: contractsEnabled(),
+      connection_test_available: process.env.VERCEL_ENV === 'preview',
       delivery: { queue_enabled: contractQueueEnabled(), whatsapp: { ...whatsapp, otp_ready: contractWhatsappCodeReady(), dispatch_guard_enabled: contractWhatsappDispatchGuardEnabled(), relay_enabled: contractWhatsappRelayEnabled(), relay_ready: contractWhatsappRelayReady() }, email_ready: Boolean(process.env.BREVO_API_KEY) },
       tasks: (tasks.data || []).filter(task => task.type === 'contract.task').map(task => ({ id: task.pagarme_event_id, contract_id: task.payload.contract_id, kind: task.payload.kind, channel: task.payload.channel, provider: task.payload.target, state: task.payload.state || task.error, attempts: task.payload.attempts, next_attempt_at: task.processed_at || task.error === 'review' ? null : task.payload.next_attempt_at })),
       whatsapp_dispatches: (tasks.data || []).filter(task => task.type === 'contract.whatsapp.dispatch').map(task => ({ id: task.pagarme_event_id, contract_id: task.payload.contract_id, provider: task.payload.provider, state: task.payload.state, started_at: task.payload.started_at })),

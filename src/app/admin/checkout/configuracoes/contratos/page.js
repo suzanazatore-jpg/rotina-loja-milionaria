@@ -68,6 +68,7 @@ export default function ContratosPage() {
       <p>Envio protegido após o intermediário: {data.delivery.whatsapp.relay_enabled ? data.delivery.whatsapp.relay_ready ? 'habilitado' : 'configuração pendente' : 'pausado'}</p>
       <p>Fila: {data.delivery.queue_enabled ? 'habilitada' : 'pausada'} · WhatsApp: {({ botconversa: 'BotConversa', papo_reto: 'Papo_reto', disabled: 'pausado', invalid: 'configuração inválida' })[data.delivery.whatsapp.provider]}{data.delivery.whatsapp.provider !== 'disabled' && ` (${data.delivery.whatsapp.ready ? 'configurado' : 'configuração pendente'})`} · Brevo: {data.delivery.email_ready ? 'chave cadastrada' : 'configuração pendente'}</p>
       <p className="central-data-note">Configuração e aceite pelo serviço ainda precisam de validação de entrega. Os envios automáticos dependem também da ativação do módulo.</p>
+      {data.connection_test_available && <Link className="central-action" href="/admin/checkout/configuracoes/contratos/testes">Abrir testes internos de conexão</Link>}
     </section>}
     <nav className="central-product-tabs">{[['contratos', 'Contratos'], ['modelos', 'Modelos']].map(([k, l]) => <button key={k} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}>{l}</button>)}</nav>
     {message && <p role="status" className="central-editor-message">{message}</p>}
