@@ -799,7 +799,7 @@ export default function Painel() {
                     {(() => {
                       const item = campanhas.find(c => c.mes_ano === mesSelecionadoCamp) || campanhas[0]
                       if (!item) return null
-                      return <CampaignJourney item={item} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => baixarPdf(item)} />
+                      return <CampaignJourney key={item.id} item={item} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => baixarPdf(item)} />
                     })()}
                   </>}
                 </div>
@@ -827,7 +827,7 @@ export default function Painel() {
                     const acoesDoMes = acoesCalendario.filter(item => (item.planning_month || String(item.action_date).slice(0, 7)) === mesAtivo)
                     return <>
                       <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '1px 1px 7px', marginBottom: '12px' }}>{meses.map(mes => <button key={mes} onClick={() => setMesSelecionado(mes)} style={{ flexShrink: 0, padding: '9px 15px', borderRadius: '9px', whiteSpace: 'nowrap', fontSize: '12px', fontWeight: 800, cursor: 'pointer', border: mesAtivo === mes ? `1px solid ${ouro}` : `1px solid ${cores.borda}`, background: mesAtivo === mes ? (tema === 'escuro' ? '#2d270f' : '#fff5cf') : cores.card, color: mesAtivo === mes ? ouro : cores.tx2 }}>{rotuloMesCurto(mes)}</button>)}</div>
-                      <InteractiveCalendar mesAno={mesAtivo} actions={acoesDoMes} pdfItem={itemPdf} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => itemPdf && baixarPdf(itemPdf)} />
+                      <InteractiveCalendar key={mesAtivo} mesAno={mesAtivo} actions={acoesDoMes} pdfItem={itemPdf} userId={usuario?.id} cores={cores} ouro={ouro} ouroGrad={ouroGrad} onDownload={() => itemPdf && baixarPdf(itemPdf)} />
                     </>
                   })()}
                 </div>

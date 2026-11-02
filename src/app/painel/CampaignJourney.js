@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import AppIcon from '@/app/components/AppIcon'
+import MonthlyPdfButton from '@/app/components/MonthlyPdfButton'
 import { normalizarPlanoCampanha } from '@/lib/campaignPlan'
 import { supabase } from '@/lib/supabase'
 
@@ -71,11 +72,12 @@ export default function CampaignJourney({ item, userId, cores, ouro, ouroGrad, o
         <p>{item.titulo}</p>
         <span>{plano.objetivo || item.descricao || 'Execute a campanha por fases e acompanhe o avanço até o encerramento.'}</span>
       </div>
+      {(item.arquivo_url || total > 0) && <div className="campaign-header-download"><MonthlyPdfButton key={item.mes_ano} tipo="campanhas" mes={item.mes_ano} arquivoUrl={item.arquivo_url} onDownload={onDownload} style={{ background: ouroGrad }}>Baixar PDF mensal</MonthlyPdfButton></div>}
     </header>
 
     <div className="campaign-journey-status">
       <span>{plano.fases.length} {plano.fases.length === 1 ? 'fase' : 'fases'} · {total} {total === 1 ? 'ação' : 'ações'}</span>
-      <span className={item.arquivo_url ? 'has-pdf' : ''}>{item.arquivo_url ? '✓ PDF disponível' : '○ Sem PDF complementar'}</span>
+      <span className={item.arquivo_url || total > 0 ? 'has-pdf' : ''}>{item.arquivo_url || total > 0 ? '✓ PDF disponível' : '○ Sem PDF complementar'}</span>
     </div>
 
     <section className="campaign-journey-progress" aria-label={`${feitas} de ${total} ações concluídas`}>
@@ -126,9 +128,6 @@ export default function CampaignJourney({ item, userId, cores, ouro, ouroGrad, o
 
     {plano.orientacao && <aside className="campaign-journey-tip"><AppIcon name="assistant" size={20} /><p><strong>Orientação geral da Suzana</strong><span>{plano.orientacao}</span></p></aside>}
 
-    {item.arquivo_url && <footer>
-      <a href={item.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF completo do mês</a>
-      <button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar PDF mensal</button>
-    </footer>}
+    {item.arquivo_url && <footer><a href={item.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF completo do mês</a></footer>}
   </article>
 }

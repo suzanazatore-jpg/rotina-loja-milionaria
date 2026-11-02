@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import AppIcon from '@/app/components/AppIcon'
+import MonthlyPdfButton from '@/app/components/MonthlyPdfButton'
 
 const DIAS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
@@ -88,16 +89,18 @@ export default function InteractiveCalendar({ mesAno, actions = [], pdfItem, use
   const concluidas = actions.filter(acao => progresso[acao.id] === 'concluido').length
   const percentual = actions.length ? Math.round(concluidas / actions.length * 100) : 0
 
+  const temPdf = Boolean(pdfItem?.arquivo_url || actions.length)
+
   return <article className="interactive-calendar interactive-calendar-package" style={{ background: cores.card, borderColor: ouro }}>
     <section className="interactive-calendar-summary interactive-calendar-package-header" style={{ borderColor: cores.borda }}>
       <div><small style={{ color: ouro }}>PLANEJAMENTO COMPLETO DO MÊS</small><h3 style={{ color: cores.tx }}>{pdfItem?.titulo || `${MESES[mes - 1]} de ${ano}`}</h3><p style={{ color: cores.tx2 }}>{pdfItem?.descricao || 'PDF completo e estratégias organizadas para colocar em prática.'}</p></div>
       <div className="interactive-calendar-package-side">
         {actions.length > 0 && <div className="interactive-calendar-progress"><strong style={{ color: ouro }}>{percentual}%</strong><span style={{ background: cores.card2 }}><i style={{ width: `${percentual}%`, background: ouroGrad }} /></span><small style={{ color: cores.tx2 }}>{concluidas} de {actions.length} concluídas</small></div>}
-        {pdfItem?.arquivo_url && <div className="interactive-calendar-package-pdf"><a href={pdfItem.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF</a><button type="button" onClick={onDownload} style={{ background: ouroGrad }}>Baixar PDF</button></div>}
+        {temPdf && <div className="interactive-calendar-package-pdf">{pdfItem?.arquivo_url && <a href={pdfItem.arquivo_url} target="_blank" rel="noopener noreferrer">Ver PDF</a>}<MonthlyPdfButton key={mesAno} tipo="calendario" mes={mesAno} arquivoUrl={pdfItem?.arquivo_url} onDownload={onDownload} style={{ background: ouroGrad }}>Baixar PDF</MonthlyPdfButton></div>}
       </div>
     </section>
 
-    <div className="interactive-calendar-package-status"><span style={{ color: pdfItem?.arquivo_url ? '#55c99a' : cores.tx3 }}>{pdfItem?.arquivo_url ? '✓ PDF disponível' : '○ Sem PDF'}</span><span style={{ color: actions.length ? ouro : cores.tx3 }}>{actions.length} {actions.length === 1 ? 'ação interativa' : 'ações interativas'}</span></div>
+    <div className="interactive-calendar-package-status"><span style={{ color: temPdf ? '#55c99a' : cores.tx3 }}>{temPdf ? '✓ PDF disponível' : '○ Sem PDF'}</span><span style={{ color: actions.length ? ouro : cores.tx3 }}>{actions.length} {actions.length === 1 ? 'ação interativa' : 'ações interativas'}</span></div>
 
     <div className="interactive-calendar-package-body">
       {actions.length > 0 && <>
