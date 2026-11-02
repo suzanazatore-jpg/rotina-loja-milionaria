@@ -110,6 +110,26 @@ test('falha no storage e URL fora do arquivo do teste impedem o envio externo', 
   assert.equal((await sendEmailProbe(db, 'copy', { env, now, fetcher: () => assert.fail('não enviar') })).status, 'review')
 })
 
+test('PDF permanece válido após duas horas e vence no fim da janela autorizada', async () => {
+  const expires = Date.parse(env.CONTRACT_CONNECTION_TEST_EXPIRES_AT)
+  for (const elapsed of [0, 3 * 3600000, 86400000 - 300000]) {
+    const db = contractMemoryDb(), testNow = now + elapsed
+    const originalBucket = db.storage.from()
+    let lifetime
+    db.storage.from = () => ({ ...originalBucket, createSignedUrl: async (path, seconds) => {
+      lifetime = seconds
+      return originalBucket.createSignedUrl(path)
+    } })
+    assert.equal((await sendEmailProbe(db, 'invite', { env, now: testNow, fetcher: async () => ({ ok: true, json: async () => ({ messageId: '<window@brevo.invalid>' }) }) })).status, 'accepted')
+    assert.equal(lifetime, Math.floor((expires - testNow) / 1000))
+    assert.ok(testNow + lifetime * 1000 <= expires)
+    if (!elapsed) assert.ok(lifetime > 7200)
+  }
+  const db = contractMemoryDb()
+  assert.equal((await sendEmailProbe(db, 'invite', { env, now: expires - 500, fetcher: () => assert.fail('não enviar link prestes a vencer') })).status, 'review')
+  await assert.rejects(sendEmailProbe(contractMemoryDb(), 'invite', { env, now: expires, fetcher: () => assert.fail('prazo encerrado') }))
+})
+
 test('configuração inválida ou código WhatsApp não gera registro nem mensagem', async () => {
   const db = contractMemoryDb()
   await assert.rejects(startWhatsappProbe(db, 'code', { env, now }))

@@ -31,7 +31,7 @@ export function connectionProbeConfig(env = process.env, now = Date.now()) {
   const storage = new URL(env.NEXT_PUBLIC_SUPABASE_URL)
   if (storage.protocol !== 'https:' || storage.username || storage.password) throw new ProbeError('Armazenamento de homologação inválido.')
   // Nova ocorrência para a correção do link já recebido; não reabre reservas anteriores.
-  const target = createHmac('sha256', secret).update(JSON.stringify(['private-pdf-button-v3', phone, email, expires])).digest('hex')
+  const target = createHmac('sha256', secret).update(JSON.stringify(['private-pdf-button-window-v4', phone, email, expires])).digest('hex')
   return { phone, email, expires, secret, target, origin: base.origin, storageOrigin: storage.origin }
 }
 
@@ -56,7 +56,11 @@ async function temporaryPdfUrl(db, config, now) {
   const bucket = db.storage.from('contracts'), path = probePath(config)
   const upload = await bucket.upload(path, await probePdf(), { contentType: 'application/pdf', upsert: true, cacheControl: '0' })
   if (upload.error) throw new ProbeError('Não foi possível preparar o PDF demonstrativo.')
-  const signed = await bucket.createSignedUrl(path, Math.max(1, Math.min(7200, Math.floor((config.expires - now) / 1000))))
+  // O ensaio pode ser aberto horas depois do envio. A validade acompanha a
+  // janela autorizada, limitada a 48h pela configuração, sem antecipar seu fim.
+  const validitySeconds = Math.floor((config.expires - now) / 1000)
+  if (validitySeconds < 1) throw new ProbeError('A janela de teste está encerrando.')
+  const signed = await bucket.createSignedUrl(path, validitySeconds)
   if (signed.error || !signed.data?.signedUrl || !validPdfUrl(signed.data.signedUrl, config)) throw new ProbeError('Não foi possível criar o link temporário do PDF.')
   return signed.data.signedUrl
 }
