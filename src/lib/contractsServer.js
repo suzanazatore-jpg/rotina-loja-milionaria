@@ -69,7 +69,7 @@ async function sendWhatsapp(payload, env = process.env, fetcher = fetch, db) {
 
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 export function emailLayout(title, paragraphs, button) {
-  return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#222;line-height:1.5"><h2 style="color:#5b1a26">${escapeHtml(title)}</h2>${paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('')}${button ? `<p style="margin:28px 0"><a href="${escapeHtml(button.url)}" style="background:#5b1a26;color:#fff;padding:14px 26px;border-radius:8px;text-decoration:none;font-weight:bold">${escapeHtml(button.label)}</a></p><p style="font-size:12px;color:#777">Se o botão não abrir, copie o link: ${escapeHtml(button.url)}</p>` : ''}<p style="font-size:12px;color:#777">Suzana Zatorre Educacional</p></div>`
+  return `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#222;line-height:1.5"><h2 style="color:#5b1a26">${escapeHtml(title)}</h2>${paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join('')}${button ? `<p style="margin:28px 0"><a href="${escapeHtml(button.url)}" style="display:inline-block;background:#15803d;color:#fff;padding:14px 26px;border-radius:8px;text-decoration:none;font-weight:bold">${escapeHtml(button.label)}</a></p><p style="font-size:13px;color:#666">Se precisar de ajuda para abrir o documento, responda este e-mail.</p>` : ''}<p style="font-size:12px;color:#777">Suzana Zatorre Educacional</p></div>`
 }
 
 const MESSAGES = {
