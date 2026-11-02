@@ -42,3 +42,11 @@ test('recovery rejects non-admins, arbitrary recipients and unsupported actions 
  for(const action of ['prepare','send'])assert.equal((await post(new Request('https://example.test',{method:'POST',body:JSON.stringify({action})}))).status,200)
  assert.deepEqual(options,[{notify:false,collectMissing:true},{notify:true,collectMissing:false}])
 })
+test('weekly text uses confirmed period totals when one daily click/conversion value is unavailable',async()=>{
+ const {rangeTotals}=await import('../src/lib/trafficReportModel.js')
+ const source=(await readFile(new URL('../src/lib/trafficWeeklyReports.js',import.meta.url),'utf8')).replace(/^import .*\n/gm,'').replace(/^export \{trafficChannels\}.*\n/gm,'').replace(/^export /gm,'')
+ const summary=new Function('rangeTotals',source+';return weeklySummary;')(rangeTotals)
+ const exact=snapshot();exact.payload.totals.clicks=71;exact.payload.campaigns=[{id:'c',spend:70,result_event:'onsite_conversion.messaging_conversation_started_7d',results:2}]
+ const text=summary({name:'Conta'},daily.map(r=>({...r,data_status:'ok',clicks:null})),range,exact).summary
+ assert.match(text,/Cliques no link: 71/);assert.match(text,/Conversas iniciadas: 2/)
+})

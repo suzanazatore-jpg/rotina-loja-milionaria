@@ -7,8 +7,8 @@ import {collectWeeklyAccount} from './trafficWeeklyCollection.js'
 export {trafficChannels} from './trafficNotificationChannels'
 const brl=n=>n==null?'Não informado':n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
 const number=n=>n==null?'Não informado':n.toLocaleString('pt-BR')
-export function weeklySummary(account,rows,range){
- const totals=rangeTotals(rows,range.from,range.to)
+export function weeklySummary(account,rows,range,snapshot){
+ const totals=rangeTotals(rows,range.from,range.to,snapshot)
  const summary=`${account.name} — ${range.from.split('-').reverse().join('/')} a ${range.to.split('-').reverse().join('/')}\nInvestimento: ${brl(totals.spend)}\nImpressões: ${number(totals.impressions)}\nCliques no link: ${number(totals.clicks)}\nCTR do link: ${totals.ctr==null?'Não informado':number(totals.ctr)+'%'}\nCPC do link: ${brl(totals.cpc)}\nLeads: ${number(totals.leads)}\nConversas iniciadas: ${number(totals.messages)}\nCompras: ${number(totals.purchases)}`
  return {totals,summary,recommendations:'Resultados devem ser avaliados de acordo com o objetivo e evento de cada campanha. As recomendações específicas da gestão serão acrescentadas pela equipe.'}
 }
@@ -37,11 +37,12 @@ export async function runTrafficWeekly(now=new Date(),{notify=true,collectMissin
  for(const account of accounts){
   const members=links.filter(l=>l.client_id===account.id);if(!members.length){skipped++;continue}
   const readRows=()=>allRows(()=>db.from('traffic_daily_metrics').select('*').eq('client_id',account.id).gte('metric_date',range.from).lte('metric_date',range.to).order('metric_date'))
-  let rows=await readRows(),content=weeklySummary(account,rows,range)
+  const readSnapshot=async()=>checked(await db.from('traffic_metric_snapshots').select('period_start,period_end,payload').eq('meta_account_id',account.meta_account_id).eq('period_start',range.from).eq('period_end',range.to).maybeSingle())
+  let rows=await readRows(),snapshot=await readSnapshot(),content=weeklySummary(account,rows,range,snapshot)
   let collection
   if(collectMissing&&account.mcp_status==='enabled'&&(content.totals.days!==7||content.totals.spend==null||content.totals.impressions==null)&&Date.now()<deadline){
    collection=await collectWeeklyAccount(db,account,range)
-   if(collection.status==='saved'){rows=await readRows();content=weeklySummary(account,rows,range)}
+   if(collection.status==='saved'){rows=await readRows();snapshot=await readSnapshot();content=weeklySummary(account,rows,range,snapshot)}
   }
   // Never announce a complete weekly report while any day is missing or collection failed.
   if(content.totals.days!==7||content.totals.spend==null||content.totals.impressions==null){skipped++;pending.push({client_id:account.id,name:account.name,days:content.totals.days,reason:collection?.reason||'Coleta da semana incompleta.'});continue}
