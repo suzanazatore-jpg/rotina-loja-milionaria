@@ -250,8 +250,35 @@ Uma falha após o aceite do Pabbly aparece no painel a partir do registro separa
 - [Painel da implantação](https://vercel.com/mariano12/rotina-loja-milionaria/9jrnHeD2mKhG6fqZGRBDPmbK79KH): **Ready**, build de **52 segundos**.
 - [Abrir contratos na homologação](https://rotina-loja-milionaria-git-prep-contracts-conn-f11bec-mariano12.vercel.app/admin/checkout/configuracoes/contratos).
 - URL exata da implantação: `https://rotina-loja-milionaria-574q9s7bh-mariano12.vercel.app`.
-- Acesso pelo Chrome carregou a tela de login do aplicativo. A inspeção autenticada do painel aguarda Suzana entrar nesta nova prévia; não foram extraídas nem transferidas credenciais/sessões de outros hosts.
+- Após Suzana entrar, o painel autenticado foi conferido em 02/11: carregou sem erro, sem contratos emitidos e com módulo/fila/OTP/proteções de envio pausados. Não foram extraídas nem transferidas credenciais/sessões de outros hosts.
 - POST externo vazio ao relay encontrou **HTTP 401 da proteção da Vercel**, antes do aplicativo. Portanto a resposta 503 de pausa foi comprovada localmente, não no receptor remoto. Não foi criado link compartilhável, segredo de bypass ou exceção de proteção. Pabbly também precisará de um caminho autorizado para acessar essa prévia nos testes.
 - Pesquisa das variáveis do projeto não encontrou chaves `CONTRACT`; o código usa os padrões desligados para módulo, fila, OTP e relay. Nenhuma variável foi criada/alterada nem segredo gerado nesta publicação.
 - Produção conferida antes/depois: `002d9c38eaccb0414de4bf64e471747cf0f9ca6e`, implantação `GgA6aCk6uPpZWifo2YhiUQPGAowR`, domínio `rotina.suzanazatorre.com.br`. Sem promoção, merge na main, alteração de alias de produção ou migração.
 - Recuperação: a prévia é independente da produção e não alterou dados. Para comparar, usar as prévias anteriores do projeto; não há mudança de banco para desfazer. Novos commits nesta branch continuam sem deploy automático.
+
+## Conferência autenticada e acesso de teste pendente — 02/11/2026
+
+- Painel: módulo desativado; fila pausada; código WhatsApp pausado; proteções da origem e do intermediário pausadas; BotConversa com configuração pendente; Brevo com chave cadastrada. A presença da chave não comprova entrega de e-mails.
+- Lista: nenhum contrato emitido. Os três modelos (CVM, EVS e Gestão de Tráfego) carregam como versão 1. A conferência técnica das variáveis visíveis nos textos não encontrou campos fora da lista aceita pela interface. Não é uma validação jurídica ou comercial; nenhum texto foi salvo ou alterado.
+- A autenticação de Suzana libera seu navegador, mas não autentica requisições vindas do Pabbly. A proteção HTTP 401 da Vercel continua sendo a dependência externa.
+- A configuração da Vercel contém um segredo de automação existente, identificado como **Pagar.me — webhook sandbox checkout/painel-admin** e designado como variável de sistema. Seu valor não foi revelado, reutilizado, transferido ou revogado.
+
+### Proposta concreta aguardando autorização de acesso
+
+Criar um segredo de automação **separado** para os testes do Pabbly neste projeto, sem substituir o segredo/variável de sistema do Pagar.me. Usar o novo valor somente no cabeçalho `x-vercel-protection-bypass` das três ações API do fluxo de contratos no Pabbly; nunca no repositório, documentação, link público ou mensagem de entrega.
+
+Esse mecanismo da Vercel tem alcance em **todas as implantações protegidas do projeto**, embora sua utilização planejada seja somente no endereço da homologação de contratos. Ele não remove o login do aplicativo nem a validação HMAC do relay. Não configurar exceção pública de domínio nem desligar a proteção global. Ao encerrar os testes, revogar exclusivamente a nova chave; preservar a chave existente do Pagar.me.
+
+| Campo a configurar nas ações API do Pabbly | Valor previsto, sem credenciais |
+| --- | --- |
+| URL fixa | `https://rotina-loja-milionaria-574q9s7bh-mariano12.vercel.app/api/contratos/whatsapp-relay` |
+| `Content-Type` | `application/json` |
+| `x-vercel-protection-bypass` | Nova chave exclusiva de automação, somente após autorização |
+| `Authorization` | `Bearer ` + `relay_token` dinâmico do aplicativo; é independente da chave da Vercel |
+| Corpo | Os nove campos já mapeados, assinados pelo aplicativo |
+
+Após autorização, primeiro comprovar que uma chamada sem dados reais atravessa a Vercel e encontra a resposta de pausa do aplicativo. O fluxo permanece pausado, sem destinatários reais, sem habilitar ofertas nem realizar compra. Configuração do relay, captura de amostra assinada e testes positivos do banco/BotConversa/Brevo continuam como etapas posteriores de homologação; não estão validados pelo login no painel.
+
+Até a decisão de Suzana, nenhuma credencial nova foi criada e nenhuma configuração de acesso/envio foi alterada. A confirmação é necessária porque criar e transmitir a chave concede acesso automatizado adicional ao projeto, além da autorização anterior de publicar a prévia pausada.
+
+Fonte oficial: [Vercel — Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation).
