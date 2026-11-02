@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { contractMemoryDb } from './helpers/contract-memory-db.mjs'
-import { prepareContractWhatsappRelay, handleContractWhatsappRelay, contractWhatsappRelaySummary } from '../src/lib/contractWhatsappRelay.js'
+import { prepareContractWhatsappRelay, handleContractWhatsappRelay, contractWhatsappRelaySummary, contractButtonPath } from '../src/lib/contractWhatsappRelay.js'
 import { sendContractWhatsapp } from '../src/lib/contractWhatsapp.js'
 
 const now = Date.parse('2026-11-02T12:00:00Z')
@@ -19,12 +19,18 @@ test('aplicativo assina o conteúdo e o relay normaliza o schema mapeado pelo Pa
   assert.equal(bridgeBody.relay_url, `${env.CONTRACTS_APP_URL}/api/contratos/whatsapp-relay`)
   assert.match(bridgeBody.relay_token, /^1\.\d{13}\.[A-Za-z0-9_-]{43}$/)
   const calls = []
-  const response = await invoke(db, bridgeBody, { body: { ...payload, schema_version: '1', phone: Number(payload.phone) }, fetcher: async (url, options) => { calls.push(url); assert.equal(options.redirect, 'error'); assert.ok(options.signal instanceof AbortSignal); assert.deepEqual(JSON.parse(options.body), payload); return { ok: true } } })
+  const response = await invoke(db, bridgeBody, { body: { ...payload, schema_version: '1', phone: Number(payload.phone), link_path: 'destino-adulterado' }, fetcher: async (url, options) => { calls.push(url); assert.equal(options.redirect, 'error'); assert.ok(options.signal instanceof AbortSignal); assert.deepEqual(JSON.parse(options.body), { ...payload, link_path: 'assinar/ficticio' }); return { ok: true } } })
   assert.equal(response.status, 200)
   assert.equal((await response.json()).delivery_state, 'provider_accepted')
   assert.deepEqual(calls, [env.CONTRACT_BOTCONVERSA_LINK_RECEIVER_URL])
   const stored = JSON.stringify(db.tables.webhook_events)
   for (const value of [payload.phone, payload.name, payload.message, payload.link, payload.program, bridgeBody.relay_token, env.CONTRACT_WHATSAPP_RELAY_SECRET]) assert.equal(stored.includes(value), false)
+})
+
+test('botão preserva caminho e autorização do documento sem aceitar credenciais ou HTTP', () => {
+  assert.equal(contractButtonPath('https://app.example.invalid/api/contratos/token?pdf=1'), 'api/contratos/token?pdf=1')
+  assert.equal(contractButtonPath('https://storage.example.invalid/storage/file.pdf?token=temporary'), 'storage/file.pdf?token=temporary')
+  for (const link of ['http://example.invalid/a', 'https://user:pass@example.invalid/a', 'https://example.invalid/a#secret', 'invalid']) assert.throws(() => contractButtonPath(link))
 })
 
 test('reexecutar apenas a etapa de envio ou executar concorrentemente não repete o BotConversa', async () => {

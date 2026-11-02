@@ -31,7 +31,7 @@ export function connectionProbeConfig(env = process.env, now = Date.now()) {
   const storage = new URL(env.NEXT_PUBLIC_SUPABASE_URL)
   if (storage.protocol !== 'https:' || storage.username || storage.password) throw new ProbeError('Armazenamento de homologação inválido.')
   // Nova ocorrência para a correção do link já recebido; não reabre reservas anteriores.
-  const target = createHmac('sha256', secret).update(JSON.stringify(['private-pdf-v2', phone, email, expires])).digest('hex')
+  const target = createHmac('sha256', secret).update(JSON.stringify(['private-pdf-button-v3', phone, email, expires])).digest('hex')
   return { phone, email, expires, secret, target, origin: base.origin, storageOrigin: storage.origin }
 }
 

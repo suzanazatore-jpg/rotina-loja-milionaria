@@ -21,6 +21,12 @@ function https(value) {
   if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new RelayError(503)
   return url.href
 }
+// A URL completa permanece no envelope assinado. O receptor usa somente o
+// caminho no botão do modelo, cujo domínio é fixado na aprovação da Meta.
+export function contractButtonPath(link) {
+  const url = new URL(https(link))
+  return url.pathname.replace(/^\/+/, '') + url.search
+}
 export function contractWhatsappRelayConfiguration(env = process.env) {
   const key = env.CONTRACT_WHATSAPP_RELAY_SECRET
   if (!key || key.length < 32) throw new RelayError(503)
@@ -120,7 +126,7 @@ export async function handleContractWhatsappRelay(request, { getDb, env = proces
       const eligible = body.evento === 'contrato_assinado' ? contract.status === 'signed' && Boolean(contract.signed_pdf_path) : ['pending', 'viewed'].includes(contract.status)
       if (!eligible) state = 'canceled'
       else {
-        const sent = await fetcher(body.evento === 'contrato_assinado' ? config.copy : config.link, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000), headers: { 'Content-Type': 'application/json', 'X-Delivery-Id': body.delivery_id }, body: JSON.stringify(body) })
+        const sent = await fetcher(body.evento === 'contrato_assinado' ? config.copy : config.link, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000), headers: { 'Content-Type': 'application/json', 'X-Delivery-Id': body.delivery_id }, body: JSON.stringify({ ...body, link_path: contractButtonPath(body.link) }) })
         if (sent.ok) state = 'accepted'
       }
     } catch { /* Resultado incerto: sem erro bruto ou payload no registro. */ }
