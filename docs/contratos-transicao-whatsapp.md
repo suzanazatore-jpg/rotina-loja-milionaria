@@ -288,3 +288,38 @@ Configuração do relay no servidor, captura de amostra assinada e testes positi
 A confirmação explícita foi obtida antes de criar e transmitir a nova chave, pois ela concede acesso automatizado adicional ao projeto. A autorização de publicação da prévia não foi tratada como autorização implícita dessa concessão de acesso.
 
 Fonte oficial: [Vercel — Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation).
+
+## Configuração restrita à homologação — continuação de 02/11/2026
+
+Após Suzana autorizar a preparação da conexão, foram salvas **12 variáveis exclusivamente em Preview, na branch `prep/contracts-connection-review`**, pelo painel do projeto existente da Vercel. A busca inicial por `CONTRACT` não encontrou variáveis anteriores. Nenhuma variável de produção ou de outra branch foi substituída.
+
+| Variável | Configuração salva |
+| --- | --- |
+| `CONTRACT_WHATSAPP_RELAY_SECRET` | Secret exclusivo, gerado com aleatoriedade criptográfica, 64 caracteres; valor omitido |
+| `CONTRACT_TOKEN_SECRET` | Outro Secret exclusivo de 64 caracteres, para links/OTP de homologação; preservar depois de emitir contratos de teste |
+| `CONTRACT_BOTCONVERSA_LINK_RECEIVER_URL` | Secret: receptor privado de convite/lembrete, conferido no BotConversa |
+| `CONTRACT_BOTCONVERSA_COPY_RECEIVER_URL` | Secret: receptor privado da cópia, distinto do anterior |
+| `CONTRACT_BOTCONVERSA_WEBHOOK_URL` | Secret: entrada do fluxo de preparação do Pabbly; não é um envio direto ao BotConversa |
+| `CONTRACTS_APP_URL` | URL da branch de homologação, salva como Secret: `https://rotina-loja-milionaria-git-prep-contracts-conn-f11bec-mariano12.vercel.app` |
+| `CONTRACTS_ENABLED` | Config: `false` |
+| `CONTRACT_DELIVERY_QUEUE_ENABLED` | Config: `false` |
+| `CONTRACT_WHATSAPP_OTP_ENABLED` | Config: `false` |
+| `CONTRACT_WHATSAPP_DISPATCH_GUARD_ENABLED` | Config: `false` |
+| `CONTRACT_BOTCONVERSA_RELAY_ENABLED` | Config: `false` |
+| `CONTRACT_WHATSAPP_PROVIDER` | Config: `disabled` |
+
+Os dois receptores do BotConversa foram novamente observados em Modo Teste. Os segredos foram preenchidos somente nos campos autorizados da Vercel, sem arquivo de credenciais, repositório, documentação ou mensagem de entrega contendo os valores. Os valores secretos não foram revelados após salvar.
+
+As ações 4, 6 e 9 do Pabbly foram alinhadas ao endereço **fixo da branch**, terminando em `/api/contratos/whatsapp-relay`, para coincidir com `CONTRACTS_APP_URL` e permitir reaplicar a mesma prévia. Após recarregar o fluxo, foram conferidos nas três ações o endereço, o cabeçalho `x-vercel-protection-bypass` e os nove campos dinâmicos preservados. `Authorization: Bearer` + `relay_token` **continua pendente**; não há token fixo configurado.
+
+Tentou-se preparar uma nova amostra somente para mapeamento, com dados fictícios e marcador de token explicitamente inválido. O Pabbly exigiu ativar o fluxo para recapturar; essa ação foi **cancelada**. A tentativa de POST da amostra retornou erro HTTP, sem comprovar captura. A amostra anterior não foi substituída nem o campo novo mapeado. O fluxo foi conferido desligado após recarregar; não foi habilitado para contornar esse requisito. Nenhuma mensagem real, reserva no banco ou compra foi executada.
+
+### Aplicação das variáveis ainda bloqueada pela reautenticação
+
+A Vercel confirmou o salvamento das variáveis e informou que é necessária nova implantação para aplicá-las. Foi preparada a opção **Redeploy da implantação Preview `9jrnHeD2mKhG6fqZGRBDPmbK79KH`, commit `83af1a8`**, com o mesmo código e o alias da branch. Antes de iniciar a nova implantação, a Vercel abriu **Reauthenticate**, exigindo verificação por e-mail da titular. Não foi inserido código, iniciado deploy de produção, promovida prévia ou alterado o código da aplicação. Não se declara a configuração já carregada no runtime: a reaplicação depende da verificação feita pela usuária diretamente na Vercel.
+
+O remetente previsto no código do Brevo é `Suzana Zatorre <suporte@suzanazatorre.com.br>`. Convite e lembrete explicam a dependência da assinatura quando aplicável; a cópia orienta acompanhar o acesso e inclui PDF em anexo. Essa conferência do código não comprova aprovação do remetente, entrega, recebimento, lembretes ou registro de falhas no Brevo. Os modelos WhatsApp revisados continuam como proposta; não houve submissão à Meta.
+
+Próximas etapas: concluir reautenticação e reaplicar somente Preview; conferir o painel com a configuração carregada e as pausas mantidas; planejar a captura de uma amostra realmente assinada e a autorização temporária do fluxo de teste; mapear o token; homologar banco, BotConversa e Brevo com destinatário de teste autorizado; somente então realizar a compra completa. A chave exclusiva de acesso do Pabbly à Vercel continua sujeita à revogação ao encerrar a homologação. Esta etapa não alterou código nem executou novamente a suíte automatizada; as últimas evidências de 297 testes continuam separadas dos testes reais pendentes.
+
+Fontes oficiais conferidas nesta etapa: [variáveis de ambiente](https://vercel.com/docs/environment-variables) e [Config/Secret](https://vercel.com/docs/environment-variables/sensitive-environment-variables).
