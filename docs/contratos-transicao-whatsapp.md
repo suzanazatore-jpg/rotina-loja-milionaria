@@ -1,6 +1,6 @@
 # Contratos: preparação BotConversa → Papo_reto
 
-Atualização em 02/11/2026: o pacote inicial foi publicado pelo PR #27. Os ajustes desta revisão estão em preparação, sem publicar o aplicativo, alterar variáveis remotas, ativar ofertas, enviar mensagens reais ou realizar compra. A base atual é a main `002d9c3`. O deploy automático da branch `prep/contracts-connection-review` está desabilitado no próprio `vercel.json`; essa regra não muda as demais branches.
+Atualização em 02/11/2026: o pacote inicial foi publicado pelo PR #27. Após autorização de Suzana, esta revisão foi publicada **somente em homologação**, no commit `83af1a8`, com envios desligados. Produção permanece na main `002d9c3`; nenhuma variável remota, oferta, mensagem real, compra ou dado do banco foi alterado. O deploy automático da branch `prep/contracts-connection-review` continua desabilitado no próprio `vercel.json`; a homologação foi criada manualmente no projeto existente.
 
 Os ajustes anteriores que ficaram somente na pasta temporária não estavam disponíveis nesta sessão. Foram refeitos sobre a main atual: campo `program`, chave separada de OTP e revisão de mensagens. Os commits locais antigos não foram tratados como código recuperado nem como publicado.
 
@@ -182,7 +182,7 @@ As três novas chaves da preparação permanecem desligadas no exemplo: fila, OT
 
 ## Envio protegido após o Pabbly — próxima revisão de 02/11
 
-**Implementado no código, ainda não publicado nem conectado nas ações do Pabbly.** A proteção anterior continua na origem. A nova etapa cobre também a reexecução isolada da ação no Pabbly, que poderia pular uma trava colocada em uma etapa anterior.
+**Implementado e publicado somente em homologação, ainda não conectado nas ações do Pabbly.** A proteção anterior continua na origem. A nova etapa cobre também a reexecução isolada da ação no Pabbly, que poderia pular uma trava colocada em uma etapa anterior.
 
 O caminho preparado passa a ser: aplicativo → Pabbly → receptor protegido do aplicativo → BotConversa. Cada ação de envio do Pabbly deverá chamar `/api/contratos/whatsapp-relay`, em vez de chamar diretamente o webhook privado do BotConversa. Não há uma etapa separada de “consultar se já foi enviado”: a reserva e o HTTP ao BotConversa pertencem à mesma operação no servidor. Assim, repetir somente a ação também passa pela proteção.
 
@@ -214,7 +214,7 @@ O aplicativo acrescenta `relay_url` e `relay_token` ao payload enviado ao Pabbly
 | Reexecuções | A mesma ocorrência conserva `delivery_id`, conteúdo e token; não criar identificador novo para uma repetição automática |
 | Ações que chamam diretamente BotConversa | Substituir as três; não deixar um segundo caminho direto ou uma etapa extra de envio após o relay |
 
-As três ações atuais do Pabbly **ainda apontam diretamente ao BotConversa**. Não foram alteradas para um endpoint inexistente nem ativadas. A amostra do gatilho ainda não contém os novos campos. É necessário publicar uma versão de homologação, configurar exclusivamente destinos de teste e capturar um POST JSON assinado antes de mapear e exercitar essas ações. Não usar um token fixo fictício como se fosse uma integração funcional.
+As três ações atuais do Pabbly **ainda apontam diretamente ao BotConversa** e permanecem pausadas. A amostra do gatilho ainda não contém os novos campos. A versão de homologação foi publicada; falta resolver o acesso autorizado do Pabbly à prévia protegida, configurar exclusivamente destinos de teste e capturar um POST JSON assinado antes de mapear e exercitar essas ações. Não usar um token fixo fictício como se fosse uma integração funcional.
 
 O OTP continua sem caminho neste relay. O modelo está rejeitado e essa entrega não deve aguardar 24 horas numa automação. Se tentarem habilitar código por WhatsApp junto ao relay, o adaptador bloqueia o envio. Sua homologação posterior exige um fluxo próprio com validade curta e proteção da geração atual do código. Os códigos por e-mail continuam independentes.
 
@@ -238,6 +238,20 @@ Uma falha após o aceite do Pabbly aparece no painel a partir do registro separa
 
 - 297 testes aprovados na suíte completa, incluindo 12 testes novos de relay: concorrência, reexecução isolada, timeout, HTTP negativo, recibo perdido, adulteração do conteúdo/ambiente, token vencido, ausência de reserva, pausa, contratos inelegíveis e isolamento de destinos.
 - ESLint dos arquivos alterados, `git diff --check` e build Next.js 16.2.9 aprovados. A rota foi exercitada por HTTP local e respondeu 503, “Receptor pausado”, com todas as chaves desligadas.
-- Os testes positivos de envio/banco usam simulações. Não houve operação de mensagem nem reserva no Supabase remoto; publicação e homologação real continuam pendentes.
-- Fluxo do Pabbly confirmado pausado nesta sessão. Não foi acionada recaptura nem executada uma mensagem real. A conexão do relay no Pabbly permanece pendente de homologação publicada.
+- Os testes positivos de envio/banco usam simulações. Não houve operação de mensagem nem reserva no Supabase remoto; a publicação de homologação foi concluída e os testes reais de integração continuam pendentes.
+- Fluxo do Pabbly continua pausado. Não foi acionada recaptura nem executada uma mensagem real. A conexão do relay no Pabbly permanece pendente de configuração e teste autorizado.
 - Fonte oficial consultada: [Pabbly — reexecução de etapas e ações API](https://forum.pabbly.com/threads/how-to-track-node-level-logs-enable-retries-and-use-rest-api-integrations-in-pabbly-connect.214474).
+
+## Publicação de homologação — 02/11/2026
+
+- Autorizada por Suzana para publicar somente a prévia, mantendo envios desligados e produção inalterada.
+- Projeto existente: `Mariano12 / rotina-loja-milionaria`; ambiente **Preview**. Sem novo projeto, domínio ou serviço.
+- Commit implantado: `83af1a8d0ade848726f377bc824c8923d829362f`; branch `prep/contracts-connection-review`.
+- [Painel da implantação](https://vercel.com/mariano12/rotina-loja-milionaria/9jrnHeD2mKhG6fqZGRBDPmbK79KH): **Ready**, build de **52 segundos**.
+- [Abrir contratos na homologação](https://rotina-loja-milionaria-git-prep-contracts-conn-f11bec-mariano12.vercel.app/admin/checkout/configuracoes/contratos).
+- URL exata da implantação: `https://rotina-loja-milionaria-574q9s7bh-mariano12.vercel.app`.
+- Acesso pelo Chrome carregou a tela de login do aplicativo. A inspeção autenticada do painel aguarda Suzana entrar nesta nova prévia; não foram extraídas nem transferidas credenciais/sessões de outros hosts.
+- POST externo vazio ao relay encontrou **HTTP 401 da proteção da Vercel**, antes do aplicativo. Portanto a resposta 503 de pausa foi comprovada localmente, não no receptor remoto. Não foi criado link compartilhável, segredo de bypass ou exceção de proteção. Pabbly também precisará de um caminho autorizado para acessar essa prévia nos testes.
+- Pesquisa das variáveis do projeto não encontrou chaves `CONTRACT`; o código usa os padrões desligados para módulo, fila, OTP e relay. Nenhuma variável foi criada/alterada nem segredo gerado nesta publicação.
+- Produção conferida antes/depois: `002d9c38eaccb0414de4bf64e471747cf0f9ca6e`, implantação `GgA6aCk6uPpZWifo2YhiUQPGAowR`, domínio `rotina.suzanazatorre.com.br`. Sem promoção, merge na main, alteração de alias de produção ou migração.
+- Recuperação: a prévia é independente da produção e não alterou dados. Para comparar, usar as prévias anteriores do projeto; não há mudança de banco para desfazer. Novos commits nesta branch continuam sem deploy automático.
