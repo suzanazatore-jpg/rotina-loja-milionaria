@@ -365,3 +365,24 @@ O texto aprovado de WhatsApp ainda promete assinatura/liberação automática e 
 Fontes oficiais consultadas para a correção: [Supabase — upload](https://supabase.com/docs/reference/javascript/storage-from-upload) e [URL assinada de arquivo](https://supabase.com/docs/reference/javascript/storage-from-createsignedurl).
 
 Correções do link e da normalização numérica: **308 testes aprovados**, nenhum erro ou teste ignorado; ESLint dos arquivos alterados, `git diff --check` e novo build Next.js aprovados. A validação do novo link temporário com HTTP sem sessão e o novo envio continuam dependentes da implantação desta correção.
+
+### Correção publicada em Preview e transportes conferidos — 02/11/2026
+
+O commit `20e6351e74e5515382daf5d769b2a4984b9fa6e6` foi publicado somente em Preview, implantação [`9PzhH5MJGAJegqKN8x8cbAVptbVm`](https://vercel.com/mariano12/rotina-loja-milionaria/9PzhH5MJGAJegqKN8x8cbAVptbVm), **Ready**. Host imutável: `https://rotina-loja-milionaria-baay5aht2-mariano12.vercel.app`; alias da branch preservado. Não houve merge, promoção para produção, migração ou mudança de RLS. Os 308 testes e o build aprovados correspondem a esse código; esta atualização posterior é apenas documental e não inicia novo deploy.
+
+A URL assinada do PDF demonstrativo foi testada por HTTP **sem cookies, autenticação ou sessão**: resposta 200, `application/pdf`, assinatura `%PDF-`, duas páginas e marcação explícita **SEM VALIDADE CONTRATUAL**. O bucket continua privado. Não se colocou a chave de bypass da Vercel no link. A URL de arquivo resolve somente a demonstração de abertura do PDF; não valida a página real de assinatura nem a futura entrega de contrato comercial.
+
+O convite corrigido foi aceito pelo BotConversa no teste isolado da ação 4. O link corrigido também foi solicitado por e-mail e aceito pelo Brevo. Em seguida, com os dois receptores e o fluxo de homologação temporariamente habilitados, os eventos de lembrete e cópia demonstrativa percorreram automaticamente Pabbly → relay protegido → BotConversa e ficaram `accepted` na origem e no relay. A conversão numérica do telefone deixou de bloquear esses eventos. Estes são testes imediatos de transporte; não comprovam o agendamento de 24/48/72 horas.
+
+| Ensaio corrigido | Referência técnica | Evidência |
+| --- | --- | --- |
+| Link WhatsApp | `probe-5710dcfda4a862a09a0780c0cce83a6ef200af89` | Relay `a7c6e087b361c9b65046abbe09fe829200aace5ff747c88da19c66885f984e92`, aceito em 18:23:55 UTC |
+| Link e-mail | Mesma amostra, sufixo `:email` | Brevo aceitou em 18:24:10 UTC, `messageId` registrado no histórico restrito |
+| Lembrete WhatsApp | `probe-20e3e918749732d7ba0c85224bd128e5b31959b8` | Relay `ec3c8b479296cc37c14cea0af9a13ea71572086634d7d29eb80d50ade935d461`, aceito em 18:27:55 UTC |
+| PDF demonstrativo WhatsApp | `probe-a505a30b97b8cb76b5dc88e8f10bd1af5533fc56` | Relay `a2e9ad968e9a0aab71007660e97ec67b433a786277ce0b8accb4877825197afa`, aceito em 18:28:09 UTC |
+
+O aceite dos serviços não comprova recebimento ou leitura dos novos envios. A confirmação da usuária por print corresponde à primeira mensagem, cujo link estava incorreto. A abertura anônima foi comprovada tecnicamente para o novo arquivo; a confirmação pelo celular da usuária continua pendente. As quatro modalidades iniciais de e-mail permanecem registradas como aceitas, sem confirmação de caixa postal.
+
+Ao terminar, **Pabbly desligado e os dois receptores do BotConversa em Modo Teste**. As opções originais foram restauradas em ambos: criação/atualização de nome marcada, consentimento desmarcado. Nenhum nome de contato foi sobrescrito pelos ensaios. A contagem de contratos continua **zero**. Módulo, fila, provedor, OTP e relay geral de clientes permanecem pausados. A janela interna fixa continua com expiração de 03/11/2026 às 14:43:26 de Brasília; não foi prorrogada.
+
+Continuam pendentes a revisão dos textos aprovados pela Meta, o modelo de código WhatsApp rejeitado, a página real de assinatura acessível ao destinatário autorizado, a compra completa, os bloqueios de acesso, a assinatura/PDF final, boas-vindas, agendamento e recuperação de falhas. As três ações Pabbly ainda usam a rota exclusiva de teste; devem voltar à rota geral antes da ativação comercial. A chave exclusiva de automação da Vercel deve ser revogada ao encerrar toda a homologação, preservando a chave do Pagar.me.
