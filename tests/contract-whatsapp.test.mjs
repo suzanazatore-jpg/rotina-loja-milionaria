@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { contractPhone, contractWhatsappConfiguration, contractWhatsappReady, sendContractWhatsapp, CONTRACT_WHATSAPP_EVENTS } from '../src/lib/contractWhatsapp.js'
 
-const payload = { contract_id: 'contract-test', evento: 'contrato_enviado', name: 'Cliente Teste', phone: '(84) 99999-9999', message: 'Mensagem de teste', link: 'https://example.invalid/assinar/test', delivery_id: 'delivery-test-1' }
+const payload = { contract_id: 'contract-test', evento: 'contrato_enviado', name: 'Cliente Teste', program: 'Programa teste', phone: '(84) 99999-9999', message: 'Mensagem de teste', link: 'https://example.invalid/assinar/test', delivery_id: 'delivery-test-1' }
 test('webhook legado e Papo_reto usam o mesmo contrato de dados, com um único destino', async () => {
   const calls = []
   const fetcher = async (url, options) => { calls.push({ url, options, body: JSON.parse(options.body) }); return { ok: true } }
@@ -29,7 +29,7 @@ test('eventos do contrato, número brasileiro, HTTPS e timeout são controlados'
   assert.equal(contractPhone('123'), null)
   for (const destination of ['http://bot.example.invalid', 'https://user:secret@bot.example.invalid', 'invalid']) assert.throws(() => contractWhatsappConfiguration({ CONTRACT_WHATSAPP_WEBHOOK_URL: destination }))
   assert.throws(() => contractWhatsappConfiguration({ CONTRACT_WHATSAPP_PROVIDER: 'unknown' }))
-  const env = { CONTRACT_WHATSAPP_WEBHOOK_URL: 'https://bot.example.invalid' }
+  const env = { CONTRACT_WHATSAPP_WEBHOOK_URL: 'https://bot.example.invalid', CONTRACT_WHATSAPP_OTP_ENABLED: 'true' }
   for (const evento of CONTRACT_WHATSAPP_EVENTS) await sendContractWhatsapp({ ...payload, evento }, env, async (_url, options) => { assert.ok(options.signal instanceof AbortSignal); return { ok: true } })
   await assert.rejects(sendContractWhatsapp({ ...payload, evento: 'release_access' }, env), /event_invalid/)
   await assert.rejects(sendContractWhatsapp(payload, env, async () => ({ ok: false, status: 503 })), /http_503/)

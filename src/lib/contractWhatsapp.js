@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { contractWhatsappDispatchGuardEnabled, runContractWhatsappDispatch } from './contractWhatsappDispatch.js'
 
 export const CONTRACT_WHATSAPP_EVENTS = ['contrato_enviado', 'contrato_lembrete', 'contrato_codigo', 'contrato_assinado']
 
@@ -28,21 +29,32 @@ export function contractWhatsappReady(env = process.env) {
   try { return contractWhatsappConfiguration(env).ready } catch { return false }
 }
 
-export async function sendContractWhatsapp(payload, env = process.env, fetcher = fetch) {
+export function contractWhatsappCodeReady(env = process.env) {
+  return env.CONTRACT_WHATSAPP_OTP_ENABLED === 'true' && contractWhatsappReady(env)
+}
+
+export async function sendContractWhatsapp(payload, env = process.env, fetcher = fetch, deps = {}) {
   const config = contractWhatsappConfiguration(env)
   const phone = contractPhone(payload.phone)
   if (!config.ready || !phone) return { status: 'skipped', provider: config.provider }
   if (!CONTRACT_WHATSAPP_EVENTS.includes(payload.evento)) throw new Error('whatsapp_event_invalid')
+  if (payload.evento === 'contrato_codigo' && !contractWhatsappCodeReady(env)) return { status: 'skipped', provider: config.provider }
+  const guarded = contractWhatsappDispatchGuardEnabled(env)
+  if (guarded && !payload.delivery_id && payload.evento !== 'contrato_codigo') throw new Error('whatsapp_stable_delivery_id_required')
   const deliveryId = payload.delivery_id || randomUUID()
   if (!/^[a-zA-Z0-9:_-]{1,160}$/.test(deliveryId)) throw new Error('whatsapp_delivery_id_invalid')
   // Campos compatíveis com o webhook atual. O protocolo v1 é o contrato do receptor futuro.
-  const body = { schema_version: 1, delivery_id: deliveryId, contract_id: payload.contract_id, evento: payload.evento, name: payload.name, phone, message: payload.message, ...(payload.link ? { link: payload.link } : {}), ...(payload.code ? { code: payload.code } : {}) }
-  const response = await fetcher(config.url, {
-    method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
-    headers: { 'Content-Type': 'application/json', 'X-Delivery-Id': deliveryId, ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}) },
-    body: JSON.stringify(body),
-  })
-  if (!response.ok) throw new Error(`whatsapp_http_${response.status}`)
+  const body = { schema_version: 1, delivery_id: deliveryId, contract_id: payload.contract_id, evento: payload.evento, name: payload.name, phone, message: payload.message, ...(payload.program ? { program: payload.program } : {}), ...(payload.link ? { link: payload.link } : {}), ...(payload.code ? { code: payload.code } : {}) }
+  const transmit = async () => {
+    const response = await fetcher(config.url, {
+      method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
+      headers: { 'Content-Type': 'application/json', 'X-Delivery-Id': deliveryId, ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}) },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) throw new Error(`whatsapp_http_${response.status}`)
+  }
+  if (guarded) return runContractWhatsappDispatch(deps.db, { delivery_id: deliveryId, contract_id: payload.contract_id, evento: payload.evento, provider: config.provider }, transmit, { env, now: deps.now })
+  await transmit()
   // "sent" preserva o contrato legado; delivery_state é somente aceite HTTP, não entrega/leitura.
   return { status: 'sent', delivery_state: 'accepted', provider: config.provider, delivery_id: deliveryId }
 }

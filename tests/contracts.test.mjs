@@ -11,7 +11,7 @@ const url = name => {
 }
 const T = await import(url('contractTemplates'))
 const S = await import(url('contractsServer'))
-const env = { CONTRACTS_ENABLED: 'true', CONTRACT_TOKEN_SECRET: 'x'.repeat(40), CONTRACTS_APP_URL: 'https://app.test' }
+const env = { CONTRACTS_ENABLED: 'true', CONTRACT_WHATSAPP_OTP_ENABLED: 'true', CONTRACT_TOKEN_SECRET: 'x'.repeat(40), CONTRACTS_APP_URL: 'https://app.test' }
 Object.assign(process.env, env)
 
 // Banco simulado mínimo com filtros eq/neq/in/lte/lt e retorno de linhas.
@@ -138,6 +138,39 @@ test('assinatura exige CPF da compra, código válido e desenho; libera a trava'
   const gate = await S.contractGate(db, order, deps)
   assert.equal(gate.blocked, false); assert.equal(gate.signed, true)
   assert.ok(db.tables.contract_events.some(e => e.type === 'signed'))
+})
+
+test('WhatsApp pausado não altera OTP e permite solicitar o código por e-mail', async () => {
+  const db = fixture(), calls = []
+  const paused = { ...env, CONTRACT_WHATSAPP_OTP_ENABLED: 'false', CONTRACT_WHATSAPP_WEBHOOK_URL: 'https://wa.test/hook', BREVO_API_KEY: 'fake' }
+  const { contract_id } = await S.contractGate(db, order, { env: paused, fetcher: okFetch(calls) })
+  const token = S.contractToken(contract_id)
+  const before = structuredClone(db.tables.contracts[0])
+  await assert.rejects(S.requestContractCode(db, token, 'whatsapp', {}, { env: paused, fetcher: () => assert.fail('não enviar') }), /Use o e-mail/)
+  assert.deepEqual(db.tables.contracts[0], before)
+  const oldFlag = process.env.CONTRACT_WHATSAPP_OTP_ENABLED
+  const oldUrl = process.env.CONTRACT_WHATSAPP_WEBHOOK_URL
+  try {
+    Object.assign(process.env, { CONTRACT_WHATSAPP_OTP_ENABLED: 'false', CONTRACT_WHATSAPP_WEBHOOK_URL: paused.CONTRACT_WHATSAPP_WEBHOOK_URL })
+    assert.equal((await S.viewContract(db, token)).channels.whatsapp, false)
+  } finally {
+    if (oldFlag === undefined) delete process.env.CONTRACT_WHATSAPP_OTP_ENABLED; else process.env.CONTRACT_WHATSAPP_OTP_ENABLED = oldFlag
+    if (oldUrl === undefined) delete process.env.CONTRACT_WHATSAPP_WEBHOOK_URL; else process.env.CONTRACT_WHATSAPP_WEBHOOK_URL = oldUrl
+  }
+  assert.equal((await S.requestContractCode(db, token, 'email', {}, { env: paused, fetcher: okFetch(calls) })).sent, true)
+  assert.equal(db.tables.contracts[0].otp_sent_count, 1)
+})
+
+test('mensagens identificam o programa e só condicionam o acesso quando a compra exige assinatura', async () => {
+  for (const gated of [true, false]) {
+    const db = fixture(), calls = []
+    db.tables.offers[0].checkout_config.contract.gate_access = gated
+    await S.contractGate(db, order, { env: { ...env, CONTRACT_WHATSAPP_WEBHOOK_URL: 'https://wa.test/hook' }, fetcher: okFetch(calls) })
+    const message = calls.at(-1).body
+    assert.equal(message.program, db.tables.contracts[0].fields.programa)
+    assert.equal(message.message.includes('depende da assinatura'), gated)
+    assert.doesNotMatch(message.message, /2 minutos|na hora/)
+  }
 })
 
 test('editar a oferta não remove a exigência de um contrato emitido', async () => {

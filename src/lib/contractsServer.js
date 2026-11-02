@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 import { contractConfig, buildContractFields, renderContract, sameDocument, maskDocument, maskEmail, maskPhone, formatDocument, REMINDER_HOURS } from './contractTemplates.js'
 import { buildContractPdf } from './contractPdf.js'
-import { contractPhone, contractWhatsappReady, sendContractWhatsapp } from './contractWhatsapp.js'
+import { contractPhone, contractWhatsappCodeReady, sendContractWhatsapp } from './contractWhatsapp.js'
 import { contractQueueEnabled, enqueueContractTask, runContractTask } from './contractTaskQueue.js'
 
 export { contractPhone } from './contractWhatsapp.js'
@@ -61,8 +61,8 @@ async function sendEmail({ to, name, subject, html, text, attachment, tag }, env
   return { status: 'sent' }
 }
 
-async function sendWhatsapp(payload, env = process.env, fetcher = fetch) {
-  return sendContractWhatsapp(payload, env, fetcher)
+async function sendWhatsapp(payload, env = process.env, fetcher = fetch, db) {
+  return sendContractWhatsapp(payload, env, fetcher, { db })
 }
 
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -71,8 +71,8 @@ function emailLayout(title, paragraphs, button) {
 }
 
 const MESSAGES = {
-  invite: (first, program) => ({ subject: `Seu contrato ${program} está pronto para assinatura`, lead: `Oi, ${first}! Seu pagamento foi confirmado. Para liberar o seu acesso, falta só assinar o contrato do ${program}. Leva menos de 2 minutos, direto pelo celular.` }),
-  reminder: (first, program) => ({ subject: `Lembrete: assine o contrato ${program} para liberar seu acesso`, lead: `Oi, ${first}! Seu contrato do ${program} ainda está aguardando assinatura. Assim que assinar, seu acesso é liberado na hora.` }),
+  invite: (first, program, gated) => ({ subject: `Seu contrato ${program} está pronto para assinatura`, lead: `Oi, ${first}! Seu pagamento foi confirmado. O contrato do ${program} está disponível para leitura e assinatura.${gated ? ' A liberação do acesso depende da assinatura. Depois de assinar, acompanhe o andamento na página do contrato.' : ' Acompanhe o andamento na página do contrato.'}` }),
+  reminder: (first, program, gated) => ({ subject: `Lembrete: contrato ${program} aguardando assinatura`, lead: `Oi, ${first}! Seu contrato do ${program} ainda está aguardando assinatura.${gated ? ' A liberação do acesso depende da assinatura. Depois de assinar, acompanhe o andamento na página do contrato.' : ' Acompanhe o andamento na página do contrato.'}` }),
 }
 
 export async function sendContractInvite(db, contract, customer, kind = 'invite', deps = {}) {
@@ -100,11 +100,12 @@ async function deliverContractInvite(db, contract, customer, kind, deps = {}) {
   const url = signingUrl(contract.id, env)
   const first = String(customer.name || '').trim().split(/\s+/)[0] || 'tudo bem'
   const program = contract.fields?.programa || 'seu programa'
-  const msg = MESSAGES[kind](first, program)
+  const gated = contract.fields?._gate_access ?? contract.fulfillment_status !== 'not_gated'
+  const msg = MESSAGES[kind](first, program, gated)
   const results = {}
   for (const [channel, run] of [
     ['email', () => sendEmail({ to: customer.email, name: customer.name, subject: msg.subject, html: emailLayout(msg.subject, [msg.lead], { url, label: 'Ler e assinar o contrato' }), text: `${msg.lead}\n\n${url}`, tag: `contract-${kind}:${contract.id}` }, env, fetcher)],
-    ['whatsapp', () => sendWhatsapp({ evento: kind === 'invite' ? 'contrato_enviado' : 'contrato_lembrete', contract_id: contract.id, name: customer.name, phone: customer.phone, link: url, message: `${msg.lead}\n\n👉 ${url}`, delivery_id: deps.deliveryId }, env, fetcher)],
+    ['whatsapp', () => sendWhatsapp({ evento: kind === 'invite' ? 'contrato_enviado' : 'contrato_lembrete', contract_id: contract.id, name: customer.name, phone: customer.phone, program, link: url, message: `${msg.lead}\n\n👉 ${url}`, delivery_id: deps.deliveryId }, env, fetcher, db)],
   ]) {
     if (deps.channel && deps.channel !== channel) continue
     try { results[channel] = (await run()).status } catch { results[channel] = 'failed' }
@@ -207,7 +208,7 @@ export async function viewContract(db, token, meta = {}) {
     body: contract.body,
     original_sha256: contract.original_sha256,
     signer: { name: customer.name, document: maskDocument(customer.document), email: maskEmail(customer.email), phone: maskPhone(customer.phone) },
-    channels: { whatsapp: Boolean(contractPhone(customer.phone) && contractWhatsappReady()), email: Boolean(customer.email && process.env.BREVO_API_KEY) },
+    channels: { whatsapp: Boolean(contractPhone(customer.phone) && contractWhatsappCodeReady()), email: Boolean(customer.email && process.env.BREVO_API_KEY) },
     signed_at: contract.signed_at,
     has_pdf: Boolean(contract.signed_pdf_path),
     access_status: contract.fulfillment_status || 'awaiting_signature',
@@ -221,6 +222,7 @@ export async function requestContractCode(db, token, channel, meta = {}, deps = 
   const { contract, customer } = await loadByToken(db, token)
   if (contract.status === 'signed') throw new ContractError('Este contrato já foi assinado.', 409)
   if (contract.status === 'canceled') throw new ContractError('Este contrato foi cancelado.', 410)
+  if (channel === 'whatsapp' && !contractWhatsappCodeReady(env)) throw new ContractError('Código por WhatsApp indisponível. Use o e-mail.', 503)
   if (contract.otp_sent_count >= OTP_MAX_SENDS) throw new ContractError('Limite de códigos atingido. Fale com o suporte.', 429)
   if (contract.otp_expires_at && new Date(contract.otp_expires_at).getTime() - OTP_MINUTES * 60e3 > now - OTP_COOLDOWN_SECONDS * 1e3) throw new ContractError('Aguarde alguns segundos para pedir um novo código.', 429)
   const code = String(randomInt(0, 1e6)).padStart(6, '0')
@@ -231,7 +233,7 @@ export async function requestContractCode(db, token, channel, meta = {}, deps = 
   try {
     status = channel === 'email'
       ? (await sendEmail({ to: customer.email, name: customer.name, subject: `Código de assinatura: ${code}`, html: emailLayout('Seu código de assinatura', [text]), text, tag: `contract-otp:${contract.id}` }, env, fetcher)).status
-      : (await sendWhatsapp({ evento: 'contrato_codigo', contract_id: contract.id, name: customer.name, phone: customer.phone, code, message: text }, env, fetcher)).status
+      : (await sendWhatsapp({ evento: 'contrato_codigo', contract_id: contract.id, name: customer.name, phone: customer.phone, program: contract.fields?.programa, code, message: text }, env, fetcher, db)).status
   } catch { status = 'failed' }
   await logContractEvent(db, contract.id, 'otp_sent', { channel, ip: meta.ip, userAgent: meta.userAgent, detail: { status } })
   if (status !== 'sent') throw new ContractError('Não conseguimos enviar o código por esse canal. Tente o outro.', 502)
@@ -333,7 +335,7 @@ export async function deliverContractNotification(db, task, deliveryId, deps = {
       const pdf = Buffer.from(await file.data.arrayBuffer())
       result = await sendEmail({ to: customer.email, name: customer.name, subject, html: emailLayout(subject, [lead], { url: download, label: 'Baixar contrato assinado' }), text: `${lead}\n\n${download}`, attachment: { name: 'contrato-assinado.pdf', content: pdf.toString('base64') }, tag: `contract-signed:${contract.id}` }, env, fetcher)
     } else {
-      result = await sendWhatsapp({ evento: 'contrato_assinado', contract_id: contract.id, name: customer.name, phone: customer.phone, link: download, message: `${lead}\n\n${download}`, delivery_id: deliveryId }, env, fetcher)
+      result = await sendWhatsapp({ evento: 'contrato_assinado', contract_id: contract.id, name: customer.name, phone: customer.phone, program: contract.fields?.programa, link: download, message: `${lead}\n\n${download}`, delivery_id: deliveryId }, env, fetcher, db)
     }
   } catch { result = { status: 'failed' } }
   await logContractEvent(db, contract.id, 'signed_copy_sent', { channel: task.channel, detail: { status: result.status, ...(deliveryId ? { delivery_id: deliveryId, delivery_state: result.status === 'sent' ? 'accepted' : result.status } : {}) } })

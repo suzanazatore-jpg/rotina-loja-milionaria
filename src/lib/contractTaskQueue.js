@@ -38,11 +38,12 @@ export async function runContractTask(db, key, dispatch, { env = process.env, no
   let outcome
   try { outcome = await dispatch(task, key) } catch { outcome = { status: 'retry' } }
   const done = ['sent', 'completed', 'canceled'].includes(outcome?.status)
+  const review = outcome?.status === 'review'
   const failed = !done && payload.attempts >= MAX_ATTEMPTS
-  const savedPayload = { ...payload, state: outcome?.status === 'sent' ? 'accepted' : done ? outcome.status : failed ? 'failed' : 'retry', next_attempt_at: new Date(now + Math.min(86400000, 300000 * 2 ** (payload.attempts - 1))).toISOString() }
+  const savedPayload = { ...payload, state: review ? 'review' : outcome?.status === 'sent' ? 'accepted' : done ? outcome.status : failed ? 'failed' : 'retry', next_attempt_at: new Date(now + Math.min(86400000, 300000 * 2 ** (payload.attempts - 1))).toISOString() }
   delete savedPayload.claim
-  await checked(db.from('webhook_events').update({ payload: savedPayload, error: done ? null : failed ? 'failed' : 'retry', processed_at: done ? new Date(now).toISOString() : null }).eq('pagarme_event_id', key).eq('payload->>claim', claim))
-  return { status: done ? savedPayload.state : failed ? 'failed' : 'retry' }
+  await checked(db.from('webhook_events').update({ payload: savedPayload, error: review ? 'review' : done ? null : failed ? 'failed' : 'retry', processed_at: done ? new Date(now).toISOString() : null }).eq('pagarme_event_id', key).eq('payload->>claim', claim))
+  return { status: review ? 'review' : done ? savedPayload.state : failed ? 'failed' : 'retry' }
 }
 
 export async function processContractTaskQueue(db, dispatch, deps = {}) {
@@ -53,5 +54,5 @@ export async function processContractTaskQueue(db, dispatch, deps = {}) {
   const due = await checked(db.from('webhook_events').select('pagarme_event_id').eq('type', TYPE).is('processed_at', null).eq('payload->>environment', mode(env)).or(`payload->>channel.neq.whatsapp,payload->>target.eq.${provider}`).in('error', ['ready', 'retry', 'processing']).lte('payload->>next_attempt_at', new Date(now).toISOString()).order('received_at').limit(3))
   const results = []
   for (const row of due || []) results.push(await runContractTask(db, row.pagarme_event_id, dispatch, { env, now }))
-  return { disabled: false, checked: results.length, accepted: results.filter(row => row.status === 'accepted').length, completed: results.filter(row => row.status === 'completed').length, failed: results.filter(row => row.status === 'failed').length }
+  return { disabled: false, checked: results.length, accepted: results.filter(row => row.status === 'accepted').length, completed: results.filter(row => row.status === 'completed').length, failed: results.filter(row => row.status === 'failed').length, review_required: results.filter(row => row.status === 'review').length }
 }

@@ -1,5 +1,9 @@
 # Contratos: preparação BotConversa → Papo_reto
 
+Atualização em 02/11/2026: o pacote inicial foi publicado pelo PR #27. Os ajustes desta revisão estão em preparação, sem publicar o aplicativo, alterar variáveis remotas, ativar ofertas, enviar mensagens reais ou realizar compra. A base atual é a main `002d9c3`. O deploy automático da branch `prep/contracts-connection-review` está desabilitado no próprio `vercel.json`; essa regra não muda as demais branches.
+
+Os ajustes anteriores que ficaram somente na pasta temporária não estavam disponíveis nesta sessão. Foram refeitos sobre a main atual: campo `program`, chave separada de OTP e revisão de mensagens. Os commits locais antigos não foram tratados como código recuperado nem como publicado.
+
 Status em 01/11/2026: pacote autorizado por Suzana para publicação com envios pausados. Sem alteração do banco remoto, ativação de ofertas ou envio real. Preparado a partir da main `094bf37` e incorporado à main `0070ea0`, preservando as atualizações de produtos, rotinas em PDF e relatórios de tráfego.
 
 ## Escopo e decisões
@@ -24,6 +28,8 @@ Nenhuma funcionalidade de pagamento real foi ativada. A passagem do checkout pú
 | `CONTRACTS_ENABLED` | Chave existente do módulo; permanece desativada no exemplo |
 | `CONTRACT_DELIVERY_QUEUE_ENABLED` | Habilita a nova fila/conclusão; padrão desligado |
 | `CONTRACT_WHATSAPP_PROVIDER` | `disabled`, `botconversa` ou `papo_reto` |
+| `CONTRACT_WHATSAPP_OTP_ENABLED` | Libera código por WhatsApp somente após homologação do modelo; padrão `false` |
+| `CONTRACT_WHATSAPP_DISPATCH_GUARD_ENABLED` | Reserva cada envio antes da chamada externa; padrão `false`, a homologar com a fila habilitada |
 | `CONTRACT_BOTCONVERSA_WEBHOOK_URL` | Webhook real do fluxo BotConversa, a cadastrar depois |
 | `CONTRACT_WHATSAPP_WEBHOOK_URL` | Compatibilidade com a URL legada, somente para BotConversa |
 | `CONTRACT_BOTCONVERSA_WEBHOOK_TOKEN` | Bearer opcional, somente se suportado pelo receptor escolhido |
@@ -45,6 +51,7 @@ POST JSON para a URL configurada. Os campos atuais são preservados:
 | `contract_id` | Identificação do contrato |
 | `evento` | `contrato_enviado`, `contrato_lembrete`, `contrato_codigo` ou `contrato_assinado` |
 | `name`, `phone` | Nome e telefone brasileiro normalizado com DDI 55 |
+| `program` | Nome do programa/oferta, para o campo `contrato_programa` no BotConversa |
 | `message` | Mensagem pronta para enviar |
 | `link` | Link de assinatura ou cópia, quando houver |
 | `code` | Código OTP somente no evento de código; nunca entra na fila persistente |
@@ -114,3 +121,61 @@ Nenhum redirecionamento silencioso de tarefas antigas acontece ao mudar a config
 - Documentação de Route Handlers instalada com Next.js 16.2.9 (`node_modules/next/dist/docs/`).
 
 Não foram criadas automações agendadas no ChatGPT; o processamento preparado pertence ao próprio aplicativo.
+
+## Conexões preparadas em 01/11, conferidas pausadas em 02/11
+
+[Abrir o fluxo de preparação no Pabbly](https://connect.pabbly.com/v2/app/workflow/mapping/IjU3NjcwNTZiMDYzNDA0MzQ1MjZjNTUzMTUxM2Ii_pc).
+
+| Evento | Pabbly → BotConversa | Situação |
+| --- | --- | --- |
+| `contrato_enviado` | Filtro exato → API POST → receptor de link | Configurado; aceite HTTP 200 com dados fictícios na etapa anterior |
+| `contrato_lembrete` | Filtro exato → API POST → mesmo receptor de link | Mapeado; falta testar uma ocorrência específica de lembrete |
+| `contrato_codigo` | Rota desabilitada, sem ação externa | Modelo `contrato_codigo_assinatura` rejeitado; motivo não confirmado |
+| `contrato_assinado` | Filtro exato → API POST → receptor da cópia | Configurado; HTTP 200 conferido isoladamente com amostra fictícia, sem PDF real |
+
+Payload das três APIs: `phone`, `name`, `program`, `link`, `message`, `evento`, `contract_id`, `delivery_id`, `schema_version`. URLs privadas dos receptores ficam somente na configuração do Pabbly. Não foram cadastradas na configuração do aplicativo nesta preparação.
+
+Ambos os receptores do BotConversa continuam em **Modo Teste**. O receptor de link atualiza `contrato_programa` e `contrato_link` e chama o fluxo de link; o da cópia atualiza `contrato_programa` e `contrato_pdf` e chama o fluxo assinado. O aceite técnico do webhook não comprova execução do fluxo, PDF, envio, entrega ou leitura no WhatsApp.
+
+Os modelos aprovados de link/cópia ainda contêm promessas de acesso automático/imediato que precisam ser revisadas antes da ativação. Sugestões abaixo ainda não foram submetidas à Meta:
+
+- Link: “Olá, {primeiro-nome}! O contrato do {contrato_programa} está disponível para leitura e assinatura: {contrato_link}. Você pode acompanhar o andamento na página do contrato. Se precisar de ajuda, responda esta mensagem.”
+- Cópia: “Olá, {primeiro-nome}! Seu contrato do {contrato_programa} foi assinado. Baixe sua cópia: {contrato_pdf}. Acompanhe a situação do acesso na página de assinatura. Se precisar de ajuda, responda esta mensagem.”
+
+O OTP por WhatsApp tem chave própria. Desligado, não é oferecido na assinatura nem altera o código/contadores ao receber uma solicitação recusada. O e-mail continua disponível conforme sua configuração. O campo `program` é enviado no convite, lembrete, código habilitado e cópia. Mensagens do aplicativo respeitam a regra de assinatura da compra e não prometem liberação instantânea.
+
+## Proteção contra repetições no aplicativo — preparada em 02/11
+
+`contractWhatsappDispatch.js` reutiliza `webhook_events`, com `type=contract.whatsapp.dispatch` e chave única por ambiente/`delivery_id`. Não há nova tabela nem migração. Quando a chave de proteção estiver habilitada:
+
+1. O aplicativo registra e reserva o envio de forma condicional **antes** de chamar o receptor. Sem banco ou reserva confirmada, não faz HTTP.
+2. Chamadas repetidas ou concorrentes com o mesmo identificador não repetem a chamada externa. Contrato, evento e provedor não podem mudar nessa identidade. Cada ambiente tem sua própria reserva.
+3. HTTP 2xx fica como `accepted`: comprova somente o aceite do receptor, inclusive quando este é o Pabbly. Reexecutar a tarefa após uma falha ao gravar o resultado da fila não repete esse HTTP.
+4. Timeout, falha HTTP ou interrupção depois da reserva ficam como `review`/`dispatching`. A tarefa incerta deixa de participar de retentativas automáticas. Não se presume que a mensagem falhou nem que chegou.
+5. O painel indica ausência de confirmação e orienta conferir Pabbly/BotConversa antes de reenviar. Reenvio manual cria uma nova ocorrência e pode duplicar uma mensagem já aceita; a interface avisa quando há uma reserva incerta.
+
+Persistem somente identificadores, evento, provedor, ambiente, estado e horário; não entram nome, telefone, mensagem, código, link, PDF, token ou erro bruto do provedor. OTP habilitado tem uma identidade nova por solicitação e continua fora da fila de notificações. Convites/lembretes/cópias protegidos exigem `delivery_id` estável: usar com a fila habilitada.
+
+**Limite:** esta proteção impede repetição da chamada pelo aplicativo. Ela não deduplica repetições internas do Pabbly/BotConversa. Essa parte ainda precisa de um bloqueio no receptor e de confirmação de falhas após o aceite do Pabbly. O Papo_reto deverá receber o mesmo `delivery_id` e implementar deduplicação persistente. Não há garantia de exatamente uma mensagem externa.
+
+Para recuperar um envio incerto, conferir pelo identificador e horário se o Pabbly executou a rota e se o BotConversa aceitou a ação. Somente após determinar o resultado, solicitar uma nova ocorrência, se necessária. Não apagar/reabrir a reserva para forçar repetição automática. Os e-mails mantêm sua fila e suas retentativas independentes.
+
+### Pendências para homologação e ativação
+
+- Modelo OTP aprovado e modelos de link/cópia revisados.
+- Bloqueio de duplicações e observação de falhas dentro do receptor Pabbly/BotConversa.
+- Validar a reserva condicional e as permissões de `webhook_events` no Supabase de homologação. Os testes desta revisão simulam o banco e o HTTP; nenhuma operação remota foi feita.
+- Testar POST JSON gerado pelo aplicativo em cada evento; validar lembrete específico, cópia de PDF real e códigos.
+- Homologar Brevo e WhatsApp com destinatários de teste autorizados, conferindo recebimento e falhas.
+- Revisar ofertas/contratos, validar pagamento sem assinatura bloqueado, assinatura inválida/cancelamento, PDF, plano correto, boas-vindas e recuperação.
+- Somente depois concluir a compra de teste ponta a ponta e solicitar a ativação do que estiver aprovado.
+
+As três novas chaves da preparação permanecem desligadas no exemplo: fila, OTP WhatsApp e proteção de despacho. O módulo e o provedor também permanecem pausados. Nenhum valor remoto foi alterado.
+
+### Validação desta revisão
+
+- Suíte completa: 285 testes aprovados, sem falhas ou testes ignorados. Inclui concorrência, timeout, resposta HTTP negativa, falha ao salvar recibo, retomada da fila sem novo HTTP, isolamento de ambiente/provedor, dados sensíveis fora da reserva e OTP pausado com e-mail preservado.
+- Após incluir o contador de tarefas para revisão no cron, os 16 testes de fila/despacho passaram novamente.
+- ESLint dos arquivos JavaScript/MJS alterados, `git diff --check` e build Next.js 16.2.9 concluídos.
+- Build e testes usam configurações fictícias e chamadas externas simuladas; não comprovam entrega real ou a reserva no Supabase remoto.
+- Chrome: fluxo do Pabbly pausado; os dois receptores de contrato no BotConversa em Modo Teste. Nenhuma mensagem real nem compra de teste realizada.

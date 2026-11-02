@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "git": { "deploymentEnabled": { "prep/contracts-connection-review": false } },
   "regions": ["gru1"],
   "crons": [
     { "path": "/api/cron/trafego/preparar", "schedule": "0 11 * * 1" },

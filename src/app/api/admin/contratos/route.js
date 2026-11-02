@@ -3,7 +3,8 @@ import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { ContractError, sendContractInvite, finalizeSignedContract, logContractEvent, signingUrl, contractsEnabled } from '@/lib/contractsServer'
 import { CONTRACT_FIELDS, CONTRACT_TEMPLATES, renderContract } from '@/lib/contractTemplates'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
-import { contractWhatsappConfiguration } from '@/lib/contractWhatsapp'
+import { contractWhatsappCodeReady, contractWhatsappConfiguration } from '@/lib/contractWhatsapp'
+import { contractWhatsappDispatchGuardEnabled } from '@/lib/contractWhatsappDispatch'
 import { contractQueueEnabled } from '@/lib/contractTaskQueue'
 import { scheduleContractCompletion } from '@/lib/contractCompletionServer'
 
@@ -46,12 +47,13 @@ export async function GET(request) {
     let whatsapp
     try { const config = contractWhatsappConfiguration(); whatsapp = { provider: config.provider, ready: config.ready } } catch { whatsapp = { provider: 'invalid', ready: false } }
     const contractIds = (contracts || []).map(contract => contract.id)
-    const tasks = contractIds.length ? await db.from('webhook_events').select('pagarme_event_id,payload,error,processed_at,received_at').eq('type', 'contract.task').in('payload->>contract_id', contractIds).order('received_at', { ascending: false }).limit(1000) : { data: [] }
+    const tasks = contractIds.length ? await db.from('webhook_events').select('pagarme_event_id,type,payload,error,processed_at,received_at').in('type', ['contract.task', 'contract.whatsapp.dispatch']).in('payload->>contract_id', contractIds).order('received_at', { ascending: false }).limit(1000) : { data: [] }
     if (tasks.error) throw tasks.error
     return json({
       enabled: contractsEnabled(),
-      delivery: { queue_enabled: contractQueueEnabled(), whatsapp, email_ready: Boolean(process.env.BREVO_API_KEY) },
-      tasks: (tasks.data || []).map(task => ({ id: task.pagarme_event_id, contract_id: task.payload.contract_id, kind: task.payload.kind, channel: task.payload.channel, provider: task.payload.target, state: task.payload.state || task.error, attempts: task.payload.attempts, next_attempt_at: task.processed_at ? null : task.payload.next_attempt_at })),
+      delivery: { queue_enabled: contractQueueEnabled(), whatsapp: { ...whatsapp, otp_ready: contractWhatsappCodeReady(), dispatch_guard_enabled: contractWhatsappDispatchGuardEnabled() }, email_ready: Boolean(process.env.BREVO_API_KEY) },
+      tasks: (tasks.data || []).filter(task => task.type === 'contract.task').map(task => ({ id: task.pagarme_event_id, contract_id: task.payload.contract_id, kind: task.payload.kind, channel: task.payload.channel, provider: task.payload.target, state: task.payload.state || task.error, attempts: task.payload.attempts, next_attempt_at: task.processed_at || task.error === 'review' ? null : task.payload.next_attempt_at })),
+      whatsapp_dispatches: (tasks.data || []).filter(task => task.type === 'contract.whatsapp.dispatch').map(task => ({ id: task.pagarme_event_id, contract_id: task.payload.contract_id, provider: task.payload.provider, state: task.payload.state, started_at: task.payload.started_at })),
       fields: CONTRACT_FIELDS,
       templates,
       contracts: (contracts || []).map(c => ({ ...c, customer: cMap.get(c.customer_id) || null, offer: oMap.get(c.offer_id)?.name || null, link: c.status === 'signed' || c.status === 'canceled' ? null : signingUrl(c.id), has_pdf: Boolean(c.signed_pdf_path) })),
