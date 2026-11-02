@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { contractWhatsappDispatchGuardEnabled, runContractWhatsappDispatch } from './contractWhatsappDispatch.js'
+import { contractWhatsappRelayEnabled, contractWhatsappRelayConfiguration, prepareContractWhatsappRelay } from './contractWhatsappRelay.js'
 
 export const CONTRACT_WHATSAPP_EVENTS = ['contrato_enviado', 'contrato_lembrete', 'contrato_codigo', 'contrato_assinado']
 
@@ -40,16 +41,22 @@ export async function sendContractWhatsapp(payload, env = process.env, fetcher =
   if (!CONTRACT_WHATSAPP_EVENTS.includes(payload.evento)) throw new Error('whatsapp_event_invalid')
   if (payload.evento === 'contrato_codigo' && !contractWhatsappCodeReady(env)) return { status: 'skipped', provider: config.provider }
   const guarded = contractWhatsappDispatchGuardEnabled(env)
+  const relay = config.provider === 'botconversa' && contractWhatsappRelayEnabled(env)
+  if (relay) {
+    if (!guarded || env.CONTRACTS_ENABLED !== 'true' || payload.evento === 'contrato_codigo') throw new Error('whatsapp_relay_not_ready')
+    contractWhatsappRelayConfiguration(env)
+  }
   if (guarded && !payload.delivery_id && payload.evento !== 'contrato_codigo') throw new Error('whatsapp_stable_delivery_id_required')
   const deliveryId = payload.delivery_id || randomUUID()
   if (!/^[a-zA-Z0-9:_-]{1,160}$/.test(deliveryId)) throw new Error('whatsapp_delivery_id_invalid')
   // Campos compatíveis com o webhook atual. O protocolo v1 é o contrato do receptor futuro.
   const body = { schema_version: 1, delivery_id: deliveryId, contract_id: payload.contract_id, evento: payload.evento, name: payload.name, phone, message: payload.message, ...(payload.program ? { program: payload.program } : {}), ...(payload.link ? { link: payload.link } : {}), ...(payload.code ? { code: payload.code } : {}) }
   const transmit = async () => {
+    const envelope = relay ? await prepareContractWhatsappRelay(deps.db, body, { env, now: deps.now }) : {}
     const response = await fetcher(config.url, {
       method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000),
       headers: { 'Content-Type': 'application/json', 'X-Delivery-Id': deliveryId, ...(config.token ? { Authorization: `Bearer ${config.token}` } : {}) },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ ...body, ...envelope }),
     })
     if (!response.ok) throw new Error(`whatsapp_http_${response.status}`)
   }

@@ -179,3 +179,65 @@ As três novas chaves da preparação permanecem desligadas no exemplo: fila, OT
 - ESLint dos arquivos JavaScript/MJS alterados, `git diff --check` e build Next.js 16.2.9 concluídos.
 - Build e testes usam configurações fictícias e chamadas externas simuladas; não comprovam entrega real ou a reserva no Supabase remoto.
 - Chrome: fluxo do Pabbly pausado; os dois receptores de contrato no BotConversa em Modo Teste. Nenhuma mensagem real nem compra de teste realizada.
+
+## Envio protegido após o Pabbly — próxima revisão de 02/11
+
+**Implementado no código, ainda não publicado nem conectado nas ações do Pabbly.** A proteção anterior continua na origem. A nova etapa cobre também a reexecução isolada da ação no Pabbly, que poderia pular uma trava colocada em uma etapa anterior.
+
+O caminho preparado passa a ser: aplicativo → Pabbly → receptor protegido do aplicativo → BotConversa. Cada ação de envio do Pabbly deverá chamar `/api/contratos/whatsapp-relay`, em vez de chamar diretamente o webhook privado do BotConversa. Não há uma etapa separada de “consultar se já foi enviado”: a reserva e o HTTP ao BotConversa pertencem à mesma operação no servidor. Assim, repetir somente a ação também passa pela proteção.
+
+### Configuração preparada
+
+| Variável | Uso e estado |
+| --- | --- |
+| `CONTRACT_BOTCONVERSA_RELAY_ENABLED` | Chave do receptor protegido; `false` no exemplo |
+| `CONTRACT_WHATSAPP_RELAY_SECRET` | Segredo exclusivo, pelo menos 32 caracteres; vazio no exemplo, não criado remotamente |
+| `CONTRACT_BOTCONVERSA_LINK_RECEIVER_URL` | URL privada do receptor de convite/lembrete, somente no servidor; não cadastrada |
+| `CONTRACT_BOTCONVERSA_COPY_RECEIVER_URL` | URL privada do receptor de cópia, somente no servidor; não cadastrada |
+| `CONTRACTS_APP_URL` | URL exata do ambiente que hospedará o receptor; usar a versão de homologação nos testes |
+
+O receptor exige módulo ativo, provedor BotConversa, proteção da origem ativa, chave do receptor ativa e configuração válida. Desligado, responde 503 sem criar cliente de banco. Trocar o provedor para Papo_reto não envia nada pelo relay BotConversa. O adaptador do Papo_reto permanece independente e continua recebendo `delivery_id`.
+
+Antes do POST ao Pabbly, o aplicativo registra `type=contract.whatsapp.relay` na tabela já existente `webhook_events`. A identidade é única por ambiente e `delivery_id`. O registro contém somente identificadores, evento, estado, horários e uma impressão HMAC do conteúdo; não guarda mensagem, telefone, nome, link, programa, segredo ou token. Não há migração ou novo acesso ao banco nesta revisão.
+
+O aplicativo acrescenta `relay_url` e `relay_token` ao payload enviado ao Pabbly. O token autentica o conteúdo completo, o ambiente e a validade de 24 horas. Alterar telefone, nome, programa, mensagem, contrato, evento ou link invalida a autorização. O segredo fica exclusivamente no servidor. O token é transitório e pode ficar no histórico do Pabbly: não copiar esses históricos para relatórios públicos e limitar seu acesso operacional.
+
+### Mapeamento para as três ações do Pabbly, após publicar homologação
+
+| Configuração da ação API | Valor |
+| --- | --- |
+| Método | `POST` |
+| URL | URL fixa do host de homologação aprovado, terminando em `/api/contratos/whatsapp-relay`; conferir contra `relay_url`, sem aceitar destino arbitrário do webhook |
+| Corpo | Os mesmos nove campos existentes, mapeados da etapa 1: `phone`, `name`, `program`, `link`, `message`, `evento`, `contract_id`, `delivery_id`, `schema_version` |
+| Cabeçalho `Authorization` | `Bearer ` seguido do campo dinâmico `relay_token` da etapa 1 |
+| Cabeçalho `Content-Type` | `application/json` |
+| Reexecuções | A mesma ocorrência conserva `delivery_id`, conteúdo e token; não criar identificador novo para uma repetição automática |
+| Ações que chamam diretamente BotConversa | Substituir as três; não deixar um segundo caminho direto ou uma etapa extra de envio após o relay |
+
+As três ações atuais do Pabbly **ainda apontam diretamente ao BotConversa**. Não foram alteradas para um endpoint inexistente nem ativadas. A amostra do gatilho ainda não contém os novos campos. É necessário publicar uma versão de homologação, configurar exclusivamente destinos de teste e capturar um POST JSON assinado antes de mapear e exercitar essas ações. Não usar um token fixo fictício como se fosse uma integração funcional.
+
+O OTP continua sem caminho neste relay. O modelo está rejeitado e essa entrega não deve aguardar 24 horas numa automação. Se tentarem habilitar código por WhatsApp junto ao relay, o adaptador bloqueia o envio. Sua homologação posterior exige um fluxo próprio com validade curta e proteção da geração atual do código. Os códigos por e-mail continuam independentes.
+
+### Resultado e recuperação
+
+| Estado do receptor | Significado e comportamento |
+| --- | --- |
+| `waiting` | Preparado na origem, ainda sem execução protegida; após 15 minutos ou expiração, o painel passa a indicar revisão |
+| `dispatching` | Reserva adquirida antes do HTTP; concorrentes e reexecuções não fazem nova chamada; após 1 minuto sem resultado, o painel indica revisão |
+| `accepted` | BotConversa aceitou HTTP 2xx; a repetição retorna o aceite salvo sem chamar novamente. Não comprova execução, entrega ou leitura, inclusive em Modo Teste |
+| `review` | Timeout, falha HTTP ou resultado incerto; não há reabertura automática da reserva |
+| `canceled` | Contrato inelegível no momento da execução; nenhum HTTP de mensagem é feito |
+
+O receptor relê o contrato antes de chamar o BotConversa: convite/lembrete só para `pending/viewed`; cópia só para `signed` com PDF existente. Essa conferência reduz envios atrasados após assinatura/cancelamento, mas não torna uma mudança simultânea de contrato e uma operação externa uma transação única. O receptor não altera contrato, pagamento, PDF ou acesso.
+
+Respostas HTTP do relay: 200 para aceite/cancelamento conhecido, 202 com `status=review` para resultado incerto, 401/403 para autorização ausente/inválida/vencida, 400/413 para corpo inválido/grande e 503 para pausa/configuração/banco indisponível. Não interpretar 202 como mensagem enviada. Se o aceite externo ocorrer e a gravação falhar, a reserva permanece fechada e uma repetição não chama o BotConversa novamente.
+
+Uma falha após o aceite do Pabbly aparece no painel a partir do registro separado do relay. Se o Pabbly nunca executar a ação, a ausência também fica visível pelo prazo de espera. A revisão continua manual: conferir os históricos, determinar se houve aceite e somente então criar nova ocorrência, se necessária. Não apagar reservas para forçar reexecução.
+
+### Evidências e limites desta etapa
+
+- 297 testes aprovados na suíte completa, incluindo 12 testes novos de relay: concorrência, reexecução isolada, timeout, HTTP negativo, recibo perdido, adulteração do conteúdo/ambiente, token vencido, ausência de reserva, pausa, contratos inelegíveis e isolamento de destinos.
+- ESLint dos arquivos alterados, `git diff --check` e build Next.js 16.2.9 aprovados. A rota foi exercitada por HTTP local e respondeu 503, “Receptor pausado”, com todas as chaves desligadas.
+- Os testes positivos de envio/banco usam simulações. Não houve operação de mensagem nem reserva no Supabase remoto; publicação e homologação real continuam pendentes.
+- Fluxo do Pabbly confirmado pausado nesta sessão. Não foi acionada recaptura nem executada uma mensagem real. A conexão do relay no Pabbly permanece pendente de homologação publicada.
+- Fonte oficial consultada: [Pabbly — reexecução de etapas e ações API](https://forum.pabbly.com/threads/how-to-track-node-level-logs-enable-retries-and-use-rest-api-integrations-in-pabbly-connect.214474).

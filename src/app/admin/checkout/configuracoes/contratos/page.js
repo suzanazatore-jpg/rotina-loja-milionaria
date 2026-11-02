@@ -8,9 +8,10 @@ import { supabase } from '@/lib/supabase'
 const STATUS = { pending: 'Enviado', viewed: 'Visualizado', signed: 'Assinado', canceled: 'Cancelado' }
 const ACCESS = { completed: 'Liberado', awaiting_signature: 'Aguardando assinatura', not_gated: 'Liberado no pagamento', retry: 'Falhou — liberar', awaiting_contract: 'Aguardando assinatura', disabled: 'Liberação desligada' }
 const TASK_STATE = { ready: 'Na fila', retry: 'Nova tentativa pendente', processing: 'Processando', accepted: 'Aceito pelo serviço', completed: 'Concluído', canceled: 'Cancelado', failed: 'Falhou — revisar', review: 'Sem confirmação — revisar antes de reenviar' }
+const RELAY_STATE = { waiting: 'Aguardando execução no intermediário', dispatching: 'Processando envio ao BotConversa', accepted: 'Aceito pelo BotConversa; entrega ainda não confirmada', review: 'Sem confirmação; revisar histórico', canceled: 'Cancelado antes do envio' }
 const EVENTS = { created: 'Contrato gerado', sent: 'Link enviado', reminder_sent: 'Lembrete enviado', viewed: 'Visualizado', otp_sent: 'Código enviado', otp_failed: 'Código incorreto', document_mismatch: 'CPF divergente', signed: 'Assinado', pdf_generated: 'PDF gerado', pdf_failed: 'Falha no PDF', signed_copy_sent: 'Cópia enviada', access_released: 'Acesso liberado', access_failed: 'Falha ao liberar acesso', canceled: 'Cancelado' }
 const when = v => v ? new Date(v).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }) : '—'
-const needsWhatsappReview = (data, id) => (data.whatsapp_dispatches || []).some(item => item.contract_id === id && ['dispatching', 'review'].includes(item.state))
+const needsWhatsappReview = (data, id) => (data.whatsapp_dispatches || []).some(item => item.contract_id === id && ['dispatching', 'review'].includes(item.state)) || (data.whatsapp_relays || []).some(item => item.contract_id === id && ['waiting', 'dispatching', 'review'].includes(item.state))
 const REVIEW_COPY = 'Há um envio de WhatsApp sem confirmação. Confira o histórico no Pabbly e no BotConversa antes de solicitar outro envio, que pode repetir a mensagem. Solicitar mesmo assim?'
 
 export default function ContratosPage() {
@@ -64,6 +65,7 @@ export default function ContratosPage() {
     {data.delivery && <section className="central-chart-panel" aria-label="Estado dos envios">
       <h2>Envios e processamento</h2>
       <p>Código por WhatsApp: {data.delivery.whatsapp.otp_ready ? 'habilitado' : 'pausado'} · Proteção de reenvios no aplicativo: {data.delivery.whatsapp.dispatch_guard_enabled ? 'habilitada' : 'pausada'}</p>
+      <p>Envio protegido após o intermediário: {data.delivery.whatsapp.relay_enabled ? data.delivery.whatsapp.relay_ready ? 'habilitado' : 'configuração pendente' : 'pausado'}</p>
       <p>Fila: {data.delivery.queue_enabled ? 'habilitada' : 'pausada'} · WhatsApp: {({ botconversa: 'BotConversa', papo_reto: 'Papo_reto', disabled: 'pausado', invalid: 'configuração inválida' })[data.delivery.whatsapp.provider]}{data.delivery.whatsapp.provider !== 'disabled' && ` (${data.delivery.whatsapp.ready ? 'configurado' : 'configuração pendente'})`} · Brevo: {data.delivery.email_ready ? 'chave cadastrada' : 'configuração pendente'}</p>
       <p className="central-data-note">Configuração e aceite pelo serviço ainda precisam de validação de entrega. Os envios automáticos dependem também da ativação do módulo.</p>
     </section>}
@@ -92,6 +94,7 @@ export default function ContratosPage() {
             {c.status === 'signed' && c.fulfillment_status !== 'completed' && <button type="button" className="central-action" onClick={() => act({ action: 'release_access', id: c.id })}>Liberar acesso</button>}
             {c.status === 'signed' && (!c.has_pdf || c.fulfillment_status !== 'completed') && <button type="button" className="central-action" onClick={() => act({ action: 'retry_completion', id: c.id })}>Retomar conclusão</button>}
             {(data.tasks || []).filter(task => task.contract_id === c.id).slice(0, 4).map(task => <small key={task.id}>{task.channel === 'internal' ? 'Conclusão' : task.channel === 'email' ? 'E-mail' : 'WhatsApp'}: {TASK_STATE[task.state] || task.state} · {task.attempts} tentativa(s)</small>)}
+            {(data.whatsapp_relays || []).filter(item => item.contract_id === c.id).slice(0, 3).map(item => <small key={item.id}>BotConversa: {RELAY_STATE[item.state] || 'Pendente de revisão'}</small>)}
             {needsWhatsappReview(data, c.id) && <small>WhatsApp sem confirmação: confira o histórico no Pabbly e no BotConversa antes de reenviar.</small>}
             {c.link && <button type="button" className="central-action" onClick={() => act({ action: 'cancel', id: c.id }, 'Cancelar este contrato? O link deixa de funcionar e o acesso não será liberado.')}>Cancelar</button>}
           </td>
