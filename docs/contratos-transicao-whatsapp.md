@@ -386,3 +386,25 @@ O aceite dos serviços não comprova recebimento ou leitura dos novos envios. A 
 Ao terminar, **Pabbly desligado e os dois receptores do BotConversa em Modo Teste**. As opções originais foram restauradas em ambos: criação/atualização de nome marcada, consentimento desmarcado. Nenhum nome de contato foi sobrescrito pelos ensaios. A contagem de contratos continua **zero**. Módulo, fila, provedor, OTP e relay geral de clientes permanecem pausados. A janela interna fixa continua com expiração de 03/11/2026 às 14:43:26 de Brasília; não foi prorrogada.
 
 Continuam pendentes a revisão dos textos aprovados pela Meta, o modelo de código WhatsApp rejeitado, a página real de assinatura acessível ao destinatário autorizado, a compra completa, os bloqueios de acesso, a assinatura/PDF final, boas-vindas, agendamento e recuperação de falhas. As três ações Pabbly ainda usam a rota exclusiva de teste; devem voltar à rota geral antes da ativação comercial. A chave exclusiva de automação da Vercel deve ser revogada ao encerrar toda a homologação, preservando a chave do Pagar.me.
+
+### Apresentação corrigida: botão no lugar da URL técnica — 02/11/2026
+
+Após os prints e a autorização de Suzana, o e-mail recebeu botão verde `#15803d`; a URL longa deixou de aparecer abaixo do botão no HTML. O destino seguro foi preservado no `href`. O fallback de ajuda orienta responder ao e-mail. A parte de texto simples continua contendo o link funcional para clientes sem suporte a HTML.
+
+A revisão está no commit remoto `5a8df68d1e21b6ae5d6202b5253eba5bb9afa09d`, com a alteração do e-mail em seu pai `433b1fc`. Preview **Ready**: `dpl_5xpFN5snJ1gvzHJ1uEhbvwmHPaE3`, host `rotina-loja-milionaria-lzf7bli4w-mariano12.vercel.app`, alias da branch preservado. Não houve promoção ou merge em produção, migração, troca de credenciais ou mudança de RLS. Suíte completa: **309 testes aprovados**, ESLint, diff e build aprovados (configurações fictícias no build local).
+
+O relay agora deriva `link_path` da URL integral autenticada por HMAC, somente depois da verificação do envelope. Esse campo não é aceito do Pabbly como fonte de verdade. O teste cobre um `link_path` adulterado, preservação dos parâmetros de autorização, rejeição de HTTP/credenciais/fragmento e a deduplicação anterior. No BotConversa, ambos os receptores mapeiam `link_path` para o novo campo `contrato_destino` antes da chamada do fluxo. Os links completos continuam no protocolo de transporte e não são impressos no corpo dos novos modelos.
+
+Modelos novos submetidos e aprovados pela Meta, em português do Brasil:
+
+- `contrato_teste_botao_v3`: botão **Abrir documento de teste**, domínio fixo do Supabase para o PDF privado demonstrativo; corpo explicita que não houve compra, assinatura ou liberação. Reclassificado pela Meta como **Marketing**.
+- `contrato_assinatura_botao_v2`: botão **Ver e assinar contrato**, domínio `https://rotina.suzanazatorre.com.br/`. Reclassificado pela Meta como **Marketing**; revisar classificação/custo antes de ativar comercialmente.
+- `contrato_copia_botao_v2`: botão **Baixar meu contrato**, mesmo domínio da marca; aprovado como **Utilidade**. Não promete liberação imediata de acesso.
+
+Os dois fluxos existentes usam **temporariamente o modelo de teste**. Antes da compra comercial, selecionar o modelo de assinatura/cópia correspondente e confirmar que o domínio fixo e o caminho recebido pertencem à mesma origem. A cor dos botões nativos do WhatsApp é controlada pelo próprio aplicativo; a imagem gerada anteriormente era uma prévia, não prova de configuração ou de entrega.
+
+Nova identidade de ensaio `private-pdf-button-v3`, sem reabrir as reservas anteriores. O convite por e-mail `probe-0a76271a10b2e94fe9c96066325560b79f6b8a54:email` foi aceito pelo Brevo às 19:08:45 UTC, recibo registrado no painel. O convite WhatsApp da mesma amostra foi aceito na origem e no relay às 19:19:55/58 UTC, com o receptor do link ativo, criação/atualização de nome desabilitada e o fluxo já usando o modelo de teste com botão. Isso comprova aceite do caminho completo, não entrega/leitura ou abertura do botão no celular.
+
+A ocorrência de cópia `probe-3c02667883c72f77baf5a35b0cb6fb2949d630d2` também recebeu HTTP 200 do receptor às 19:20:58 UTC, mas esse receptor permaneceu em **Modo Teste**: sua ativação foi recusada por consentimento não marcado. Portanto, **não foi considerada enviada ao WhatsApp** e não foi repetida. Não reabrir essa reserva para forçar envio. Os exemplos de mapeamento usam telefone fictício inválido, foram capturados apenas em Modo Teste e não eram mensagens reais.
+
+Encerramento: **Pabbly desligado, ambos os receptores em Modo Teste**, criação/atualização de nome restaurada como marcada e consentimento desmarcado. Módulo/fila/provedor/relay gerais continuam pausados; contagem de contratos comerciais continua zero. Prazo do teste não foi prorrogado. O recebimento do novo e-mail/WhatsApp e a abertura do botão pelo destinatário ainda precisam de confirmação. O teste real da cópia, a compra completa e as demais pendências comerciais anteriores permanecem separados.
