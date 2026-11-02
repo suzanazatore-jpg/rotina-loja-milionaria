@@ -28,8 +28,11 @@ export function connectionProbeConfig(env = process.env, now = Date.now()) {
   if (env.VERCEL_ENV !== 'preview' || env.CONTRACT_CONNECTION_TEST_ENABLED !== 'true' || !Number.isFinite(expires) || expires <= now || expires > now + 48 * 3600000 || !phone || !/^55[1-9]\d{10,11}$/.test(phone) || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !secret || secret.length < 32) throw new ProbeError('Teste interno pausado ou prazo encerrado.')
   const base = new URL(env.CONTRACTS_APP_URL)
   if (base.protocol !== 'https:' || base.username || base.password || base.hash) throw new ProbeError('Endereço de homologação inválido.')
-  const target = createHmac('sha256', secret).update(JSON.stringify([phone, email, expires])).digest('hex')
-  return { phone, email, expires, secret, target, origin: base.origin }
+  const storage = new URL(env.NEXT_PUBLIC_SUPABASE_URL)
+  if (storage.protocol !== 'https:' || storage.username || storage.password) throw new ProbeError('Armazenamento de homologação inválido.')
+  // Nova ocorrência para a correção do link já recebido; não reabre reservas anteriores.
+  const target = createHmac('sha256', secret).update(JSON.stringify(['private-pdf-v2', phone, email, expires])).digest('hex')
+  return { phone, email, expires, secret, target, origin: base.origin, storageOrigin: storage.origin }
 }
 
 function executionEnv(env) {
@@ -48,6 +51,22 @@ function probePayload(kind, config) {
   return { schema_version: 1, delivery_id: `${id}:whatsapp`, contract_id: id, evento: EVENTS[kind], name: NAME, phone: config.phone, program: PROGRAM, message: 'TESTE TECNICO AUTORIZADO. Nenhuma compra, assinatura comercial ou liberação de acesso foi realizada. Confira o documento demonstrativo no link.', link: documentUrl(id, config, kind === 'copy') }
 }
 
+const probePath = config => `connection-tests/${config.target}/demonstrativo.pdf`
+async function temporaryPdfUrl(db, config, now) {
+  const bucket = db.storage.from('contracts'), path = probePath(config)
+  const upload = await bucket.upload(path, await probePdf(), { contentType: 'application/pdf', upsert: true, cacheControl: '0' })
+  if (upload.error) throw new ProbeError('Não foi possível preparar o PDF demonstrativo.')
+  const signed = await bucket.createSignedUrl(path, Math.max(1, Math.min(7200, Math.floor((config.expires - now) / 1000))))
+  if (signed.error || !signed.data?.signedUrl || !validPdfUrl(signed.data.signedUrl, config)) throw new ProbeError('Não foi possível criar o link temporário do PDF.')
+  return signed.data.signedUrl
+}
+function validPdfUrl(value, config) {
+  try {
+    const url = new URL(value)
+    return url.origin === config.storageOrigin && url.pathname === `/storage/v1/object/sign/contracts/${probePath(config)}` && !!url.searchParams.get('token') && !url.username && !url.password && !url.hash
+  } catch { return false }
+}
+
 export async function startWhatsappProbe(db, kind, { env = process.env, now = Date.now(), fetcher = fetch } = {}) {
   if (!EVENTS[kind]) throw new ProbeError('Código por WhatsApp continua indisponível.', 400)
   const config = connectionProbeConfig(env, now), body = probePayload(kind, config), sendingEnv = executionEnv(env)
@@ -58,6 +77,7 @@ export async function startWhatsappProbe(db, kind, { env = process.env, now = Da
   const row = await checked(db.from('webhook_events').select('payload').eq('pagarme_event_id', body.contract_id).eq('type', TYPE).single())
   if (Object.entries(metadata).some(([key, value]) => row?.payload?.[key] !== value)) throw new ProbeError('O teste não corresponde ao destinatário autorizado.')
   return runContractWhatsappDispatch(db, { delivery_id: body.delivery_id, contract_id: body.contract_id, evento: body.evento, provider: 'botconversa' }, async () => {
+    body.link = await temporaryPdfUrl(db, config, now)
     const envelope = await prepareContractWhatsappRelay(db, body, { env: sendingEnv, now })
     const response = await fetcher(destination.url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15000), headers: { 'Content-Type': 'application/json', 'X-Delivery-Id': body.delivery_id, ...(destination.token ? { Authorization: `Bearer ${destination.token}` } : {}) }, body: JSON.stringify({ ...body, ...envelope, relay_url: new URL('/api/contratos/teste/whatsapp-relay', config.origin).href }) })
     if (!response.ok) throw new ProbeError('Sem confirmação do Pabbly.')
@@ -71,7 +91,7 @@ export async function handleWhatsappProbe(request, { env = process.env, now = Da
     const kind = Object.keys(EVENTS).find(key => EVENTS[key] === body.evento)
     if (!kind) return null
     const expected = probePayload(kind, config)
-    if (Object.keys(expected).some(key => body[key] !== expected[key])) return null
+    if (Object.keys(expected).filter(key => key !== 'link').some(key => body[key] !== expected[key]) || !validPdfUrl(body.link, config)) return null
     const row = await checked(db.from('webhook_events').select('payload').eq('pagarme_event_id', body.contract_id).eq('type', TYPE).maybeSingle())
     if (row?.payload?.target !== config.target || row.payload.kind !== kind || row.payload.environment !== 'test' || Date.parse(row.payload.expires_at) !== config.expires) return null
     // Fixture de transporte, sem inserir contrato, pedido, assinatura ou acesso.
@@ -95,8 +115,8 @@ export async function sendEmailProbe(db, kind, { env = process.env, now = Date.n
   let state = 'review', messageId
   const labels = { invite: 'Link do documento de teste', reminder: 'Lembrete demonstrativo', copy: 'PDF demonstrativo em anexo', code: 'Código demonstrativo por e-mail' }
   const lead = kind === 'code' ? `Código de teste: ${randomInt(100000, 1000000)}. Este código não autoriza assinatura ou acesso e não deve ser usado em contratos reais.` : 'Este é um teste autorizado da conexão de contratos. Nenhuma compra foi realizada, nenhum contrato foi assinado e nenhum acesso foi liberado.'
-  const url = documentUrl(identity(kind, config), config, kind === 'copy')
   try {
+    const url = kind === 'code' ? '' : await temporaryPdfUrl(db, config, now)
     const sent = await sendEmail({ to: config.email, name: 'Contato autorizado de homologação', subject: `[TESTE] ${labels[kind]} — Suzana Zatorre`, html: emailLayout(labels[kind], [lead], kind === 'code' ? null : { url, label: kind === 'copy' ? 'Abrir PDF demonstrativo' : 'Abrir documento de teste' }), text: `${lead}${kind === 'code' ? '' : `\n\n${url}`}`, tag: id, ...(kind === 'copy' ? { attachment: { name: 'teste-sem-validade-contratual.pdf', content: (await probePdf()).toString('base64') } } : {}) }, env, fetcher)
     if (sent.status === 'sent') { state = 'accepted'; messageId = sent.message_id }
   } catch { /* Sem repetição automática depois de resultado incerto. */ }

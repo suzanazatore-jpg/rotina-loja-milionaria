@@ -19,7 +19,7 @@ test('aplicativo assina o conteúdo e o relay normaliza o schema mapeado pelo Pa
   assert.equal(bridgeBody.relay_url, `${env.CONTRACTS_APP_URL}/api/contratos/whatsapp-relay`)
   assert.match(bridgeBody.relay_token, /^1\.\d{13}\.[A-Za-z0-9_-]{43}$/)
   const calls = []
-  const response = await invoke(db, bridgeBody, { body: { ...payload, schema_version: '1' }, fetcher: async (url, options) => { calls.push(url); assert.equal(options.redirect, 'error'); assert.ok(options.signal instanceof AbortSignal); assert.deepEqual(JSON.parse(options.body), payload); return { ok: true } } })
+  const response = await invoke(db, bridgeBody, { body: { ...payload, schema_version: '1', phone: Number(payload.phone) }, fetcher: async (url, options) => { calls.push(url); assert.equal(options.redirect, 'error'); assert.ok(options.signal instanceof AbortSignal); assert.deepEqual(JSON.parse(options.body), payload); return { ok: true } } })
   assert.equal(response.status, 200)
   assert.equal((await response.json()).delivery_state, 'provider_accepted')
   assert.deepEqual(calls, [env.CONTRACT_BOTCONVERSA_LINK_RECEIVER_URL])
@@ -76,6 +76,14 @@ test('token vencido, ausente ou sem reserva não permite enviar', async () => {
   assert.equal((await invoke(db, envelope, { now: now + 86400001, getDb: () => assert.fail('token expirou') })).status, 403)
   assert.equal((await invoke(db, { relay_token: 'invalid' }, { getDb: () => assert.fail('sem autenticação') })).status, 401)
   assert.equal((await invoke(fixture(), envelope)).status, 403)
+})
+
+test('normalização numérica não aceita arredondamento, telefone distinto ou valores não inteiros', async () => {
+  const db = fixture(), envelope = await prepareContractWhatsappRelay(db, payload, { env, now })
+  for (const phone of [Number.MAX_SAFE_INTEGER + 1, 5584996633020.5, null, {}, '55 84996633020']) {
+    assert.equal((await invoke(db, envelope, { body: { ...payload, phone }, getDb: () => assert.fail('não acessar banco') })).status, 400)
+  }
+  assert.equal((await invoke(db, envelope, { body: { ...payload, phone: 5511999999999 }, getDb: () => assert.fail('assinatura diferente') })).status, 403)
 })
 
 test('pausa e configuração incompleta bloqueiam sem banco e sem expor segredos', async () => {

@@ -2,11 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { PDFDocument } from 'pdf-lib'
 import { contractMemoryDb } from './helpers/contract-memory-db.mjs'
-import { connectionProbeConfig, startWhatsappProbe, handleWhatsappProbe, sendEmailProbe, connectionProbeStatus, handleProbeDocument } from '../src/lib/contractConnectionProbe.js'
+import { connectionProbeConfig, startWhatsappProbe, handleWhatsappProbe, sendEmailProbe, connectionProbeStatus, probePdf } from '../src/lib/contractConnectionProbe.js'
 import { prepareContractWhatsappRelay, handleContractWhatsappRelay } from '../src/lib/contractWhatsappRelay.js'
 
 const now = Date.parse('2026-11-02T18:00:00Z')
-const env = { VERCEL_ENV: 'preview', CONTRACT_CONNECTION_TEST_ENABLED: 'true', CONTRACT_CONNECTION_TEST_PHONE: '11999999999', CONTRACT_CONNECTION_TEST_EMAIL: 'authorized@example.invalid', CONTRACT_CONNECTION_TEST_EXPIRES_AT: '2026-11-03T18:00:00Z', CONTRACTS_ENABLED: 'false', CONTRACT_WHATSAPP_PROVIDER: 'disabled', CONTRACT_WHATSAPP_DISPATCH_GUARD_ENABLED: 'false', CONTRACT_BOTCONVERSA_RELAY_ENABLED: 'false', CONTRACT_WHATSAPP_RELAY_SECRET: 'probe-secret-'.repeat(5), CONTRACTS_APP_URL: 'https://preview.example.invalid', CONTRACT_BOTCONVERSA_WEBHOOK_URL: 'https://bridge.example.invalid', CONTRACT_BOTCONVERSA_LINK_RECEIVER_URL: 'https://bot.example.invalid/link', CONTRACT_BOTCONVERSA_COPY_RECEIVER_URL: 'https://bot.example.invalid/copy', BREVO_API_KEY: 'test-key' }
+const env = { VERCEL_ENV: 'preview', NEXT_PUBLIC_SUPABASE_URL: 'https://storage.example.invalid', CONTRACT_CONNECTION_TEST_ENABLED: 'true', CONTRACT_CONNECTION_TEST_PHONE: '11999999999', CONTRACT_CONNECTION_TEST_EMAIL: 'authorized@example.invalid', CONTRACT_CONNECTION_TEST_EXPIRES_AT: '2026-11-03T18:00:00Z', CONTRACTS_ENABLED: 'false', CONTRACT_WHATSAPP_PROVIDER: 'disabled', CONTRACT_WHATSAPP_DISPATCH_GUARD_ENABLED: 'false', CONTRACT_BOTCONVERSA_RELAY_ENABLED: 'false', CONTRACT_WHATSAPP_RELAY_SECRET: 'probe-secret-'.repeat(5), CONTRACTS_APP_URL: 'https://preview.example.invalid', CONTRACT_BOTCONVERSA_WEBHOOK_URL: 'https://bridge.example.invalid', CONTRACT_BOTCONVERSA_LINK_RECEIVER_URL: 'https://bot.example.invalid/link', CONTRACT_BOTCONVERSA_COPY_RECEIVER_URL: 'https://bot.example.invalid/copy', BREVO_API_KEY: 'test-key' }
 const request = (envelope, changes = {}) => {
   const { relay_token, relay_url, ...body } = envelope
   return new Request(relay_url, { method: 'POST', headers: { Authorization: `Bearer ${relay_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, ...changes }) })
@@ -41,7 +41,7 @@ test('relay de teste valida assinatura e deduplica o envio somente ao contato fi
   const db = contractMemoryDb(), envelope = await capture(db)
   let calls = 0
   const options = { env, now, getDb: () => db, fetcher: async (url, options) => { calls++; assert.equal(url, env.CONTRACT_BOTCONVERSA_LINK_RECEIVER_URL); assert.equal(JSON.parse(options.body).phone, '5511999999999'); return { ok: true } } }
-  const responses = await Promise.all(Array.from({ length: 5 }, () => handleWhatsappProbe(request(envelope), options)))
+  const responses = await Promise.all(Array.from({ length: 5 }, () => handleWhatsappProbe(request(envelope, { phone: Number(envelope.phone) }), options)))
   assert.equal(calls, 1)
   assert.ok(responses.every(response => [200, 202].includes(response.status)))
   assert.equal((await (await handleWhatsappProbe(request(envelope), options)).json()).duplicate, true)
@@ -87,20 +87,27 @@ test('falha de envio por e-mail permanece em revisão sem repetir automaticament
   assert.equal((await sendEmailProbe(db, 'invite', { env, now, fetcher: () => assert.fail('não repetir') })).status, 'already_requested')
 })
 
-test('PDF e página são demonstrativos assinados por token de teste, sem assinatura comercial', async () => {
+test('link do PDF aponta somente ao arquivo privado com autorização temporária, sem Vercel', async () => {
   const db = contractMemoryDb(), envelope = await capture(db, 'copy')
-  const pdfResponse = await handleProbeDocument(new Request(envelope.link), { env, now })
-  assert.equal(pdfResponse.headers.get('content-type'), 'application/pdf')
-  const pdf = await PDFDocument.load(await pdfResponse.arrayBuffer())
+  const link = new URL(envelope.link)
+  assert.equal(link.origin, env.NEXT_PUBLIC_SUPABASE_URL)
+  assert.match(link.pathname, /^\/storage\/v1\/object\/sign\/contracts\/connection-tests\/[a-f0-9]{64}\/demonstrativo\.pdf$/)
+  assert.equal(link.searchParams.get('token'), 'storage-test-token')
+  const pdf = await PDFDocument.load(await probePdf())
   assert.match(pdf.getTitle(), /SEM ASSINATURA/)
-  const pageUrl = new URL(envelope.link); pageUrl.searchParams.delete('pdf')
-  const page = await handleProbeDocument(new Request(pageUrl), { env, now })
-  assert.match(await page.text(), /sem validade contratual/)
-  pageUrl.searchParams.set('proof', 'wrong')
-  assert.equal((await handleProbeDocument(new Request(pageUrl), { env, now })).status, 404)
-  assert.equal((await handleProbeDocument(new Request(envelope.link), { env, now: now + 86400001 })).status, 503)
   const response = await handleWhatsappProbe(request(envelope), { env, now, getDb: () => db, fetcher: async url => { assert.equal(url, env.CONTRACT_BOTCONVERSA_COPY_RECEIVER_URL); return { ok: true } } })
   assert.equal((await response.json()).status, 'accepted')
+})
+
+test('falha no storage e URL fora do arquivo do teste impedem o envio externo', async () => {
+  for (const invalidUrl of ['', 'https://other.example.invalid/file.pdf', 'https://storage.example.invalid/storage/v1/object/sign/contracts/another.pdf?token=x']) {
+    const db = contractMemoryDb()
+    db.storage.from = () => ({ upload: async () => ({ error: null }), createSignedUrl: async () => ({ data: { signedUrl: invalidUrl }, error: null }) })
+    assert.equal((await startWhatsappProbe(db, 'invite', { env, now, fetcher: () => assert.fail('não enviar link incorreto') })).status, 'review')
+  }
+  const db = contractMemoryDb()
+  db.storage.from = () => ({ upload: async () => ({ error: new Error('storage') }) })
+  assert.equal((await sendEmailProbe(db, 'copy', { env, now, fetcher: () => assert.fail('não enviar') })).status, 'review')
 })
 
 test('configuração inválida ou código WhatsApp não gera registro nem mensagem', async () => {

@@ -61,7 +61,7 @@ export function contractMemoryDb(seed = {}) {
       }
       return q
     },
-    storage: { from: () => ({ upload: async () => ({ error: null }), download: async () => ({ data: new Blob(['pdf']), error: null }) }) },
+    storage: { from: () => ({ upload: async () => ({ error: null }), download: async () => ({ data: new Blob(['pdf']), error: null }), createSignedUrl: async path => ({ data: { signedUrl: `https://storage.example.invalid/storage/v1/object/sign/contracts/${path}?token=storage-test-token` }, error: null }) }) },
   }
   return db
 }

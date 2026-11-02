@@ -38,9 +38,12 @@ export function contractWhatsappRelayReady(env = process.env) {
 function canonical(input) {
   if (!input || Number(input.schema_version) !== 1 || !EVENTS.includes(input.evento) || typeof input.delivery_id !== 'string' || !/^[a-zA-Z0-9:_-]{1,160}$/.test(input.delivery_id) || typeof input.contract_id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(input.contract_id)) throw new RelayError(400)
   for (const [field, max] of [['name', 300], ['message', 6000], ['link', 2048]]) if (typeof input[field] !== 'string' || !input[field] || input[field].length > max) throw new RelayError(400)
-  if (typeof input.phone !== 'string' || !/^55\d{10,11}$/.test(input.phone) || input.code !== undefined || input.program !== undefined && (typeof input.program !== 'string' || input.program.length > 500)) throw new RelayError(400)
+  // O Pabbly converte sequências numéricas em JSON numbers na execução automática.
+  // Só inteiros exatos são normalizados; a assinatura continua vinculada à mesma string.
+  const phone = typeof input.phone === 'number' && Number.isSafeInteger(input.phone) ? String(input.phone) : input.phone
+  if (typeof phone !== 'string' || !/^55\d{10,11}$/.test(phone) || input.code !== undefined || input.program !== undefined && (typeof input.program !== 'string' || input.program.length > 500)) throw new RelayError(400)
   // Não aceita destinos externos no corpo; link é conteúdo assinado, não o endpoint de envio.
-  const body = { schema_version: 1, delivery_id: input.delivery_id, contract_id: input.contract_id, evento: input.evento, name: input.name, phone: input.phone, message: input.message, ...(input.program ? { program: input.program } : {}), link: input.link }
+  const body = { schema_version: 1, delivery_id: input.delivery_id, contract_id: input.contract_id, evento: input.evento, name: input.name, phone, message: input.message, ...(input.program ? { program: input.program } : {}), link: input.link }
   if (Buffer.byteLength(JSON.stringify(body)) > MAX_BODY) throw new RelayError(413)
   return body
 }
