@@ -6,7 +6,7 @@ O dashboard administrativo e a área `/trafego` consultam diretamente a Marketin
 
 A rota valida login, plano vigente e vínculo da conta ativa antes de qualquer consulta Meta. Busca o intervalo exato (até 93 dias), totais deduplicados, diário, campanhas, conjuntos, anúncios e imagens por ID. Consulta o comparativo separadamente. Sem confirmação da fonte, uma falha não vira zero. Paginação incompleta e valores inconsistentes mantêm a coleta anterior com aviso. São apenas leituras: não altera anúncios e não publica análises ou avisos.
 
-Os resultados online são apresentados na sessão aberta, com horário real da consulta; não sobrescrevem o histórico agendado no banco. O procedimento abaixo continua responsável pelo histórico persistido e pelos relatórios editoriais. O funcionamento online de uma conta exige que a credencial tenha acesso a ela; a habilitação no MCP não comprova esse acesso direto.
+Os resultados online são apresentados na sessão aberta, com horário real da consulta; não sobrescrevem o histórico agendado no banco. A coleta MCP abaixo mantém o histórico persistido. Desde 02/11/2026, a preparação semanal tenta recuperar semanas incompletas das contas habilitadas pela conexão Meta do servidor, com validação e releitura, sem enviar avisos nessa etapa. Falta de acesso mantém a pendência explícita e não vira zero. O funcionamento online de uma conta exige que a credencial tenha acesso a ela; a habilitação no MCP não comprova esse acesso direto.
 
 A coleta é executada por tarefa do ChatGPT com os conectores Meta Ads e Supabase. Não é uma conexão direta da API Meta no servidor Vercel e não depende de o Chrome estar aberto. Falhas de conexão, limite de execução ou autorização devem ser registradas; nunca considerar uma execução futura garantida.
 
@@ -55,3 +55,9 @@ Criar uma linha em `traffic_collection_runs` com status running; finalizar com s
 ## Evidência
 
 Uma coleta manual completa foi validada em 21/10/2026: 20 dias, três campanhas, três conjuntos, 12 anúncios com imagens reais. A execução agendada ainda precisa produzir seu primeiro histórico para comprovar recorrência.
+
+## Recuperação operacional — 02/11/2026
+
+A coleta diária `Atualizar dados da Central` estava pausada desde 26/10 e foi reativada. A consulta online em tela não alimentava a preparação semanal. O token do servidor não tem acesso a todas as contas de clientes; a coleta MCP continua necessária para essas contas. Nunca declarar a recorrência validada antes de uma nova execução conferida.
+
+Em Central de Tráfego > Sobre os dados, **Preparar relatórios da semana** chama a rota administrativa autenticada `/api/admin/trafego/semana` para a última semana encerrada. Ela preserva rascunhos, exibe contas pendentes e tenta completar os dados apenas nas contas habilitadas. **Enviar avisos pendentes da semana** é uma ação separada que mantém vínculos, elegibilidade, canais habilitados, pausa e chaves idempotentes por destinatária/semana/canal. O histórico distingue aceite, envio, ausência de dispositivo e entrega incerta; uma entrega aceita ou incerta não é repetida automaticamente. A rota não aceita datas ou contatos livres.
