@@ -17,7 +17,7 @@ O Guru_Fake conserva as regras de pagamento, documento, assinatura e acesso. Wha
 | R03: documento completo | Modelo validado ao salvar e antes de emitir | Variáveis desconhecidas, vazias e propriedades herdadas bloqueadas |
 | R04: tentativas independentes | Fila persistente em `webhook_events`, uma tarefa por canal/ocorrência | Falha parcial, duplicata, concorrência, timeout, pausa, troca de ambiente e limite |
 | R05: retomar após assinatura | Tarefa de conclusão e recuperação de assinaturas interrompidas | Falhar PDF/acesso separadamente, retomar sem repetir a etapa concluída |
-| R06: orientar cliente e operação | Checkout oferece assinatura; página assinada distingue PDF/acesso; venda mostra contrato e canais | Testes dos estados e build; inspeção visual autenticada da versão nova ainda pendente |
+| R06: orientar cliente e operação | Checkout oferece assinatura; página assinada distingue PDF/acesso; venda mostra contrato e canais | Testes dos estados e build; painel autenticado de contratos conferido, jornada com compra/assinatura ainda pendente |
 
 Nenhuma funcionalidade de pagamento real foi ativada. A passagem do checkout público de homologação para vendas reais permanece como tarefa separada. A otimização geral da listagem de assinaturas também permanece fora deste pacote de contratos.
 
@@ -214,7 +214,7 @@ O aplicativo acrescenta `relay_url` e `relay_token` ao payload enviado ao Pabbly
 | Reexecuções | A mesma ocorrência conserva `delivery_id`, conteúdo e token; não criar identificador novo para uma repetição automática |
 | Ações que chamam diretamente BotConversa | Substituir as três; não deixar um segundo caminho direto ou uma etapa extra de envio após o relay |
 
-As três ações atuais do Pabbly **ainda apontam diretamente ao BotConversa** e permanecem pausadas. A amostra do gatilho ainda não contém os novos campos. A versão de homologação foi publicada; falta resolver o acesso autorizado do Pabbly à prévia protegida, configurar exclusivamente destinos de teste e capturar um POST JSON assinado antes de mapear e exercitar essas ações. Não usar um token fixo fictício como se fosse uma integração funcional.
+As três ações atuais do Pabbly **agora apontam ao relay da homologação** e o fluxo permanece pausado. Após autorização de Suzana, o cabeçalho de acesso à Vercel foi cadastrado nas três ações e cada uma recebeu a resposta esperada “Receptor pausado”. A amostra do gatilho ainda não contém `relay_token`; a autorização HMAC do aplicativo continua pendente de configuração e captura. Não usar um token fixo fictício como se fosse uma integração funcional.
 
 O OTP continua sem caminho neste relay. O modelo está rejeitado e essa entrega não deve aguardar 24 horas numa automação. Se tentarem habilitar código por WhatsApp junto ao relay, o adaptador bloqueia o envio. Sua homologação posterior exige um fluxo próprio com validade curta e proteção da geração atual do código. Os códigos por e-mail continuam independentes.
 
@@ -256,16 +256,16 @@ Uma falha após o aceite do Pabbly aparece no painel a partir do registro separa
 - Produção conferida antes/depois: `002d9c38eaccb0414de4bf64e471747cf0f9ca6e`, implantação `GgA6aCk6uPpZWifo2YhiUQPGAowR`, domínio `rotina.suzanazatorre.com.br`. Sem promoção, merge na main, alteração de alias de produção ou migração.
 - Recuperação: a prévia é independente da produção e não alterou dados. Para comparar, usar as prévias anteriores do projeto; não há mudança de banco para desfazer. Novos commits nesta branch continuam sem deploy automático.
 
-## Conferência autenticada e acesso de teste pendente — 02/11/2026
+## Conferência autenticada e acesso de teste — 02/11/2026
 
 - Painel: módulo desativado; fila pausada; código WhatsApp pausado; proteções da origem e do intermediário pausadas; BotConversa com configuração pendente; Brevo com chave cadastrada. A presença da chave não comprova entrega de e-mails.
 - Lista: nenhum contrato emitido. Os três modelos (CVM, EVS e Gestão de Tráfego) carregam como versão 1. A conferência técnica das variáveis visíveis nos textos não encontrou campos fora da lista aceita pela interface. Não é uma validação jurídica ou comercial; nenhum texto foi salvo ou alterado.
-- A autenticação de Suzana libera seu navegador, mas não autentica requisições vindas do Pabbly. A proteção HTTP 401 da Vercel continua sendo a dependência externa.
+- A autenticação de Suzana libera seu navegador, mas não autentica requisições vindas do Pabbly. O bloqueio inicial HTTP 401 da Vercel foi resolvido para as ações autorizadas de teste, conforme o registro abaixo.
 - A configuração da Vercel contém um segredo de automação existente, identificado como **Pagar.me — webhook sandbox checkout/painel-admin** e designado como variável de sistema. Seu valor não foi revelado, reutilizado, transferido ou revogado.
 
-### Proposta concreta aguardando autorização de acesso
+### Acesso exclusivo do Pabbly autorizado e testado
 
-Criar um segredo de automação **separado** para os testes do Pabbly neste projeto, sem substituir o segredo/variável de sistema do Pagar.me. Usar o novo valor somente no cabeçalho `x-vercel-protection-bypass` das três ações API do fluxo de contratos no Pabbly; nunca no repositório, documentação, link público ou mensagem de entrega.
+Suzana autorizou expressamente criar a chave e cadastrá-la no Pabbly. Foi criado um segredo de automação **separado**, identificado como “Pabbly — contratos homologação — revogar ao encerrar testes”, sem substituir o segredo/variável de sistema do Pagar.me. O novo valor foi usado somente no cabeçalho `x-vercel-protection-bypass` das três ações API do fluxo de contratos no Pabbly. Não foi copiado ao repositório, documentação, link público, mensagem de entrega ou arquivo local.
 
 Esse mecanismo da Vercel tem alcance em **todas as implantações protegidas do projeto**, embora sua utilização planejada seja somente no endereço da homologação de contratos. Ele não remove o login do aplicativo nem a validação HMAC do relay. Não configurar exceção pública de domínio nem desligar a proteção global. Ao encerrar os testes, revogar exclusivamente a nova chave; preservar a chave existente do Pagar.me.
 
@@ -273,12 +273,18 @@ Esse mecanismo da Vercel tem alcance em **todas as implantações protegidas do 
 | --- | --- |
 | URL fixa | `https://rotina-loja-milionaria-574q9s7bh-mariano12.vercel.app/api/contratos/whatsapp-relay` |
 | `Content-Type` | `application/json` |
-| `x-vercel-protection-bypass` | Nova chave exclusiva de automação, somente após autorização |
-| `Authorization` | `Bearer ` + `relay_token` dinâmico do aplicativo; é independente da chave da Vercel |
+| `x-vercel-protection-bypass` | Nova chave exclusiva de automação, cadastrada nas três ações; valor omitido |
+| `Authorization` | Ainda a mapear: `Bearer ` + `relay_token` dinâmico do aplicativo; é independente da chave da Vercel |
 | Corpo | Os nove campos já mapeados, assinados pelo aplicativo |
 
-Após autorização, primeiro comprovar que uma chamada sem dados reais atravessa a Vercel e encontra a resposta de pausa do aplicativo. O fluxo permanece pausado, sem destinatários reais, sem habilitar ofertas nem realizar compra. Configuração do relay, captura de amostra assinada e testes positivos do banco/BotConversa/Brevo continuam como etapas posteriores de homologação; não estão validados pelo login no painel.
+As ações 4 (link), 6 (lembrete) e 9 (cópia) foram exercitadas **isoladamente** pelo botão de teste da ação, com a amostra fictícia já capturada: nome fictício, UUID zerado, telefone não discável com DDD 00, link `example.invalid` e evento `contrato_enviado`. Em todas, o Pabbly exibiu `error: Receptor pausado.` — resposta esperada do aplicativo antes de banco, HMAC ou envio ao BotConversa. Isso comprova acesso ao receptor; não comprova assinatura HMAC, execução das rotas/filtros por evento, cópia de PDF, fila, entrega ou leitura de mensagem. O Pabbly pode destacar essas respostas como erro porque o receptor deliberadamente permanece desligado.
 
-Até a decisão de Suzana, nenhuma credencial nova foi criada e nenhuma configuração de acesso/envio foi alterada. A confirmação é necessária porque criar e transmitir a chave concede acesso automatizado adicional ao projeto, além da autorização anterior de publicar a prévia pausada.
+As três configurações foram conferidas após recarregar: URL fixa do relay, nome do cabeçalho, correspondência da nova chave (sem expor o valor) e os nove campos dinâmicos preservados. Não restou chamada direta ao BotConversa nessas ações. O fluxo geral foi conferido desativado. A rota de código continua desabilitada e sem ação externa.
+
+O novo segredo permanece ativo enquanto a homologação está em andamento, com utilização prevista somente neste fluxo. Não possui expiração automática configurada; revogar exclusivamente essa chave ao encerrar a homologação. A chave do Pagar.me continua marcada como variável de sistema. Não foram alterados proteção global, domínios públicos, variáveis do aplicativo, módulo, fila, ofertas, pagamentos ou banco. Não houve mensagem real nem compra.
+
+Configuração do relay no servidor, captura de amostra assinada e testes positivos do banco/BotConversa/Brevo continuam como etapas posteriores de homologação. Os próximos campos do aplicativo são `CONTRACT_WHATSAPP_RELAY_SECRET`, os dois receptores privados do BotConversa e a URL do ambiente; manter as chaves de execução desligadas até preparar a validação controlada. Só depois mapear `relay_token` nas três ações, conferir eventos e testar os canais com os destinos autorizados. Nenhuma dessas verificações é substituída pelo teste de acesso desta etapa.
+
+A confirmação explícita foi obtida antes de criar e transmitir a nova chave, pois ela concede acesso automatizado adicional ao projeto. A autorização de publicação da prévia não foi tratada como autorização implícita dessa concessão de acesso.
 
 Fonte oficial: [Vercel — Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation).
