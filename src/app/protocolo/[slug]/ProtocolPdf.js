@@ -52,7 +52,7 @@ export default function ProtocolPdf({url}) {
       const response=await fetch(cleanUrl)
       if(!response.ok)throw new Error()
       const blobUrl=URL.createObjectURL(await response.blob())
-      const link=window.document.createElement('a');link.href=blobUrl;link.download='tarefa-do-protocolo.pdf';link.click()
+      const link=window.document.createElement('a');link.href=blobUrl;link.download='tarefa-do-desafio.pdf';link.click()
       setTimeout(()=>URL.revokeObjectURL(blobUrl),60000)
     }catch{setError('Não foi possível baixar agora. Toque no nome do material para recarregar o PDF e tente novamente.')}
     finally{setSaving(false)}

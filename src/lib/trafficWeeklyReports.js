@@ -3,11 +3,12 @@ import {groupWeeklyReports,weeklyDigestNotice,weeklyDeliveryKey} from './traffic
 import {allRows,trafficDb} from './trafficReportServer'
 import {loadTrafficAccess} from './trafficAccess'
 import {trafficChannels,sendTrafficChannel} from './trafficNotificationChannels'
+import {collectWeeklyAccount} from './trafficWeeklyCollection.js'
 export {trafficChannels} from './trafficNotificationChannels'
 const brl=n=>n==null?'Não informado':n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
 const number=n=>n==null?'Não informado':n.toLocaleString('pt-BR')
-export function weeklySummary(account,rows,range){
- const totals=rangeTotals(rows,range.from,range.to)
+export function weeklySummary(account,rows,range,snapshot){
+ const totals=rangeTotals(rows,range.from,range.to,snapshot)
  const summary=`${account.name} — ${range.from.split('-').reverse().join('/')} a ${range.to.split('-').reverse().join('/')}\nInvestimento: ${brl(totals.spend)}\nImpressões: ${number(totals.impressions)}\nCliques no link: ${number(totals.clicks)}\nCTR do link: ${totals.ctr==null?'Não informado':number(totals.ctr)+'%'}\nCPC do link: ${brl(totals.cpc)}\nLeads: ${number(totals.leads)}\nConversas iniciadas: ${number(totals.messages)}\nCompras: ${number(totals.purchases)}`
  return {totals,summary,recommendations:'Resultados devem ser avaliados de acordo com o objetivo e evento de cada campanha. As recomendações específicas da gestão serão acrescentadas pela equipe.'}
 }
@@ -22,21 +23,29 @@ export async function deliverTraffic(db,report,user,channel,send){
  try{const result=await send(claimed[0].id);await checked(await db.from('traffic_report_deliveries').update({status:result?.status||'sent',provider_id:result?.id||null,sent_at:['skipped','failed'].includes(result?.status)?null:new Date().toISOString(),error_message:result?.reason||null}).eq('id',claimed[0].id));return {id:claimed[0].id,channel,status:result?.status||'sent',reason:result?.reason}}
  catch(error){await checked(await db.from('traffic_report_deliveries').update({status:'unknown',error_message:String(error.message||'Falha de entrega').slice(0,240)}).eq('id',claimed[0].id));return {id:claimed[0].id,channel,status:'unknown',reason:String(error.message||'Falha de entrega')}}
 }
-export async function runTrafficWeekly(now=new Date(),{notify=true}={}){
+export async function runTrafficWeekly(now=new Date(),{notify=true,collectMissing=false}={}){
  const db=trafficDb(),configuration=await db.from('traffic_report_settings').select('*').eq('id',true).single()
  if(['PGRST205','42P01'].includes(configuration.error?.code))return {enabled:false,reason:'Atualização do banco pendente.'}
  const settings=await checked(configuration)
  if(!settings.weekly_enabled)return {enabled:false,reason:'Avisos semanais aguardam ativação.'}
  const range=lastClosedWeek(now),links=await allRows(()=>db.from('traffic_client_users').select('client_id,user_id').order('client_id').order('user_id'))
- const accounts=await allRows(()=>db.from('traffic_clients').select('id,name,active,mcp_status').eq('active',true).order('id'))
+ const accounts=await allRows(()=>db.from('traffic_clients').select('id,name,active,mcp_status,meta_account_id').eq('active',true).order('id'))
  const prepared=[]
+ const pending=[],deliveries=[]
+ const deadline=Date.now()+220000
  let published=0,skipped=0
  for(const account of accounts){
   const members=links.filter(l=>l.client_id===account.id);if(!members.length){skipped++;continue}
-  const rows=await allRows(()=>db.from('traffic_daily_metrics').select('*').eq('client_id',account.id).gte('metric_date',range.from).lte('metric_date',range.to).order('metric_date'))
-  const content=weeklySummary(account,rows,range)
+  const readRows=()=>allRows(()=>db.from('traffic_daily_metrics').select('*').eq('client_id',account.id).gte('metric_date',range.from).lte('metric_date',range.to).order('metric_date'))
+  const readSnapshot=async()=>checked(await db.from('traffic_metric_snapshots').select('period_start,period_end,payload').eq('meta_account_id',account.meta_account_id).eq('period_start',range.from).eq('period_end',range.to).maybeSingle())
+  let rows=await readRows(),snapshot=await readSnapshot(),content=weeklySummary(account,rows,range,snapshot)
+  let collection
+  if(collectMissing&&account.mcp_status==='enabled'&&(content.totals.days!==7||content.totals.spend==null||content.totals.impressions==null)&&Date.now()<deadline){
+   collection=await collectWeeklyAccount(db,account,range)
+   if(collection.status==='saved'){rows=await readRows();snapshot=await readSnapshot();content=weeklySummary(account,rows,range,snapshot)}
+  }
   // Never announce a complete weekly report while any day is missing or collection failed.
-  if(content.totals.days!==7||content.totals.spend==null||content.totals.impressions==null){skipped++;continue}
+  if(content.totals.days!==7||content.totals.spend==null||content.totals.impressions==null){skipped++;pending.push({client_id:account.id,name:account.name,days:content.totals.days,reason:collection?.reason||'Coleta da semana incompleta.'});continue}
   let report=await checked(await db.from('traffic_reports').select('id,published_at').eq('client_id',account.id).eq('period_type','weekly').eq('period_start',range.from).eq('period_end',range.to).maybeSingle())
   if(report&&!report.published_at){skipped++;continue} // Preserve drafts under editorial review.
   if(!report){const result=await db.from('traffic_reports').insert({client_id:account.id,period_type:'weekly',period_start:range.from,period_end:range.to,summary:content.summary,recommendations:content.recommendations,published_at:now.toISOString()}).select('id,published_at').single();if(result.error?.code==='23505')report=await checked(await db.from('traffic_reports').select('id,published_at').eq('client_id',account.id).eq('period_type','weekly').eq('period_start',range.from).eq('period_end',range.to).single());else report=await checked(result);published++}
@@ -52,9 +61,10 @@ export async function runTrafficWeekly(now=new Date(),{notify=true}={}){
    const batch={batch_key:weeklyDeliveryKey(range),report_ids:group.reports.map(r=>r.id)}
    for(const channel of ['app','push','email','whatsapp']){
     if(channel!=='app'&&!settings[channel+'_enabled'])continue
-    await deliverTraffic(db,batch,recipient,channel,id=>sendTrafficChannel(db,recipient,channel,notice,id))
+    const delivery=await deliverTraffic(db,batch,recipient,channel,id=>sendTrafficChannel(db,recipient,channel,notice,id))
+    deliveries.push({channel,status:delivery.status,reused:!!delivery.reused})
    }
  }
 
- return {enabled:true,published,skipped,period:range,notifications:notify}
+ return {enabled:true,published,ready:prepared.length,skipped,pending,deliveries,period:range,notifications:notify}
 }

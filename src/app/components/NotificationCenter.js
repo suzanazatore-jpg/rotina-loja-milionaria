@@ -18,7 +18,7 @@ function timeLabel(value) {
 
 function notificationDestination(item) {
   const target = new URL(item?.target_url || '/painel', window.location.origin)
-  if (target.pathname.startsWith('/protocolo/')) return { target, section: null, label: 'Abrir missão do protocolo' }
+  if (target.pathname.startsWith('/protocolo/')) return { target, section: null, label: 'Abrir missão do desafio' }
   const section = target.searchParams.get('destino') || target.searchParams.get('secao') || 'inicio'
   const labels = {
     rotina: 'Abrir Rotina',

@@ -989,3 +989,25 @@
   .premium-mobile-home-carousel .premium-banner-copy { padding: 22px 20px 28px; }
   .premium-mobile-home-carousel .premium-banner-copy h2 { font-size: 21px; }
 }
+
+/* Cabeçalhos estáveis mesmo com títulos e materiais mensais mais extensos. */
+.campaign-journey-header, .routine-week-header { flex-wrap: wrap; align-items: flex-start; }
+.campaign-journey-header > div:nth-child(2), .routine-week-header > div:nth-child(2) { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+.campaign-header-download, .routine-header-download { flex-basis: 100%; }
+.monthly-pdf-control { display: inline-flex; flex-direction: column; gap: 6px; max-width: 100%; }
+.monthly-pdf-control button { border: 0; border-radius: 9px; padding: 12px 16px; color: #111; font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; }
+.monthly-pdf-control button:disabled { opacity: .65; cursor: wait; }
+.monthly-pdf-error { color: #d74b4b; max-width: 300px; white-space: normal; }
+.interactive-calendar-package .interactive-calendar-package-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+.interactive-calendar-package-header > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+.interactive-calendar-package-side { display: grid; justify-items: end; min-width: 0; }
+.interactive-calendar-package-pdf { flex-wrap: wrap; }
+.interactive-calendar-package-pdf .monthly-pdf-control { flex: 1; }
+.campaign-step-copy, .routine-week-tasks button > span { min-width: 0; overflow-wrap: anywhere; }
+.interactive-calendar-action, .interactive-calendar-copy { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .interactive-calendar-package .interactive-calendar-package-header { grid-template-columns: minmax(0, 1fr); }
+  .interactive-calendar-package-side { width: 100%; display: flex; justify-content: space-between; }
+  .campaign-journey-header > div:nth-child(2), .routine-week-header > div:nth-child(2) { flex-basis: 180px; }
+  .campaign-header-download .monthly-pdf-control, .routine-header-download > span { width: 100%; }
+}

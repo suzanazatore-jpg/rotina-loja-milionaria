@@ -69,7 +69,7 @@ test('weekly runner prepares first and sends only one notice per recipient and c
   traffic_client_users:[{client_id:'a',user_id:'u1'},{client_id:'b',user_id:'u1'},{client_id:'c',user_id:'u2'}],
   traffic_clients:['a','b','c'].map(id=>({id,name:'Conta '+id,active:true})),
   traffic_daily_metrics:['a','b','c'].flatMap(client_id=>Array.from({length:7},(_,i)=>({client_id,metric_date:'2026-10-'+(19+i),data_status:'ok',spend:10,clicks:1,impressions:100}))),
-  traffic_reports:['a','b','c'].map(id=>({id:'r'+id,client_id:id,period_type:'weekly',period_start:range.from,period_end:range.to,published_at:'2026-10-26T11:00:00Z'})),
+  traffic_metric_snapshots:[],traffic_reports:['a','b','c'].map(id=>({id:'r'+id,client_id:id,period_type:'weekly',period_start:range.from,period_end:range.to,published_at:'2026-10-26T11:00:00Z'})),
   profiles:['u1','u2'].map(id=>({id,name:id,email:id+'@example.test'})),perfis:[],traffic_report_deliveries:[]
  }
  const db={from(table){let filters=[],mode='read',values,one=false

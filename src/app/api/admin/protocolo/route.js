@@ -19,7 +19,7 @@ export async function GET(request) {
     if(preview){
       const {data:course,error:courseError}=await supabase.from('courses').select('id,slug,title,subtitle,protocol_enabled,protocol_offer_url,is_published').eq('slug',slug).maybeSingle()
       if(courseError)throw courseError
-      if(!course?.protocol_enabled)return Response.json({error:'Protocolo não encontrado.'},{status:404})
+      if(!course?.protocol_enabled)return Response.json({error:'Desafio não encontrado.'},{status:404})
       const [lessons,materials]=await Promise.all([
         supabase.from('lessons').select('id,title,description,video_url,duration_label,protocol_checklist,sort_order,created_at').eq('course_id',course.id).order('sort_order').order('created_at'),
         supabase.from('materials').select('id,title,lesson_id,file_url,is_published').eq('course_id',course.id).order('sort_order'),
