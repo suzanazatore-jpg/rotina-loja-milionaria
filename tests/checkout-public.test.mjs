@@ -8,7 +8,7 @@ const source=readFileSync(new URL('../src/lib/checkoutPublicServer.js',import.me
  .replace("'./pagarme.js'",JSON.stringify(moduleUrl('pagarme')))
  .replace("'./checkoutCart.js'",JSON.stringify(moduleUrl('checkoutCart')))
  .replace("'./checkoutTracking.js'",JSON.stringify(moduleUrl('checkoutTracking')))
-const {checkoutTestConfiguration,loadCheckoutOffer,publicCheckoutData}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+const {checkoutPaymentConfiguration,checkoutTestConfiguration,loadCheckoutOffer,publicCheckoutData}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env={CHECKOUT_TEST_ENABLED:'true',CHECKOUT_SESSION_SECRET:'a'.repeat(32),PAGARME_SECRET_KEY:'sk_test_mock',PAGARME_PUBLIC_KEY:'pk_test_mock'}
 test('public checkout denies real payments, incomplete configuration and accidental activation',()=>{
  assert.equal(checkoutTestConfiguration(env).ready,true)
@@ -40,8 +40,34 @@ test('offer lookup filters active records and exposes only public product/offer 
  assert.equal(exposed.test.publicKey,'pk_test_mock')
  assert.equal(exposed.test.key,undefined)
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'preview'}).analytics_enabled,false)
- assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'production'}).analytics_enabled,true)
+ assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'production'}).analytics_enabled,false)
  assert.equal(await loadCheckoutOffer('../invalid',db),null)
  product.marketplace_id='future_provider'
  assert.equal(await loadCheckoutOffer('offer',db),null)
+})
+
+const liveEnv={VERCEL_ENV:'production',PAGARME_SECRET_KEY:'sk_productionMock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',PAGARME_PUBLIC_KEY:'pk_productionMock',CHECKOUT_LIVE_ENABLED:'true',CHECKOUT_SESSION_SECRET:'a'.repeat(32),PAGARME_WEBHOOK_SECRET:'b'.repeat(32),CHECKOUT_FULFILLMENT_ENABLED:'true',CHECKOUT_ACCESS_LEDGER_ENABLED:'true',CHECKOUT_LIVE_OFFER_IDS:'pilot'}
+const pilot={offer:{id:'pilot'},product:{plan_id:'plan',type:'one_time'},config:{}}
+test('live validation requires production, chosen offer, delivery, webhook and matching public key',()=>{
+ const cfg=checkoutPaymentConfiguration(pilot,liveEnv)
+ assert.equal(cfg.ready,true);assert.equal(cfg.mode,'live');assert.equal(cfg.adminOnly,true)
+ assert.equal(cfg.publicKey,'pk_productionMock');assert.equal(cfg.key,undefined)
+ for(const change of [{VERCEL_ENV:'preview'},{CHECKOUT_LIVE_ENABLED:'false'},{CHECKOUT_TEST_ENABLED:'true'},{CHECKOUT_LIVE_OFFER_IDS:''},{CHECKOUT_LIVE_OFFER_IDS:'other'},{CHECKOUT_SESSION_SECRET:'short'},{PAGARME_WEBHOOK_SECRET:''},{CHECKOUT_FULFILLMENT_ENABLED:'false'},{CHECKOUT_ACCESS_LEDGER_ENABLED:'false'}])assert.equal(checkoutPaymentConfiguration(pilot,{...liveEnv,...change}).ready,false,JSON.stringify(change))
+ assert.equal(checkoutPaymentConfiguration({...pilot,product:{type:'one_time'}},liveEnv).ready,false)
+ assert.equal(checkoutPaymentConfiguration({...pilot,product:{plan_id:'plan',type:'subscription'}},liveEnv).ready,false)
+ assert.equal(checkoutPaymentConfiguration(pilot,{...liveEnv,PAGARME_PUBLIC_KEY:'pk_test_mock'}).publicKey,'')
+ assert.equal(checkoutPaymentConfiguration(pilot,{...liveEnv,PAGARME_PUBLIC_KEY:'sk_neverExpose'}).publicKey,'')
+})
+test('contract offer cannot charge while contract service is disabled or incomplete',()=>{
+ const contracted={...pilot,config:{contract:{required:true}}}
+ assert.equal(checkoutPaymentConfiguration(contracted,liveEnv).ready,false)
+ assert.equal(checkoutPaymentConfiguration(contracted,{...liveEnv,CONTRACTS_ENABLED:'true'}).ready,false)
+ assert.equal(checkoutPaymentConfiguration(contracted,{...liveEnv,CONTRACTS_ENABLED:'true',CONTRACT_TOKEN_SECRET:'c'.repeat(32)}).ready,true)
+})
+test('test credentials on shared API endpoint stay test and do not track in production',()=>{
+ const cfg=checkoutTestConfiguration({...env,PAGARME_BASE_URL:'https://api.pagar.me/core/v5'})
+ assert.equal(cfg.ready,true)
+ assert.equal(checkoutTestConfiguration({...env,VERCEL_ENV:'production'}).ready,false)
+ const data=publicCheckoutData({...pilot,prices:[],bumps:[]},{...liveEnv,CHECKOUT_TRACKING_ENABLED:'true'})
+ assert.equal(data.analytics_enabled,true);assert.equal(data.test.ready,false);assert.equal(data.payment.ready,true)
 })

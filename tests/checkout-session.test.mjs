@@ -6,11 +6,12 @@ const { signCheckoutSession, readCheckoutSession, safeCheckoutRedirect } = await
 const secret = 'local-test-secret-with-at-least-32-characters'
 const now = 1791993600000
 
-test('checkout session binds an offer and expires in thirty minutes', () => {
+test('checkout session binds an offer and covers Pix lifetime and expires in ninety minutes', () => {
   const token = signCheckoutSession('offer-a',secret,now)
   assert.equal(readCheckoutSession(token,'offer-a',secret,now).offerId,'offer-a')
   assert.equal(readCheckoutSession(token,'offer-b',secret,now),null)
-  assert.equal(readCheckoutSession(token,'offer-a',secret,now+30*60000),null)
+  assert.ok(readCheckoutSession(token,'offer-a',secret,now+60*60000))
+  assert.equal(readCheckoutSession(token,'offer-a',secret,now+90*60000),null)
   assert.equal(readCheckoutSession(token,'offer-a',secret,now-1),null)
 })
 test('forged cookies, wrong keys and malformed tokens are rejected', () => {

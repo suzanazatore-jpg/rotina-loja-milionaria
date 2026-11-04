@@ -194,3 +194,13 @@ test('compact Pix sends a valid address-free customer to the gateway and preserv
  globalThis.fetch=async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.customer.address,undefined);assert.equal(body.payments[0].amount,4230);return Response.json({id:'or_compact',code:localOrder.id,amount:4230,customer:{email:customer.email},charges:[{id:'ch_compact',status:'pending'}]})}
  try{const result=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'compact-pix-123456',null,{requireAddress:false});assert.equal(result.status,'waiting_payment');assert.equal(steps.length,0)}finally{globalThis.fetch=original;delete process.env.PAGARME_SECRET_KEY}
 })
+
+test('real sk_ keys require live flag and production; test keys never masquerade as live',()=>{
+ const production={PAGARME_SECRET_KEY:'sk_realMock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',CHECKOUT_LIVE_ENABLED:'true',VERCEL_ENV:'production'}
+ assert.equal(gatewayConfiguration(production).mode,'live')
+ assert.equal(gatewayConfiguration({...production,PAGARME_SECRET_KEY:'sk_live_mock'}).mode,'live')
+ assert.throws(()=>gatewayConfiguration({...production,VERCEL_ENV:'preview'}))
+ assert.throws(()=>gatewayConfiguration({...production,PAGARME_BASE_URL:'https://sdx-api.pagar.me/core/v5'}))
+ assert.equal(gatewayConfiguration({...production,PAGARME_SECRET_KEY:'sk_test_mock'}).mode,'test')
+ assert.throws(()=>gatewayConfiguration({...production,PAGARME_SECRET_KEY:'not-a-key'}))
+})
