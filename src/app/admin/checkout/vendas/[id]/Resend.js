@@ -124,6 +124,13 @@ export default function Resend({ base, view, contract, close, refresh }) {
                   />
                   {k === 'hooks' && picked.includes(k) && (
                     <div className="sv-sub">
+                      <p style={{ fontSize: 12, margin: '4px 0 10px' }}>
+                        Os webhooks vinculados ao produto desta venda serão reenviados automaticamente.
+                      </p>
+                      <details>
+                        <summary style={{ cursor: 'pointer', fontSize: 12 }}>
+                          Escolher destinos (opcional)
+                        </summary>
                       {rows.map((d) => (
                         <label key={d.id}>
                           <input
@@ -139,6 +146,7 @@ export default function Resend({ base, view, contract, close, refresh }) {
                           {d.name}
                         </label>
                       ))}
+                      </details>
                     </div>
                   )}
                 </div>
