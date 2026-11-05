@@ -120,12 +120,13 @@ test('reusing request key with different fingerprint never calls gateway', async
   await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'request-key-123456'),/outros dados/)
   assert.equal(steps.length,0)
 })
-test('card wallet receives token and billing address, and order receives only server card ID', async () => {
+for (const compact of [false,true]) test(`card wallet receives a token ${compact ? 'without an address for low ticket' : 'with billing address for complete checkout'}`, async () => {
   process.env.PAGARME_SECRET_KEY='sk_test_mock'
   const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393',address:{line_1:'Rua 1, 10',zip_code:'59000000',city:'Natal',state:'RN'}}
+  if (compact) delete customer.address
   let localOrder
   const steps=[
-    {table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
+    {table:'offers',data:{...offer,product_id:'product',checkout_config:{form_profile:compact?'compact':'complete'}}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
     {table:'customers',data:null},{table:'customers',data:{id:'customer'}},
     {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
     {table:'webhook_events',data:null},{table:'order_items',data:null},{table:'customers',data:{id:'customer',pagarme_customer_id:null}},
@@ -136,9 +137,9 @@ test('card wallet receives token and billing address, and order receives only se
   globalThis.fetch=async(url,options)=>{
     called.push(url)
     const body=JSON.parse(options.body)
-    if(url.endsWith('/customers')) return Response.json({id:'cus_owned'})
+    if(url.endsWith('/customers')) { assert.equal(Boolean(body.address),!compact); return Response.json({id:'cus_owned'}) }
     if(url.endsWith('/customers/cus_owned/cards')) {
-      assert.deepEqual(body,{token:'token_secure',billing_address:{country:'BR',state:'RN',city:'Natal',zip_code:'59000000',line_1:'Rua 1, 10'}})
+      assert.deepEqual(body,compact ? {token:'token_secure'} : {token:'token_secure',billing_address:{country:'BR',state:'RN',city:'Natal',zip_code:'59000000',line_1:'Rua 1, 10'}})
       assert.equal(body.number,undefined); assert.equal(body.cvv,undefined)
       return Response.json({id:'card_owned'})
     }
@@ -179,13 +180,13 @@ test('a product assigned to a future marketplace cannot be charged through Pagar
  await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',payment_method:'pix'},'request-marketplace-123'),/Marketplace ainda não disponível/)
  assert.equal(steps.length,0)
 })
-test('compact Pix accepts no address but default and card processing still require it',async()=>{
+test('compact buyers may omit address while complete card checkout requires it',async()=>{
  const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393'}
  assert.equal(normalizeCustomer(customer,{requireAddress:false}).address,undefined)
  assert.throws(()=>normalizeCustomer(customer),/endereço/)
  assert.throws(()=>normalizeCustomer({...customer,address:{city:'Natal'}},{requireAddress:false}),/endereço/)
  const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}}]
- await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'credit_card',card_token:'token_secure'},'compact-card-123456',null,{requireAddress:false}),/endereço/)
+ await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'credit_card',card_token:'token_secure'},'complete-card-123456'),/endereço/)
  assert.equal(steps.length,0)
 })
 test('compact Pix sends a valid address-free customer to the gateway and preserves totals',async()=>{

@@ -37,11 +37,13 @@
 .cp-page.express-checkout .cp-purchase-button:disabled { background:var(--cp-accent); color:white; opacity:.78; }
 .cp-page.express-checkout .pc-notice { text-align:center; font-size:12px; color:#545454; background:#f6f6f6; margin:12px 0; }
 .cp-page.express-checkout .cp-footer { width:min(650px,100%); max-width:63%; display:flex; flex-direction:column; align-items:stretch; gap:0; border:0; padding:0; margin:0 0 0 auto; opacity:1; }
-.cp-page.express-checkout .express-help { order:-1; display:block; text-align:center; color:#383c3e; background:#fff; padding:32px 24px; }
-.express-help details { display:none; }
-.express-help h3 { color:inherit; text-transform:uppercase; margin:10px 0; font-size:15px; }
-.cp-page.express-checkout .express-help a { color:#383c3e; font-size:14px; }
-.cp-page.express-checkout .pc-payment-footer { padding-top:16px; }
+.cp-page.express-checkout .guru-support { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 18px; padding:22px 0 16px; border-bottom:1px solid #377c70; color:#fff; }
+.cp-page.express-checkout .guru-support h3 { flex-basis:100%; margin:0; color:inherit; font-size:16px; }
+.cp-page.express-checkout .guru-support a { color:white; font-size:14px; overflow-wrap:anywhere; }
+.cp-page.express-checkout .pc-payment-footer { order:1; margin:4px 0 0; font-size:13px; }
+.cp-page.express-checkout .cp-footer > strong { margin-top:14px; }
+.pc-checkout .cp-page.express-checkout .cp-form-card { padding-bottom:28px!important; border-radius:16px; }
+.cp-page.express-checkout > .pc-notice { border:0; background:transparent; color:#d5e1e5; font-size:13px; }
 @media (max-width:1024px) {
   .pc-checkout .cp-page.express-checkout { padding:24px 0 32px; }
   .pc-checkout .cp-page.express-checkout .cp-summary { margin:0 24px; gap:16px; }
@@ -53,8 +55,5 @@
   .pc-checkout .cp-page.express-checkout .pc-address input[name=zip_code] { max-width:none; }
   .cp-page.express-checkout .cp-purchase-button { width:100%; }
   .cp-page.express-checkout .cp-footer { max-width:none; width:100%; margin:0; }
-  .express-help section { display:none; }
-  .express-help details { display:block; }
-  .express-help summary { display:inline-block; padding:8px 18px; border-radius:5px; background:#ededed; cursor:pointer; }
-  .express-help details a { display:block; margin-top:12px; }
+  .cp-page.express-checkout .cp-footer { padding:0 24px; box-sizing:border-box; }
 }

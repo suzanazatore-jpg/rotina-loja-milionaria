@@ -28,7 +28,7 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
   const fullProfile = contractRequired || (offer.checkout_config?.form_profile
     ? offer.checkout_config.form_profile !== 'compact'
     : requireAddress)
-  const customer = normalizeCustomer(input.customer, { requireAddress: input.payment_method !== 'pix' || fullProfile })
+  const customer = normalizeCustomer(input.customer, { requireAddress: fullProfile })
   const billingAddress = { ...customer.address }
   for (const [field, limit] of [['street', 128], ['number', 32], ['district', 64]]) {
     const value = input.customer?.address?.[field]
@@ -82,8 +82,8 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
       customerId = created.id
       await result(db.from('customers').update({ pagarme_customer_id: customerId }).eq('id', local.id))
     }
-    // Carteira do gateway aceita o token com endereço; PAN e CVV nunca chegam aqui.
-    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, billing_address: billingAddress } })
+    // A carteira recebe somente o token e, quando informado, o endereço de cobrança.
+    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, ...(customer.address ? { billing_address: billingAddress } : {}) } })
     gatewayCard = { card_id: walletCard.id }
     gatewayCustomer = { id: customerId }
   }
