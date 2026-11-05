@@ -32,10 +32,15 @@ export async function sendWebhook(urlValue, payload, secret, deliveryId, resolve
   })
 }
 
-export async function processOutboundWebhooks(db, { sender = sendWebhook, env = process.env, now = Date.now() } = {}) {
+export async function processOutboundWebhooks(db, { sender = sendWebhook, env = process.env, now = Date.now(), deliveryIds = null } = {}) {
   if (env.CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED !== 'true') return { disabled: true, sent: 0 }
   const mode = env.VERCEL_ENV === 'production' ? 'live' : 'test'
-  const result = await db.from('webhook_deliveries').select('id,webhook_id,status,attempts,payload,outbound_webhooks!inner(active)').eq('outbound_webhooks.active', true).eq('payload->>environment', mode).in('status', ['pending', 'retry']).lte('next_attempt_at', new Date(now).toISOString()).order('next_attempt_at').limit(3)
+  let query = db.from('webhook_deliveries').select('id,webhook_id,status,attempts,payload,outbound_webhooks!inner(active)').eq('outbound_webhooks.active', true).eq('payload->>environment', mode).in('status', ['pending', 'retry']).lte('next_attempt_at', new Date(now).toISOString())
+  if (deliveryIds !== null) {
+    if (!Array.isArray(deliveryIds) || !deliveryIds.length || deliveryIds.length > 15 || deliveryIds.some(id => !/^[0-9a-f-]{36}$/i.test(id))) throw new Error('invalid_delivery_selection')
+    query = query.in('id', deliveryIds)
+  }
+  const result = await query.order('next_attempt_at').limit(deliveryIds ? 15 : 3)
   if (result.error) throw new Error('outbound_queue_unavailable')
   let sent = 0
   for (const row of result.data || []) {
