@@ -26,7 +26,7 @@ test('contract providers preserve activation and validation rules',()=>{
 test('payment summary follows gateway environment guards without enabling live payments',()=>{
   const env={PAGARME_SECRET_KEY:'sk_live_private',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}
   assert.equal(integrationStatus(env).pagarme.configured,false)
-  assert.equal(integrationStatus({...env,CHECKOUT_LIVE_ENABLED:'true'}).pagarme.label,'Configurado · produção')
+  assert.equal(integrationStatus({...env,CHECKOUT_LIVE_ENABLED:'true',VERCEL_ENV:'production'}).pagarme.label,'Configurado · produção')
   assert.equal(integrationStatus({PAGARME_SECRET_KEY:'sk_test_private'}).pagarme.label,'Configurado · teste')
   assert.equal(env.CHECKOUT_LIVE_ENABLED,undefined)
 })

@@ -1,5 +1,5 @@
 import { after } from 'next/server'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'
 import { isInternalAccessWebhook } from '@/lib/checkoutWebhookPayload'
@@ -65,11 +65,15 @@ export async function POST(request, context) {
   if ((recent || []).some(row => ['pending','retry','processing'].includes(row.status))) {
     return reply({ error: 'Já existe um envio pendente deste webhook. Consulte o status antes de reenviar.' }, 409)
   }
+  if (body.request_id && !UUID.test(body.request_id)) return reply({ error: 'Solicitação inválida.' }, 400)
+  const hash = body.request_id && createHash('sha256').update([order.id,original.webhook_id,body.request_id].join(':')).digest('hex')
+  const deliveryId = hash && [hash.slice(0,8),hash.slice(8,12),hash.slice(12,16),hash.slice(16,20),hash.slice(20,32)].join('-')
   const { data: delivery, error: insertError } = await db.from('webhook_deliveries').insert({
-    webhook_id: original.webhook_id, event_type: 'order.paid', order_id: order.id,
+    ...(deliveryId ? {id:deliveryId} : {}), webhook_id: original.webhook_id, event_type: 'order.paid', order_id: order.id,
     subscription_id: original.subscription_id, payload: original.payload,
     status: 'pending', attempts: 0, next_attempt_at: new Date().toISOString(),
   }).select('id').single()
+  if (deliveryId && insertError?.code === '23505') return reply({ ok:true, queued:true, delivery_id:deliveryId },202)
   if (insertError || !delivery) return reply({ error: 'Não foi possível agendar o reenvio.' }, 503)
   await db.from('webhook_events').insert({
     pagarme_event_id: `webhook-admin:${randomUUID()}`,

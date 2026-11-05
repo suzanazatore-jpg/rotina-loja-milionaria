@@ -81,7 +81,8 @@ export function orderPayload(order, offer, product, customer, card, cartItems) {
 export function confirmedOrderState(remote, expected) {
   if (remote.code !== expected.id || remote.amount !== expected.total_cents || remote.customer?.email?.toLowerCase() !== expected.email) throw new PaymentError('Confirmação não corresponde ao pedido.', 409)
   const charge = remote.charges?.[0]
-  const state = charge?.status || remote.status
+  const refunded = charge?.status === 'canceled' && Number(charge.paid_amount) > 0 && Number(charge.canceled_amount) >= Number(charge.paid_amount)
+  const state = refunded ? 'refunded' : charge?.status || remote.status
   const status = ({ paid: 'paid', failed: 'failed', canceled: 'canceled', refunded: 'refunded', chargedback: 'chargedback', pending: 'waiting_payment', processing: 'waiting_payment' })[state] || 'pending'
   return { status, pagarme_order_id: remote.id, pagarme_charge_id: charge?.id || null, ...(status === 'paid' ? { paid_at: charge?.paid_at || expected.paid_at || remote.updated_at || new Date().toISOString() } : {}), ...(expected.payment_method === 'pix' ? { pix_qr_code: charge?.last_transaction?.qr_code || null, pix_expires_at: charge?.last_transaction?.expires_at || null } : {}) }
 }
