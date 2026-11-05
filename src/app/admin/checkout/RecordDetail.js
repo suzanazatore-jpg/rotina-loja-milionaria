@@ -3,6 +3,7 @@ import {useEffect,useState} from 'react'
 import Link from 'next/link'
 import {supabase} from '@/lib/supabase'
 import {BuyerCard,FieldGrid,Timeline,Status,money,date,statusLabels} from './CentralUI'
+import AuditPanel from './AuditPanel'
 const titles={vendas:'Vendas',assinaturas:'Assinaturas',clientes:'Clientes'}
 const contractLabels={pending:'Aguardando assinatura',viewed:'Visualizado',signed:'Assinado',canceled:'Cancelado',completed:'Liberado',awaiting_signature:'Aguardando assinatura',retry:'Nova tentativa pendente',awaiting_contract:'Aguardando assinatura',disabled:'Liberação pausada',not_gated:'Liberado no pagamento',ready:'Na fila',processing:'Processando',accepted:'Aceito pelo serviço',failed:'Falha — revisar'}
 async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
@@ -34,6 +35,6 @@ export default function RecordDetail({entity,id}){
  {tab==='subscriptions'&&<section className="central-chart-panel"><h2>Assinaturas</h2><div className="cv-table-wrap"><table className="cv-table"><thead><tr><th>Código</th><th>Produto</th><th>Status</th><th>Frequência</th></tr></thead><tbody>{data.subscriptions.map(s=><tr key={s.id}><td><Link className="cv-link" href={`/admin/checkout/assinaturas/${s.id}`}>{s.pagarme_subscription_id || s.id}</Link></td><td>{s.product_name}</td><td>{statusLabels[s.status] || s.status}</td><td>{s.billing_frequency}</td></tr>)}{!data.subscriptions.length&&<tr><td colSpan={4}>Nenhuma assinatura registrada.</td></tr>}</tbody></table></div></section>}
  {tab==='products'&&<section className="central-chart-panel"><h2>Produtos comprados</h2>{data.products.map(i=><p key={i.product_id}><Link className="cv-link" href={`/admin/checkout/produtos/${i.product_id}`}>{i.product?.name || 'Produto'}</Link></p>)}{!data.products.length&&<p>Nenhum produto com compra aprovada registrado.</p>}</section>}
  {tab==='comments'&&<section className="central-chart-panel"><h2>Comentários internos</h2><form className="cv-comment-form" onSubmit={comment}><label htmlFor="cv-note">Registrar observação no histórico</label><textarea id="cv-note" required maxLength={3000} value={text} onChange={e=>setText(e.target.value)}/><button className="central-primary" disabled={saving}>{saving?'Salvando…':'Salvar comentário'}</button></form>{data.activity.comments.map(c=><article className="cv-comment" key={c.id}><small>{c.actor} · {date(c.at)}</small><p>{c.text}</p></article>)}{!data.activity.comments.length&&<p>Nenhum comentário registrado.</p>}</section>}
- {tab==='audit'&&<Timeline events={data.activity.events}/>}
+ {tab==='audit'&&(entity==='vendas'?<AuditPanel orderId={id} events={data.activity.events}/>:<Timeline events={data.activity.events}/>)}
  </main>
 }
