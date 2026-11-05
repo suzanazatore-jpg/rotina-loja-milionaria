@@ -23,7 +23,9 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
   const offer = await result(db.from('offers').select('*').eq('id', input.offer_id).single())
   const product = await result(db.from('products').select('*').eq('id', offer.product_id).single())
   if ((product.marketplace_id || 'pagarme') !== 'pagarme') throw new PaymentError('Marketplace ainda não disponível para pagamentos.')
-  if (!product.plan_id) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
+  const isReservation = !product.plan_id && product.type === 'one_time' && (process.env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').map(id => id.trim()).includes(offer.id)
+  if (!product.plan_id && !isReservation) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
+  if (isReservation && selection.length) throw new PaymentError('Reservas não permitem itens adicionais.')
   const customer = normalizeCustomer(input.customer, { requireAddress: input.payment_method !== 'pix' || requireAddress })
   const billingAddress = { ...customer.address }
   for (const [field, limit] of [['street', 128], ['number', 32], ['district', 64]]) {
@@ -32,7 +34,7 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
   }
   const installments = input.installments ?? 1
   const available = selection.length ? await loadOrderBumps(db, offer.id) : []
-  const { items, amount } = buildCheckoutCart(offer, product, available, selection, input.payment_method, installments)
+  const { items, amount } = buildCheckoutCart(offer, product, available, selection, input.payment_method, installments, { allowReservation: isReservation })
   const card = input.payment_method === 'credit_card' ? cardReference(input) : null
   if (input.payment_method === 'pix' && (input.card || input.card_number || input.cvv)) throw new PaymentError('Não envie dados de cartão.')
   // A impressão digital impede que a mesma chave cobre outra oferta, valor ou cliente.
