@@ -6,8 +6,9 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import CheckoutSettingsEditor,{CheckoutImageField} from './CheckoutSettingsEditor'
 import Image from 'next/image'
-import {paymentLink,CHECKOUT_ORIGIN} from '@/lib/checkoutLinks'
+import {paymentLink,offerPath} from '@/lib/checkoutLinks'
 import CatalogAudit from './CatalogAudit'
+import interior from './ProductInterior.module.css'
 import ContractOfferSettings from './ContractOfferSettings'
 import { CHECKOUT_DEFAULTS } from '@/lib/checkoutSettings'
 import { FormOferta, OFERTA_VAZIA } from './CheckoutForms'
@@ -60,7 +61,10 @@ export default function OfferEditor({produtoId,ofertaId}) {
       const response=await fetch('/api/admin/checkout',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({entidade:'oferta',id:ofertaId==='nova'?undefined:ofertaId,dados})})
       const json=await response.json()
       if(!response.ok)throw new Error(json.error || 'Não foi possível salvar.')
-      setBaseline(JSON.stringify(dados));setMessage('✓ Oferta salva.')
+      const saved = {...dados, id:json.id, slug:json.slug, payment_path:json.payment_path}
+      setDados(saved)
+      setBaseline(JSON.stringify(saved))
+      setMessage('✓ Oferta salva.')
       if(ofertaId==='nova')router.replace(`/admin/checkout/produtos/${encodeURIComponent(produtoId)}/ofertas/${encodeURIComponent(json.id)}`)
     }catch(e){setMessage(e.message)}finally{setSaving(false)}
   }
@@ -74,15 +78,44 @@ export default function OfferEditor({produtoId,ofertaId}) {
   if(!dados || !catalog)return <div className="central-error" role="alert">{message}<p><Link href="/admin/checkout">Voltar para Produtos</Link></p></div>
   const product=catalog.produtos.find(p=>p.id===produtoId)
   const base=`/admin/checkout/produtos/${encodeURIComponent(produtoId)}`
-  const link=ofertaId==='nova'?'':paymentLink(JSON.parse(baseline))
+  const savedLink = ofertaId==='nova' ? '' : paymentLink(JSON.parse(baseline))
+  const path = offerPath(dados.payment_path) || offerPath(dados.name)
+  const link = path ? paymentLink({payment_path:path}) : ''
+  const canShare = Boolean(link && link === savedLink)
   const available=catalog.ofertas.filter(o=>o.id!==ofertaId && o.active && !dados.bumps.some(b=>b.bump_offer_id===o.id) && catalog.produtos.find(p=>p.id===o.product_id)?.type==='one_time')
   return <main className="central-home cv-offer-editor">
-    <div className="central-breadcrumb"><Link href="/admin/checkout">Produtos</Link><span>/</span><Link href={base}>{product.name}</Link><span>/</span><span>Ofertas</span><span>/</span><strong>{dados.name || 'Nova oferta'}</strong></div>
-    <div className="central-dashboard-heading"><div><span className="central-eyebrow">OFERTA</span><h1>{dados.name || 'Nova oferta'}</h1><p>{product.name} · {product.type==='subscription'?'Assinatura':'Pagamento único'}</p></div><Link className="central-action" href={base}>← Voltar ao produto</Link></div>
-    <nav className="central-product-tabs" aria-label="Abas da oferta">{[['detalhes','Detalhes'],['bumps','Order Bump'],['vendas','Vendas'],['contrato','Contrato'],['checkout','Checkout'],['auditoria','Auditoria']].map(([key,label])=><button key={key} disabled={key==='bumps' && product.type==='subscription'} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
+    <nav aria-label="Caminho da oferta" className={interior.breadcrumb}>
+      <Link href="/admin/central-vendas">Início</Link><span>/</span><Link href="/admin/checkout">Produtos</Link><span>/</span>
+      <Link href={base}>{product.name}</Link><span>/</span><span>Ofertas</span><span>/</span><strong>{dados.name || 'Nova oferta'}</strong>
+    </nav>
+    <div className={interior.topbar}>
+      <Link className="central-action" href={base}>← Voltar ao produto</Link>
+      <details className={interior.additional}><summary>⚙ Configurações adicionais</summary>
+        <div>{[['checkout','Checkout'],['contrato','Contrato'],['vendas','Vendas']].map(([key,label])=>
+          <button key={key} onClick={e=>{e.currentTarget.closest('details').open=false;setTab(key)}}>{label}</button>
+        )}</div>
+      </details>
+    </div>
+    <nav className="central-product-tabs" aria-label="Abas da oferta">
+      {[['detalhes','Detalhe'],['bumps','Order Bump'],['auditoria','Auditoria'],...([['checkout','Checkout'],['contrato','Contrato'],['vendas','Vendas']].filter(([key])=>key===tab))].map(([key,label])=>
+        <button key={key} disabled={key==='bumps' && product.type==='subscription'} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>
+      )}
+    </nav>
     {dados.guru_config?.unsupported_methods?.length > 0 && <p className="central-editor-message" role="note">Importada do Guru. {dados.guru_config.unsupported_methods.map(m=>m==='boleto'?'Boleto':'Pix recorrente').join(' e ')} ainda não disponível neste checkout. Preço e frequência preservados; cobrança automática disponível no cartão.</p>}
     {message && <p role="status" className="central-editor-message">{message}</p>}
-    {tab==='detalhes'&&ofertaId!=='nova' && <section className="central-chart-panel"><h2>Links de pagamento</h2><label className="cv-short-alias">Personalizar link curto<div><span>{CHECKOUT_ORIGIN}/p/</span><input aria-label="Nome do link curto" value={dados.checkout_config.payment_alias || ''} placeholder="Ex.: biblioteca" pattern="[a-z][a-z0-9-]{1,31}" maxLength={32} onChange={e=>setDados({...dados,checkout_config:{...dados.checkout_config,payment_alias:e.target.value.toLowerCase()}})}/></div><small>Salve a oferta para ativar o nome escolhido. O link original continua funcionando.</small></label><div className="central-payment-link"><code>{link}</code><button className="central-action" onClick={async()=>{try{await navigator.clipboard.writeText(link);setMessage('✓ Link copiado.')}catch{setMessage('Não foi possível copiar. Selecione o link acima.')}}}>Copiar link</button><a className="central-action" href={link} target="_blank" rel="noopener noreferrer">Abrir checkout ↗</a></div><p className="central-data-note">O link abre a aparência salva da oferta. Pagamentos disponíveis somente após configurar a homologação do Pagar.me.</p></section>}
+    {tab==='detalhes' && <section className="central-chart-panel">
+      <h2>Links de pagamento</h2>
+      <div className="central-payment-link"><label>URL de pagamento
+        <input aria-label="URL de pagamento" readOnly value={link} placeholder="Preencha o nome da oferta" />
+      </label>
+        <button className="central-action" disabled={!canShare} onClick={async()=>{
+          try { await navigator.clipboard.writeText(savedLink); setMessage('✓ Link copiado.') }
+          catch { setMessage('Selecione a URL para copiar o link.') }
+        }}>Copiar link</button>
+        {canShare && <a className="central-action" href={savedLink} target="_blank" rel="noopener noreferrer">Abrir checkout ↗</a>}
+      </div>
+      <p className="central-data-note">{link && !canShare ? 'Salve a oferta para ativar e copiar o endereço. Nomes repetidos recebem um número no final.' : 'Link principal de venda'}</p>
+    </section>}
     {tab==='auditoria' && ofertaId!=='nova' && <CatalogAudit offerId={ofertaId} token={token} />}
     <form onSubmit={save}>
       <div hidden={tab!=='detalhes'} className="central-offer-grid"><section className="central-chart-panel"><h2>Detalhe</h2><FormOferta dados={dados} produto={product} showBumps={false} onChange={setDados} /><label className="central-active-switch"><input type="checkbox" checked={dados.active} onChange={e=>setDados({...dados,active:e.target.checked})} />Oferta ativa</label></section><aside className="central-chart-panel central-offer-image"><h2>Imagem</h2><p className="central-data-note">{dados.checkout_config.product_image_url?'Imagem da oferta':'Herdada do produto'} · ideal 1024 × 1024</p>{(dados.checkout_config.product_image_url || product.image_url)&&<Image unoptimized width={200} height={200} className="cv-offer-product-image" src={dados.checkout_config.product_image_url || product.image_url} alt="Imagem da oferta"/>}<CheckoutImageField label="Imagem do produto ou especialista" value={dados.checkout_config.product_image_url || product.image_url || ''} onChange={url=>setDados({...dados,checkout_config:{...dados.checkout_config,product_image_url:url}})} style={{width:'100%'}}/></aside></div>
