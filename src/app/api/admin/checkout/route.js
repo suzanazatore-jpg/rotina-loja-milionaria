@@ -1,5 +1,7 @@
 import { normalizeCheckoutSettings } from '@/lib/checkoutSettings'
 import { offerPath } from '@/lib/checkoutLinks'
+import { checkoutPaymentConfiguration } from '@/lib/checkoutPublicServer'
+import { resolveCheckoutSettings } from '@/lib/checkoutSettings'
 import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient, gerarSlug, reaisParaCentavos } from '@/lib/checkoutAdminServer'
@@ -169,6 +171,20 @@ async function salvarBumps(supabase, ofertaId, bumps) {
   }
 }
 
+function publicationStatus(offer, product, globalConfig = {}) {
+  if (!offer?.active || !product?.active) return { status: 'inactive', reason: 'Oferta ou produto inativo.' }
+  if (!Array.isArray(offer.payment_methods) || !offer.payment_methods.length) return { status: 'blocked', reason: 'Escolha uma forma de pagamento.' }
+  if (product.type !== 'one_time') return { status: 'blocked', reason: 'Assinaturas exigem validação do ciclo recorrente.' }
+  if (!product.plan_id && !(process.env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').includes(offer.id))
+    return { status: 'blocked', reason: 'Associe um plano de acesso ao produto.' }
+  const config = resolveCheckoutSettings(offer.checkout_config || {}, globalConfig)
+  const payment = checkoutPaymentConfiguration({ offer, product, config })
+  if (!payment.ready) return { status: 'blocked', reason: 'Pagamento ainda não habilitado para esta oferta. Revise os requisitos de publicação.' }
+  return payment.adminOnly
+    ? { status: 'admin_only', reason: 'Disponível apenas para a conta administrativa.' }
+    : { status: 'public', reason: 'Link pronto para receber pagamentos.' }
+}
+
 function traduzirErro(mensagem) {
   if (/duplicate key.*slug/i.test(mensagem)) return 'Já existe um item com esse link (slug). Use outro nome ou slug.'
   return mensagem
@@ -190,7 +206,10 @@ export async function GET(request) {
   ])
   const falha = produtos.error || ofertas.error || bumps.error || planos.error || cursos.error || conteudos.error || mentorias.error || marketplaces.error
   if (falha) return erro(falha.message, 500)
-  return NextResponse.json({ produtos: produtos.data, ofertas: ofertas.data, bumps: bumps.data, planos: planos.data, cursos: cursos.data, conteudos: conteudos.data, mentorias: mentorias.data, global_config: globalConfig, marketplaces: marketplaces.data, fulfillment_enabled: process.env.CHECKOUT_FULFILLMENT_ENABLED === 'true' }, {headers:{'Cache-Control':'no-store'}})
+  const productById = new Map(produtos.data.map(product => [product.id, product]))
+  const publication = Object.fromEntries(ofertas.data.map(offer => [offer.id,
+    publicationStatus(offer, productById.get(offer.product_id), globalConfig)]))
+  return NextResponse.json({ produtos: produtos.data, ofertas: ofertas.data, bumps: bumps.data, planos: planos.data, cursos: cursos.data, conteudos: conteudos.data, mentorias: mentorias.data, global_config: globalConfig, marketplaces: marketplaces.data, publication, fulfillment_enabled: process.env.CHECKOUT_FULFILLMENT_ENABLED === 'true' }, {headers:{'Cache-Control':'no-store'}})
 }
 
 export async function POST(request) {
@@ -233,9 +252,11 @@ export async function POST(request) {
       const { error: linkError } = await supabase.from('checkout_offer_links').upsert({ path, offer_id: data.id }, { onConflict: 'path' })
       if (linkError) throw new Error('Oferta salva, mas o link não foi registrado. Tente salvar novamente.')
       await salvarBumps(supabase, data.id, dados.bumps)
-      return NextResponse.json({ ok: true, ...data, payment_path:path,
-        publication: !registro.active ? 'inactive' : registro.checkout_config.auto_publish ? 'public' : 'restricted',
-        payment_url: `https://rotina.suzanazatorre.com.br/p/${path}` })
+      const {data:productForStatus} = await supabase.from('products').select('*').eq('id',registro.product_id).single()
+      const status = publicationStatus({...registro,id:data.id},productForStatus,await loadGlobalCheckoutSettings(supabase))
+      return NextResponse.json({ ok:true, ...data, payment_path:path,
+        publication:status.status, publication_reason:status.reason,
+        payment_url:`https://rotina.suzanazatorre.com.br/p/${path}` })
     }
     return erro('Entidade inválida.')
   } catch (e) {
@@ -268,5 +289,11 @@ export async function PATCH(request) {
   }
   const { error } = await supabase.from(tabela).update(updates).eq('id', id)
   if (error) return erro(error.message, 500)
-  return NextResponse.json({ ok: true, publication: updates.checkout_config?.auto_publish ? 'public' : 'restricted' })
+  if (entidade === 'oferta') {
+    const {data:offer} = await supabase.from('offers').select('*').eq('id',id).single()
+    const {data:product} = await supabase.from('products').select('*').eq('id',offer.product_id).single()
+    const status = publicationStatus(offer,product,await loadGlobalCheckoutSettings(supabase))
+    return NextResponse.json({ok:true,publication:status.status,publication_reason:status.reason})
+  }
+  return NextResponse.json({ok:true})
 }
