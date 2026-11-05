@@ -14,6 +14,12 @@ export function effectiveFormProfile(config = {}) {
   return config.contract?.required === true || config.form_profile !== 'compact' ? 'complete' : 'compact'
 }
 
+export function offerDisplayName(config, offer, product) {
+  if (config.use_offer_name === true) return offer.name || product.name
+  if (config.use_offer_name === false) return product.name
+  return config.product_display_name || offer.name || product.name
+}
+
 export function resolveCheckoutSettings(offer = {}, global = {}) {
   const resolved = { ...offer }
   if (offer.appearance_mode === 'inherit') {
@@ -44,6 +50,8 @@ export function normalizeCheckoutSettings(input) {
     result[key] = value
   }
   for (const key of ['button_text','store_name']) result[key] = String(input[key] ?? CHECKOUT_DEFAULTS[key]).trim().slice(0,100) || CHECKOUT_DEFAULTS[key]
+  if (typeof input.use_offer_name === 'boolean') result.use_offer_name = input.use_offer_name
+  if (Number.isSafeInteger(input.regular_price_cents) && input.regular_price_cents > 0) result.regular_price_cents = input.regular_price_cents
   result.document_type = ['cpf','cnpj','cpf_cnpj'].includes(input.document_type)?input.document_type:'cpf_cnpj'
   result.payment_alias=String(input.payment_alias || '').trim().toLowerCase()
   if(result.payment_alias&&!/^[a-z][a-z0-9-]{1,31}$/.test(result.payment_alias))throw new Error('Use de 2 a 32 letras, números e hífens no link curto.')

@@ -73,3 +73,11 @@ test('complete Guru Pix requires the street, number and district and compact Pix
  input.customer.address={street:'Rua Um',number:'s/n',district:'Centro',city:'Natal',state:'RN',zip_code:'59000000'}
  validateCheckoutForm({form_profile:'complete',layout:'guru'},input)
 })
+
+test('offer title choice follows renames while historical custom titles remain usable', async()=>{
+ const {offerDisplayName}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+ const product={name:'Produto'}, offer={name:'Oferta nova'}
+ assert.equal(offerDisplayName(normalizeCheckoutSettings({use_offer_name:true,product_display_name:'Antiga'}),offer,product),'Oferta nova')
+ assert.equal(offerDisplayName(normalizeCheckoutSettings({use_offer_name:false}),offer,product),'Produto')
+ assert.equal(offerDisplayName(normalizeCheckoutSettings({product_display_name:'Personalizado'}),offer,product),'Personalizado')
+})

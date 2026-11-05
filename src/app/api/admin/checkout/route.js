@@ -76,6 +76,11 @@ async function montarOferta(supabase, dados) {
   const preco = reaisParaCentavos(dados.price)
   if (!preco || preco <= 0) throw new Error('Informe um preço válido.')
 
+  const temPromocao = dados.promo_price != null && String(dados.promo_price).trim() !== ''
+  const promocao = temPromocao ? reaisParaCentavos(dados.promo_price) : null
+  if (temPromocao && (!Number.isSafeInteger(promocao) || promocao <= 0 || promocao >= preco)) {
+    throw new Error('O valor promocional deve ser maior que zero e menor que o valor da oferta.')
+  }
   const assinatura = produto.type === 'subscription'
   let metodos = (Array.isArray(dados.payment_methods) ? dados.payment_methods : []).filter(m => METODOS.has(m))
   if (assinatura) metodos = ['credit_card'] // recorrência automática no Pagar.me é só no cartão
@@ -120,7 +125,7 @@ async function montarOferta(supabase, dados) {
     name: nome,
     ...(dados.id ? {} : {slug: dados.slug ? gerarSlug(dados.slug) : randomUUID()}),
     ...(typeof dados.payment_path === 'string' ? {payment_path:offerPath(dados.payment_path) || offerPath(nome) || 'oferta'} : {}),
-    price_cents: preco,
+    price_cents: promocao ?? preco,
     payment_methods: metodos,
     max_installments: maxParcelas,
     free_installments: semJuros,
@@ -133,7 +138,9 @@ async function montarOferta(supabase, dados) {
     billing_interval_count: qtdIntervalo,
     trial_days: trial,
     thank_you_url: dados.checkout_config ? normalizeCheckoutSettings(dados.checkout_config).redirects.approved || null : obrigado,
-    ...(dados.checkout_config ? {checkout_config: normalizeCheckoutSettings(dados.checkout_config)} : {}),
+    ...(dados.checkout_config ? {checkout_config: normalizeCheckoutSettings({
+      ...dados.checkout_config, regular_price_cents: temPromocao ? preco : null,
+    })} : {}),
     active: dados.active !== false,
   }
 }
