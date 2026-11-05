@@ -29,6 +29,10 @@ export default function OfferPaymentLinks({link,canShare,onMessage}) {
     <h2>Links de pagamento</h2>
     <div className={styles.linkRow}>
       <label>URL de pagamento<input readOnly value={link} placeholder="Preencha o nome da oferta" /></label>
+      {canShare && <a className={styles.open} href={link} target="_blank" rel="noopener noreferrer"
+        title="Abrir checkout em nova aba" aria-label="Abrir checkout em nova aba">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M13 4h7v7m0-7L10 14"/><path d="M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/></svg>
+      </a>}
       <button type="button" title="Copiar link" aria-label="Copiar link" disabled={!canShare} onClick={copy}>
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><rect x="8" y="3" width="11" height="14" rx="2"/><path d="M5 7H4v14h11v-1"/></svg>
       </button>
@@ -37,7 +41,6 @@ export default function OfferPaymentLinks({link,canShare,onMessage}) {
       </button>
     </div>
     <small>{canShare?'Link principal de venda':'Salve a oferta para ativar o endereço.'}</small>
-    {canShare && <a className={styles.open} href={link} target="_blank" rel="noopener noreferrer">Abrir checkout ↗</a>}
     <div className={styles.secondaryLink}><span>URL One Click Buy</span><small>Compra adicional em um clique indisponível nesta central.</small></div>
     {qr && canShare && <LinkQR url={link} onClose={()=>setQR(false)}/>}
   </section>
