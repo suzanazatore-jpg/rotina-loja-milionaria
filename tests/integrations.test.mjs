@@ -24,7 +24,7 @@ test('contract providers preserve activation and validation rules',()=>{
   assert.equal(integrationStatus({CONTRACT_WHATSAPP_PROVIDER:'papo_reto',CONTRACT_PAPO_RETO_WEBHOOK_URL:'https://hooks.example/contract',CONTRACT_PAPO_RETO_WEBHOOK_TOKEN:'private-token'})['papo-reto'].configured,true)
 })
 test('payment summary follows gateway environment guards without enabling live payments',()=>{
-  const env={PAGARME_SECRET_KEY:'sk_live_private',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}
+  const env={VERCEL_ENV:'production',PAGARME_SECRET_KEY:'sk_live_private',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}
   assert.equal(integrationStatus(env).pagarme.configured,false)
   assert.equal(integrationStatus({...env,CHECKOUT_LIVE_ENABLED:'true',VERCEL_ENV:'production'}).pagarme.label,'Configurado · produção')
   assert.equal(integrationStatus({PAGARME_SECRET_KEY:'sk_test_private'}).pagarme.label,'Configurado · teste')

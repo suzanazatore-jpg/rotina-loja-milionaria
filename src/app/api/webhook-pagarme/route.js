@@ -34,8 +34,7 @@ export async function POST(request) {
     if (stored.processed_at) return NextResponse.json({ received: true })
     const order = await reconcileWebhookResource(db, event, { reconcileSubscriptionCharge })
     if (order?.status === 'paid') {
-      await fulfillPaidOrder(db, order.order_id)
-      await deliverPaidConversion(db, order.order_id)
+      await Promise.all([fulfillPaidOrder(db, order.order_id), deliverPaidConversion(db, order.order_id)])
     }
     if (order && ['refunded','chargedback'].includes(order.status)) await reverseOrderAccess(db, order.order_id)
     const { error } = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', event.id)

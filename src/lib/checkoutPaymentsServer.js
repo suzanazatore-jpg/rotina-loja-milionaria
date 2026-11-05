@@ -87,7 +87,7 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
     const remote = await pagarme('/subscriptions', { method: 'POST', idempotencyKey: order.id, body: { code: order.id, plan_id: plan.id, payment_method: 'credit_card', customer_id: gatewayCustomer.id, ...gatewayCard, installments: 1, metadata } })
     const subscription = await result(db.from('subscriptions').upsert({ customer_id: order.customer_id, offer_id: offer.id, origin_order_id: order.id, pagarme_subscription_id: remote.id, status: remote.status === 'canceled' ? 'canceled' : 'active', current_period_end: remote.current_cycle?.end_at || null }, { onConflict: 'pagarme_subscription_id' }).select('*').single())
     // Assinatura ativa NÃO prova que a primeira cobrança foi paga.
-    return { order_id: order.id, subscription, status: 'pending' }
+    return { order_id: order.id, subscription, status: 'pending', trial_started: offer.trial_days > 0 && remote.status === 'trialing' }
   }
   const remote = await pagarme('/orders', { method: 'POST', idempotencyKey: order.id, body: orderPayload(order, offer, product, gatewayCustomer, gatewayCard, items) })
   const update = confirmedOrderState(remote, { ...order, email: customer.email })
