@@ -45,7 +45,7 @@
 
 /* Product detail, including the two-column workspace on wide screens. */
 .productPage { max-width: 1590px; margin-inline: auto !important; }
-.productPage .topbar { display: grid; gap: 17px; margin-bottom: 6px; }
+.productPage .topbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 17px; margin-bottom: 6px; }
 .productPage .breadcrumb { justify-self: start; font-size: 12px; padding: 5px 10px; }
 .productPage .additional { justify-self: end; margin: 0; }
 .productPage .additional summary { color: var(--cv-link); border-color: currentColor; padding: 8px 16px; }
