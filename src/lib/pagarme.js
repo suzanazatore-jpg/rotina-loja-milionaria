@@ -84,5 +84,11 @@ export function confirmedOrderState(remote, expected) {
   const refunded = charge?.status === 'canceled' && Number(charge.paid_amount) > 0 && Number(charge.canceled_amount) >= Number(charge.paid_amount)
   const state = refunded ? 'refunded' : charge?.status || remote.status
   const status = ({ paid: 'paid', failed: 'failed', canceled: 'canceled', refunded: 'refunded', chargedback: 'chargedback', pending: 'waiting_payment', processing: 'waiting_payment' })[state] || 'pending'
-  return { status, pagarme_order_id: remote.id, pagarme_charge_id: charge?.id || null, ...(status === 'paid' ? { paid_at: charge?.paid_at || expected.paid_at || remote.updated_at || new Date().toISOString() } : {}), ...(expected.payment_method === 'pix' ? { pix_qr_code: charge?.last_transaction?.qr_code || null, pix_expires_at: charge?.last_transaction?.expires_at || null } : {}) }
+  const transaction = charge?.last_transaction || {}
+  const acquirerCode = String(transaction.acquirer_return_code || transaction.gateway_response?.code || '').trim()
+  const safeCode = /^[A-Za-z0-9_-]{1,32}$/.test(acquirerCode) ? acquirerCode : ''
+  const knownReason = status === 'failed' || status === 'canceled'
+    ? (safeCode ? `Pagamento não aprovado pelo adquirente (código ${safeCode}).` : 'Pagamento não aprovado pelo processador. Consulte o emissor do cartão.')
+    : null
+  return { status, pagarme_order_id: remote.id, pagarme_charge_id: charge?.id || null, refusal_reason: knownReason, ...(status === 'paid' ? { paid_at: charge?.paid_at || expected.paid_at || remote.updated_at || new Date().toISOString() } : {}), ...(expected.payment_method === 'pix' ? { pix_qr_code: charge?.last_transaction?.qr_code || null, pix_expires_at: charge?.last_transaction?.expires_at || null } : {}) }
 }
