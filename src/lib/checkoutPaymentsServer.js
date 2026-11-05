@@ -26,7 +26,7 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
   const isReservation = !product.plan_id && product.type === 'one_time' && (process.env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').map(id => id.trim()).includes(offer.id)
   if (!product.plan_id && !isReservation) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
   if (isReservation && selection.length) throw new PaymentError('Reservas não permitem itens adicionais.')
-  const customer = normalizeCustomer(input.customer, { requireAddress: input.payment_method !== 'pix' || requireAddress })
+  const customer = normalizeCustomer(input.customer, { requireAddress })
   const billingAddress = { ...customer.address }
   for (const [field, limit] of [['street', 128], ['number', 32], ['district', 64]]) {
     const value = input.customer?.address?.[field]
