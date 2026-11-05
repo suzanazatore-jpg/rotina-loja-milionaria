@@ -65,6 +65,8 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
     await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items, tracking, contract_policy, gateway_base: process.env.PAGARME_BASE_URL || 'https://sdx-api.pagar.me/core/v5' }, processed_at: new Date().toISOString() }))
     await result(db.from('order_items').upsert(orderItemRecords(order.id, items), { onConflict: 'id', ignoreDuplicates: true }))
   }
+  let processingStage = 'cadastro no gateway'
+  try {
   let gatewayCustomer = customer
   let gatewayCard = card
   if (card) {
@@ -76,12 +78,14 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
       await result(db.from('customers').update({ pagarme_customer_id: customerId }).eq('id', local.id))
     }
     // Carteira do gateway aceita o token com endereço; PAN e CVV nunca chegam aqui.
+    processingStage = 'validação do cartão no gateway'
     const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, ...(customer.address ? { billing_address: billingAddress } : {}) } })
     gatewayCard = { card_id: walletCard.id }
     gatewayCustomer = { id: customerId }
   }
   const metadata = { local_order_id: order.id, offer_id: offer.id }
   if (product.type === 'subscription') {
+    processingStage = 'criação da assinatura no gateway'
     const planBody = subscriptionPlanPayload(offer, product)
     const plan = await pagarme('/plans', { method: 'POST', body: planBody, idempotencyKey: `plan-${digest(planBody)}` })
     const remote = await pagarme('/subscriptions', { method: 'POST', idempotencyKey: order.id, body: { code: order.id, plan_id: plan.id, payment_method: 'credit_card', customer_id: gatewayCustomer.id, ...gatewayCard, installments: 1, metadata } })
@@ -89,12 +93,23 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
     // Assinatura ativa NÃO prova que a primeira cobrança foi paga.
     return { order_id: order.id, subscription, status: 'pending', trial_started: offer.trial_days > 0 && remote.status === 'trialing' }
   }
+  processingStage = 'criação da cobrança no gateway'
   const remote = await pagarme('/orders', { method: 'POST', idempotencyKey: order.id, body: orderPayload(order, offer, product, gatewayCustomer, gatewayCard, items) })
   const update = confirmedOrderState(remote, { ...order, email: customer.email })
   const saved = await result(db.from('orders').update(update).eq('id', order.id).is('pagarme_order_id', null).select('id'))
   // Um webhook pode ter conciliado antes de a resposta da criação chegar.
   if (!saved?.length) return syncPayment(db, order.id)
   return { order_id: order.id, ...update }
+  } catch (error) {
+    // Não presumir recusa bancária: nenhuma cobrança do gateway foi confirmada neste caminho.
+    // Não registrar PAN, CVV, token, dados pessoais nem resposta bruta do provedor.
+    const safeStage = ['cadastro no gateway','validação do cartão no gateway','criação da assinatura no gateway','criação da cobrança no gateway'].includes(processingStage)
+      ? processingStage : 'processamento do gateway'
+    await db.from('orders').update({
+      refusal_reason: `Não foi possível concluir a etapa: ${safeStage}. Nenhuma recusa bancária foi confirmada. Confira os dados e o registro do gateway antes de tentar novamente.`,
+    }).eq('id', order.id).is('pagarme_order_id', null).eq('status', 'pending')
+    throw error
+  }
 }
 
 export async function syncPayment(db, id) {
