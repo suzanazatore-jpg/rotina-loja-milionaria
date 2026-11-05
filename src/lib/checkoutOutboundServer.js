@@ -24,8 +24,11 @@ export async function sendWebhook(urlValue, payload, secret, deliveryId, resolve
       lookup: (_hostname, options, callback) => options.all ? callback(null, [{ address: addresses[0].address, family: 4 }]) : callback(null, addresses[0].address, 4),
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body), 'X-Webhook-Id': deliveryId, 'X-Webhook-Signature': `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` },
     }, response => {
-      response.resume()
-      resolve(response.statusCode)
+      let responseBody = ''
+      response.setEncoding('utf8')
+      response.on('data', chunk => { if (responseBody.length < 2048) responseBody += chunk.slice(0, 2048 - responseBody.length) })
+      response.on('end', () => resolve({ status: response.statusCode, body: responseBody }))
+      response.on('error', reject)
     })
     req.on('error', reject)
     req.end(body)
@@ -54,11 +57,15 @@ export async function processOutboundWebhooks(db, { sender = sendWebhook, env = 
     if (!live && !test) continue
     const claimed = await db.from('webhook_deliveries').update({ status: 'processing', attempts: row.attempts + 1 }).eq('id', row.id).eq('status', row.status).eq('attempts', row.attempts).select('id')
     if (claimed.error || !claimed.data?.length) continue
-    let code = null
-    try { code = await sender(hook.data.url, webhookBody(row.payload, hook.data.payload_format || 'native', env.GURU_ACCOUNT_TOKEN, hook.data.product_ids), hook.data.secret, row.id) } catch { /* Não salva respostas, URLs ou segredos em logs. */ }
+    let code = null, responseBody = null
+    try {
+      const response = await sender(hook.data.url, webhookBody(row.payload, hook.data.payload_format || 'native', env.GURU_ACCOUNT_TOKEN, hook.data.product_ids), hook.data.secret, row.id)
+      code = typeof response === 'number' ? response : response?.status ?? null
+      responseBody = typeof response === 'object' && response?.body ? String(response.body).slice(0,2048) : null
+    } catch { /* Não salva URLs, segredos ou payloads em logs. */ }
     const ok = code >= 200 && code < 300
     const attempts = row.attempts + 1
-    const update = ok ? { status: 'delivered', delivered_at: new Date(now).toISOString(), response_status: code, response_body: null } : { status: attempts >= 8 ? 'failed' : 'retry', response_status: code, response_body: null, next_attempt_at: new Date(now + Math.min(86400, 300 * 2 ** Math.min(attempts - 1, 9)) * 1000).toISOString() }
+    const update = ok ? { status: 'delivered', delivered_at: new Date(now).toISOString(), response_status: code, response_body: responseBody } : { status: attempts >= 8 ? 'failed' : 'retry', response_status: code, response_body: null, next_attempt_at: new Date(now + Math.min(86400, 300 * 2 ** Math.min(attempts - 1, 9)) * 1000).toISOString() }
     const saved = await db.from('webhook_deliveries').update(update).eq('id', row.id).eq('status', 'processing').eq('attempts', attempts)
     if (saved.error) throw new Error('outbound_receipt_unavailable')
     if (ok) sent++
