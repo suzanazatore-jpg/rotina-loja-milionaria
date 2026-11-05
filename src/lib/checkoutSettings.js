@@ -31,7 +31,7 @@ export function resolveCheckoutSettings(offer = {}, global = {}) {
 export function checkoutSettingsDraft(offer = {}, global = {}) {
   const result = { ...CHECKOUT_DEFAULTS, ...offer, redirects: { ...CHECKOUT_DEFAULTS.redirects, ...offer.redirects } }
   if (offer.appearance_mode === 'inherit') for (const key of SHARED_CHECKOUT_KEYS) result[key] = global[key] ?? CHECKOUT_DEFAULTS[key]
-  if(result.layout==='guru'){result.font='Inter';result.support_email ||= 'suporte@suzanazatorre.com.br';result.support_phone ||= '5584998320702';result.logo_url ||= 'https://storage.googleapis.com/disk.clkdmg.site/clients/9b581bf5-7a5b-4f31-a49f-4826c44042a2/images/account/9b6436a3-f1d8-46a0-9a65-e0f36adf77b8.png'}
+  if(result.layout==='guru'){result.font='Inter';result.support_email ||= 'suporte@suzanazatorre.com.br';if (!result.express_checkout) result.support_phone ||= '5584998320702';result.logo_url ||= 'https://storage.googleapis.com/disk.clkdmg.site/clients/9b581bf5-7a5b-4f31-a49f-4826c44042a2/images/account/9b6436a3-f1d8-46a0-9a65-e0f36adf77b8.png'}
   return result
 }
 export async function loadGlobalCheckoutSettings(db) {
@@ -55,6 +55,7 @@ export function normalizeCheckoutSettings(input) {
   result.document_type = ['cpf','cnpj','cpf_cnpj'].includes(input.document_type)?input.document_type:'cpf_cnpj'
   result.payment_alias=String(input.payment_alias || '').trim().toLowerCase()
   if(result.payment_alias&&!/^[a-z][a-z0-9-]{1,31}$/.test(result.payment_alias))throw new Error('Use de 2 a 32 letras, números e hífens no link curto.')
+  if (input.express_checkout === true) result.express_checkout = true
   result.form_profile = effectiveFormProfile(input)
   for (const key of ['company_name','company_document','company_address']) result[key] = String(input[key] ?? CHECKOUT_DEFAULTS[key]).trim().slice(0, key === 'company_address' ? 300 : 150)
   if (result.company_document && !/^\d{14}$/.test(result.company_document.replace(/\D/g, ''))) throw new Error('Informe um CNPJ de 14 dígitos para o vendedor.')
@@ -90,7 +91,7 @@ export function normalizeCheckoutSettings(input) {
   if (result.meta_pixel_id && !/^\d{5,30}$/.test(result.meta_pixel_id)) throw new Error('ID do Meta Pixel inválido.')
   for (const key of Object.keys(REDIRECT_LABELS)) result.redirects[key] = safeUrl(input.redirects?.[key])
   for (const key of ['confirm_email','require_terms','require_privacy']) result[key] = input[key] === true
-  if(result.layout==='guru'){result.font='Inter';result.support_email ||= 'suporte@suzanazatorre.com.br';result.support_phone ||= '5584998320702';result.logo_url ||= 'https://storage.googleapis.com/disk.clkdmg.site/clients/9b581bf5-7a5b-4f31-a49f-4826c44042a2/images/account/9b6436a3-f1d8-46a0-9a65-e0f36adf77b8.png'}
+  if(result.layout==='guru'){result.font='Inter';result.support_email ||= 'suporte@suzanazatorre.com.br';if (!result.express_checkout) result.support_phone ||= '5584998320702';result.logo_url ||= 'https://storage.googleapis.com/disk.clkdmg.site/clients/9b581bf5-7a5b-4f31-a49f-4826c44042a2/images/account/9b6436a3-f1d8-46a0-9a65-e0f36adf77b8.png'}
   return result
 }
 export function checkoutExpired(config, now = Date.now()) {
