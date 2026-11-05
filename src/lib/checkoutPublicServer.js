@@ -40,8 +40,10 @@ export function checkoutPaymentConfiguration(loaded, env = process.env) {
     const gateway = gatewayConfiguration(env)
     if (gateway.mode === 'test') return { ...checkoutTestConfiguration(env), mode: 'test', adminOnly: true }
     const allowedOffers = (env.CHECKOUT_LIVE_OFFER_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
+    // Autoriza ofertas de validação específicas sem torná-las públicas e sem abrir o restante do catálogo.
+    const adminTestOffers = (env.CHECKOUT_ADMIN_TEST_OFFER_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
     const ready = env.CHECKOUT_TEST_ENABLED !== 'true'
-      && allowedOffers.includes(loaded.offer.id)
+      && (allowedOffers.includes(loaded.offer.id) || adminTestOffers.includes(loaded.offer.id))
       && (Boolean(loaded.product.plan_id) || (loaded.product.type === 'one_time' && (env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').map(id => id.trim()).includes(loaded.offer.id)))
       && loaded.product.type === 'one_time'
       && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
@@ -53,7 +55,7 @@ export function checkoutPaymentConfiguration(loaded, env = process.env) {
     // Somente ofertas explicitamente autorizadas podem receber compras de clientes.
     // A oferta de teste e todas as demais continuam restritas ao administrador.
     const publicOffers = (env.CHECKOUT_PUBLIC_OFFER_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
-    const adminOnly = !publicOffers.includes(loaded.offer.id)
+    const adminOnly = adminTestOffers.includes(loaded.offer.id) || !publicOffers.includes(loaded.offer.id)
     return { ready, mode: 'live', adminOnly, tokenBase: gateway.base, publicKey }
   } catch { return disabled }
 }
