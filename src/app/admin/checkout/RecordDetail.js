@@ -7,45 +7,63 @@ const titles={vendas:'Vendas',assinaturas:'Assinaturas',clientes:'Clientes'}
 const contractLabels={pending:'Aguardando assinatura',viewed:'Visualizado',signed:'Assinado',canceled:'Cancelado',completed:'Liberado',awaiting_signature:'Aguardando assinatura',retry:'Nova tentativa pendente',awaiting_contract:'Aguardando assinatura',disabled:'Liberação pausada',not_gated:'Liberado no pagamento',ready:'Na fila',processing:'Processando',accepted:'Aceito pelo serviço',failed:'Falha — revisar'}
 async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
 function SalesTable({orders,contact=false}){return <div className="cv-table-wrap"><table className="cv-table"><thead><tr><th>Código</th>{contact&&<th>Contato</th>}<th>Produto</th><th>Criada em</th><th>Valor</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="cv-code"><Status value={o.status}/><Link className="cv-link" href={`/admin/checkout/vendas/${o.id}`}>{o.pagarme_charge_id || o.pagarme_order_id || o.id}</Link></div></td>{contact&&<td>{o.customer?.name || '—'}</td>}<td>{o.product_name || o.offer_name || '—'}</td><td>{date(o.created_at)}</td><td>{money(o.total_cents)}</td></tr>)}{!orders.length&&<tr><td colSpan={contact?5:4}>Nenhuma venda registrada.</td></tr>}</tbody></table></div>}
-function SaleWebhooks({id}){
- const [rows,setRows]=useState([]),[paid,setPaid]=useState(false),[loading,setLoading]=useState(false)
- const [error,setError]=useState(''),[notice,setNotice]=useState(''),[chosen,setChosen]=useState(null),[sending,setSending]=useState(false)
+function SaleWebhooks({id,onClose}){
+ const [rows,setRows]=useState([]),[paid,setPaid]=useState(false),[loading,setLoading]=useState(true)
+ const [selected,setSelected]=useState(''),[step,setStep]=useState('select'),[sending,setSending]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('')
  async function load(){
   setLoading(true);setError('')
   try{
    const response=await fetch(`/api/admin/checkout/vendas/${id}/webhooks`,{headers:await headers(),cache:'no-store'})
    const json=await response.json()
-   if(!response.ok)throw new Error(json.error||'Falha ao consultar webhooks.')
+   if(!response.ok)throw new Error(json.error||'Não foi possível carregar os webhooks.')
    setRows(json.deliveries||[]);setPaid(json.paid)
   }catch(e){setError(e.message)}finally{setLoading(false)}
  }
  useEffect(()=>{load()},[id])
+ useEffect(()=>{
+  function key(e){if(e.key==='Escape'&&!sending)onClose()}
+  window.addEventListener('keydown',key)
+  return ()=>window.removeEventListener('keydown',key)
+ },[onClose,sending])
+ const eligible=rows.filter(r=>r.active&&!r.internal&&r.event_type==='order.paid')
+ const chosen=rows.find(r=>r.id===selected)
  async function resend(){
   if(!chosen||sending)return
-  setSending(true);setError('');setNotice('')
+  setSending(true);setError('')
   try{
    const response=await fetch(`/api/admin/checkout/vendas/${id}/webhooks`,{method:'POST',headers:await headers(),body:JSON.stringify({delivery_id:chosen.id,confirm:true})})
    const json=await response.json()
    if(!response.ok)throw new Error(json.error||'Não foi possível reenviar.')
-   setNotice('Reenvio solicitado somente para '+json.destination+'. Acompanhe o resultado abaixo.')
-   setChosen(null)
+   setNotice('Evento colocado na fila de envio. Confira o status nas atividades do webhook.')
+   setStep('done');setSelected('')
    await load()
   }catch(e){setError(e.message)}finally{setSending(false)}
  }
- return <section className="central-chart-panel">
-  <div className="cv-actions"><h2 style={{margin:0}}>Webhooks da venda</h2><button className="central-action" onClick={load} disabled={loading}>{loading?'Atualizando…':'↻ Atualizar'}</button></div>
-  <p className="central-data-note">Escolha um destino para reenviar o evento de pagamento, sem alterar a cobrança ou o acesso. O HTTP 200 confirma o recebimento pelo destino, não a gravação na planilha.</p>
-  {error&&<p role="alert" className="central-error">{error}</p>}
-  {notice&&<p role="status" style={{color:'#238a55'}}>{notice}</p>}
-  <div className="cv-table-wrap"><table className="cv-table"><thead><tr><th>Webhook</th><th>Evento</th><th>Status</th><th>Tentativas / HTTP</th><th>Entregue em</th><th>Ação</th></tr></thead><tbody>
-   {rows.map(row=><tr key={row.id}><td>{row.name}{(!row.active||row.internal)&&<small style={{display:'block'}}>Pausado / interno</small>}</td><td>{row.event_type}</td><td>{row.status==='delivered'?'Entregue':row.status==='pending'?'Na fila':row.status==='processing'?'Processando':row.status==='retry'?'Tentando novamente':row.status==='failed'?'Falha':row.status}</td><td>{row.attempts} / {row.response_status??'—'}</td><td>{row.delivered_at?date(row.delivered_at):'—'}</td><td><button className="central-action" type="button" disabled={!paid||!row.active||row.internal||row.event_type!=='order.paid'||sending} onClick={()=>{setNotice('');setChosen(row)}}>Reenviar</button></td></tr>)}
-   {!rows.length&&<tr><td colSpan={6}>{loading?'Carregando…':'Nenhum webhook registrado para esta venda.'}</td></tr>}
-  </tbody></table></div>
-  {chosen&&<div className="central-chart-panel" role="group" aria-label="Confirmação do reenvio">
-   <h3>Reenviar evento?</h3><p>Destino: <strong>{chosen.name}</strong></p><p>Venda: <strong>{id}</strong></p><p>Esse reenvio pode executar novamente ações no Pabbly ou BotConversa, inclusive inserir outra linha na planilha. Confirme apenas se deseja repetir este destino.</p>
-   <div className="cv-actions"><button className="central-action" disabled={sending} onClick={()=>setChosen(null)}>Cancelar</button><button className="central-primary" disabled={sending} onClick={resend}>{sending?'Solicitando…':'Confirmar reenvio'}</button></div>
-  </div>}
- </section>
+ const line={fontSize:13,color:'var(--cv-text,inherit)'}
+ return <div role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget&&!sending)onClose()}} style={{position:'fixed',inset:0,zIndex:2000,background:'rgba(12,14,19,.55)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+  <div role="dialog" aria-modal="true" aria-label="Reenviar webhook da venda" style={{width:'100%',maxWidth:470,background:'var(--cv-panel,#fff)',color:'var(--cv-text,#19202c)',border:'1px solid var(--cv-border,#e4e5e9)',borderRadius:12,boxShadow:'0 20px 60px rgba(0,0,0,.2)',padding:22}}>
+   <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:16,marginBottom:16}}>
+    <div><h2 style={{fontSize:18,fontWeight:650,margin:0}}>Reenviar</h2><p style={{fontSize:12,color:'#7d8491',margin:'5px 0 0'}}>Selecione o webhook desta venda.</p></div>
+    <button type="button" aria-label="Fechar" onClick={onClose} disabled={sending} style={{border:0,background:'transparent',color:'inherit',fontSize:23,cursor:'pointer',lineHeight:1}}>×</button>
+   </div>
+   {error&&<p role="alert" style={{fontSize:12,color:'#c0394b',margin:'0 0 12px'}}>{error}</p>}
+   {step==='done'?<p role="status" style={{fontSize:13,margin:'12px 0 24px'}}>{notice}</p>:<>
+    {loading?<p style={line}>Consultando webhooks…</p>:eligible.length?<>
+     <label htmlFor="cv-resend-select" style={{fontSize:12,fontWeight:600,display:'block',marginBottom:7}}>Webhook</label>
+     <select id="cv-resend-select" value={selected} onChange={e=>{setSelected(e.target.value);setError('')}} style={{width:'100%',padding:'11px 12px',border:'1px solid #cfd2d9',borderRadius:7,fontSize:13,background:'var(--cv-panel,#fff)',color:'inherit'}}>
+      <option value="">Selecione um destino</option>
+      {eligible.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}
+     </select>
+     {chosen&&<p style={{fontSize:12,color:'#707987',lineHeight:1.6,margin:'12px 0 0'}}>Último envio: {chosen.status==='delivered'?'entregue':chosen.status==='pending'?'na fila':chosen.status} · {chosen.attempts} tentativa(s) · HTTP {chosen.response_status??'—'}</p>}
+     {step==='confirm'&&<p style={{fontSize:12,lineHeight:1.55,padding:'11px 12px',background:'rgba(225,158,49,.09)',borderRadius:7,margin:'14px 0 0'}}>Reenviar para <strong>{chosen?.name}</strong>? O destino poderá executar novamente ações, inclusive registrar a venda na planilha. Não será criada outra cobrança.</p>}
+    </>:<p style={line}>Não há webhooks externos ativos disponíveis para esta venda.</p>}
+   </>}
+   <div style={{display:'flex',justifyContent:'flex-end',gap:9,marginTop:22}}>
+    <button type="button" className="central-action" onClick={()=>{if(step==='confirm')setStep('select');else onClose()}} disabled={sending}>{step==='confirm'?'Voltar':step==='done'?'Fechar':'Cancelar'}</button>
+    {step!=='done'&&<button type="button" className="central-primary" disabled={!paid||!chosen||loading||sending} onClick={()=>{if(step==='select')setStep('confirm');else resend()}}>{sending?'Enviando…':step==='confirm'?'Confirmar reenvio':'Continuar'}</button>}
+   </div>
+  </div>
+ </div>
 }
 
 export default function RecordDetail({entity,id}){
@@ -59,7 +77,7 @@ export default function RecordDetail({entity,id}){
  const r=data.record,latest=data.orders[0],code=r.pagarme_subscription_id || r.pagarme_charge_id || r.id,items=data.items.filter(i=>entity!=='vendas'||i.order_id===id),lastPaid=data.orders.find(o=>o.status==='paid'),charges=[...new Map(data.orders.filter(o=>o.pagarme_charge_id).map(o=>[o.pagarme_charge_id,o])).values()]
  return <main className="central-home"><div className="central-breadcrumb"><Link href={`/admin/checkout/${entity}`}>{titles[entity]}</Link><span>/</span><span>{entity==='clientes'?r.name:code}</span></div><header className="cv-heading"><h1>{entity==='clientes'?r.name:entity==='assinaturas'?'Detalhes da assinatura':'Detalhes da venda'}</h1><button className="central-action" onClick={()=>setRefresh(v=>v+1)}>↻ Atualizar</button></header><nav className="cv-detail-nav" role="tablist" aria-label="Histórico do registro">{tabs.map(([key,label])=><button key={key} role="tab" aria-selected={tab===key} onClick={()=>setTab(key)}>{label}</button>)}</nav>{error&&<p role="alert" className="central-error">{error}</p>}
  {tab==='detail'&&entity==='clientes'&&<><BuyerCard customer={r}/><FieldGrid title="Histórico comercial" fields={[["Cadastrado em",date(r.created_at)],['Vendas registradas',data.orders.length],['Vendas aprovadas',data.orders.filter(o=>o.status==='paid').length],['Assinaturas',data.subscriptions.length],['Produtos comprados',data.products.length],['Total em compras aprovadas',money(data.orders.filter(o=>o.status==='paid').reduce((s,o)=>s+o.total_cents,0))]]}/></>}
- {tab==='detail'&&entity==='vendas'&&<><div className="cv-actions"><span className="cv-code"><Status value={r.status}/>{statusLabels[r.status] || r.status}</span><button className="central-action" disabled={busy} onClick={()=>sync('sync')}>{busy?'Consultando…':'Atualizar status no Pagar.me'}</button><button className="central-action" onClick={()=>setShowWebhooks(v=>!v)}>{showWebhooks?'Ocultar webhooks':'Reenviar'}</button></div>{showWebhooks&&<SaleWebhooks id={id}/>}<FieldGrid title="Detalhe" fields={[["Código",code],['Moeda','BRL'],['Criada em',date(r.created_at)],['Aprovada em',date(r.paid_at)],['URL do checkout',r.offer?.slug?<Link className="cv-link" href={`/checkout/${r.offer.slug}`} target="_blank">Abrir checkout ↗</Link>:'—'],['Marketplace',r.marketplace]]}/><FieldGrid title="Pagamento" fields={[["Forma de pagamento",r.payment_method==='pix'?'Pix':'Cartão de crédito'],['Parcelas',`${r.installments} × ${money(r.total_cents/Math.max(1,r.installments))}`],['Produto',money(r.subtotal_cents)],['Juros',money(r.interest_cents)],['Desconto',money(r.discount_cents)],['Total integral',money(r.total_cents)]]}/><FieldGrid title="Produto" fields={[["Nome",r.product_name],['Oferta',r.offer_name],['Marketplace ID',r.offer?.product?.code],['Produtor','Suzana Zatorre Educacional Ltda']]}/>{items.length>0&&<section className="central-chart-panel"><h2>Itens da compra</h2>{items.map(i=><p key={i.id}>{i.product?.name || 'Produto'} · {i.kind==='bump'?'Order bump':'Principal'} · {money(i.price_cents)}</p>)}</section>}</>}
+ {tab==='detail'&&entity==='vendas'&&<><div className="cv-actions"><span className="cv-code"><Status value={r.status}/>{statusLabels[r.status] || r.status}</span><button className="central-action" disabled={busy} onClick={()=>sync('sync')}>{busy?'Consultando…':'Atualizar status no Pagar.me'}</button><button className="central-action" onClick={()=>setShowWebhooks(v=>!v)}>↻ Reenviar</button></div>{showWebhooks&&<SaleWebhooks id={id} onClose={()=>setShowWebhooks(false)}/>}<FieldGrid title="Detalhe" fields={[["Código",code],['Moeda','BRL'],['Criada em',date(r.created_at)],['Aprovada em',date(r.paid_at)],['URL do checkout',r.offer?.slug?<Link className="cv-link" href={`/checkout/${r.offer.slug}`} target="_blank">Abrir checkout ↗</Link>:'—'],['Marketplace',r.marketplace]]}/><FieldGrid title="Pagamento" fields={[["Forma de pagamento",r.payment_method==='pix'?'Pix':'Cartão de crédito'],['Parcelas',`${r.installments} × ${money(r.total_cents/Math.max(1,r.installments))}`],['Produto',money(r.subtotal_cents)],['Juros',money(r.interest_cents)],['Desconto',money(r.discount_cents)],['Total integral',money(r.total_cents)]]}/><FieldGrid title="Produto" fields={[["Nome",r.product_name],['Oferta',r.offer_name],['Marketplace ID',r.offer?.product?.code],['Produtor','Suzana Zatorre Educacional Ltda']]}/>{items.length>0&&<section className="central-chart-panel"><h2>Itens da compra</h2>{items.map(i=><p key={i.id}>{i.product?.name || 'Produto'} · {i.kind==='bump'?'Order bump':'Principal'} · {money(i.price_cents)}</p>)}</section>}</>}
  {tab==='detail'&&entity==='assinaturas'&&<><div className="cv-actions"><span className="cv-code"><Status value={r.status}/>{statusLabels[r.status] || r.status}</span><button className="central-action" disabled={busy} onClick={()=>sync('sync')}>{busy?'Consultando…':'Atualizar status no Pagar.me'}</button>{r.status!=='canceled'&&<button className="central-action cv-danger" onClick={()=>setConfirm(true)}>Cancelar assinatura</button>}</div>{confirm&&<section className="central-chart-panel"><h2>Cancelar esta assinatura?</h2><p>As próximas cobranças serão interrompidas. O período de acesso já comprado será mantido.</p><div className="cv-actions"><button className="central-action" disabled={busy} onClick={()=>setConfirm(false)}>Voltar</button><button className="central-primary" disabled={busy} onClick={()=>sync('cancel')}>{busy?'Cancelando…':'Confirmar cancelamento'}</button></div></section>}<FieldGrid title="Detalhe" fields={[["Código",code],['Forma de pagamento','Cartão de crédito'],['Cobrada a cada',r.billing_frequency],['Iniciada em',date(r.created_at)],['Atualizada em',date(r.updated_at)],['Cancelada em',date(r.canceled_at)],['Último valor',latest?money(latest.total_cents):'—'],['Cobranças registradas',r.charge_count],['Parcelamento',latest?.installments || '—']]}/><FieldGrid title="Ciclo atual" fields={[["Última cobrança",date(latest?.created_at)],['Fim do período registrado',date(r.current_period_end)],['Último pagamento confirmado',date(lastPaid?.paid_at)]]}/><FieldGrid title="Produto e renovação" fields={[["Nome",r.product_name],['Oferta',r.offer_name],['Frequência',r.billing_frequency],['Valor atual da oferta',r.offer?.price_cents!=null?money(r.offer.price_cents):'—'],['Dias de teste',r.offer?.trial_days ?? '—'],['Limite de ciclos da oferta',r.offer?.billing_cycles ?? 'Sem limite informado']]}/></>}
  {tab==='detail'&&entity==='vendas'&&data.contract&&<FieldGrid title="Contrato e entrega" fields={[
   ['Assinatura',contractLabels[data.contract.status] || data.contract.status],
