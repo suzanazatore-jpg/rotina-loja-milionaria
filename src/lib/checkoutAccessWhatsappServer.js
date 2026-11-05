@@ -5,10 +5,10 @@ import { sendWebhook } from './checkoutOutboundServer.js'
 export async function notifyNewStudentAccess(db, { orderId, customer, password }) {
   const url = process.env.CHECKOUT_BOTCONVERSA_ACCESS_URL
   const marker = `access-whatsapp:${orderId}`
-  if (!url || !password || !/^\\d{8}$/.test(password)) return 'not_configured'
-  let phone = String(customer.phone || '').replace(/\\D/g, '')
+  if (!url || !password || !/^\d{8}$/.test(password)) return 'not_configured'
+  let phone = String(customer.phone || '').replace(/\D/g, '')
   if (phone.length === 10 || phone.length === 11) phone = `55${phone}`
-  if (!/^55\\d{10,11}$/.test(phone)) return 'invalid_phone'
+  if (!/^55\d{10,11}$/.test(phone)) return 'invalid_phone'
   // Inserção única por pedido: impede duas solicitações se o gateway repetir um webhook.
   const { error: markError } = await db.from('webhook_events').insert({
     pagarme_event_id: marker, type: 'checkout.access.whatsapp',
@@ -23,7 +23,7 @@ export async function notifyNewStudentAccess(db, { orderId, customer, password }
     const name = String(customer.name || '').trim()
     const data = {
       EMAIL: String(customer.email || '').trim(),
-      FNAME: name.split(/\\s+/)[0] || 'Aluna',
+      FNAME: name.split(/\s+/)[0] || 'Aluna',
       PHONE: phone,
       Senha: password,
       Produto: product?.name || 'Rotina da Loja Milionária',
