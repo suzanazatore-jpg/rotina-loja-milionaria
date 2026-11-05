@@ -9,3 +9,5 @@
 .grid>.spacer{visibility:hidden}@media(max-width:480px){.grid>.spacer{display:none}}
 
 :global(.central) :global(.central-body) .root .sectionTitle{font-size:18px!important;line-height:1.55}.help{display:inline-flex;align-items:center;gap:4px;margin-left:10px;padding:0;border:0;background:none;color:var(--cv-link);font:12px Arial,sans-serif;cursor:pointer;vertical-align:middle}.help span{font-size:10px}.inputLabel select{display:block;width:100%;padding:10px 0;background:transparent;border:0;border-bottom:1px solid var(--cv-border);color:var(--cv-muted)}
+
+.environment{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--cv-field);border:1px solid var(--cv-border);border-radius:10px;padding:14px 18px;margin-bottom:14px;color:var(--cv-muted);font-size:13px}.environment strong{color:var(--cv-text)}.environment a{margin-left:auto;color:var(--cv-link)!important;text-decoration:underline!important}.timeline .destination{color:var(--cv-link);word-break:break-all;line-height:1.5}.timeline .outcome{font-size:12px;color:var(--cv-muted)}.auditUrl{display:flex;gap:8px;align-items:center;overflow-wrap:anywhere}.auditUrl button{margin-left:auto}

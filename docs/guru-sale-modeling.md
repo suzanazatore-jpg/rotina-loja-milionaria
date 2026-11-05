@@ -25,3 +25,11 @@ Testes existentes de histórico, webhooks, acesso e contrato: 25 aprovados. Novo
 ## Primeira inspeção publicada
 
 Commit 69be172, prévia READY: cinco abas carregaram; reenvio e edição do comprador abriram; formulário inline de comentários abriu sem criar nota; auditoria exibiu eventos reais. Disponibilidade observada nesta prévia: email habilitado; área de membros/contratos/webhooks indisponíveis. Corrigidos após inspeção: título de seção sobrescrito pelo CSS global, rótulos técnicos da auditoria e período inicial de seis meses. Adquirente é consultado somente em leitura ao abrir Extras ou detalhes do pagamento.
+
+## Correção de auditoria e ambientes — 05/11/2026
+
+Aplicação compartilhada em todas as rotas /admin/checkout/vendas/[id], não limitada a uma cliente. Auditoria passa a apresentar origem, destino, URL da integração, resultado, HTTP e tentativas; fila não é apresentada como entrega. Para histórico antigo sem snapshot do endereço, o modal declara que a URL exibida é a configuração atual da integração. Segredos continuam suprimidos no JSON.
+
+Confirmado por consulta de metadados: a venda de referência foi criada na API real; a prévia usa sandbox e tem liberação/envios pausados. O módulo reconhece ambiente pelo snapshot original e bloqueia ações externas cruzadas antes de registrar/disparar operações. A interface orienta abrir a venda no domínio real em vez de consultar o sandbox com um código real. Nenhuma credencial foi copiada de produção para a prévia; nenhum flag de envio foi ativado.
+
+Build completo aprovado. 14 testes de histórico e detalhes aprovados, incluindo distinção fila/entrega/falha, origem/destino e ambientes. Sem envios ou operações financeiras durante a validação.

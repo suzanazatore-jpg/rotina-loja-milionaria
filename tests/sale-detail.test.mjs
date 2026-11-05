@@ -27,7 +27,7 @@ test('sale API requires authorization for reads and mutations before querying or
  let source=readFileSync(new URL('../src/app/api/admin/checkout/venda/route.js',import.meta.url),'utf8')
  const stubs={"next/server":"export const after=()=>{}",'../registros/route':'export const GET=()=>{}','@/lib/checkoutAdminServer':'export const checkoutAdminClient=()=>({});export const autorizarAdmin=async()=>false;export const ADMIN_EMAIL="admin"','@/lib/saleDetail':'export const invoiceToken=()=>{};export const validateInvoice=()=>{};export const validateBuyer=()=>{};export const auditEvent=()=>{};export const redactAudit=()=>{}','@/lib/centralRecords':'export const validId=()=>true','@/lib/checkoutFulfillmentServer':'export const fulfillPaidOrder=()=>{}','@/lib/checkoutPaymentsServer':'export const syncPayment=()=>{}','@/lib/checkoutAccessServer':'export const reverseOrderAccess=()=>{}','@/lib/pagarme':'export const pagarme=()=>{}','@/lib/checkoutOutboundServer':'export const processOutboundWebhooks=()=>{}','@/lib/contractsServer':'export const sendContractInvite=()=>{};export const sendSignedContractCopies=()=>{}'}
  for(const [path,stub] of Object.entries(stubs))source=source.replace(`'${path}'`,JSON.stringify(dataURL(stub)))
- const route=await import(dataURL(source));for(const method of ['GET','POST'])assert.equal((await route[method](new Request('https://example.org/api/admin/checkout/venda'))).status,401)
+ source=source.replace("'@/lib/saleAudit'",JSON.stringify(new URL('../src/lib/saleAudit.js',import.meta.url).href));const route=await import(dataURL(source));for(const method of ['GET','POST'])assert.equal((await route[method](new Request('https://example.org/api/admin/checkout/venda'))).status,401)
 })
 test('sale mutations reject foreign origins and invalid buyer data without writes; refund verifies gateway identity before DELETE',async()=>{
  const writes=[],gatewayCalls=[]
@@ -39,10 +39,21 @@ test('sale mutations reject foreign origins and invalid buyer data without write
  const stubs={"next/server":"export const after=()=>{}",'../registros/route':'export const GET=()=>{}','@/lib/checkoutAdminServer':'export const checkoutAdminClient=()=>globalThis.__saleDb;export const autorizarAdmin=async()=>true;export const ADMIN_EMAIL="admin"','@/lib/centralRecords':'export const validId=v=>/^[0-9a-f-]{36}$/.test(v)','@/lib/checkoutFulfillmentServer':'export const fulfillPaidOrder=()=>{}','@/lib/checkoutPaymentsServer':'export const syncPayment=()=>{}','@/lib/checkoutAccessServer':'export const reverseOrderAccess=()=>{}','@/lib/pagarme':'export const pagarme=(...args)=>globalThis.__saleGateway(...args)','@/lib/checkoutOutboundServer':'export const processOutboundWebhooks=()=>{}','@/lib/contractsServer':'export const sendContractInvite=()=>{};export const sendSignedContractCopies=()=>{}'}
  for(const [path,stub] of Object.entries(stubs))source=source.replace(`'${path}'`,JSON.stringify(dataURL(stub)))
  source=source.replace("'@/lib/saleDetail'",JSON.stringify(new URL('../src/lib/saleDetail.js',import.meta.url).href))
- const route=await import(dataURL(source)),request=(body,origin='https://example.org')=>new Request('https://example.org/api/admin/checkout/venda',{method:'POST',headers:{origin,'Content-Type':'application/json','Idempotency-Key':id},body:JSON.stringify({id,...body})})
+ source=source.replace("'@/lib/saleAudit'",JSON.stringify(new URL('../src/lib/saleAudit.js',import.meta.url).href));const route=await import(dataURL(source)),request=(body,origin='https://example.org')=>new Request('https://example.org/api/admin/checkout/venda',{method:'POST',headers:{origin,'Content-Type':'application/json','Idempotency-Key':id},body:JSON.stringify({id,...body})})
  assert.equal((await route.POST(request({action:'sync'},'https://evil.example'))).status,403);assert.equal(writes.length,0)
  assert.equal((await route.POST(request({action:'buyer',buyer:{name:'x'}}))).status,400);assert.equal(writes.filter(w=>w[0]==='insert').length,0)
  const response=await route.POST(request({action:'refund',reason:'Teste'}));assert.equal(response.status,400);assert.equal(gatewayCalls.length,1);assert.equal(gatewayCalls[0].options,undefined)
  assert.ok(writes.some(w=>w[0]==='insert'));assert.ok(writes.every(w=>w[1]!=='orders'))
  delete globalThis.__saleDb;delete globalThis.__saleGateway
+})
+test('audit shows exact configured destination and never calls queued delivery sent',async()=>{
+ const {deliveryAudit,providerAudit,saleEnvironment}=await import('../src/lib/saleAudit.js')
+ const hook={name:'BotConversa — compra',url:'https://example.org/hooks/buyer'}
+ const waiting=deliveryAudit({id:'1',status:'pending',attempts:0,event_type:'order.paid',created_at:'2026-11-05T20:00:00Z'},hook)
+ assert.equal(waiting.destination.url,hook.url);assert.equal(waiting.title,'Webhook na fila');assert.match(waiting.outcome,/ainda não enviado/)
+ const sent=deliveryAudit({id:'2',status:'delivered',response_status:200,attempts:1},hook);assert.equal(sent.title,'Webhook Enviado');assert.equal(sent.http_status,200)
+ const failed=deliveryAudit({id:'3',status:'retry',response_status:500},hook);assert.match(failed.failure,/500/)
+ const incoming=providerAudit({id:'4',type:'charge.paid',error:'reconciliation_pending'});assert.equal(incoming.source,'Pagar.me');assert.equal(incoming.destination.name,'Central de Vendas');assert.match(incoming.outcome,/aguardando conciliação/)
+ assert.equal(saleEnvironment({gateway_base:'https://api.pagar.me/core/v5'},'https://sdx-api.pagar.me/core/v5').matches,false)
+ assert.equal(saleEnvironment({gateway_base:'https://api.pagar.me/core/v5'},'https://api.pagar.me/core/v5').matches,true)
 })
