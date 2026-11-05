@@ -66,7 +66,7 @@ async function montarProduto(supabase,dados) {
 
 async function montarOferta(supabase, dados) {
   if (!dados.product_id) throw new Error('Produto da oferta não informado.')
-  const { data: produto, error } = await supabase.from('products').select('id,type,slug').eq('id', dados.product_id).single()
+  const { data: produto, error } = await supabase.from('products').select('id,type,slug,active,plan_id,marketplace_id').eq('id', dados.product_id).single()
   if (error || !produto) throw new Error('Produto não encontrado.')
 
   const nome = String(dados.name || '').trim()
@@ -117,7 +117,7 @@ async function montarOferta(supabase, dados) {
     product_id: produto.id,
     name: nome,
     ...(dados.id ? {} : {slug: dados.slug ? gerarSlug(dados.slug) : randomUUID()}),
-    ...(typeof dados.payment_path === 'string' ? {payment_path:offerPath(dados.payment_path) || offerPath(nome) || 'oferta'} : {}),
+    ...(typeof dados.payment_path === 'string' || !dados.id ? {payment_path:offerPath(dados.payment_path || nome) || 'oferta'} : {}),
     price_cents: preco,
     payment_methods: metodos,
     max_installments: maxParcelas,
@@ -131,7 +131,21 @@ async function montarOferta(supabase, dados) {
     billing_interval_count: qtdIntervalo,
     trial_days: trial,
     thank_you_url: dados.checkout_config ? normalizeCheckoutSettings(dados.checkout_config).redirects.approved || null : obrigado,
-    ...(dados.checkout_config ? {checkout_config: normalizeCheckoutSettings(dados.checkout_config)} : {}),
+    checkout_config: {
+      ...(dados.checkout_config ? normalizeCheckoutSettings(dados.checkout_config) : dados.id
+        ? (await supabase.from('offers').select('checkout_config').eq('id', dados.id).single()).data?.checkout_config || {}
+        : normalizeCheckoutSettings({})),
+      // A chave 'Oferta ativa' publica automaticamente ofertas avulsas completas.
+      // Ofertas de R$1/teste e assinaturas nunca são publicadas automaticamente.
+      auto_publish: dados.active !== false
+        && produto.active === true
+        && produto.type === 'one_time'
+        && produto.marketplace_id === 'pagarme'
+        && Boolean(produto.plan_id)
+        && preco >= 1000
+        && !/^(teste|test)(?:\\b|\\s|[-_:])/i.test(nome)
+        && (!dados.checkout_config?.contract?.required || (process.env.CONTRACTS_ENABLED === 'true' && (process.env.CONTRACT_TOKEN_SECRET?.length || 0) >= 32)),
+    },
     active: dados.active !== false,
   }
 }
@@ -209,10 +223,19 @@ export async function POST(request) {
       const consulta = id
         ? supabase.from('offers').update(registro).eq('id', id)
         : supabase.from('offers').insert(registro)
+      const path = registro.payment_path || (id ? (await supabase.from('offers').select('payment_path').eq('id',id).single()).data?.payment_path : null) || offerPath(registro.name)
+      const { data: existingLink, error: linkCheckError } = await supabase.from('checkout_offer_links').select('offer_id').eq('path',path).maybeSingle()
+      if (linkCheckError) throw new Error('Não foi possível verificar a URL amigável.')
+      if (existingLink && existingLink.offer_id !== id) throw new Error('Este link já está sendo usado por outra oferta.')
       const { data, error } = await consulta.select('id,slug,payment_path').single()
       if (error) throw new Error(error.message)
+      // A URL exibida no painel passa a ser registrada no roteador no mesmo salvamento.
+      const { error: linkError } = await supabase.from('checkout_offer_links').upsert({ path, offer_id: data.id }, { onConflict: 'path' })
+      if (linkError) throw new Error('Oferta salva, mas o link não foi registrado. Tente salvar novamente.')
       await salvarBumps(supabase, data.id, dados.bumps)
-      return NextResponse.json({ ok: true, ...data })
+      return NextResponse.json({ ok: true, ...data, payment_path:path,
+        publication: !registro.active ? 'inactive' : registro.checkout_config.auto_publish ? 'public' : 'restricted',
+        payment_url: `https://rotina.suzanazatorre.com.br/p/${path}` })
     }
     return erro('Entidade inválida.')
   } catch (e) {
