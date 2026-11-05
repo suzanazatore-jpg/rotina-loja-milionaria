@@ -35,7 +35,7 @@ export function quoteBump(mainOffer, bump, method, installments) {
   return calculatePayment({ ...bump.offer, max_installments: mainOffer.max_installments, free_installments: mainOffer.free_installments, monthly_interest_pct: mainOffer.monthly_interest_pct, interest_model: mainOffer.interest_model }, bump.product, method, installments)
 }
 
-export function buildCheckoutCart(offer, product, available, selection, method, installments = 1) {
+export function buildCheckoutCart(offer, product, available, selection, method, installments = 1, { allowReservation = false } = {}) {
   const ids = normalizeBumpSelection(selection)
   if (product.type === 'subscription' && ids.length) throw new PaymentError('Assinaturas não permitem adicionais nesta compra.')
   const wanted = new Set(ids)
@@ -43,7 +43,7 @@ export function buildCheckoutCart(offer, product, available, selection, method, 
   if (selected.length !== ids.length) throw new PaymentError('Um adicional selecionado não está disponível nesta oferta.')
   const line = (itemOffer, itemProduct, kind, amounts) => ({ offer_id: itemOffer.id, product_id: itemProduct.id, plan_id: itemProduct.plan_id, name: itemProduct.name, kind, ...amounts })
   const items = [line(offer, product, 'main', calculatePayment(offer, product, method, installments)), ...selected.map(bump => line(bump.offer, bump.product, 'bump', quoteBump(offer, bump, method, installments)))]
-  if (items.some(item => !item.plan_id)) throw new PaymentError('Vincule um plano do app a todos os produtos da compra.')
+  if (items.some(item => !item.plan_id) && !(allowReservation && items.length === 1 && items[0].kind === 'main' && !items[0].plan_id)) throw new PaymentError('Vincule um plano do app a todos os produtos da compra.')
   const amount = items.reduce((totals, item) => {
     for (const key of Object.keys(totals)) totals[key] += item[key]
     return totals
