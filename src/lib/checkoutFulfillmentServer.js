@@ -3,6 +3,7 @@ import { randomInt } from 'node:crypto'
 import { PaymentError } from './pagarme.js'
 import { enviarEmailBoasVindas } from './enviarEmailBoasVindas.js'
 import { enviarEmailRenovacao } from './enviarEmailRenovacao.js'
+import { notifyNewStudentAccess } from './checkoutAccessWhatsappServer.js'
 
 async function checked(query) {
   const { data, error } = await query
@@ -136,7 +137,14 @@ export async function fulfillPaidOrder(db, orderId) {
       else await enviarEmailRenovacao({ nome: customer.name, email: customer.email, valor: (order.total_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), proximaCobranca: new Date(expiration).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) })
     } catch { emailStatus = 'failed' }
     await checked(db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: emailStatus === 'failed' ? 'Email não enviado; reenviar pelo painel de alunas.' : null, payload: { order_id: order.id, profile_id: profile.id, plan_ids: plans.map(plan => plan.id), email_status: emailStatus } }).eq('id', event.id))
-    return { fulfillment: 'completed', email_status: emailStatus }
+    // Envia a senha somente quando um perfil novo é criado. Não redefine senha de alunas antigas.
+    // Erros do BotConversa são auditados separadamente e nunca revertem pagamento ou acesso.
+    let whatsappStatus = 'not_applicable'
+    if (password) {
+      try { whatsappStatus = await notifyNewStudentAccess(db, { orderId: order.id, customer, password }) }
+      catch { whatsappStatus = 'review_required' }
+    }
+    return { fulfillment: 'completed', email_status: emailStatus, whatsapp_status: whatsappStatus }
   } catch (error) {
     await db.from('webhook_events').update({ error: 'retry' }).eq('id', event.id)
     throw error
