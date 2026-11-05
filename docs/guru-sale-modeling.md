@@ -20,4 +20,8 @@ Não importar dados nem marca Guru. Shell e navegação global preservados. Dado
 
 ## Validação
 
-Testes existentes de histórico, webhooks, acesso e contrato: 25 aprovados. Novos testes de link assinado, redação de segredos, dados fiscais/comprador e autorização da API: 5 aprovados. Build inicial compilou mas parou em módulo antigo que exige variáveis de ambiente; build completo com placeholders de compilação passou, sem modificar as variáveis do deployment. A versão final e a inspeção no ambiente publicado serão registradas após deploy.
+Testes existentes de histórico, webhooks, acesso e contrato: 25 aprovados. Novos testes de link assinado, redação de segredos, dados fiscais/comprador, autorização, origem e validação da cobrança: 6 aprovados. Build inicial compilou mas parou em módulo antigo que exige variáveis de ambiente; build completo com placeholders de compilação passou, sem modificar as variáveis do deployment. A versão final e a inspeção no ambiente publicado serão registradas após deploy.
+
+## Primeira inspeção publicada
+
+Commit 69be172, prévia READY: cinco abas carregaram; reenvio e edição do comprador abriram; formulário inline de comentários abriu sem criar nota; auditoria exibiu eventos reais. Disponibilidade observada nesta prévia: email habilitado; área de membros/contratos/webhooks indisponíveis. Corrigidos após inspeção: título de seção sobrescrito pelo CSS global, rótulos técnicos da auditoria e período inicial de seis meses. Adquirente é consultado somente em leitura ao abrir Extras ou detalhes do pagamento.
