@@ -42,7 +42,7 @@ test('sale mutations reject foreign origins and invalid buyer data without write
  source=source.replace("'@/lib/saleLiveRelay'",JSON.stringify(new URL('../src/lib/saleLiveRelay.js',import.meta.url).href));source=source.replace("'@/lib/saleAudit'",JSON.stringify(new URL('../src/lib/saleAudit.js',import.meta.url).href));const route=await import(dataURL(source)),request=(body,origin='https://example.org')=>new Request('https://example.org/api/admin/checkout/venda',{method:'POST',headers:{origin,'Content-Type':'application/json','Idempotency-Key':id},body:JSON.stringify({id,...body})})
  assert.equal((await route.POST(request({action:'sync'},'https://evil.example'))).status,403);assert.equal(writes.length,0)
  assert.equal((await route.POST(request({action:'buyer',buyer:{name:'x'}}))).status,400);assert.equal(writes.filter(w=>w[0]==='insert').length,0)
- const response=await route.POST(request({action:'refund',reason:'Teste'}));assert.equal(response.status,400);assert.equal(gatewayCalls.length,1);assert.equal(gatewayCalls[0].options,undefined)
+ const response=await route.POST(request({action:'refund',reason:'Teste',confirm:true}));assert.equal(response.status,400);assert.equal(gatewayCalls.length,1);assert.equal(gatewayCalls[0].options,undefined)
  assert.ok(writes.some(w=>w[0]==='insert'));assert.ok(writes.every(w=>w[1]!=='orders'))
  delete globalThis.__saleDb;delete globalThis.__saleGateway
 })
@@ -66,4 +66,18 @@ test('live resend stays on the same screen and delegates only to the fixed authe
  assert.equal(calls[0].url,`https://rotina.suzanazatorre.com.br/api/admin/checkout/vendas/${id}/webhooks`);assert.equal(calls[0].options.method,'GET');assert.equal(calls[0].options.headers.Authorization,'Bearer admin-session');assert.equal(calls[0].options.redirect,'error')
  assert.deepEqual(eligibleLiveWebhooks(rows).map(r=>r.id),['a']);assert.deepEqual(eligibleLiveWebhooks({...rows,paid:false}),[])
  await assert.rejects(liveSaleRequest(request,'https://evil.example','webhooks',null,fetcher));await assert.rejects(liveSaleRequest(request,id,'refund',{},fetcher));assert.equal(calls.length,1)
+})
+test('financial delegation requires explicit confirmation and maps only the current sale to native handlers',async()=>{
+ const {liveSaleRequest}=await import('../src/lib/saleLiveRelay.js'),calls=[]
+ const request=new Request('https://preview.example/api/admin/checkout/venda',{headers:{authorization:'Bearer administrator'}})
+ const fetcher=async(url,options)=>{calls.push({url,options});return Response.json({message:'Resposta de teste'})}
+ for(const body of [{},{confirm:false,reason:'Teste',requestId:id},{confirm:true,reason:'',requestId:id}])await assert.rejects(liveSaleRequest(request,id,'refund',body,fetcher))
+ assert.equal(calls.length,0)
+ await liveSaleRequest(request,id,'refund',{confirm:true,reason:'Teste',requestId:id,order_id:'other',amount:999},fetcher)
+ assert.equal(calls[0].url,`https://rotina.suzanazatorre.com.br/api/admin/checkout/vendas/${id}/acoes`)
+ assert.deepEqual(JSON.parse(calls[0].options.body),{action:'refund',reason:'Teste',confirm:true,requestId:id})
+ await liveSaleRequest(request,id,'sync',{requestId:id},fetcher)
+ assert.equal(calls[1].url,'https://rotina.suzanazatorre.com.br/api/admin/checkout/pagamentos');assert.deepEqual(JSON.parse(calls[1].options.body),{action:'sync',order_id:id})
+ await liveSaleRequest(request,id,'chargeback',{confirm:true,reason:'Teste',requestId:id},fetcher)
+ assert.equal(JSON.parse(calls[2].options.body).action,'chargeback')
 })

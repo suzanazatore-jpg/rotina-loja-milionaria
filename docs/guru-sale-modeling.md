@@ -41,3 +41,7 @@ Substitui a exigência de navegação ao domínio real para reenviar Webhooks: o
 Na janela nativa de produção, todos os destinos elegíveis já iniciam selecionados. A escolha individual passa a ficar recolhida em “Escolher destinos (opcional)”, sem mudar o cadastro da integração ou as escolhas dos próximos reenvios.
 
 15 testes de histórico, validação, destino e delegação autenticada aprovados; build da prévia aprovado. Nenhum envio real executado para QA.
+
+## Ações de pagamento na mesma tela
+
+Corrigida a inconsistência que mantinha Atualizar Status, Reembolsar e Chargeback desabilitados para vendas reais na tela de prévia. As ações de vendas reais usam os handlers administrativos nativos do mesmo aplicativo, mantendo autenticação e o identificador da venda. Reembolso e chargeback exigem motivo e confirmação expressa na janela; o serviço nativo valida a cobrança e, para chargeback, a confirmação do Pagar.me. Nenhuma operação financeira foi executada durante QA. Testes com adaptador de rede falso verificam bloqueio sem confirmação e payloads limitados à venda atual; 25 testes pertinentes aprovados.
