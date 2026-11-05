@@ -50,7 +50,11 @@ export function checkoutPaymentConfiguration(loaded, env = process.env) {
       && env.CHECKOUT_ACCESS_LEDGER_ENABLED === 'true'
       && (!loaded.config.contract?.required || (env.CONTRACTS_ENABLED === 'true' && (env.CONTRACT_TOKEN_SECRET?.length || 0) >= 32))
     const publicKey = /^pk_(?:live_)?[a-zA-Z0-9]+$/.test(env.PAGARME_PUBLIC_KEY || '') ? env.PAGARME_PUBLIC_KEY : ''
-    return { ready, mode: 'live', adminOnly: true, tokenBase: gateway.base, publicKey }
+    // Somente ofertas explicitamente autorizadas podem receber compras de clientes.
+    // A oferta de teste e todas as demais continuam restritas ao administrador.
+    const publicOffers = (env.CHECKOUT_PUBLIC_OFFER_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
+    const adminOnly = !publicOffers.includes(loaded.offer.id)
+    return { ready, mode: 'live', adminOnly, tokenBase: gateway.base, publicKey }
   } catch { return disabled }
 }
 export function publicCheckoutData(loaded, env = process.env) {
