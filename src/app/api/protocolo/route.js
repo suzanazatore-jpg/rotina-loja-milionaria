@@ -59,7 +59,7 @@ async function state(ctx) {
 export async function GET(request) {
   try {
     const ctx = await context(request, new URL(request.url).searchParams.get('slug'))
-    if (ctx.status) return json({ error: 'Protocolo não disponível para esta conta.' }, ctx.status)
+    if (ctx.status) return json({ error: 'Desafio não disponível para esta conta.' }, ctx.status)
     return json(await state(ctx))
   } catch { return json({ error: 'Não foi possível carregar a campanha.' }, 500) }
 }
@@ -67,7 +67,7 @@ export async function POST(request) {
   try {
     const body = await request.json()
     const ctx = await context(request, body?.slug)
-    if (ctx.status) return json({ error: 'Protocolo não disponível para esta conta.' }, ctx.status)
+    if (ctx.status) return json({ error: 'Desafio não disponível para esta conta.' }, ctx.status)
     const { supabase, user, course } = ctx
     const base = { owner_id: user.id, course_id: course.id }
     if (body.action === 'start') {

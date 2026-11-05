@@ -29,6 +29,7 @@ const groups = [
 const searchText = value => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()
 export default function Settings({initialView=null}) {
   const [settings,setSettings] = useState({gtm_id:'',meta_pixel_id:'',checkout_config:{...CHECKOUT_DEFAULTS}})
+  const [trackingProducts,setTrackingProducts] = useState([])
   const [loading,setLoading] = useState(true)
   const [saving,setSaving] = useState(false)
   const [message,setMessage] = useState('')
@@ -50,15 +51,15 @@ export default function Settings({initialView=null}) {
     let active=true
     async function load() {
       try {
-        const response=await fetch('/api/admin/checkout/configuracoes',{headers:await headers(),cache:'no-store'})
+        const response=await fetch('/api/admin/checkout/configuracoes' + (initialView==='tracking'?'?view=tracking':''),{headers:await headers(),cache:'no-store'})
         const json=await response.json()
         if(!response.ok)throw new Error(json.error)
-        if(active){setSettings(json.tracking);setBaseline(JSON.stringify(json.tracking))}
+        if(active){setTrackingProducts(json.products || []);setSettings(json.tracking);setBaseline(JSON.stringify(json.tracking))}
       } catch(error) {if(active)setMessage(error.message)}
       finally{if(active)setLoading(false)}
     }
     load();return()=>{active=false}
-  },[])
+  },[initialView])
   async function save(event) {
     event.preventDefault();if(!baseline || loading || saving)return;setSaving(true);setMessage('')
     try {
@@ -92,6 +93,10 @@ export default function Settings({initialView=null}) {
         {view==='tracking'?<section className="central-chart-panel"><h2>Rastreamento global</h2><div className="central-settings-fields"><label>Google Tag Manager<input style={field} value={settings.gtm_id} onChange={event=>setSettings({...settings,gtm_id:event.target.value})} maxLength={24} placeholder="GTM-XXXXXXX" autoComplete="off" /></label><label>Meta Pixel — ID<input style={field} value={settings.meta_pixel_id} onChange={event=>setSettings({...settings,meta_pixel_id:event.target.value})} inputMode="numeric" maxLength={30} placeholder="Somente números" autoComplete="off" /></label></div><p className="central-data-note">O rastreamento respeita o consentimento da compradora e os controles de ativação do ambiente.</p></section>:<CheckoutSettingsEditor key={view} initialTab={view==='identity'?'content':'appearance'} globalEditor value={settings.checkout_config || CHECKOUT_DEFAULTS} onChange={checkout_config=>setSettings({...settings,checkout_config})} offer={{name:'Exemplo de oferta',price:'47,00',payment_methods:['pix','credit_card'],max_installments:12,free_installments:1}} product={{name:'Seu produto',type:'one_time'}} />}
         <div className={styles.actions}><span>{dirty?'Alterações ainda não salvas':'Nenhuma alteração pendente'}</span><button className="central-primary" type="submit" disabled={!dirty || !baseline || loading || saving}>{loading?'Carregando…':saving?'Salvando…':'Salvar padrão'}</button></div>
       </fieldset></form>
+      {view==='tracking' && baseline && <section className="central-chart-panel">
+        <h2>Produtos disponíveis para rastreamentos</h2>
+        {trackingProducts.length ? <ul>{trackingProducts.map(product=><li key={product.id}><Link href={`/admin/checkout/produtos/${product.id}`}>{product.name}</Link></li>)}</ul> : <p>Ative “Uso em Rastreamentos” no detalhe dos produtos que deseja listar aqui.</p>}
+      </section>}
     </>}
   </main>
 }

@@ -1,0 +1,37 @@
+.field {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--cv-muted);
+}
+.field input[hidden] { display: none; }
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+  width: min(168px, 100%);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px dashed var(--cv-link);
+  border-radius: 12px;
+  color: var(--cv-link);
+  background: var(--cv-field);
+  cursor: pointer;
+}
+.tile:hover, .tile:focus-visible { outline: 2px solid var(--cv-link); outline-offset: 2px; }
+.preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.action { font-size: 14px; font-weight: 600; }
+.preview + .action {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: #151515d9; color: white; padding: 6px;
+}
+.tools { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.tools button, .url summary { border: 0; background: transparent; color: var(--cv-link); font: inherit; font-size: 13px; cursor: pointer; }
+.url { max-width: 100%; text-align: center; }
+.url label { display: grid; text-align: left; }
+.url input { width: 100%; min-width: 0; }

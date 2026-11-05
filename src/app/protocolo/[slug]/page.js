@@ -107,7 +107,7 @@ export default function Protocolo({ params }) {
           const sampleLessons = PROTOCOL_DAYS.map((item, index) => ({ id: `demo-dia-${index + 1}`, title: item.title, description: item.description, protocol_checklist: item.checks, video_url: null }))
           if (!active) return
           setDemo(true);setPreview(true)
-          setCourse({ id: DEMO_COURSE_ID, title: 'Protocolo Zerando o Estoque em 7 dias', slug: DEMO_SLUG })
+          setCourse({ id: DEMO_COURSE_ID, title: 'Desafio: Zerando o Estoque em 7 Dias', slug: DEMO_SLUG })
           setLessons(sampleLessons);setMaterials([])
           setData({ run: { lot_name: 'Exemplo: coleção anterior', starting_pieces: 30, goal_cents: 300000, started_on: today }, entries: [], sales: [], today })
           setSelected(0);loadDraft(sampleLessons[0], [])
@@ -131,7 +131,7 @@ export default function Protocolo({ params }) {
           return
         }
         const { data: c, error: ce } = await supabase.from('courses').select('id,slug,title,subtitle,protocol_enabled,protocol_offer_url,is_published').eq('slug', slug).eq('is_published', true).maybeSingle()
-        if (ce || !c?.protocol_enabled) throw new Error('Este protocolo não está disponível.')
+        if (ce || !c?.protocol_enabled) throw new Error('Este desafio não está disponível.')
         const [state, ls, ms] = await Promise.all([
           call(),
           supabase.from('lessons').select('id,title,description,video_url,duration_label,protocol_checklist,sort_order,created_at').eq('course_id', c.id).eq('is_published', true).order('sort_order').order('created_at'),
@@ -231,7 +231,7 @@ export default function Protocolo({ params }) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   if (loading) return <ProtocolLoading theme={theme} />
-  if (!course || !data) return <div className="pro-page pro-center"><p>{error || 'Protocolo não disponível.'}</p><button onClick={() => router.push('/painel?secao=conteudos')}>Voltar</button></div>
+  if (!course || !data) return <div className="pro-page pro-center"><p>{error || 'Desafio não disponível.'}</p><button onClick={() => router.push('/painel?secao=conteudos')}>Voltar</button></div>
 
   return <div className={`pro-page pro-theme-${theme}`}>
     <header className="pro-header"><div><span className="pro-overline">Suzana Zatorre · meu curso</span><h1>{course.title}</h1></div>{preview && <button className="pro-quiet" onClick={()=>router.push(`/admin/cursos/conteudo?id=${course.id}`)}>← Voltar ao ADM</button>}</header>
@@ -241,13 +241,13 @@ export default function Protocolo({ params }) {
       {preview&&<div className="pro-preview" role="status"><strong>{demo?'Demonstração do aplicativo':'Prévia do ADM'}</strong> · dados fictícios. Você pode navegar e testar os registros; nada aqui é salvo na conta da aluna.</div>}
       {error && <div role="alert" className="pro-error">{error}</div>}
       {lesson && <section id="pro-aula" className="pro-card pro-lesson-first"><div className="pro-video">{embed(lesson.video_url) ? <iframe key={lesson.id} src={embed(lesson.video_url)} title={lesson.title} allow="autoplay; fullscreen; picture-in-picture" allowFullScreen /> : <p>Vídeo ainda não disponível.</p>}</div><div className="pro-continue"><a href="#pro-tarefa">Continue abaixo: PDF, tarefas e vendas ↓</a></div><span className="pro-overline">Dia {selected+1} de 7 · aula + missão</span><h2>{lesson.title}</h2><details className="pro-lesson-description"><summary>Ver orientação completa do dia</summary><p>{lesson.description}</p></details></section>}
-      <nav className="pro-days" aria-label="Dias do Protocolo">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
+      <nav className="pro-days" aria-label="Dias do Desafio">{lessons.map((item,index)=><button key={item.id} disabled={index>=day} aria-current={index===selected?'step':undefined} onClick={()=>selectDay(index)}><span>Dia {index+1}</span><strong>{data.entries.some(row=>row.lesson_id===item.id&&row.completed_at)?'✓':index>=day?'🔒':String(index+1)}</strong></button>)}</nav>
       {lesson && <section id="pro-tarefa" className="pro-card"><span className="pro-overline">Tarefa do dia</span>{materials.filter(item=>item.lesson_id===lesson.id).map(item=><button key={item.id} className="pro-material" onClick={()=>downloadMaterial(item)}>Ler PDF no app <span>{item.title}</span></button>)}{pdfLoading&&<p role="status">Abrindo a tarefa em PDF…</p>}{pdfError&&<p role="alert">{pdfError} Toque no arquivo acima para tentar novamente.</p>}{pdfUrl && <ProtocolPdf key={pdfUrl} url={pdfUrl} />}</section>}
       {!data.run ? <section id="pro-produtos" className="pro-card pro-start"><span className="pro-overline">Antes de começar</span><h2>Quais produtos você vai vender?</h2><p>Monte a lista de produtos da sua campanha de 7 dias. O total de peças será somado automaticamente.</p>
         <label>Nome da campanha (opcional)<input value={lot} maxLength={120} onChange={e=>setLot(e.target.value)} placeholder="Ex.: estoque da coleção anterior" /></label>
         <ProductEditor products={products} setProducts={setProducts} busy={busy} />
         <label>Meta de vendas da campanha (R$)<input inputMode="decimal" value={goal} onChange={e=>setGoal(e.target.value)} placeholder="Ex.: 3000,00" /></label>
-        {lessons.length!==7||lessons.some(item=>!Array.isArray(item.protocol_checklist)||!item.protocol_checklist.length)?<p>As sete missões ainda estão sendo preparadas pela Suzana.</p>:<button className="pro-primary" disabled={busy} onClick={()=>saveProducts(true)}>{busy?'Preparando...':'Começar meu Protocolo'}</button>}
+        {lessons.length!==7||lessons.some(item=>!Array.isArray(item.protocol_checklist)||!item.protocol_checklist.length)?<p>As sete missões ainda estão sendo preparadas pela Suzana.</p>:<button className="pro-primary" disabled={busy} onClick={()=>saveProducts(true)}>{busy?'Preparando...':'Começar meu Desafio'}</button>}
       </section> : <>
         <section className="pro-hero"><div><span className="pro-overline">Sua campanha · {data.run.lot_name}</span><h2>{money(totalCents)} <small>em vendas registradas</small></h2><p>{soldPieces} de {data.run.starting_pieces} peças vendidas · {completedCount} de {lessons.length} missões concluídas</p></div><div className="pro-goal"><strong>{percent}% da meta</strong><span>{money(data.run.goal_cents)}</span><div className="pro-bar"><span style={{width:`${percent}%`}} /></div></div></section>
         {selected===0&&<section id="pro-produtos" className="pro-card"><span className="pro-overline">Dia 1 · Seu estoque</span><h2>Produtos da campanha</h2>

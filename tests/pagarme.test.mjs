@@ -82,7 +82,12 @@ test('paid order creation registers locally before gateway and verifies returned
     {table:'customers',data:null},
     {table:'customers',data:{id:'customer'}},
     {table:'orders',get data(){return localOrder},check(operations){localOrder=operations.find(row=>row[0]==='insert')[1]; assert.equal(localOrder.total_cents,4230)}},
-    {table:'webhook_events',data:null},
+    {table:'webhook_events',data:null,check(ops){
+      const payload=ops.find(row=>row[0]==='insert')[1].payload
+      assert.equal(payload.form_profile,'complete')
+      assert.equal(payload.fiscal_buyer.document,customer.document)
+      assert.equal(payload.fiscal_buyer.billing_address.city,'Natal')
+    }},
     {table:'order_items',data:null},
     {table:'orders',data:[{id:'saved'}],check(operations){assert.equal(operations.find(row=>row[0]==='update')[1].status,'paid');assert.deepEqual(operations.find(row=>row[0]==='is'),['is','pagarme_order_id',null])}},
   ]
@@ -115,12 +120,13 @@ test('reusing request key with different fingerprint never calls gateway', async
   await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'request-key-123456'),/outros dados/)
   assert.equal(steps.length,0)
 })
-test('card wallet receives token and billing address, and order receives only server card ID', async () => {
+for (const compact of [false,true]) test(`card wallet receives a token ${compact ? 'without an address for low ticket' : 'with billing address for complete checkout'}`, async () => {
   process.env.PAGARME_SECRET_KEY='sk_test_mock'
   const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393',address:{line_1:'Rua 1, 10',zip_code:'59000000',city:'Natal',state:'RN'}}
+  if (compact) delete customer.address
   let localOrder
   const steps=[
-    {table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
+    {table:'offers',data:{...offer,product_id:'product',checkout_config:{form_profile:compact?'compact':'complete'}}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
     {table:'customers',data:null},{table:'customers',data:{id:'customer'}},
     {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
     {table:'webhook_events',data:null},{table:'order_items',data:null},{table:'customers',data:{id:'customer',pagarme_customer_id:null}},
@@ -131,9 +137,9 @@ test('card wallet receives token and billing address, and order receives only se
   globalThis.fetch=async(url,options)=>{
     called.push(url)
     const body=JSON.parse(options.body)
-    if(url.endsWith('/customers')) return Response.json({id:'cus_owned'})
+    if(url.endsWith('/customers')) { assert.equal(Boolean(body.address),!compact); return Response.json({id:'cus_owned'}) }
     if(url.endsWith('/customers/cus_owned/cards')) {
-      assert.deepEqual(body,{token:'token_secure',billing_address:{country:'BR',state:'RN',city:'Natal',zip_code:'59000000',line_1:'Rua 1, 10'}})
+      assert.deepEqual(body,compact ? {token:'token_secure'} : {token:'token_secure',billing_address:{country:'BR',state:'RN',city:'Natal',zip_code:'59000000',line_1:'Rua 1, 10'}})
       assert.equal(body.number,undefined); assert.equal(body.cvv,undefined)
       return Response.json({id:'card_owned'})
     }
@@ -174,13 +180,13 @@ test('a product assigned to a future marketplace cannot be charged through Pagar
  await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',payment_method:'pix'},'request-marketplace-123'),/Marketplace ainda não disponível/)
  assert.equal(steps.length,0)
 })
-test('compact Pix accepts no address but default and card processing still require it',async()=>{
+test('compact buyers may omit address while complete card checkout requires it',async()=>{
  const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393'}
  assert.equal(normalizeCustomer(customer,{requireAddress:false}).address,undefined)
  assert.throws(()=>normalizeCustomer(customer),/endereço/)
  assert.throws(()=>normalizeCustomer({...customer,address:{city:'Natal'}},{requireAddress:false}),/endereço/)
  const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}}]
- await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'credit_card',card_token:'token_secure'},'compact-card-123456',null,{requireAddress:false}),/endereço/)
+ await assert.rejects(()=>createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'credit_card',card_token:'token_secure'},'complete-card-123456'),/endereço/)
  assert.equal(steps.length,0)
 })
 test('compact Pix sends a valid address-free customer to the gateway and preserves totals',async()=>{
@@ -188,9 +194,24 @@ test('compact Pix sends a valid address-free customer to the gateway and preserv
  const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393'}
  let localOrder
  const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
- {table:'customers',data:null},{table:'customers',data:{id:'customer'}},{table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
- {table:'webhook_events',data:null},{table:'order_items',data:null},{table:'orders',data:[{id:'saved'}]}]
+ {table:'customers',data:null,check(ops){assert.ok(!('billing_address' in ops.find(row=>row[0]==='upsert')[1]))}},{table:'customers',data:{id:'customer'}},{table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
+ {table:'webhook_events',data:null,check(ops){
+   const payload=ops.find(row=>row[0]==='insert')[1].payload
+   assert.equal(payload.form_profile,'compact')
+   assert.equal(payload.fiscal_buyer,undefined)
+   assert.equal(payload.contract_policy.contract.required,false)
+ }},{table:'order_items',data:null},{table:'orders',data:[{id:'saved'}]}]
  const original=globalThis.fetch
  globalThis.fetch=async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.customer.address,undefined);assert.equal(body.payments[0].amount,4230);return Response.json({id:'or_compact',code:localOrder.id,amount:4230,customer:{email:customer.email},charges:[{id:'ch_compact',status:'pending'}]})}
  try{const result=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'compact-pix-123456',null,{requireAddress:false});assert.equal(result.status,'waiting_payment');assert.equal(steps.length,0)}finally{globalThis.fetch=original;delete process.env.PAGARME_SECRET_KEY}
+})
+
+test('real sk_ keys require live flag and production; test keys never masquerade as live',()=>{
+ const production={PAGARME_SECRET_KEY:'sk_realMock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',CHECKOUT_LIVE_ENABLED:'true',VERCEL_ENV:'production'}
+ assert.equal(gatewayConfiguration(production).mode,'live')
+ assert.equal(gatewayConfiguration({...production,PAGARME_SECRET_KEY:'sk_live_mock'}).mode,'live')
+ assert.throws(()=>gatewayConfiguration({...production,VERCEL_ENV:'preview'}))
+ assert.throws(()=>gatewayConfiguration({...production,PAGARME_BASE_URL:'https://sdx-api.pagar.me/core/v5'}))
+ assert.equal(gatewayConfiguration({...production,PAGARME_SECRET_KEY:'sk_test_mock'}).mode,'test')
+ assert.throws(()=>gatewayConfiguration({...production,PAGARME_SECRET_KEY:'not-a-key'}))
 })

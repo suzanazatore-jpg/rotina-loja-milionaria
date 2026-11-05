@@ -1,4 +1,6 @@
 import { normalizeCheckoutSettings } from '@/lib/checkoutSettings'
+import { offerPath } from '@/lib/checkoutLinks'
+import { randomUUID } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient, gerarSlug, reaisParaCentavos } from '@/lib/checkoutAdminServer'
 import { loadGlobalCheckoutSettings } from '@/lib/checkoutSettings'
@@ -48,6 +50,8 @@ async function montarProduto(supabase,dados) {
   if (code !== undefined && (!Number.isSafeInteger(code) || code < 1000000000 || code > 9999999999)) throw new Error('O código deve ter 10 dígitos.')
   return {
     ...(code !== undefined ? { code } : {}),
+    ...(typeof dados.catalog_hidden === 'boolean' && { catalog_hidden: dados.catalog_hidden }),
+    ...(typeof dados.tracking_eligible === 'boolean' && { tracking_eligible: dados.tracking_eligible }),
     name: nome,
     marketplace_id: marketplace,
     image_url: image,
@@ -72,6 +76,11 @@ async function montarOferta(supabase, dados) {
   const preco = reaisParaCentavos(dados.price)
   if (!preco || preco <= 0) throw new Error('Informe um preço válido.')
 
+  const temPromocao = dados.promo_price != null && String(dados.promo_price).trim() !== ''
+  const promocao = temPromocao ? reaisParaCentavos(dados.promo_price) : null
+  if (temPromocao && (!Number.isSafeInteger(promocao) || promocao <= 0 || promocao >= preco)) {
+    throw new Error('O valor promocional deve ser maior que zero e menor que o valor da oferta.')
+  }
   const assinatura = produto.type === 'subscription'
   let metodos = (Array.isArray(dados.payment_methods) ? dados.payment_methods : []).filter(m => METODOS.has(m))
   if (assinatura) metodos = ['credit_card'] // recorrência automática no Pagar.me é só no cartão
@@ -114,8 +123,9 @@ async function montarOferta(supabase, dados) {
   return {
     product_id: produto.id,
     name: nome,
-    slug: gerarSlug(dados.slug || `${produto.slug}-${nome}`),
-    price_cents: preco,
+    ...(dados.id ? {} : {slug: dados.slug ? gerarSlug(dados.slug) : randomUUID()}),
+    ...(typeof dados.payment_path === 'string' ? {payment_path:offerPath(dados.payment_path) || offerPath(nome) || 'oferta'} : {}),
+    price_cents: promocao ?? preco,
     payment_methods: metodos,
     max_installments: maxParcelas,
     free_installments: semJuros,
@@ -128,7 +138,9 @@ async function montarOferta(supabase, dados) {
     billing_interval_count: qtdIntervalo,
     trial_days: trial,
     thank_you_url: dados.checkout_config ? normalizeCheckoutSettings(dados.checkout_config).redirects.approved || null : obrigado,
-    ...(dados.checkout_config ? {checkout_config: normalizeCheckoutSettings(dados.checkout_config)} : {}),
+    ...(dados.checkout_config ? {checkout_config: normalizeCheckoutSettings({
+      ...dados.checkout_config, regular_price_cents: temPromocao ? preco : null,
+    })} : {}),
     active: dados.active !== false,
   }
 }
@@ -206,10 +218,10 @@ export async function POST(request) {
       const consulta = id
         ? supabase.from('offers').update(registro).eq('id', id)
         : supabase.from('offers').insert(registro)
-      const { data, error } = await consulta.select('id').single()
+      const { data, error } = await consulta.select('id,slug,payment_path').single()
       if (error) throw new Error(error.message)
       await salvarBumps(supabase, data.id, dados.bumps)
-      return NextResponse.json({ ok: true, id: data.id })
+      return NextResponse.json({ ok: true, ...data })
     }
     return erro('Entidade inválida.')
   } catch (e) {

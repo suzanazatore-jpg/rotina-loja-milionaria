@@ -55,3 +55,29 @@ test('offer contract survives normalization and appearance inheritance without b
  assert.deepEqual(resolveCheckoutSettings({}, {contract}).contract,{required:false})
  assert.throws(()=>normalizeCheckoutSettings({contract:{...contract,term_months:0}}),/prazo/)
 })
+
+test('a legacy compact offer with a required contract always collects fiscal data',()=>{
+  const contract={required:true,template:'cvm',term_months:3}
+  const saved=resolveCheckoutSettings({layout:'guru',form_profile:'compact',contract})
+  assert.equal(saved.form_profile,'complete')
+  assert.equal(saved.contract.required,true)
+  const simple=resolveCheckoutSettings({...saved,form_profile:'compact',contract:{required:false}})
+  assert.equal(simple.form_profile,'compact')
+  assert.equal(simple.contract.required,false)
+})
+
+test('complete Guru Pix requires the street, number and district and compact Pix skips fiscal fields',()=>{
+ const input={customer:{document:'12345678901'},payment_method:'pix'}
+ assert.throws(()=>validateCheckoutForm({form_profile:'complete',layout:'guru'},input),/endereço/)
+ validateCheckoutForm({form_profile:'compact',layout:'guru'},input)
+ input.customer.address={street:'Rua Um',number:'s/n',district:'Centro',city:'Natal',state:'RN',zip_code:'59000000'}
+ validateCheckoutForm({form_profile:'complete',layout:'guru'},input)
+})
+
+test('offer title choice follows renames while historical custom titles remain usable', async()=>{
+ const {offerDisplayName}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+ const product={name:'Produto'}, offer={name:'Oferta nova'}
+ assert.equal(offerDisplayName(normalizeCheckoutSettings({use_offer_name:true,product_display_name:'Antiga'}),offer,product),'Oferta nova')
+ assert.equal(offerDisplayName(normalizeCheckoutSettings({use_offer_name:false}),offer,product),'Produto')
+ assert.equal(offerDisplayName(normalizeCheckoutSettings({product_display_name:'Personalizado'}),offer,product),'Personalizado')
+})

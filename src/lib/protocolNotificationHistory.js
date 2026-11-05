@@ -9,7 +9,7 @@ export async function ensureProtocolHistory(supabase, run, course, lesson, index
   const id = protocolNotificationId(run.owner_id, lesson.id)
   const row = {
     id, user_id: run.owner_id, notification_type: 'personalizada',
-    title: `Dia ${index+1} do seu Protocolo`,
+    title: `Dia ${index+1} do seu Desafio`,
     body: (lesson.protocol_notification || `Sua missão de hoje é: ${lesson.title}. Toque para abrir a aula.`).slice(0,240),
     target_url: `/protocolo/${course.slug}?aula=${lesson.id}`,
     scheduled_for: today,

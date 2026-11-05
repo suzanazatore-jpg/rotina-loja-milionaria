@@ -15,7 +15,7 @@ Implementação na branch `checkout/painel-admin`. A main e o webhook Guru não 
 
 A criação de pagamentos nesta etapa é administrativa, para homologação. O formulário público chama sua própria rota, limitada à homologação administrativa. Os adicionais selecionados são validados pelo vínculo em order_bumps, cobrados com o produto principal e registrados como itens separados.
 
-Produção exige `CHECKOUT_LIVE_ENABLED=true` e chave `sk_live_` com URL de produção. Liberação de acesso exige `CHECKOUT_FULFILLMENT_ENABLED=true`; deixar desligada durante a homologação com contas reais. Não habilitar cobrança real antes de validar o ciclo completo no sandbox.
+Produção exige `CHECKOUT_LIVE_ENABLED=true`, `VERCEL_ENV=production` e chave `sk_` (ou `sk_live_`) com URL de produção. O modo é determinado pela credencial; `sk_test_` continua sendo teste mesmo no endpoint compartilhado. Liberação de acesso exige `CHECKOUT_FULFILLMENT_ENABLED=true`; deixar desligada durante a homologação com contas reais. Não habilitar cobrança real antes de validar o ciclo completo no sandbox.
 
 O navegador tokeniza o cartão diretamente no Pagar.me, com `PAGARME_PUBLIC_KEY` (`pk_test_...`) e domínio autorizado no painel do gateway. O servidor cria a carteira do cliente e o cartão via token + endereço, e usa o `card_id` gerado no próprio gateway. PAN/CVV não chegam ao backend. Nenhum `card_id` enviado pelo navegador é aceito.
 
@@ -23,7 +23,7 @@ O navegador tokeniza o cartão diretamente no Pagar.me, com `PAGARME_PUBLIC_KEY`
 
 O link `/checkout/{slug}` carrega a aparência salva e as opções de pagamento da oferta ativa. `POST /api/checkout/{slug}` inicia a sessão (`action: start`) e paga (`action: pay`). `GET` consulta exclusivamente o pedido da sessão assinada, sem retornar dados pessoais ou aceitar IDs arbitrários. O estado financeiro é atualizado pelos webhooks; o navegador apenas lê esse estado a cada 10 segundos.
 
-Para iniciar testes no formulário: `CHECKOUT_TEST_ENABLED=true`, `CHECKOUT_SESSION_SECRET` com pelo menos 32 caracteres, chave secreta sandbox e, para cartão, `PAGARME_PUBLIC_KEY`. A sessão de compra dura 30 minutos, usa cookie HttpOnly e SameSite Strict, e vincula a oferta à chave do pedido. As requisições POST verificam a origem e requerem a sessão administrativa do app durante a homologação. O modo de produção é recusado nesta rota.
+Para iniciar testes no formulário: `CHECKOUT_TEST_ENABLED=true`, `CHECKOUT_SESSION_SECRET` com pelo menos 32 caracteres, chave secreta sandbox e, para cartão, `PAGARME_PUBLIC_KEY`. A sessão de compra dura 90 minutos (cobre o prazo de 60 minutos do Pix), usa cookie HttpOnly e SameSite Strict, e vincula a oferta à chave do pedido. As requisições POST verificam a origem e requerem a sessão administrativa do app durante a homologação. A validação em produção também exige administrador, além dos critérios abaixo; ainda não libera compras anônimas.
 
 Não habilitar o checkout anônimo de produção até homologar os fluxos reais e concluir proteção contra abuso/limites de tentativas. Se faltar configuração, a página exibe o visual e deixa o pagamento indisponível. O formulário preserva o mesmo payload em memória nas retentativas para evitar uma segunda cobrança. Ao recarregar, consulta o pedido existente; não reenvia automaticamente.
 
@@ -157,3 +157,22 @@ A listagem de Webhooks separa Vendas e Assinaturas, com colunas Nome e URL, atal
 - Imagens são enviadas apenas pelo administrador, com limite de 4 MB, validação de conteúdo e normalização por Sharp para WebP, até 1024 × 1024. Armazenamento em `panel-banners/checkout-products/`; a associação só é gravada ao salvar o produto. Remover uma imagem no formulário remove a associação, sem apagar imagens que possam estar em uso em ofertas.
 - `products.image_url` é o padrão para ofertas sem imagem própria; `updated_at` é preenchido nas novas edições. Datas de alterações antigas não são inventadas. Duplicação copia a imagem.
 - Ofertas: nome, quantidade fixa de uma unidade e valor; ações de copiar link, duplicar e ativar, com filtros recolhidos. Vendas usa a API administrativa já existente, filtrada pelo produto, com consulta de detalhes sem alterar o pedido.
+
+
+## Validação real restrita — 04/11/2026
+
+- `CHECKOUT_LIVE_OFFER_IDS`: lista explícita de ofertas autorizadas para a validação; vazio bloqueia todas. A primeira é `0fb4fa16-235d-429d-9948-9a51002535aa`, Desafio R$27, plano com 180 dias.
+- Exige produto avulso com plano, sessão assinada, segredo do webhook (ambos com no mínimo 32 caracteres), fulfillment e ledger ligados. Assinaturas e itens adicionais continuam bloqueados nesta etapa.
+- Ofertas com contrato não cobram se o serviço de contratos e seu segredo não estiverem configurados. Contratos e canais de entrega exigem validação separada antes da mentoria.
+- Cartão exige chave pública de produção (`pk_` ou `pk_live_`); chaves de teste/segredo nunca são expostas como chave pública. Domínio de tokenização ainda deve ser validado com a conta Pagar.me.
+- O checkout mantém a autenticação administrativa tanto no sandbox quanto na validação real. Não está liberado para divulgação pública.
+- A resposta distingue pagamento e fulfillment. Falha na entrega após pagamento não transforma a resposta em nova tentativa de cobrança. O navegador continua consultando a entrega e só oferece o redirecionamento de aprovado após sua conclusão.
+- Nova sessão dura 90 minutos; o Pix expira em 60. Um pedido continua vinculado à mesma sessão nas retentativas.
+- Callback de produção: `https://rotina.suzanazatorre.com.br/api/webhook-pagarme`, HTTP Basic, usuário `pagarme`. Senha exclusiva armazenada apenas no servidor e no gateway. Não usar a chave de API como senha do webhook.
+- Configuração preparada na Vercel com `CHECKOUT_LIVE_ENABLED=false` até a titular concluir o cadastro do webhook e a versão ser verificada. Sem compras reais realizadas nesta preparação.
+
+Verificações: 144 testes de checkout/pagamentos/contratos mais teste de rota real restrita (145 no total); build Next.js aprovado com valores fictícios de Supabase no ambiente local. Nenhuma chamada de cobrança real. Teste de HTTP da rota usa dependências simuladas e cobre visitante, origem indevida, cartão sem chave, itens extras, valor arbitrário, entrega com falha e sessão de outra oferta.
+
+Pendente para liberação comercial: compra real de R$27 e confirmação via webhook, acesso/email, cartão, compra com contrato, Meta CAPI/GTM e proteção contra abuso antes de permitir sessões anônimas. A versão preparada não comprova esses resultados.
+
+Reversão: manter `CHECKOUT_LIVE_ENABLED=false` e republicar. Código anterior: `a013b2a8b1bc84805333b2d21b832cbc45acd3d8`; deployment anterior `dpl_GhErJbYQJ2yaLQjP5YnAR49nAgdV`. Não apagar pedidos, acessos ou notificações para reverter código.

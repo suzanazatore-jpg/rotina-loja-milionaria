@@ -91,3 +91,12 @@ test('unauthorized toggle does not write or expose a product',async()=>{
  assert.equal(db.products[0].active,true)
  assert.deepEqual(db.calls,[])
 })
+
+test('catalog-only hiding leaves checkout available and the product recoverable in filters', async()=>{
+  const db=database()
+  db.products[0].catalog_hidden=true
+  assert.deepEqual(visible(db.products),[])
+  assert.deepEqual(visible(db.products,'inactive'),['p'])
+  assert.deepEqual(visible(db.products,'all'),['p'])
+  assert.ok(await loadCheckoutOffer('one',db))
+})

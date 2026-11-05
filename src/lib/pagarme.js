@@ -10,9 +10,12 @@ export function gatewayConfiguration(env = process.env) {
   const base = env.PAGARME_BASE_URL || 'https://sdx-api.pagar.me/core/v5'
   if (!key) throw new PaymentError('Pagar.me não configurado.', 503)
   if (!['https://sdx-api.pagar.me/core/v5', 'https://api.pagar.me/core/v5'].includes(base)) throw new PaymentError('Ambiente Pagar.me inválido.', 503)
-  if (base.includes('sdx-api') && !key.startsWith('sk_test_')) throw new PaymentError('Use uma chave de teste no sandbox.', 503)
-  if (!base.includes('sdx-api') && (env.CHECKOUT_LIVE_ENABLED !== 'true' || !key.startsWith('sk_live_'))) throw new PaymentError('Pagamentos reais ainda não habilitados.', 503)
-  return { base, key }
+  const test = /^sk_test_[a-zA-Z0-9]+$/.test(key)
+  const live = /^sk_(?:live_)?[a-zA-Z0-9]+$/.test(key) && !test
+  if (!test && !live) throw new PaymentError('Credencial Pagar.me inválida.', 503)
+  if (base.includes('sdx-api') && !test) throw new PaymentError('Use uma chave de teste no sandbox.', 503)
+  if (live && (env.CHECKOUT_LIVE_ENABLED !== 'true' || env.VERCEL_ENV !== 'production')) throw new PaymentError('Pagamentos reais ainda não habilitados.', 503)
+  return { base, key, mode: test ? 'test' : 'live' }
 }
 
 export async function pagarme(path, { method = 'GET', body, idempotencyKey } = {}, fetcher = fetch) {
@@ -58,7 +61,7 @@ export function normalizeCustomer(input, { requireAddress = true } = {}) {
   const address = input?.address || {}
   if (!name || name.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || ![11,14].includes(document.length) || ![10,11].includes(phone.length)) throw new PaymentError('Informe nome, email, CPF/CNPJ e telefone válidos.')
   const hasAddress = Object.values(address).some(value => String(value || '').trim())
-  if ((requireAddress || hasAddress) && (!address.line_1 || !address.zip_code || !address.city || !/^[A-Z]{2}$/.test(address.state || ''))) throw new PaymentError('Informe o endereço de cobrança completo.')
+  if ((requireAddress || hasAddress) && (!String(address.line_1 || '').replace(/[ ,]/g,'') || !/^\d{8}$/.test(String(address.zip_code || '').replace(/-/g,'')) || !String(address.city || '').trim() || !/^[A-Z]{2}$/.test(address.state || ''))) throw new PaymentError('Informe o endereço de cobrança completo.')
   return { name, email, document, type: document.length === 11 ? 'individual' : 'company', document_type: document.length === 11 ? 'CPF' : 'CNPJ', phones: { mobile_phone: { country_code: '55', area_code: phone.slice(0,2), number: phone.slice(2) } }, ...(requireAddress || hasAddress ? { address: { country: 'BR', state: address.state, city: String(address.city).slice(0,64), zip_code: String(address.zip_code).replace(/\D/g, ''), line_1: String(address.line_1).slice(0,256), ...(address.line_2 ? { line_2: String(address.line_2).slice(0,128) } : {}) } } : {}) }
 }
 

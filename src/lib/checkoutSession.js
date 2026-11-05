@@ -1,8 +1,10 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 
+export const CHECKOUT_SESSION_MAX_AGE = 90 * 60
+
 export function signCheckoutSession(offerId, secret, now = Date.now()) {
   if (!secret || secret.length < 32) throw new Error('Sessão de checkout não configurada.')
-  const body = Buffer.from(JSON.stringify({ offerId, key: randomUUID(), expires: now + 30 * 60000 })).toString('base64url')
+  const body = Buffer.from(JSON.stringify({ offerId, key: randomUUID(), expires: now + CHECKOUT_SESSION_MAX_AGE * 1000 })).toString('base64url')
   return `${body}.${createHmac('sha256', secret).update(body).digest('base64url')}`
 }
 export function readCheckoutSession(token, offerId, secret, now = Date.now()) {
@@ -14,7 +16,7 @@ export function readCheckoutSession(token, offerId, secret, now = Date.now()) {
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return null
   try {
     const session = JSON.parse(Buffer.from(body, 'base64url').toString())
-    return session.offerId === offerId && session.expires > now && session.expires <= now + 30 * 60000 && /^[0-9a-f-]{36}$/.test(session.key) ? session : null
+    return session.offerId === offerId && session.expires > now && session.expires <= now + CHECKOUT_SESSION_MAX_AGE * 1000 && /^[0-9a-f-]{36}$/.test(session.key) ? session : null
   } catch { return null }
 }
 

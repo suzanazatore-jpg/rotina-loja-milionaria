@@ -28,18 +28,40 @@ export async function loadCheckoutOffer(slug, db = checkoutAdminClient()) {
 export function checkoutTestConfiguration(env = process.env) {
   try {
     const gateway = gatewayConfiguration(env)
-    const ready = env.CHECKOUT_TEST_ENABLED === 'true' && gateway.base.includes('sdx-api') && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
+    const ready = env.CHECKOUT_TEST_ENABLED === 'true' && gateway.mode === 'test' && env.VERCEL_ENV !== 'production' && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
     return { ready, tokenBase: gateway.base, publicKey: /^pk_test_[a-zA-Z0-9]+$/.test(env.PAGARME_PUBLIC_KEY || '') ? env.PAGARME_PUBLIC_KEY : '' }
   } catch { return { ready: false, tokenBase: 'https://sdx-api.pagar.me/core/v5', publicKey: '' } }
+}
+// A primeira compra real é restrita ao administrador e às ofertas escolhidas.
+// Não transforma uma credencial instalada em autorização para vender todo o catálogo.
+export function checkoutPaymentConfiguration(loaded, env = process.env) {
+  const disabled = { ready: false, mode: 'disabled', adminOnly: true, tokenBase: 'https://api.pagar.me/core/v5', publicKey: '' }
+  try {
+    const gateway = gatewayConfiguration(env)
+    if (gateway.mode === 'test') return { ...checkoutTestConfiguration(env), mode: 'test', adminOnly: true }
+    const allowedOffers = (env.CHECKOUT_LIVE_OFFER_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
+    const ready = env.CHECKOUT_TEST_ENABLED !== 'true'
+      && allowedOffers.includes(loaded.offer.id)
+      && Boolean(loaded.product.plan_id)
+      && loaded.product.type === 'one_time'
+      && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
+      && (env.PAGARME_WEBHOOK_SECRET?.length || 0) >= 32
+      && env.CHECKOUT_FULFILLMENT_ENABLED === 'true'
+      && env.CHECKOUT_ACCESS_LEDGER_ENABLED === 'true'
+      && (!loaded.config.contract?.required || (env.CONTRACTS_ENABLED === 'true' && (env.CONTRACT_TOKEN_SECRET?.length || 0) >= 32))
+    const publicKey = /^pk_(?:live_)?[a-zA-Z0-9]+$/.test(env.PAGARME_PUBLIC_KEY || '') ? env.PAGARME_PUBLIC_KEY : ''
+    return { ready, mode: 'live', adminOnly: true, tokenBase: gateway.base, publicKey }
+  } catch { return disabled }
 }
 export function publicCheckoutData(loaded, env = process.env) {
   const { offer, product, config, prices, bumps = [] } = loaded
   const test = checkoutTestConfiguration(env)
+  const payment = checkoutPaymentConfiguration(loaded, env)
   // Nunca enviar o registro completo: contém vínculos internos e configuração administrativa.
   return {
-    offer: { id: offer.id, name: offer.name, slug: offer.slug, price_cents: offer.price_cents, payment_methods: offer.payment_methods, default_installments: offer.default_installments || 1, billing_cycles: offer.billing_cycles || 0, billing_interval: offer.billing_interval, billing_interval_count: offer.billing_interval_count, trial_days: offer.trial_days },
-    product: { id: product.id, name: product.name, type: product.type }, config, prices, test,
-    analytics_enabled: env.VERCEL_ENV === 'production' && env.CHECKOUT_TRACKING_ENABLED === 'true' && env.PAGARME_BASE_URL === 'https://api.pagar.me/core/v5',
-    bumps: bumps.map(bump => ({ offer_id: bump.offer.id, product_id: bump.product.id, product_name: bump.product.name, offer_name: bump.offer.name, headline: bump.headline, description: bump.description, prices: prices.filter(price => bump.offer.payment_methods?.includes(price.method)).map(price => ({ method: price.method, installments: price.installments, ...quoteBump(offer, bump, price.method, price.installments) })) })),
+    offer: { id: offer.id, name: offer.name, slug: offer.slug, price_cents: offer.price_cents, payment_methods: offer.payment_methods, default_installments: offer.default_installments || 1, ...(config.express_checkout ? { monthly_interest_pct: Number(offer.monthly_interest_pct) || 0 } : {}), billing_cycles: offer.billing_cycles || 0, billing_interval: offer.billing_interval, billing_interval_count: offer.billing_interval_count, trial_days: offer.trial_days },
+    product: { id: product.id, name: product.name, type: product.type }, config, prices, test, payment,
+    analytics_enabled: payment.ready && payment.mode === 'live' && env.CHECKOUT_TRACKING_ENABLED === 'true',
+    bumps: (payment.mode === 'live' ? [] : bumps).map(bump => ({ offer_id: bump.offer.id, product_id: bump.product.id, product_name: bump.product.name, offer_name: bump.offer.name, headline: bump.headline, description: bump.description, prices: prices.filter(price => bump.offer.payment_methods?.includes(price.method)).map(price => ({ method: price.method, installments: price.installments, ...quoteBump(offer, bump, price.method, price.installments) })) })),
   }
 }

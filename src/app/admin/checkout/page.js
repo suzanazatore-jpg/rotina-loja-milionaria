@@ -7,6 +7,7 @@ import { FilterDialog, FilterSection } from './CentralUI'
 import { FormProduto } from './CheckoutForms'
 import ProductDetails from './ProductDetails'
 import ProductOffers from './ProductOffers'
+import { paymentLink } from '@/lib/checkoutLinks'
 import ProductSales from './ProductSales'
 import interior from './ProductInterior.module.css'
 import CatalogAudit from './CatalogAudit'
@@ -103,7 +104,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
       await api('PATCH', { entidade, id: item.id, active })
       if (entidade === 'produto') {
         setProdutos(current => current.map(product => product.id === item.id ? { ...product, active } : product))
-        setMensagem(active ? `✓ ${item.name}: produto visível e disponível para compra nas ofertas ativas.` : `✓ ${item.name}: produto oculto e novas compras desativadas. Para reativar, abra Filtros → Visibilidade → Ocultos.`)
+        setMensagem(active ? `✓ ${item.name}: produto disponível para compra nas ofertas ativas.` : `✓ ${item.name}: produto oculto e novas compras desativadas. Para reativar, abra Filtros → Visibilidade → Ocultos.`)
       } else {
         await carregar()
       }
@@ -119,13 +120,9 @@ export default function AdminCheckout({ initialProdutoId = null }) {
     router.push(`/admin/checkout/produtos/${encodeURIComponent(produto.id)}/ofertas/nova`)
   }
 
-  function linkCheckout(o) {
-    return `${typeof window !== 'undefined' ? window.location.origin : ''}/checkout/${o.slug}`
-  }
+  async function copiarLink(o) {try{await navigator.clipboard.writeText(paymentLink(o));setMensagem('✓ Link copiado.')}catch{setMensagem('Não foi possível copiar o link.')}}
 
-  async function copiarLink(o) {try{await navigator.clipboard.writeText(linkCheckout(o));setMensagem('✓ Link copiado.')}catch{setMensagem('Não foi possível copiar o link.')}}
-
-  const visibleProducts = produtos.filter(p => `${p.name} ${p.slug}`.toLocaleLowerCase('pt-BR').includes(busca.trim().toLocaleLowerCase('pt-BR')) && String(p.code || p.id).includes(codigo.trim()) && (statusFilter === 'all' || p.active === (statusFilter === 'active')) && (typeFilter === 'all' || p.type === typeFilter) && (marketplaceFilter === 'all' || (p.marketplace_id || 'pagarme') === marketplaceFilter)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
+  const visibleProducts = produtos.filter(p => `${p.name} ${p.slug}`.toLocaleLowerCase('pt-BR').includes(busca.trim().toLocaleLowerCase('pt-BR')) && String(p.code || p.id).includes(codigo.trim()) && (statusFilter === 'all' || Boolean(p.active && !p.catalog_hidden) === (statusFilter === 'active')) && (typeFilter === 'all' || p.type === typeFilter) && (marketplaceFilter === 'all' || (p.marketplace_id || 'pagarme') === marketplaceFilter)).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))
   async function duplicarOferta(o) {
     setSalvando(true); setMensagem('')
     try {const result=await api('POST',{entidade:'oferta',id:o.id,action:'duplicate'}); router.push(`/admin/checkout/produtos/${o.product_id}/ofertas/${result.id}`)} catch(error){setMensagem(error.message)} finally{setSalvando(false)}
@@ -143,7 +140,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
 
   return (
     <div style={{ minHeight: '100%', background: 'var(--cv-bg)', color: 'var(--cv-text)', fontFamily: 'inherit' }}>
-  <main style={{ width: '100%', margin: 0, padding: '26px 18px 60px' }}>
+  <main className={selecionado ? interior.productPage : undefined} style={{ width: '100%', margin: 0, padding: '26px 18px 60px' }}>
         {!selecionado && <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '18px', marginBottom: '22px', flexWrap: 'wrap' }}>
           <div>
 
@@ -168,16 +165,16 @@ export default function AdminCheckout({ initialProdutoId = null }) {
                 <label>Nome<input value={filterDraft.name} onChange={e=>draftField('name',e.target.value)} placeholder="Nome do produto"/></label>
                 <label>Marketplace<select value={filterDraft.marketplace} onChange={e=>draftField('marketplace',e.target.value)}><option value="all">Todos</option>{marketplaces.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select></label>
               </div></FilterSection>
-              <FilterSection title="Visibilidade"><div className={productStyles.radios}>{[['all','Todos'],['active','Visíveis'],['inactive','Ocultos']].map(([value,label])=><label key={value}><input type="radio" name="product-visibility" value={value} checked={filterDraft.visibility===value} onChange={()=>draftField('visibility',value)}/>{label}</label>)}</div><p className={productStyles.filterHint}>Produtos ocultos não permitem novas compras pelo checkout. Selecione Ocultos ou Todos para encontrá-los e reativá-los.</p></FilterSection>
+              <FilterSection title="Visibilidade"><div className={productStyles.radios}>{[['all','Todos'],['active','Visíveis'],['inactive','Ocultos']].map(([value,label])=><label key={value}><input type="radio" name="product-visibility" value={value} checked={filterDraft.visibility===value} onChange={()=>draftField('visibility',value)}/>{label}</label>)}</div><p className={productStyles.filterHint}>Ocultos inclui produtos fora da lista principal e produtos com compras desativadas. Abra o detalhe para ajustar a visibilidade.</p></FilterSection>
             </div>
           </FilterDialog>}
 
           <div className={productStyles.tableWrap}><table className={productStyles.table}><thead><tr><th>Nome</th><th>Código</th><th>Marketplace</th><th><span className={productStyles.srOnly}>Ações</span></th></tr></thead><tbody>{visibleProducts.map(p=><tr key={p.id}><td><div className={productStyles.nameWithVisibility}><label className={productStyles.visibilitySwitch} title={p.active ? 'Ocultar e desativar novas compras' : 'Reativar produto'}><input type="checkbox" role="switch" aria-label={`Disponível para compra: ${p.name}`} checked={p.active === true} disabled={salvando} onChange={()=>alternar('produto',p)}/><span className={productStyles.switchTrack} aria-hidden="true"/></label><Link className={productStyles.productName} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`}>{p.name}</Link></div></td><td>{p.code || p.id}</td><td>{nomeMarketplace(p.marketplace_id)}</td><td><div className={productStyles.actions}><Link className={productStyles.productOpen} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`} title={p.type==='subscription'?'Abrir assinatura':'Abrir produto'} aria-label={`Abrir ${p.type==='subscription'?'assinatura':'produto'} ${p.name}`}><ProductIcon kind={p.type}/></Link><button className={productStyles.duplicate} disabled={salvando} title="Duplicar produto" aria-label={`Duplicar ${p.name}`} onClick={()=>duplicarProduto(p)}><ProductIcon kind="copy"/></button></div></td></tr>)}{!visibleProducts.length && <tr><td colSpan={4}>Nenhum produto encontrado. Use Filtros → Visibilidade para consultar os ocultos.</td></tr>}</tbody></table></div>
 
         </> : <>
-          <div className={interior.topbar}><div className={interior.breadcrumb}><Link href="/admin/checkout">Produtos</Link><span>/</span><span>{selecionado.name}</span></div><details className={interior.additional}><summary>⚙ Configurações adicionais ⌄</summary><div><button onClick={()=>{setAba('detalhes');setExtraOpen(open=>!open)}}>Plano e integrações</button><Link href="/admin/checkout/configuracoes">Padrões de checkout</Link></div></details></div>
+          <div className={interior.topbar}><nav aria-label="Caminho do produto" className={interior.breadcrumb}><Link href="/admin/central-vendas">Início</Link><span>/</span><Link href="/admin/checkout">Produtos</Link><span>/</span><span>{selecionado.name}</span></nav><details className={interior.additional}><summary>⚙ Configurações adicionais ⌄</summary><div><button onClick={event=>{event.currentTarget.closest('details').open=false;setAba('detalhes');setExtraOpen(open=>!open)}}>Plano e integrações</button><Link href="/admin/checkout/configuracoes">Padrões de checkout</Link></div></details></div>
           <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhe'],['ofertas','Ofertas'],['vendas','Vendas'],['auditoria','Auditoria']].map(([key,label])=><button key={key} aria-current={aba===key?'page':undefined} onClick={()=>setAba(key)}>{label}</button>)}</nav>
-          {<div hidden={aba!=='detalhes'}><ProductDetails key={`${selecionado.id}:${selecionado.updated_at || ''}`} product={selecionado} offers={ofertas.filter(o=>o.product_id===selecionado.id)} marketplaces={marketplaces} plans={planos} token={token} onSave={salvarDetalhe} saving={salvando} advanced={extraOpen}/></div>}
+          {<div hidden={aba!=='detalhes'}><ProductDetails key={`${selecionado.id}:${selecionado.updated_at || ''}`} product={selecionado} marketplaces={marketplaces} plans={planos} token={token} onSave={salvarDetalhe} saving={salvando} advanced={extraOpen}/></div>}
           {aba==='ofertas' && <ProductOffers product={selecionado} offers={ofertas.filter(o=>o.product_id===produtoId)} onCreate={()=>novaOferta(selecionado)} onDuplicate={duplicarOferta} onToggle={o=>alternar('oferta',o)} onCopy={copiarLink} busy={salvando}/>}
           {aba==='vendas' && <ProductSales productId={selecionado.id} token={token}/>}
           {aba==='auditoria' && <CatalogAudit productId={selecionado.id} token={token}/>}

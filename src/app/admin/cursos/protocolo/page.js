@@ -108,13 +108,13 @@ export default function ProtocoloAdmin() {
     if(draft.replacement)setReplacements(current=>({...current,[lesson.id]:draft.replacement}))
     setLessons(current=>current.map((item,i)=>i===index?{...item,description:draft.orientacao,protocol_checklist:draft.acoes,protocol_notification:draft.lembrete}:item))
     setDrafts(current=>{const next={...current};delete next[lesson.id];return next})
-    setMessage('Tarefas aplicadas ao formulário. Confira os campos e clique em Salvar configurações do Protocolo para publicar.')
+    setMessage('Tarefas aplicadas ao formulário. Confira os campos e clique em Salvar configurações do Desafio para publicar.')
   }
   async function seed(){
     setBusy(true);setError('');setMessage('')
     try{
       if(lessons.length)throw new Error('Este curso já tem aulas. Configure as missões abaixo, sem criar duplicatas.')
-      const {data:module,error:moduleError}=await supabase.from('modules').insert({course_id:id,title:'Protocolo · 7 dias',sort_order:0,is_published:true}).select('id').single()
+      const {data:module,error:moduleError}=await supabase.from('modules').insert({course_id:id,title:'Desafio · 7 dias',sort_order:0,is_published:true}).select('id').single()
       if(moduleError)throw moduleError
       const payload=PROTOCOL_DAYS.map((d,index)=>({course_id:id,module_id:module.id,slug:`dia-${index+1}-protocolo`,title:d.title,description:d.description,sort_order:index,is_published:false,protocol_checklist:d.checks,protocol_notification:d.notification,duration_label:'Aula curta · 2 a 3 min'}))
       const {error:lessonError}=await supabase.from('lessons').insert(payload)
@@ -143,7 +143,7 @@ export default function ProtocoloAdmin() {
   }
   return <AdminCursosShell><div style={{maxWidth:800,margin:'0 auto',color:'#fff'}}>
     <button style={{...button,background:'#222',color:'#e6c45c',marginBottom:18}} onClick={()=>router.push(`/admin/cursos/conteudo?id=${id}`)}>← Voltar ao curso</button>
-    <p style={{color:'#d4af37',fontSize:12,letterSpacing:1,textTransform:'uppercase'}}>Produto de 7 dias</p><h1 style={{fontSize:25,margin:'4px 0'}}>{course?.title||'Configurar Protocolo'}</h1>
+    <p style={{color:'#d4af37',fontSize:12,letterSpacing:1,textTransform:'uppercase'}}>Produto de 7 dias</p><h1 style={{fontSize:25,margin:'4px 0'}}>{course?.title||'Configurar Desafio'}</h1>
     <p style={{color:'#aaa',lineHeight:1.55}}>Importe o PDF do dia para gerar as orientações, as ações e o lembrete. Para substituir um arquivo, use “Trocar PDF e atualizar tarefas”. Revise a prévia, aplique ao dia e salve para publicar o PDF e as tarefas juntos. Os vídeos ficam no editor de aulas.</p>
     {loading?<p>Carregando...</p>:<>
       {error&&<p role="alert" style={{background:'#351a1a',padding:12,borderRadius:9,color:'#ffc5c5'}}>{error}</p>}
@@ -160,7 +160,7 @@ export default function ProtocoloAdmin() {
           <strong>PDF da tarefa — Dia {index+1}</strong>
           <p style={{fontSize:12,color:'#bbb'}}>Importe o PDF para transformar o conteúdo em tarefas. A aluna também pode consultar o arquivo original.</p>
           {materials.filter(m=>m.lesson_id===lesson.id).map(m=><div key={m.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,flexWrap:'wrap',margin:'10px 0'}}><span style={{fontSize:13}}>📎 {m.title}</span><label style={{...button,fontSize:12,display:'inline-block',opacity:(!!importing||!!uploading||busy||!!drafts[lesson.id]||!!replacements[lesson.id]) ? 0.5 : 1}}>Trocar PDF e atualizar tarefas<input aria-label={`Trocar PDF: ${m.title}`} type="file" accept="application/pdf,.pdf" hidden disabled={!!importing||!!uploading||busy||!!drafts[lesson.id]||!!replacements[lesson.id]} onChange={e=>{const file=e.target.files?.[0];e.target.value='';void replaceTask(lesson,m,file)}} /></label><button style={{...button,fontSize:12}} disabled={!!importing||!!uploading||busy||!!drafts[lesson.id]||!!replacements[lesson.id]} onClick={()=>importTask(lesson,m.id)}>Gerar tarefas deste PDF</button></div>)}
-          {replacements[lesson.id]&&<p role="status" style={{color:'#e6c45c'}}>Novo PDF: {replacements[lesson.id].title}. Revise as tarefas abaixo e clique em Salvar configurações do Protocolo para concluir a troca.</p>}
+          {replacements[lesson.id]&&<p role="status" style={{color:'#e6c45c'}}>Novo PDF: {replacements[lesson.id].title}. Revise as tarefas abaixo e clique em Salvar configurações do Desafio para concluir a troca.</p>}
           <label style={{display:'block',fontSize:13}}>Adicionar outro PDF e gerar tarefas<input type="file" accept="application/pdf,.pdf" disabled={!!uploading||!!importing||busy||!!drafts[lesson.id]||!!replacements[lesson.id]} onChange={e=>{const file=e.target.files?.[0];e.target.value='';void uploadTask(lesson,index,file,true)}} style={{display:'block',marginTop:8}} /></label>
           <details style={{marginTop:12,fontSize:12}}><summary style={{cursor:'pointer'}}>Somente anexar PDF, sem gerar tarefas</summary><input type="file" accept="application/pdf,.pdf" disabled={!!uploading||!!importing||busy||!!drafts[lesson.id]||!!replacements[lesson.id]} onChange={e=>{const file=e.target.files?.[0];e.target.value='';void uploadTask(lesson,index,file)}} style={{display:'block',marginTop:8}} /></details>
           {(uploading===lesson.id||importing===lesson.id)&&<p role="status" style={{color:'#e6c45c'}}> {importing===lesson.id?'Lendo o PDF e organizando as tarefas…':'Enviando PDF…'}</p>}
@@ -170,7 +170,7 @@ export default function ProtocoloAdmin() {
         <label style={{display:'block',fontSize:13}}>Ações da tarefa (uma por linha)<textarea style={{...input,marginTop:6,minHeight:95,resize:'vertical'}} value={(lesson.protocol_checklist||[]).join('\n')} onChange={e=>editLesson(index,'protocol_checklist',e.target.value.split('\n'))} /></label>
         <label style={{display:'block',fontSize:13,marginTop:14}}>Texto do lembrete deste dia<input style={{...input,marginTop:6}} maxLength={180} value={lesson.protocol_notification||''} onChange={e=>editLesson(index,'protocol_notification',e.target.value)} /></label>
       </section>)}
-      {course&&<button style={{...button,margin:'12px 0 30px'}} disabled={busy||!!importing||!!uploading||Object.keys(drafts).length>0} onClick={save}>{busy?'Salvando...':'Salvar configurações do Protocolo'}</button>}
+      {course&&<button style={{...button,margin:'12px 0 30px'}} disabled={busy||!!importing||!!uploading||Object.keys(drafts).length>0} onClick={save}>{busy?'Salvando...':'Salvar configurações do Desafio'}</button>}
     </>}
   </div></AdminCursosShell>
 }

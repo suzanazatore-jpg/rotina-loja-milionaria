@@ -17,7 +17,7 @@ export function integrationStatus(env = process.env, tracking = {}) {
     brevo:state(env.BREVO_API_KEY,'A presença da credencial não confirma entrega. Consulte o histórico de campanhas e contratos.'),
     botconversa:{...state(whatsapp.ready && whatsapp.provider==='botconversa','O destino deve receber os eventos e acionar o fluxo de WhatsApp. Confira os recebimentos no provedor.'), ...(whatsapp.ready && whatsapp.provider==='botconversa' && !contractEnabled?{label:'Configurado · contratos pausados'}:{})},
     'papo-reto':{...state(whatsapp.ready && whatsapp.provider==='papo_reto','O adaptador permite trocar o provedor de WhatsApp. A conexão depende do receptor e da autenticação configurados no servidor.'), ...(whatsapp.ready && whatsapp.provider==='papo_reto' && !contractEnabled?{label:'Configurado · contratos pausados'}:{})},
-    pagarme:{...state(gateway,'Acompanhe a confirmação dos pagamentos e os recebimentos pelo painel de webhooks.'), ...(gateway?{label:gateway.base.includes('sdx-api')?'Configurado · teste':'Configurado · produção'}:{})},
+    pagarme:{...state(gateway,'Acompanhe a confirmação dos pagamentos e os recebimentos pelo painel de webhooks.'), ...(gateway?{label:gateway.mode === 'test'?'Configurado · teste':'Configurado · produção'}:{})},
     contracts:{...state(contractEnabled && env.CONTRACT_TOKEN_SECRET,'Os modelos e o acompanhamento estão disponíveis. A exigência de assinatura depende da ativação dos contratos e da configuração da oferta.'),label:contractEnabled?(env.CONTRACT_TOKEN_SECRET?'Contratos habilitados':'Configuração incompleta'):'Contratos pausados'},
     webhooks:{...state(true,'A disponibilidade do módulo não indica destinos ativos. Consulte os cadastros, eventos e entregas.'),label:'Gerenciador disponível'},
   }
