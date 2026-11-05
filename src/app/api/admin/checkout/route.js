@@ -259,7 +259,7 @@ export async function PATCH(request) {
       .select('active,type,plan_id,marketplace_id').eq('id',offer.product_id).maybeSingle()
     if (productError || !product) return erro('Produto não encontrado.',404)
     const restricted = Number(offer.price_cents) < 1000
-      || /^(teste|test)(?:\\b|\\s|[-_:])/i.test(offer.name || '')
+      || /^(teste|test)(?:\b|\s|[-_:])/i.test(offer.name || '')
       || offer.checkout_config?.contract?.required && !(process.env.CONTRACTS_ENABLED === 'true' && (process.env.CONTRACT_TOKEN_SECRET?.length || 0) >= 32)
     updates.checkout_config = {...(offer.checkout_config || {}),
       auto_publish: active === true && product.active === true && product.type === 'one_time'
