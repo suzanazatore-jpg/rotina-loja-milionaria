@@ -55,6 +55,7 @@ export function normalizeCheckoutSettings(input) {
   result.document_type = ['cpf','cnpj','cpf_cnpj'].includes(input.document_type)?input.document_type:'cpf_cnpj'
   result.payment_alias=String(input.payment_alias || '').trim().toLowerCase()
   if(result.payment_alias&&!/^[a-z][a-z0-9-]{1,31}$/.test(result.payment_alias))throw new Error('Use de 2 a 32 letras, números e hífens no link curto.')
+  if (input.seven_day_guarantee === true) result.seven_day_guarantee = true
   if (input.express_checkout === true) result.express_checkout = true
   result.form_profile = effectiveFormProfile(input)
   for (const key of ['company_name','company_document','company_address']) result[key] = String(input[key] ?? CHECKOUT_DEFAULTS[key]).trim().slice(0, key === 'company_address' ? 300 : 150)
