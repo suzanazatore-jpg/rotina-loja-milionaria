@@ -61,7 +61,7 @@ export function normalizeCustomer(input, { requireAddress = true } = {}) {
   const address = input?.address || {}
   if (!name || name.length > 128 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 || ![11,14].includes(document.length) || ![10,11].includes(phone.length)) throw new PaymentError('Informe nome, email, CPF/CNPJ e telefone válidos.')
   const hasAddress = Object.values(address).some(value => String(value || '').trim())
-  if ((requireAddress || hasAddress) && (!address.line_1 || !address.zip_code || !address.city || !/^[A-Z]{2}$/.test(address.state || ''))) throw new PaymentError('Informe o endereço de cobrança completo.')
+  if ((requireAddress || hasAddress) && (!String(address.line_1 || '').replace(/[ ,]/g,'') || !/^\d{8}$/.test(String(address.zip_code || '').replace(/-/g,'')) || !String(address.city || '').trim() || !/^[A-Z]{2}$/.test(address.state || ''))) throw new PaymentError('Informe o endereço de cobrança completo.')
   return { name, email, document, type: document.length === 11 ? 'individual' : 'company', document_type: document.length === 11 ? 'CPF' : 'CNPJ', phones: { mobile_phone: { country_code: '55', area_code: phone.slice(0,2), number: phone.slice(2) } }, ...(requireAddress || hasAddress ? { address: { country: 'BR', state: address.state, city: String(address.city).slice(0,64), zip_code: String(address.zip_code).replace(/\D/g, ''), line_1: String(address.line_1).slice(0,256), ...(address.line_2 ? { line_2: String(address.line_2).slice(0,128) } : {}) } } : {}) }
 }
 

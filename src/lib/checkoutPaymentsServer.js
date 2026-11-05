@@ -24,7 +24,11 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
   const product = await result(db.from('products').select('*').eq('id', offer.product_id).single())
   if ((product.marketplace_id || 'pagarme') !== 'pagarme') throw new PaymentError('Marketplace ainda não disponível para pagamentos.')
   if (!product.plan_id) throw new PaymentError('Vincule um plano do app antes de vender o produto.')
-  const customer = normalizeCustomer(input.customer, { requireAddress: input.payment_method !== 'pix' || requireAddress })
+  const contractRequired = offer.checkout_config?.contract?.required === true
+  const fullProfile = contractRequired || (offer.checkout_config?.form_profile
+    ? offer.checkout_config.form_profile !== 'compact'
+    : requireAddress)
+  const customer = normalizeCustomer(input.customer, { requireAddress: input.payment_method !== 'pix' || fullProfile })
   const billingAddress = { ...customer.address }
   for (const [field, limit] of [['street', 128], ['number', 32], ['district', 64]]) {
     const value = input.customer?.address?.[field]
@@ -52,7 +56,12 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
       if (sub) return { order_id: order.id, subscription: sub, status: order.status }
     }
   } else {
-    await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}`, billing_address: billingAddress }, { onConflict: 'email' }))
+    const buyer = {
+      email: customer.email, name: customer.name, document: customer.document,
+      phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}`,
+      ...(customer.address ? {billing_address: billingAddress} : {}),
+    }
+    await result(db.from('customers').upsert(buyer, { onConflict: 'email', defaultToNull: false }))
     const localCustomer = await result(db.from('customers').select('id').eq('email', customer.email).single())
     // A chave única no banco e a idempotência do gateway protegem tentativas concorrentes.
     const inserted = await db.from('orders').insert({ id: randomUUID(), event_id: eventId, customer_id: localCustomer.id, offer_id: offer.id, payment_method: input.payment_method, installments, ...amount }).select('*').single()
@@ -60,7 +69,7 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
     if (inserted.error) throw new PaymentError('Não foi possível registrar o pedido.', 500)
     order = inserted.data
     const contract_policy = { version: 1, offer_id: offer.id, name: offer.name, billing_interval: offer.billing_interval || null, contract: offer.checkout_config?.contract || { required: false } }
-    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items, tracking, contract_policy, gateway_base: process.env.PAGARME_BASE_URL || 'https://sdx-api.pagar.me/core/v5' }, processed_at: new Date().toISOString() }))
+    await result(db.from('webhook_events').insert({ pagarme_event_id: `request:${key}`, type: 'checkout.request', payload: { fingerprint, items, tracking, contract_policy, form_profile: fullProfile ? 'complete' : 'compact', ...(fullProfile ? { fiscal_buyer: buyer } : {}), gateway_base: process.env.PAGARME_BASE_URL || 'https://sdx-api.pagar.me/core/v5' }, processed_at: new Date().toISOString() }))
     await result(db.from('order_items').upsert(orderItemRecords(order.id, items), { onConflict: 'id', ignoreDuplicates: true }))
   }
   let gatewayCustomer = customer

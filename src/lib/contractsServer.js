@@ -121,7 +121,7 @@ export async function createContractForOrder(db, order, offer, config, deps = {}
   const template = await must(db.from('contract_templates').select('*').eq('slug', config.template).eq('active', true).maybeSingle())
   if (!template) throw new ContractError(`Modelo de contrato "${config.template}" não encontrado ou inativo.`, 409)
   const customer = await must(db.from('customers').select('*').eq('id', order.customer_id).single())
-  const fields = buildContractFields({ order, customer, offer, config })
+  const fields = buildContractFields({ order, customer: deps.purchaseBuyer || customer, offer, config })
   const { text, missing } = renderContract(template.body, fields)
   if (missing.length) throw new ContractError(`Modelo com campos não preenchidos: ${missing.join(', ')}. Revise o contrato antes de emitir.`, 409)
   const id = randomUUID()
@@ -159,10 +159,11 @@ export async function contractGate(db, order, deps = {}) {
     }
     return contractDecision(contract)
   }
-  let offer
+  let offer, purchaseBuyer
   if (purchase.event_id?.startsWith('checkout:')) {
     const snapshot = await must(db.from('webhook_events').select('payload').eq('pagarme_event_id', `request:${purchase.event_id.slice(9)}`).maybeSingle())
     const policy = snapshot?.payload?.contract_policy
+    purchaseBuyer = snapshot?.payload?.fiscal_buyer
     if (policy) {
       if (policy.version !== 1 || policy.offer_id !== purchase.offer_id || !policy.contract || typeof policy.contract.required !== 'boolean') throw new ContractError('Regra de contrato da compra inválida.', 409)
       offer = { id: purchase.offer_id, name: policy.name, billing_interval: policy.billing_interval, checkout_config: { contract: policy.contract } }
@@ -173,7 +174,7 @@ export async function contractGate(db, order, deps = {}) {
   const config = contractConfig(offer)
   if (offer.checkout_config?.contract?.required === true && !config) throw new ContractError('Oferta com contrato obrigatório sem configuração válida.', 409)
   if (!config) return { required: false }
-  ;({ contract } = await createContractForOrder(db, purchase, offer, config, deps))
+  ;({ contract } = await createContractForOrder(db, purchase, offer, config, {...deps, purchaseBuyer}))
   return contractDecision(contract)
 }
 

@@ -6,6 +6,10 @@ export default function ContractOfferSettings({ value, onChange, offer, product 
   const contract = value?.contract || { required: false }
   const recurring = product?.type === 'subscription'
   const set = patch => onChange({ ...value, contract: { gate_access: true, term_months: recurring ? 1 : 3, template: 'cvm', platform_months: 12, ...contract, ...patch } })
+  if (value?.form_profile === 'compact' && !contract.required) return <section className="central-chart-panel">
+    <h2>Contrato</h2>
+    <p>Para exigir assinatura nesta oferta, selecione o checkout Completo na aba Detalhe.</p>
+  </section>
   return <section className="central-chart-panel">
     <h2>Contrato</h2>
     <p className="central-data-note">Quando ativo, cada compra aprovada desta oferta gera o contrato com os dados do pedido (nome, CPF, endereço, valor pago, forma de pagamento e parcelas) e envia o link de assinatura por WhatsApp e e-mail.</p>

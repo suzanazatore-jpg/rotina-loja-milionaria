@@ -9,6 +9,11 @@ export const REDIRECT_LABELS = { approved: 'Aprovada', declined: 'Negada', pendi
 // Somente identidade e aparência são herdadas. Preço, entrega e redirecionamentos
 // continuam exclusivos de cada oferta. Ofertas antigas preservam seu visual.
 export const SHARED_CHECKOUT_KEYS = ['background','panel','text','accent','button_text_color','store_name','logo_url','banner_url','mobile_banner_url','favicon_url','font','layout','support_email','support_phone','terms_url','privacy_url','company_name','company_document','company_address','countdown_enabled','countdown_ends_at','countdown_message']
+// Preserve the signed-contract policy of older offers with conflicting settings.
+export function effectiveFormProfile(config = {}) {
+  return config.contract?.required === true || config.form_profile !== 'compact' ? 'complete' : 'compact'
+}
+
 export function resolveCheckoutSettings(offer = {}, global = {}) {
   const resolved = { ...offer }
   if (offer.appearance_mode === 'inherit') {
@@ -42,7 +47,7 @@ export function normalizeCheckoutSettings(input) {
   result.document_type = ['cpf','cnpj','cpf_cnpj'].includes(input.document_type)?input.document_type:'cpf_cnpj'
   result.payment_alias=String(input.payment_alias || '').trim().toLowerCase()
   if(result.payment_alias&&!/^[a-z][a-z0-9-]{1,31}$/.test(result.payment_alias))throw new Error('Use de 2 a 32 letras, números e hífens no link curto.')
-  result.form_profile = input.form_profile === 'compact' ? 'compact' : 'complete'
+  result.form_profile = effectiveFormProfile(input)
   for (const key of ['company_name','company_document','company_address']) result[key] = String(input[key] ?? CHECKOUT_DEFAULTS[key]).trim().slice(0, key === 'company_address' ? 300 : 150)
   if (result.company_document && !/^\d{14}$/.test(result.company_document.replace(/\D/g, ''))) throw new Error('Informe um CNPJ de 14 dígitos para o vendedor.')
   result.subtitle = String(input.subtitle || '').trim().slice(0,500)
@@ -85,6 +90,12 @@ export function checkoutExpired(config, now = Date.now()) {
 }
 export function validateCheckoutForm(config, input) {
   if (checkoutExpired(config)) throw new Error('O prazo desta oferta foi encerrado.')
+  if (config.form_profile === 'complete') {
+    const address = input.customer?.address || {}
+    if (!['street','number','district','city','state','zip_code'].every(key => typeof address[key] === 'string' && address[key].trim())) {
+      throw new Error('Complete o endereço para nota fiscal e contrato.')
+    }
+  }
   const digits=String(input.customer?.document || '').replace(/\D/g,'')
   if(config.document_type==='cpf'&&digits.length!==11 || config.document_type==='cnpj'&&digits.length!==14)throw new Error(config.document_type==='cpf'?'Informe um CPF válido.':'Informe um CNPJ válido.')
   if (config.confirm_email && String(input.email_confirmation || '').trim().toLowerCase() !== String(input.customer?.email || '').trim().toLowerCase()) throw new Error('Os emails não conferem.')

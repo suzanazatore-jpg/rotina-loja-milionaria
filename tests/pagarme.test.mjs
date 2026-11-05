@@ -82,7 +82,12 @@ test('paid order creation registers locally before gateway and verifies returned
     {table:'customers',data:null},
     {table:'customers',data:{id:'customer'}},
     {table:'orders',get data(){return localOrder},check(operations){localOrder=operations.find(row=>row[0]==='insert')[1]; assert.equal(localOrder.total_cents,4230)}},
-    {table:'webhook_events',data:null},
+    {table:'webhook_events',data:null,check(ops){
+      const payload=ops.find(row=>row[0]==='insert')[1].payload
+      assert.equal(payload.form_profile,'complete')
+      assert.equal(payload.fiscal_buyer.document,customer.document)
+      assert.equal(payload.fiscal_buyer.billing_address.city,'Natal')
+    }},
     {table:'order_items',data:null},
     {table:'orders',data:[{id:'saved'}],check(operations){assert.equal(operations.find(row=>row[0]==='update')[1].status,'paid');assert.deepEqual(operations.find(row=>row[0]==='is'),['is','pagarme_order_id',null])}},
   ]
@@ -188,8 +193,13 @@ test('compact Pix sends a valid address-free customer to the gateway and preserv
  const customer={name:'Ana',email:'ana@example.com',document:'12345678901',phone:'84981236393'}
  let localOrder
  const steps=[{table:'offers',data:{...offer,product_id:'product'}},{table:'products',data:{...product,plan_id:'plan-local'}},{table:'orders',data:null},
- {table:'customers',data:null},{table:'customers',data:{id:'customer'}},{table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
- {table:'webhook_events',data:null},{table:'order_items',data:null},{table:'orders',data:[{id:'saved'}]}]
+ {table:'customers',data:null,check(ops){assert.ok(!('billing_address' in ops.find(row=>row[0]==='upsert')[1]))}},{table:'customers',data:{id:'customer'}},{table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1]}},
+ {table:'webhook_events',data:null,check(ops){
+   const payload=ops.find(row=>row[0]==='insert')[1].payload
+   assert.equal(payload.form_profile,'compact')
+   assert.equal(payload.fiscal_buyer,undefined)
+   assert.equal(payload.contract_policy.contract.required,false)
+ }},{table:'order_items',data:null},{table:'orders',data:[{id:'saved'}]}]
  const original=globalThis.fetch
  globalThis.fetch=async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.customer.address,undefined);assert.equal(body.payments[0].amount,4230);return Response.json({id:'or_compact',code:localOrder.id,amount:4230,customer:{email:customer.email},charges:[{id:'ch_compact',status:'pending'}]})}
  try{const result=await createPayment(scriptedDatabase(steps),{offer_id:'offer',customer,payment_method:'pix'},'compact-pix-123456',null,{requireAddress:false});assert.equal(result.status,'waiting_payment');assert.equal(steps.length,0)}finally{globalThis.fetch=original;delete process.env.PAGARME_SECRET_KEY}
