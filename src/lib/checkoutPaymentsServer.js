@@ -76,7 +76,7 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
       await result(db.from('customers').update({ pagarme_customer_id: customerId }).eq('id', local.id))
     }
     // Carteira do gateway aceita o token com endereço; PAN e CVV nunca chegam aqui.
-    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, billing_address: billingAddress } })
+    const walletCard = await pagarme(`/customers/${customerId}/cards`, { method: 'POST', idempotencyKey: `card-${order.id}`, body: { token: card.card_token, ...(customer.address ? { billing_address: billingAddress } : {}) } })
     gatewayCard = { card_id: walletCard.id }
     gatewayCustomer = { id: customerId }
   }
