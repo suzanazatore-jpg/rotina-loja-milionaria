@@ -68,8 +68,17 @@ export async function POST(request){
    if(input.dry_run!==false)return respond({ok:true,dry_run:true,preview})
    if(process.env.CHECKOUT_SALES_TEST_ENABLED!=='true')return respond({error:'O teste real ainda está bloqueado no servidor.'},409)
    if(!saleDeliveryReady()[recipient.channel])return respond({error:'Canal sem configuração de envio.'},409)
-   const result=await sendSaleNotification(recipient,preview)
-   return respond({ok:true,result})
+   const {data:entry,error:insertError}=await db.from('checkout_notification_deliveries').insert({recipient_id:recipient.id,order_id:null,event_type:'test',status:'sending',attempts:1}).select('id').single()
+   if(insertError)throw insertError
+   try{
+    const result=await sendSaleNotification(recipient,{...preview,delivery_id:entry.id})
+    const saved=await db.from('checkout_notification_deliveries').update({status:'sent',provider_message_id:result.provider_message_id||null,sent_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',entry.id)
+    if(saved.error)throw saved.error
+    return respond({ok:true,result})
+   }catch(error){
+    await db.from('checkout_notification_deliveries').update({status:'failed',error_message:String(error.message||'send_failed').slice(0,120),updated_at:new Date().toISOString()}).eq('id',entry.id)
+    return respond({error:'O serviço não confirmou o envio. Consulte o histórico.'},502)
+   }
   }
   return respond({error:'Ação desconhecida.'},400)
  }catch(error){
