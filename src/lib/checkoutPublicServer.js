@@ -63,7 +63,7 @@ export function publicCheckoutData(loaded, env = process.env) {
   const payment = checkoutPaymentConfiguration(loaded, env)
   // Nunca enviar o registro completo: contém vínculos internos e configuração administrativa.
   return {
-    offer: { id: offer.id, name: offer.name, slug: offer.slug, price_cents: offer.price_cents, payment_methods: offer.payment_methods, default_installments: offer.default_installments || 1, billing_cycles: offer.billing_cycles || 0, billing_interval: offer.billing_interval, billing_interval_count: offer.billing_interval_count, trial_days: offer.trial_days },
+    offer: { id: offer.id, name: offer.name, slug: offer.slug, price_cents: offer.price_cents, payment_methods: offer.payment_methods, default_installments: offer.default_installments || 1, monthly_interest_pct: Number(offer.monthly_interest_pct) || 0, billing_cycles: offer.billing_cycles || 0, billing_interval: offer.billing_interval, billing_interval_count: offer.billing_interval_count, trial_days: offer.trial_days },
     product: { id: product.id, name: product.name, type: product.type }, config, prices, test, payment,
     analytics_enabled: payment.ready && payment.mode === 'live' && env.CHECKOUT_TRACKING_ENABLED === 'true',
     bumps: (payment.mode === 'live' ? [] : bumps).map(bump => ({ offer_id: bump.offer.id, product_id: bump.product.id, product_name: bump.product.name, offer_name: bump.offer.name, headline: bump.headline, description: bump.description, prices: prices.filter(price => bump.offer.payment_methods?.includes(price.method)).map(price => ({ method: price.method, installments: price.installments, ...quoteBump(offer, bump, price.method, price.installments) })) })),
