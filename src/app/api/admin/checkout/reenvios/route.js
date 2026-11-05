@@ -81,7 +81,7 @@ export async function POST(request) {
       queued.push({webhook_id:webhookId,id:inserted.id,already_queued:false})
     }
     await checked(db.from('webhook_events').insert({pagarme_event_id:`manual-webhook:${randomUUID()}`,type:'checkout.webhook.manual',payload:{order_id:orderId,webhook_ids:ids,delivery_ids:queued.map(q=>q.id)},processed_at:new Date().toISOString()}))
-    after(async()=>{try{await processOutboundWebhooks(db)}catch{console.error('checkout manual webhook: fila pendente')}})
+    after(async()=>{try{await processOutboundWebhooks(db,{deliveryIds:queued.map(q=>q.id)})}catch{console.error('checkout manual webhook: fila pendente')}})
     return json({ok:true,queued})
   } catch {return json({error:'Não foi possível preparar o reenvio. Nenhuma confirmação de entrega foi registrada.'},500)}
 }
