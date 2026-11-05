@@ -42,7 +42,7 @@ export function checkoutPaymentConfiguration(loaded, env = process.env) {
     const allowedOffers = (env.CHECKOUT_LIVE_OFFER_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
     const ready = env.CHECKOUT_TEST_ENABLED !== 'true'
       && allowedOffers.includes(loaded.offer.id)
-      && Boolean(loaded.product.plan_id)
+      && (Boolean(loaded.product.plan_id) || (loaded.product.type === 'one_time' && (env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').map(id => id.trim()).includes(loaded.offer.id)))
       && loaded.product.type === 'one_time'
       && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
       && (env.PAGARME_WEBHOOK_SECRET?.length || 0) >= 32
