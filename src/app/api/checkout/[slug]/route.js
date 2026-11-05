@@ -30,7 +30,7 @@ async function checkout(request, context) {
   return { db, loaded, store, name, session, slug }
 }
 async function readStatus(db, loaded, session) {
-  const { data: order, error } = await db.from('orders').select('id,event_id,paid_at,status,total_cents,payment_method,installments,pix_qr_code,pix_expires_at').eq('event_id', `checkout:${session.key}`).eq('offer_id', loaded.offer.id).maybeSingle()
+  const { data: order, error } = await db.from('orders').select('id,event_id,paid_at,status,total_cents,payment_method,installments,pix_qr_code,pix_expires_at,pagarme_order_id,pagarme_charge_id,refusal_reason,created_at').eq('event_id', `checkout:${session.key}`).eq('offer_id', loaded.offer.id).maybeSingle()
   if (error) throw new PaymentError('Não foi possível consultar o pagamento.', 503)
   if (!order) return { status: 'not_started' }
   let purchase = null
@@ -54,7 +54,8 @@ async function readStatus(db, loaded, session) {
     if (stored.error) throw new PaymentError('Não foi possível consultar a próxima etapa da compra.', 503)
     progress = contractCheckoutStatus(stored.data, data?.payload?.contract_policy?.contract || loaded.config.contract, stored.data ? signingUrl(stored.data.id) : null)
   }
-  return { purchase, fulfillment, reservation: !loaded.product.plan_id && (process.env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').map(id => id.trim()).includes(loaded.offer.id), status: order.status, contract_required: progress.contract_required, contract: progress.contract, total_cents: order.total_cents, payment_method: order.payment_method, installments: order.installments, pix_code: order.pix_qr_code, pix_expires_at: order.pix_expires_at, redirect_url: progress.blocked || (order.status === 'paid' && fulfillment !== 'completed') ? null : safeCheckoutRedirect(loaded.config, order.status, order.payment_method) }
+  const unresolvedGateway = order.status === 'pending' && !order.pagarme_order_id && new Date(order.created_at).getTime() < Date.now() - 60000
+  return { gateway_recorded: Boolean(order.pagarme_order_id), processing_incomplete: unresolvedGateway, processing_note: unresolvedGateway ? (order.refusal_reason || 'Não foi possível confirmar a criação da cobrança no Pagar.me. Nenhuma recusa bancária foi comprovada. Consulte o suporte antes de uma nova tentativa.') : null, purchase, fulfillment, reservation: !loaded.product.plan_id && (process.env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').map(id => id.trim()).includes(loaded.offer.id), status: order.status, contract_required: progress.contract_required, contract: progress.contract, total_cents: order.total_cents, payment_method: order.payment_method, installments: order.installments, pix_code: order.pix_qr_code, pix_expires_at: order.pix_expires_at, redirect_url: progress.blocked || (order.status === 'paid' && fulfillment !== 'completed') ? null : safeCheckoutRedirect(loaded.config, order.status, order.payment_method) }
 }
 export async function GET(request, context) {
   try {
