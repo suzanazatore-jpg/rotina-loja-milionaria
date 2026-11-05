@@ -13,8 +13,6 @@
 .heading h2 { margin:0!important; }
 .heading span { font-size:12px;border-radius:20px;background:var(--cv-field);color:var(--cv-link);padding:5px 12px; }
 .imageTip { padding:14px 16px;border-radius:10px;background:color-mix(in srgb,#f39a42 14%,var(--cv-panel)); }
-.imageControls { max-width:380px;margin:20px auto; }
-.imageControls summary { color:var(--cv-link);cursor:pointer;text-align:center;padding:8px; }
 .dialog { margin:auto;width:min(380px,94vw);padding:24px;text-align:center;color:var(--cv-text);background:var(--cv-panel);border:1px solid var(--cv-border);border-radius:16px; }
 .dialog::backdrop { background:#0007; }
 .dialog img { display:block;width:min(264px,100%);height:auto;margin:auto;image-rendering:pixelated; }

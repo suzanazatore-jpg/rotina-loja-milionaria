@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import CheckoutSettingsEditor,{CheckoutImageField} from './CheckoutSettingsEditor'
-import Image from 'next/image'
 import {paymentLink,offerPath} from '@/lib/checkoutLinks'
 import OfferPaymentLinks from './OfferPaymentLinks'
 import ProductSales from './ProductSales'
@@ -138,11 +137,8 @@ export default function OfferEditor({produtoId,ofertaId}) {
         <aside className="central-chart-panel central-offer-image">
           <header className={detailStyles.heading}><h2>Imagem</h2></header>
           <p className={detailStyles.imageTip}>ⓘ　Tamanho ideal 1024 × 1024 (quadrada)</p>
-          {(dados.checkout_config.product_image_url || product.image_url) && <Image unoptimized width={180} height={180} className="cv-offer-product-image" src={dados.checkout_config.product_image_url || product.image_url} alt="Imagem da oferta"/>}
-          <details className={detailStyles.imageControls}><summary>Selecionar ou ajustar imagem</summary>
-            <CheckoutImageField label="Imagem da oferta" value={dados.checkout_config.product_image_url || product.image_url || ''} onChange={url=>setDados({...dados,checkout_config:{...dados.checkout_config,product_image_url:url}})} style={{width:'100%'}}/>
-            {dados.checkout_config.product_image_url && <button type="button" className="central-action" onClick={()=>setDados({...dados,checkout_config:{...dados.checkout_config,product_image_url:''}})}>Remover imagem da oferta</button>}
-          </details>
+          <CheckoutImageField picture label="Imagem da oferta" value={dados.checkout_config.product_image_url} fallbackUrl={product.image_url}
+            onChange={url=>setDados(current=>({...current,checkout_config:{...current.checkout_config,product_image_url:url}}))} />
         </aside>
       </div>
       <section hidden={tab!=='bumps'} className="central-chart-panel"><div className="central-section-heading"><h2>Order Bump</h2><button type="button" className="central-action" onClick={()=>setAddOpen(!addOpen)}>＋ Adicionar oferta</button></div><p className="central-data-note">Escolha os adicionais e a ordem em que aparecem. Salve a oferta para aplicar as alterações.</p>
