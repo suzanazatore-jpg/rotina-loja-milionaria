@@ -42,3 +42,50 @@
 .srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-width:800px){.detailCard{grid-template-columns:1fr}.imagePanel{border-left:0;border-top:1px solid var(--cv-border)}.imagePanel .imageTip{max-width:320px}.detailFields,.panel{padding:20px}.fieldGrid{gap:20px}.breadcrumb{max-width:100%;flex-wrap:wrap}.additional{margin-left:0}.topbar{align-items:start}.imagePanel .note{text-align:center}}
 @media(max-width:480px){.fieldGrid{grid-template-columns:1fr}.wide{grid-column:auto}.panel,.detailFields{padding:16px}.sectionTitle{font-size:16px}.sectionHeading{gap:10px}}
+
+/* Product detail, including the two-column workspace on wide screens. */
+.productPage { max-width: 1590px; margin-inline: auto !important; }
+.productPage .topbar { display: grid; gap: 17px; margin-bottom: 6px; }
+.productPage .breadcrumb { justify-self: start; font-size: 12px; padding: 5px 10px; }
+.productPage .additional { justify-self: end; margin: 0; }
+.productPage .additional summary { color: var(--cv-link); border-color: currentColor; padding: 8px 16px; }
+.productPage .detailCard { border: 0; border-radius: 16px; }
+.detailCard .detailFields { padding: 24px clamp(18px, 2vw, 34px) 24px 24px; }
+.detailCard .imagePanel { padding: 24px 24px 24px clamp(18px, 2vw, 34px); }
+.titleRow { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.titleRow .sectionTitle { margin: 0 !important; line-height: 1.15; }
+.titleRow .sectionTitle:before { margin-bottom: 8px; }
+.help { position: relative; align-self: flex-end; font-size: 11px; color: var(--cv-link); }
+.help summary { cursor: pointer; list-style: none; }
+.help summary::-webkit-details-marker { display: none; }
+.help div { position: absolute; top: 100%; left: -50px; width: min(260px, 68vw); padding: 12px; z-index: 2; border: 1px solid var(--cv-border); border-radius: 8px; background: var(--cv-panel); color: var(--cv-text); line-height: 1.5; box-shadow: 0 4px 16px #0002; }
+.edition { margin-left: auto; border-radius: 18px; padding: 6px 14px; background: var(--cv-field); color: var(--cv-link); font-size: 13px; }
+.detailCard .fieldGrid { gap: 19px clamp(24px, 4vw, 70px); }
+.detailCard .fieldGrid label { gap: 3px; }
+.detailCard .fieldGrid input:not([type=checkbox]), .detailCard .fieldGrid select { min-height: 28px; margin: 0; padding: 3px 0 6px; }
+.validField { position: relative; display: block; }
+.validField span { position: absolute; right: 4px; top: 2px; color: var(--cv-success, #44825b); pointer-events: none; }
+.detailCard .validField input { padding-right: 26px!important; }
+.detailCard .validField input:valid { border-color: var(--cv-success, #558360); }
+.groupField { padding-top: 13px; }
+.groupField select:disabled { opacity: .55; cursor: default; }
+.switches { grid-column: 1/-1; display: grid; gap: 12px; justify-items: start; }
+.detailCard .switch { display: flex; align-items: center; gap: 9px; color: var(--cv-text); cursor: pointer; min-height: 24px; }
+.detailCard .switch input { width: 30px; height: 17px; min-height: 0; margin: 0; padding: 0; }
+.detailCard .switch input:after { width: 13px; height: 13px; }
+.detailCard .switch input:checked:after { transform: translateX(13px); }
+.detailCard .switch input:focus-visible { outline: 2px solid var(--cv-link); outline-offset: 3px; }
+.dateLabel { font-size: 14px; color: var(--cv-link); }
+.detailCard .date { margin: 3px 0 0; padding-bottom: 7px; font-size: 14px; }
+.detailCard .saveRow { margin-top: 22px; }
+.saveRow button { min-width: 104px; }
+.detailCard .imageTip { display: flex; align-items: center; gap: 10px; background: color-mix(in srgb, #e99242 14%, var(--cv-panel)); color: var(--cv-text); padding: 14px 16px; margin: 0 0 16px; border-radius: 10px; font-size: 14px; }
+.imageTip span { color: #b77a29; }
+.detailCard .productImage, .detailCard .imagePlaceholder { max-width: 180px; border-radius: 26px; }
+.imagePlaceholder svg { opacity: .55; }
+.detailCard .imageActions { margin-top: 32px; }
+.offerUrl { display: block; font-size: 12px; overflow-wrap: anywhere; color: var(--cv-link); margin-top: 5px; }
+@media(max-width:800px) {
+  .detailCard .detailFields,.detailCard .imagePanel { padding: 20px; }
+  .detailCard .imagePanel .imageTip { max-width: none; }
+}

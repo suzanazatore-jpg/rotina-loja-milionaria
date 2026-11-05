@@ -48,6 +48,8 @@ async function montarProduto(supabase,dados) {
   if (code !== undefined && (!Number.isSafeInteger(code) || code < 1000000000 || code > 9999999999)) throw new Error('O código deve ter 10 dígitos.')
   return {
     ...(code !== undefined ? { code } : {}),
+    ...(typeof dados.catalog_hidden === 'boolean' && { catalog_hidden: dados.catalog_hidden }),
+    ...(typeof dados.tracking_eligible === 'boolean' && { tracking_eligible: dados.tracking_eligible }),
     name: nome,
     marketplace_id: marketplace,
     image_url: image,
