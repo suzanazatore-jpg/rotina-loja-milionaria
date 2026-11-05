@@ -19,7 +19,7 @@ test('blocks nonpublic DNS results before creating a connection',async()=>{
 function db(steps){return {from(table){const ops=[];const q=new Proxy({}, {get(_target,key){if(key==='then')return(resolve,reject)=>{try{const step=steps.shift();assert.ok(step,`Unexpected ${table}`);assert.equal(step.table,table);step.check?.(ops);resolve({data:step.data,error:step.error})}catch(e){reject(e)}};return(...args)=>{ops.push([key,...args]);return q}}});return q}}}
 const row={id:'delivery',webhook_id:'hook',status:'pending',attempts:0,payload:{environment:'test'}}
 const hook={url:'https://example.com',secret:'secret',active:true}
-const env={CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED:'true',CHECKOUT_OUTBOUND_TEST_ENABLED:'true',VERCEL_ENV:'preview',PAGARME_BASE_URL:'https://sdx-api.pagar.me/core/v5'}
+const env={CHECKOUT_OUTBOUND_NOT_BEFORE:'1970-01-01T00:00:00.000Z',CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED:'true',CHECKOUT_OUTBOUND_TEST_ENABLED:'true',VERCEL_ENV:'preview',PAGARME_BASE_URL:'https://sdx-api.pagar.me/core/v5'}
 test('paused workers never query or send',async()=>assert.equal((await processOutboundWebhooks(db([]),{env:{}})).disabled,true))
 test('test events cannot reach production and inactive destinations are skipped',async()=>{
  for(const [destination,settings] of [[hook,{...env,VERCEL_ENV:'production'}],[{...hook,active:false},env]]){

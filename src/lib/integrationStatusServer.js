@@ -10,7 +10,7 @@ export function integrationStatus(env = process.env, tracking = {}) {
   try { gateway = gatewayConfiguration(env) } catch { /* preserve gateway's existing activation rules */ }
   const contractEnabled = env.CONTRACTS_ENABLED === 'true'
   return {
-    meta:state(env.META_ADS_ACCESS_TOKEN || tracking.meta_pixel_id, env.META_ADS_ACCESS_TOKEN?'Há credencial para relatórios. Consulte as contas e atualize os dados para verificar a conexão.':'O Pixel pode ser cadastrado no rastreamento. A leitura de anúncios depende de conexão própria.'),
+    meta:{...state(env.META_ADS_ACCESS_TOKEN || tracking.meta_pixel_id,'Consulte os eventos, o token do servidor e as confirmações de recebimento pela Meta.'),label:tracking.meta_pixel_id && !env.META_CAPI_ACCESS_TOKEN?'Pixel cadastrado · token pendente':tracking.meta_pixel_id?'Pixel cadastrado':'Pixel pendente'},
     'google-tag-manager':state(tracking.gtm_id, tracking.gtm_id?'Contêiner global cadastrado. O disparo depende do consentimento e das regras do checkout.':'Cadastre o contêiner global ou personalize o rastreamento por oferta.'),
     members:{...state(true,'A entrega usa os planos vinculados aos produtos.'),label:env.CHECKOUT_FULFILLMENT_ENABLED==='true'?'Liberação habilitada':'Liberação automática pausada'},
     pabbly:state(env.PABBLY_CAMPANHA_WEBHOOK_URL,'O endereço da automação é configurado no servidor. Acompanhe os resultados no histórico das campanhas.'),

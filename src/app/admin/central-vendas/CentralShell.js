@@ -28,10 +28,14 @@ const menu = [
 export default function CentralShell({ children }) {
   const pathname = usePathname()
   const router = useRouter()
-  const theme = useSyncExternalStore(subscribe, snapshot, () => 'preto')
+  const saleDetail = /^\/admin\/checkout\/vendas\/[^/]+\/?$/.test(pathname)
+  const [saleTheme,setSaleTheme] = useState('claro')
+  const globalTheme = useSyncExternalStore(subscribe, snapshot, () => 'preto')
   const [access, setAccess] = useState('loading')
   const [menuOpen, setMenuOpen] = useState(false)
-  const [collapsed, setCollapsed] = useState(false)
+  const [menuToggled,setMenuToggled] = useState(false)
+  const collapsed = saleDetail ? !menuToggled : menuToggled
+  const theme = saleDetail ? saleTheme : globalTheme
   useEffect(() => {
     let active = true
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -42,11 +46,12 @@ export default function CentralShell({ children }) {
     return () => { active = false }
   }, [router])
   function changeTheme(value) {
+    if(saleDetail){setSaleTheme(value);return}
     window.localStorage.setItem(THEME_KEY, value)
     window.dispatchEvent(new Event('sz-central-theme'))
   }
   const title = pathname.startsWith('/admin/checkout/configuracoes/') ? 'Configurações' : pathname.startsWith('/admin/checkout/produtos/') ? 'Produtos' : menu.find(([, href]) => href === pathname)?.[0] || 'Central de Vendas'
-  return <div className={`central ${inter.variable} ${urbanist.variable} ${collapsed ? 'central-collapsed' : ''}`} data-theme={theme}>
+  return <div className={`central ${saleDetail ? 'central-sale' : ''} ${inter.variable} ${urbanist.variable} ${collapsed ? 'central-collapsed' : ''}`} data-theme={theme}>
     <aside className={`central-sidebar ${menuOpen ? 'is-open' : ''}`}>
       <Link href="/admin/central-vendas" className="central-brand" onClick={() => setMenuOpen(false)}><span className="central-monogram">SZ</span><span>Central de Vendas<small>Suzana Zatorre</small></span></Link>
       <p className="central-nav-caption">GESTÃO COMERCIAL</p>
@@ -55,7 +60,7 @@ export default function CentralShell({ children }) {
       <div className="central-sidebar-footer">Seu negócio. Sua central.</div>
     </aside>
     <div className="central-workspace">
-      <header className="central-topbar"><div className="central-topbar-title"><button className="central-menu-button" onClick={() => { setCollapsed(!collapsed); setMenuOpen(!menuOpen) }} aria-expanded={!collapsed} aria-label="Expandir ou recolher menu da Central de Vendas">☰</button><div><span className="central-eyebrow">CENTRAL DE VENDAS</span><p>{title}</p></div></div><div className="central-theme" role="group" aria-label="Tema da Central de Vendas">{['claro', 'preto'].map(value => <button key={value} aria-pressed={theme === value} onClick={() => changeTheme(value)}>{value === 'claro' ? '☀ Claro' : '◐ Preto'}</button>)}</div></header>
+      <header className="central-topbar"><div className="central-topbar-title"><button className="central-menu-button" onClick={() => { setMenuToggled(!menuToggled); setMenuOpen(!menuOpen) }} aria-expanded={!collapsed} aria-label="Expandir ou recolher menu da Central de Vendas">☰</button><div>{!saleDetail && <span className="central-eyebrow">CENTRAL DE VENDAS</span>}<p>{saleDetail?'Suzana Zatorre Educacional Ltda':title}</p></div></div><div className="central-theme" role="group" aria-label="Tema da Central de Vendas">{['claro', 'preto'].map(value => <button key={value} aria-pressed={theme === value} onClick={() => changeTheme(value)}>{value === 'claro' ? '☀ Claro' : '◐ Preto'}</button>)}</div></header>
       <div className="central-body">{access === 'allowed' ? children : <div className="central-access" role="status">{access === 'loading' ? 'Carregando sua central…' : 'Acesso restrito ao administrador.'}</div>}</div>
     </div>
   </div>

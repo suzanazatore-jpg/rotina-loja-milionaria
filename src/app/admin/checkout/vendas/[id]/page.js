@@ -1,2 +1,6 @@
-import RecordDetail from '../../RecordDetail'
-export default async function Page({params}){const {id}=await params;return <RecordDetail entity="vendas" id={id}/>}
+import SaleDetail from './SaleDetail'
+export default async function Page({ params, searchParams }) {
+  return (
+    <SaleDetail key={(await params).id} id={(await params).id} initialTab={(await searchParams).tab} />
+  )
+}

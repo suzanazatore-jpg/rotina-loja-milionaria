@@ -20,7 +20,7 @@ export function ecommercePayload(cart) {
 export function dispatchAnalytics(target, config, event, cart, key) {
   try {
   const destination = trackingDestination(config)
-  if (destination.channel === 'off' || !['page_view','view_item','begin_checkout','purchase'].includes(event)) return false
+  if (destination.channel === 'off' || !['page_view','view_item','add_to_cart','begin_checkout','add_payment_info','start_trial','purchase'].includes(event)) return false
   const ecommerce = event === 'page_view' ? null : ecommercePayload(cart)
   if (event !== 'page_view' && !ecommerce) return false
   if (event === 'purchase' && (!cart?.transaction_id || !cart?.event_id)) return false
@@ -36,7 +36,7 @@ export function dispatchAnalytics(target, config, event, cart, key) {
     target.dataLayer.push({ event, ...(ecommerce ? { ecommerce } : {}), ...(cart?.event_id ? { event_id: cart.event_id } : {}) })
   } else {
     if (typeof target.fbq !== 'function') return false
-    const name = { page_view:'PageView',view_item:'ViewContent',begin_checkout:'InitiateCheckout',purchase:'Purchase' }[event]
+    const name = { page_view:'PageView',view_item:'ViewContent',add_to_cart:'AddToCart',begin_checkout:'InitiateCheckout',add_payment_info:'AddPaymentInfo',start_trial:'StartTrial',purchase:'Purchase' }[event]
     const params = ecommerce ? { currency:'BRL',value:ecommerce.value,content_type:'product',content_ids:ecommerce.items.map(item=>item.item_id),contents:ecommerce.items.map(item=>({id:item.item_id,quantity:1,item_price:item.price})),num_items:ecommerce.items.length } : {}
     target.fbq('trackSingle', destination.id, name, params, ...(cart?.event_id ? [{ eventID: cart.event_id }] : []))
   }

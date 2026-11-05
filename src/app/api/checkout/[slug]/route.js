@@ -1,3 +1,6 @@
+import { conversionConfiguration } from '@/lib/checkoutConversionsServer'
+import { deliverFunnelEvent, funnelEvent } from '@/lib/checkoutMetaFunnelServer'
+import { websiteIdentifiers } from '@/lib/checkoutMetaVisit'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
@@ -87,12 +90,21 @@ export async function POST(request, context) {
       const {error} = await db.from('webhook_events').upsert({pagarme_event_id:`checkout-form:${session.key}`,type:'checkout.form.accepted',payload:{offer_id:loaded.offer.id,terms_url:loaded.config.terms_url,privacy_url:loaded.config.privacy_url,terms_accepted:input.terms_accepted===true,privacy_accepted:input.privacy_accepted===true},processed_at:new Date().toISOString()},{onConflict:'pagarme_event_id',ignoreDuplicates:true})
       if(error) throw new PaymentError('Não foi possível registrar o aceite. Tente novamente.',503)
     }
-    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, input.marketing_consent === true ? { consent: true, gateway_base: process.env.PAGARME_BASE_URL, pixel_id: loaded.config.meta_pixel_id, source_url: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}` } : null, { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
+    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, input.marketing_consent === true ? { consent: true, identifiers: websiteIdentifiers(request), gateway_base: process.env.PAGARME_BASE_URL, pixel_id: loaded.config.meta_pixel_id, source_url: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}` } : null, { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
     if (payment.status === 'paid') {
       // O pagamento já ocorreu. Uma falha de entrega não pode sugerir nova cobrança.
       try { await fulfillPaidOrder(db, payment.order_id) } catch { /* O webhook e a conciliação administrativa podem repetir a entrega. */ }
       await deliverPaidConversion(db, payment.order_id)
     }
-    return response(await readStatus(db, loaded, session))
+    const status = await readStatus(db, loaded, session)
+    if (payment.trial_started && input.marketing_consent === true) {
+      status.trial_event_id = 'trial:' + payment.order_id
+      const config = conversionConfiguration(loaded.config.meta_pixel_id)
+      if (config) {
+        const event = funnelEvent('StartTrial', status.trial_event_id, new URL(request.url).origin + '/checkout/' + encodeURIComponent(slug), websiteIdentifiers(request), loaded.product, session.key)
+        try { await deliverFunnelEvent(db, config, loaded.config.meta_pixel_id, event) } catch { /* Delivery status is independent of the subscription. */ }
+      }
+    }
+    return response(status)
   } catch (error) { return response({ error: error instanceof PaymentError ? error.message : 'Não foi possível processar o checkout.' }, error.status || 500) }
 }
