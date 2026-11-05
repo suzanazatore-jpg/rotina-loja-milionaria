@@ -177,12 +177,16 @@ function publicationStatus(offer, product, globalConfig = {}) {
   if (product.type !== 'one_time') return { status: 'blocked', reason: 'Assinaturas exigem validação do ciclo recorrente.' }
   if (!product.plan_id && !(process.env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').includes(offer.id))
     return { status: 'blocked', reason: 'Associe um plano de acesso ao produto.' }
-  const config = resolveCheckoutSettings(offer.checkout_config || {}, globalConfig)
-  const payment = checkoutPaymentConfiguration({ offer, product, config })
-  if (!payment.ready) return { status: 'blocked', reason: 'Pagamento ainda não habilitado para esta oferta. Revise os requisitos de publicação.' }
-  return payment.adminOnly
-    ? { status: 'admin_only', reason: 'Disponível apenas para a conta administrativa.' }
-    : { status: 'public', reason: 'Link pronto para receber pagamentos.' }
+  try {
+    const config = resolveCheckoutSettings(offer.checkout_config || {}, globalConfig)
+    const payment = checkoutPaymentConfiguration({ offer, product, config })
+    if (!payment.ready) return { status: 'blocked', reason: 'Pagamento ainda não habilitado para esta oferta. Revise os requisitos de publicação.' }
+    return payment.adminOnly
+      ? { status: 'admin_only', reason: 'Disponível apenas para a conta administrativa.' }
+      : { status: 'public', reason: 'Link pronto para receber pagamentos.' }
+  } catch {
+    return { status: 'blocked', reason: 'Configuração do checkout inválida. Revise a oferta antes de publicar.' }
+  }
 }
 
 function traduzirErro(mensagem) {
