@@ -35,7 +35,10 @@ export async function sendWebhook(urlValue, payload, secret, deliveryId, resolve
 export async function processOutboundWebhooks(db, { sender = sendWebhook, env = process.env, now = Date.now() } = {}) {
   if (env.CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED !== 'true') return { disabled: true, sent: 0 }
   const mode = env.VERCEL_ENV === 'production' ? 'live' : 'test'
-  const result = await db.from('webhook_deliveries').select('id,webhook_id,status,attempts,payload,outbound_webhooks!inner(active)').eq('outbound_webhooks.active', true).eq('payload->>environment', mode).in('status', ['pending', 'retry']).lte('next_attempt_at', new Date(now).toISOString()).order('next_attempt_at').limit(3)
+  // A abertura da fila não dispara mensagens de vendas antigas: elas permanecem para revisão manual.
+  const cutoff = env.CHECKOUT_OUTBOUND_NOT_BEFORE
+  if (!cutoff || Number.isNaN(Date.parse(cutoff))) return { disabled: true, reason: 'cutoff_not_configured', sent: 0 }
+  const result = await db.from('webhook_deliveries').select('id,webhook_id,status,attempts,payload,outbound_webhooks!inner(active)').eq('outbound_webhooks.active', true).eq('payload->>environment', mode).gte('created_at', new Date(cutoff).toISOString()).in('status', ['pending', 'retry']).lte('next_attempt_at', new Date(now).toISOString()).order('next_attempt_at').limit(3)
   if (result.error) throw new Error('outbound_queue_unavailable')
   let sent = 0
   for (const row of result.data || []) {
