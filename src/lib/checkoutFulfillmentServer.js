@@ -55,6 +55,22 @@ export async function fulfillPaidOrder(db, orderId) {
   if (process.env.CHECKOUT_FULFILLMENT_ENABLED !== 'true') return { fulfillment: 'disabled' }
   const order = await checked(db.from('orders').select('*').eq('id', orderId).single())
   if (order.status !== 'paid' || !order.paid_at) return { fulfillment: 'waiting_payment' }
+  // Reserva é sinal de pagamento, não matrícula ou concessão de plano no aplicativo.
+  const reservationOfferIds = (process.env.CHECKOUT_RESERVATION_OFFER_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
+  if (reservationOfferIds.includes(order.offer_id)) {
+    const { data: offer, error: offerError } = await db.from('offers').select('product_id').eq('id', order.offer_id).single()
+    if (offerError) throw new PaymentError('Não foi possível validar a reserva.', 503)
+    const { data: product, error: productError } = await db.from('products').select('plan_id,type').eq('id', offer.product_id).single()
+    if (productError || product?.plan_id || product?.type !== 'one_time') throw new PaymentError('Reserva não corresponde a um sinal sem acesso.', 409)
+    const marker = `reservation:${order.id}`
+    const { error: saveError } = await db.from('webhook_events').upsert({
+      pagarme_event_id: marker, type: 'checkout.reservation',
+      payload: { order_id: order.id, offer_id: order.offer_id, status: 'paid', no_app_access: true },
+      processed_at: new Date().toISOString(), error: null
+    }, { onConflict: 'pagarme_event_id', ignoreDuplicates: true })
+    if (saveError) throw new PaymentError('Não foi possível registrar a reserva paga.', 503)
+    return { fulfillment: 'completed', reservation: true }
+  }
   // Ofertas com contrato: o acesso só é liberado depois da assinatura (o próprio fluxo de assinatura chama esta função).
   if (process.env.CONTRACTS_ENABLED === 'true') {
     const { contractGate } = await import('./contractsServer.js')
