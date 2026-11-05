@@ -1,0 +1,29 @@
+name: Validar auditoria e reenvio
+on:
+  push:
+    branches:
+      - fix/guru-auditoria-reenvio-20261105
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test tests/checkout-outbound.test.mjs tests/checkout-webhook.test.mjs
+      - run: npx eslint src/app/admin/checkout/RecordDetail.js src/app/admin/checkout/AuditPanel.js src/app/api/admin/checkout/reenvios/route.js src/lib/checkoutOutboundServer.js
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+          NEXT_PUBLIC_SUPABASE_URL: 'https://build-placeholder.supabase.co'
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: 'build-only-not-a-real-key'
+          SUPABASE_SERVICE_ROLE_KEY: 'build-only-not-a-real-secret'
