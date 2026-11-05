@@ -38,7 +38,11 @@ export async function processOutboundWebhooks(db, { sender = sendWebhook, env = 
   // A abertura da fila não dispara mensagens de vendas antigas: elas permanecem para revisão manual.
   const cutoff = env.CHECKOUT_OUTBOUND_NOT_BEFORE
   if (!cutoff || Number.isNaN(Date.parse(cutoff))) return { disabled: true, reason: 'cutoff_not_configured', sent: 0 }
-  const result = await db.from('webhook_deliveries').select('id,webhook_id,status,attempts,payload,outbound_webhooks!inner(active)').eq('outbound_webhooks.active', true).eq('payload->>environment', mode).gte('created_at', new Date(cutoff).toISOString()).in('status', ['pending', 'retry']).lte('next_attempt_at', new Date(now).toISOString()).order('next_attempt_at').limit(3)
+  const replayId = /^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(env.CHECKOUT_OUTBOUND_REPLAY_DELIVERY_ID || '') ? env.CHECKOUT_OUTBOUND_REPLAY_DELIVERY_ID : null
+  let query = db.from('webhook_deliveries').select('id,webhook_id,status,attempts,payload,outbound_webhooks!inner(active)').eq('outbound_webhooks.active', true).eq('payload->>environment', mode).in('status', ['pending', 'retry']).lte('next_attempt_at', new Date(now).toISOString())
+  // Exceção explícita para uma entrega antiga autorizada, sem reabrir a fila histórica.
+  query = replayId ? query.or(`created_at.gte.${new Date(cutoff).toISOString()},id.eq.${replayId}`) : query.gte('created_at', new Date(cutoff).toISOString())
+  const result = await query.order('next_attempt_at').limit(3)
   if (result.error) throw new Error('outbound_queue_unavailable')
   let sent = 0
   for (const row of result.data || []) {
