@@ -67,7 +67,8 @@ test('webhook HTTP failure remains unprocessed; retry completes and duplicate ne
  globalThis.__checkoutWebhook={db,state}
  let route=readFileSync(new URL('../src/app/api/webhook-pagarme/route.js',import.meta.url),'utf8')
  route=route.replace("import { reverseOrderAccess } from '@/lib/checkoutAccessServer'",'const reverseOrderAccess = async () => ({})')
- route=route.replace("import { NextResponse } from 'next/server'",'const NextResponse = Response')
+ route=route.replace("import { NextResponse, after } from 'next/server'",'const NextResponse = Response; const after = () => {}')
+ route=route.replace("import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'",'const processOutboundWebhooks = async () => {}')
  route=route.replace("import { checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const checkoutAdminClient = () => globalThis.__checkoutWebhook.db')
  route=route.replace("import { reconcileSubscriptionCharge } from '@/lib/checkoutPaymentsServer'",'const reconcileSubscriptionCharge = () => {}')
  route=route.replace("import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'",'const fulfillPaidOrder = async () => { globalThis.__checkoutWebhook.state.grants++ }')

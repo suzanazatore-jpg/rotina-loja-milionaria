@@ -16,7 +16,7 @@ export function conversionEvent(order, snapshot, customer, now = Date.now()) {
   if (!purchase || snapshot?.tracking?.consent !== true || !Number.isFinite(time) || time > now / 1000 || time < now / 1000 - 7 * 86400) return null
   const email = String(customer?.email || '').trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null
-  return { event_name: 'Purchase', event_id: purchase.event_id, event_time: time, action_source: 'website', event_source_url: snapshot.tracking.source_url, user_data: { em: [hash(email)] }, custom_data: { currency: 'BRL', value: purchase.total_cents / 100, order_id: order.id, content_type: 'product', content_ids: purchase.items.map(item => item.item_id), contents: purchase.items.map(item => ({ id: item.item_id, quantity: 1, item_price: item.price_cents / 100 })) } }
+  return { event_name: 'Purchase', event_id: purchase.event_id, event_time: time, action_source: 'website', event_source_url: snapshot.tracking.source_url, user_data: { ...snapshot.tracking.identifiers, em: [hash(email)] }, custom_data: { currency: 'BRL', value: purchase.total_cents / 100, order_id: order.id, content_type: 'product', content_ids: purchase.items.map(item => item.item_id), contents: purchase.items.map(item => ({ id: item.item_id, quantity: 1, item_price: item.price_cents / 100 })) } }
 }
 export async function sendConversion(config, pixelId, event, fetcher = fetch) {
   const response = await fetcher(`https://graph.facebook.com/${config.version}/${pixelId}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: config.token, data: [event], ...(config.testCode ? { test_event_code: config.testCode } : {}) }), signal: AbortSignal.timeout(10000) })
@@ -34,13 +34,18 @@ export async function deliverPaidConversion(db, orderId) {
     const snapshot = saved.data?.payload
     const pixelId = snapshot?.tracking?.pixel_id
     const config = conversionConfiguration(pixelId)
-    if (!config || snapshot.tracking.consent !== true || snapshot.tracking.gateway_base !== process.env.PAGARME_BASE_URL) return { status: 'disabled' }
+    if (!pixelId || pixelId !== process.env.META_CAPI_PIXEL_ID || snapshot.tracking.consent !== true || snapshot.tracking.gateway_base !== process.env.PAGARME_BASE_URL) return { status: 'disabled' }
+    // Keep eligible live approvals in the retry queue while the token is being installed.
+    const awaitingToken = !process.env.META_CAPI_ACCESS_TOKEN && process.env.CHECKOUT_CAPI_ENABLED === 'true'
+      && process.env.VERCEL_ENV === 'production' && snapshot.tracking.gateway_base === 'https://api.pagar.me/core/v5'
+    if (!config && !awaitingToken) return { status: 'disabled' }
+    const inserted = await db.from('webhook_events').upsert({ pagarme_event_id: marker, type: 'checkout.capi', payload: { order_id: order.id, pixel_id: pixelId, event_id: `purchase:${order.id}`, mode: config?.testCode ? 'test' : 'live' }, error: 'retry' }, { onConflict: 'pagarme_event_id', ignoreDuplicates: true })
+    if (inserted.error) return { status: 'pending' }
+    if (!config) return { status: 'pending' }
     const customer = await db.from('customers').select('email').eq('id', order.customer_id).single()
     if (customer.error) return { status: 'pending' }
     const event = conversionEvent(order, snapshot, customer.data)
     if (!event) return { status: 'skipped' }
-    const inserted = await db.from('webhook_events').upsert({ pagarme_event_id: marker, type: 'checkout.capi', payload: { order_id: order.id, pixel_id: pixelId, event_id: event.event_id, mode: config.testCode ? 'test' : 'live' }, error: 'retry' }, { onConflict: 'pagarme_event_id', ignoreDuplicates: true })
-    if (inserted.error) return { status: 'pending' }
     const claimed = await db.from('webhook_events').update({ error: 'processing' }).eq('pagarme_event_id', marker).eq('error', 'retry').is('processed_at', null).select('id,payload')
     if (claimed.error || !claimed.data?.length) return { status: 'recorded' }
     const payload = claimed.data[0].payload || {}

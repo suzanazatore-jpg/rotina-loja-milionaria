@@ -1,6 +1,6 @@
 'use client'
 import Script from 'next/script'
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { trackingDestination, dispatchAnalytics } from '@/lib/checkoutAnalytics'
 const CONSENT_KEY='sz-checkout-consent-v2'
 function subscribe(callback) {
@@ -43,31 +43,48 @@ function setup(config) {
   return true
   }catch{return false}
 }
-export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,started,purchase}) {
+export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,started,paying,purchase,visit,endpoint,trialId}) {
+  const browserVisit = useRef(null)
+  const posted = useRef(new Set())
   const consent=useSyncExternalStore(subscribe,snapshot,()=> 'unknown')
   const destination=trackingDestination(config)
-  const allowed=enabled && consent==='granted' && destination.channel!=='off'
-  useEffect(()=>{updateConsent(allowed)},[allowed])
+  const browserAllowed = enabled && !visit?.test
+  const allowed=(browserAllowed || visit?.test) && consent==='granted' && destination.channel!=='off'
+  useEffect(()=>{updateConsent(Boolean(browserAllowed && allowed))},[browserAllowed,allowed])
   useEffect(()=>{
-    if(!allowed)return
+    if(!allowed || !browserAllowed)return
     if(!setup(config))return
     dispatchAnalytics(window,config,'page_view',null,`page:${viewCart.items[0].item_id}`)
     dispatchAnalytics(window,config,'view_item',viewCart,`view:${viewCart.items[0].item_id}`)
-  },[allowed,config,viewCart])
+  },[allowed,browserAllowed,config,viewCart])
   useEffect(()=>{
-    if(!allowed || !started)return
-    if(!setup(config))return
-    dispatchAnalytics(window,config,'begin_checkout',currentCart,`begin:${viewCart.items[0].item_id}`)
-  },[allowed,started,config,currentCart,viewCart])
+    if (!allowed || (browserAllowed && !setup(config))) return
+    browserVisit.current ||= crypto.randomUUID()
+    const stages = [
+      ['add_to_cart','AddToCart',true,viewCart],
+      ['begin_checkout','InitiateCheckout',started,currentCart],
+      ['add_payment_info','AddPaymentInfo',paying,currentCart],
+    ]
+    for (const [action,name,reached,cart] of stages) {
+      if (!reached) continue
+      const id = name + ':' + (visit?.id || browserVisit.current)
+      if (browserAllowed) dispatchAnalytics(window, config, action, { ...cart, event_id: id }, id)
+      if (visit && !posted.current.has(id)) {
+        posted.current.add(id)
+        fetch(endpoint + '/eventos', { method:'POST', keepalive:true, headers:{'Content-Type':'application/json'}, body:JSON.stringify({ consent:true, event:name, ticket:visit.ticket }) }).catch(()=>{})
+      }
+    }
+    if (browserAllowed && trialId) dispatchAnalytics(window,config,'start_trial',{...currentCart,event_id:trialId},trialId)
+  },[allowed,browserAllowed,config,viewCart,currentCart,started,paying,trialId,visit,endpoint])
   useEffect(()=>{
-    if(!allowed || !purchase)return
+    if(!allowed || !browserAllowed || !purchase)return
     if(!setup(config))return
     dispatchAnalytics(window,config,'purchase',purchase,purchase.event_id)
-  },[allowed,config,purchase])
-  if(!enabled || destination.channel==='off')return null
+  },[allowed,browserAllowed,config,purchase])
+  if((!enabled && !visit?.test) || destination.channel==='off')return null
   return <>
-    {allowed && (destination.channel==='gtm' ? <Script id={`sz-gtm-${destination.id}`} src={`https://www.googletagmanager.com/gtm.js?id=${destination.id}`} strategy="afterInteractive"/> : <Script id="sz-meta-sdk" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive"/>)}
-    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir análise e publicidade? Usaremos cookies e enviaremos dados da compra e um identificador derivado do seu email à Meta para medir campanhas.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
+    {allowed && browserAllowed && (destination.channel==='gtm' ? <Script id={`sz-gtm-${destination.id}`} src={`https://www.googletagmanager.com/gtm.js?id=${destination.id}`} strategy="afterInteractive"/> : <Script id="sz-meta-sdk" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive"/>)}
+    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir análise e publicidade? Usaremos cookies e enviaremos as etapas do checkout, dados da compra e identificadores do navegador e do email à Meta para medir campanhas.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
     {consent!=='unknown' && <button type="button" className="pc-cookie-settings" onClick={()=>choose('unknown')}>Preferências de cookies</button>}
   </>
 }

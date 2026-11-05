@@ -1,3 +1,4 @@
+import { metaVisit } from '@/lib/checkoutMetaVisit'
 import { notFound } from 'next/navigation'
 import { loadCheckoutOffer, publicCheckoutData } from '@/lib/checkoutPublicServer'
 import PublicCheckout from './PublicCheckout'
@@ -8,5 +9,5 @@ export default async function Page({ params }) {
   const { slug } = await params
   const loaded = await loadCheckoutOffer(slug)
   if (!loaded) notFound()
-  return <PublicCheckout data={publicCheckoutData(loaded)} />
+  return <PublicCheckout data={publicCheckoutData(loaded)} metaVisit={metaVisit(loaded)} />
 }
