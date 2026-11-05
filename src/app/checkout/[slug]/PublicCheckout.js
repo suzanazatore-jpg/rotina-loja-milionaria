@@ -30,7 +30,7 @@ function PaymentSymbol({ method }) {
 }
 function Asset({ src, alt, className = '' }) { return <Image unoptimized src={src} alt={alt} width={800} height={400} className={className} /> }
 
-export default function PublicCheckout({ data }) {
+export default function PublicCheckout({ data, metaVisit }) {
   const { offer, product, config, prices, payment: test, bumps = [] } = data
   const title = offerDisplayName(config,offer,product)
   const focused = config.layout === 'focused'
@@ -51,7 +51,17 @@ export default function PublicCheckout({ data }) {
   const [attemptStarted, setAttemptStarted] = useState(false)
   const pendingRequest = useRef(null)
   const form = useRef(null)
+  const [contactReady, setContactReady] = useState(false)
+  const [paying, setPaying] = useState(false)
+  function readContact() {
+    const fields = form.current?.elements
+    return ['name','email','phone'].every(key => {
+      const field = fields?.namedItem(key)
+      return field?.value.trim() && field.validity.valid
+    })
+  }
   function refreshValidity() {
+    if (readContact()) setContactReady(true)
     if (express && form.current) setFormValid(!form.current.querySelector(':invalid'))
   }
   useEffect(() => {
@@ -122,6 +132,8 @@ export default function PublicCheckout({ data }) {
     submitting.current = true; setBusy(true); setError('')
     try {
       if(!method)throw new Error('Escolha cartão de crédito ou Pix para continuar.')
+      if (readContact()) setContactReady(true)
+      setPaying(true)
       const { data: { session } } = await supabase.auth.getSession()
       const headers = { 'Content-Type': 'application/json', ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) }
       const start = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify({ action: 'start' }) })
@@ -158,7 +170,7 @@ export default function PublicCheckout({ data }) {
   const color = { '--cp-bg': config.background, '--cp-panel': config.panel, '--cp-text': config.text, '--cp-accent': config.accent, '--cp-button-text': config.button_text_color, fontFamily: config.layout==='guru'?'var(--checkout-inter), Inter, Arial, sans-serif':config.font }
   return <main className={`pc-checkout ${inter.variable}`} style={color}>
     <CheckoutCountdown config={config} onExpire={setCountdownExpired} />
-    <CheckoutAnalytics config={config} enabled={data.analytics_enabled} viewCart={viewCart} currentCart={analyticsCart} started={attemptStarted} purchase={result?.purchase} />
+    <CheckoutAnalytics config={config} enabled={data.analytics_enabled} viewCart={viewCart} currentCart={analyticsCart} started={contactReady} paying={paying} visit={metaVisit} endpoint={endpoint} trialId={result?.trial_event_id} purchase={result?.purchase} />
     <div className={`cp-page ${express ? 'express-checkout' : ''} ${config.layout === 'focused' ? 'focused' : config.layout === 'stacked' ? 'stacked' : config.layout === 'guru' ? 'guru' : config.layout === 'banner' ? 'banner' : ''}`}>
       {focused && <div className="cp-hero"><p>{config.store_name}</p><h1>{config.headline || title}{config.headline_highlight && <span>{config.headline_highlight}</span>}</h1></div>}
       {config.layout === 'banner' && config.headline && <div className="cp-model-headline">{config.headline}{config.headline_highlight && <span>{config.headline_highlight}</span>}</div>}

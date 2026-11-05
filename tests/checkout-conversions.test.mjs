@@ -128,3 +128,18 @@ test('scheduler stays within 100 jobs and each conversion expression runs once d
  assert.equal(jobs.length,48);assert.equal(new Set(jobs.map(job=>job.schedule)).size,48)
  for(const job of jobs)assert.match(job.schedule,/^(15|45) ([0-9]|1[0-9]|2[0-3]) \* \* \*$/)
 })
+
+test('approved and consented purchase waits for a missing token without sending anything',async()=>{
+ const old=Object.fromEntries(Object.keys(env).map(key=>[key,process.env[key]]))
+ Object.assign(process.env,env)
+ delete process.env.META_CAPI_ACCESS_TOKEN
+ try {
+   const db=database()
+   assert.equal((await deliverPaidConversion(db,'order')).status,'pending')
+   assert.equal(db.tables.webhook_events.find(row=>row.type==='checkout.capi').error,'retry')
+   const refused=database()
+   refused.tables.webhook_events[0].payload.tracking.consent=false
+   await deliverPaidConversion(refused,'order')
+   assert.equal(refused.tables.webhook_events.length,1)
+ } finally {for(const [key,value] of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+})
