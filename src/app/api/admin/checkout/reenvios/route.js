@@ -30,6 +30,14 @@ export async function GET(request) {
     if (!UUID.test(orderId)) return json({error:'Venda inválida.'},400)
     const record = await sale(db,orderId)
     if (!record) return json({error:'Venda não encontrada.'},404)
+    const requestedDelivery = url.searchParams.get('delivery_id')
+    if (requestedDelivery) {
+      if (!UUID.test(requestedDelivery)) return json({error:'Envio inválido.'},400)
+      const delivery = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,created_at,delivered_at,payload').eq('id',requestedDelivery).eq('order_id',orderId).maybeSingle())
+      if (!delivery) return json({error:'Envio não encontrado.'},404)
+      const hook = await checked(db.from('outbound_webhooks').select('name').eq('id',delivery.webhook_id).maybeSingle())
+      return json({delivery,webhook_name:hook?.name || 'Integração removida'})
+    }
     const hooks = await hooksFor(db,record.products)
     const deliveries = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,created_at,delivered_at,next_attempt_at,payload').eq('order_id',orderId).order('created_at',{ascending:false}).limit(150))
     // A URL e os segredos do destino jamais são enviados ao navegador.
