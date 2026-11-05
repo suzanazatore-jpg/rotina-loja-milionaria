@@ -44,7 +44,7 @@ export default function PublicCheckout({ data }) {
   const { offer, product, config, prices, payment: test, bumps = [] } = data
   const focused = config.layout === 'focused'
   const SummaryHeading = focused ? 'h2' : 'h1'
-  const initialMethod = config.layout==='guru'&&new Set(prices.map(p=>p.method)).size>1?null:focused && prices.some(price => price.method === 'credit_card') ? 'credit_card' : prices[0]?.method || 'pix'
+  const initialMethod = test.ready && !test.adminOnly && prices.some(price => price.method === 'pix') ? 'pix' : config.layout==='guru'&&new Set(prices.map(p=>p.method)).size>1?null:focused && prices.some(price => price.method === 'credit_card') ? 'credit_card' : prices[0]?.method || 'pix'
   const [method, setMethod] = useState(initialMethod)
   const [installments, setInstallments] = useState(initialMethod === 'credit_card' ? offer.default_installments || 1 : 1)
   const [selectedBumps, setSelectedBumps] = useState([])
@@ -155,7 +155,7 @@ export default function PublicCheckout({ data }) {
       {focused && <div className="cp-hero"><p>{config.store_name}</p><h1>{config.headline || config.product_display_name || product.name}{config.headline_highlight && <span>{config.headline_highlight}</span>}</h1></div>}
       {config.layout === 'banner' && config.headline && <div className="cp-model-headline">{config.headline}{config.headline_highlight && <span>{config.headline_highlight}</span>}</div>}
     <header className="cp-header"><div className="cp-brand">{config.logo_url ? <Asset src={config.logo_url} alt={config.store_name} className="cp-logo" /> : <span className="cp-brand-mark">SZ</span>}<strong>{config.store_name}</strong></div><span className="cp-security">Pagamento protegido</span></header>
-      {!focused && <div className="pc-notice" role="status">{test.ready ? test.mode === 'live' ? 'Compra real de validação — disponível somente para o administrador.' : 'Ambiente de teste — disponível somente para o administrador.' : 'Checkout em preparação. Pagamentos ainda não disponíveis.'}</div>}
+      {!focused && (!test.ready || test.adminOnly) && <div className="pc-notice" role="status">{!test.ready ? 'Checkout em preparação. Pagamentos ainda não disponíveis.' : test.mode === 'live' ? 'Compra real de validação — disponível somente para o administrador.' : 'Ambiente de teste — disponível somente para o administrador.'}</div>}
       {config.banner_url && <div className={`cp-banner ${config.mobile_banner_url ? 'pc-desktop-banner' : ''}`}><Asset src={config.banner_url} alt="Oferta" /></div>}
       {config.mobile_banner_url && <div className="cp-banner pc-mobile-banner"><Asset src={config.mobile_banner_url} alt="Oferta" /></div>}
       <div className="cp-columns">
