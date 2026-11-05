@@ -33,3 +33,11 @@ Aplicação compartilhada em todas as rotas /admin/checkout/vendas/[id], não li
 Confirmado por consulta de metadados: a venda de referência foi criada na API real; a prévia usa sandbox e tem liberação/envios pausados. O módulo reconhece ambiente pelo snapshot original e bloqueia ações externas cruzadas antes de registrar/disparar operações. A interface orienta abrir a venda no domínio real em vez de consultar o sandbox com um código real. Nenhuma credencial foi copiada de produção para a prévia; nenhum flag de envio foi ativado.
 
 Build completo aprovado. 14 testes de histórico e detalhes aprovados, incluindo distinção fila/entrega/falha, origem/destino e ambientes. Sem envios ou operações financeiras durante a validação.
+
+## Simplificação do reenvio na mesma tela
+
+Substitui a exigência de navegação ao domínio real para reenviar Webhooks: o servidor da tela utiliza os handlers administrativos autenticados do mesmo aplicativo no domínio fixo de produção. Somente dados da venda solicitada e destinos elegíveis vinculados a ela são usados; a confirmação permanece no botão Enviar da própria janela. A chave de produção não é copiada para a prévia, os workers locais permanecem pausados e nenhum envio é disparado no carregamento. Consultas de adquirente também podem usar a operação somente leitura existente. Não há alterações no cadastro ou layout do cliente.
+
+Na janela nativa de produção, todos os destinos elegíveis já iniciam selecionados. A escolha individual passa a ficar recolhida em “Escolher destinos (opcional)”, sem mudar o cadastro da integração ou as escolhas dos próximos reenvios.
+
+15 testes de histórico, validação, destino e delegação autenticada aprovados; build da prévia aprovado. Nenhum envio real executado para QA.
