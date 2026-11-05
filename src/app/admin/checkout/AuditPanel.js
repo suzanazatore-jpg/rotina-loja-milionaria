@@ -7,10 +7,11 @@ async function auth(){const {data:{session}}=await supabase.auth.getSession();re
 const kind = e => e.kind==='webhook'?'webhook':/falha|recusad|erro|contest/i.test(e.title)?'error':/facebook/i.test(e.title)?'facebook':/pagamento|cobrança|pedido/i.test(e.title)?'payment':'event'
 const symbols={webhook:'↗',error:'!',facebook:'f',payment:'✓',event:'◷'}
 const statuses={pending:'Na fila',processing:'Processando',retry:'Nova tentativa',failed:'Falhou',delivered:'Enviado'}
-export default function AuditPanel({orderId,events=[]}){
+export default function AuditPanel({orderId,events=[],openRequest=0}){
  const [hooks,setHooks]=useState([]),[deliveries,setDeliveries]=useState([]),[enabled,setEnabled]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(''),[notice,setNotice]=useState(''),[modal,setModal]=useState(false),[selected,setSelected]=useState([]),[busy,setBusy]=useState(false),[filter,setFilter]=useState('all'),[expanded,setExpanded]=useState(null),[detail,setDetail]=useState(null)
  async function reload(){try{const response=await fetch(`/api/admin/checkout/reenvios?order_id=${encodeURIComponent(orderId)}`,{headers:await auth(),cache:'no-store'}),json=await response.json();if(!response.ok)throw Error(json.error);setHooks(json.hooks || []);setDeliveries(json.deliveries || []);setEnabled(json.enabled)}catch(e){setError(e.message)}finally{setLoading(false)}}
  useEffect(()=>{reload()},[orderId])
+ useEffect(()=>{if(openRequest>0){setSelected([]);setModal(true)}},[openRequest])
  async function reveal(id){if(expanded===id){setExpanded(null);setDetail(null);return}setExpanded(id);setDetail(null);try{const response=await fetch(`/api/admin/checkout/reenvios?order_id=${encodeURIComponent(orderId)}&delivery_id=${encodeURIComponent(id)}`,{headers:await auth(),cache:'no-store'}),data=await response.json();if(!response.ok)throw Error(data.error);setDetail(data)}catch(e){setDetail({error:e.message})}}
  async function submit(e){e.preventDefault();if(!selected.length)return;setBusy(true);setError('');setNotice('');try{const response=await fetch('/api/admin/checkout/reenvios',{method:'POST',headers:await auth(),body:JSON.stringify({order_id:orderId,webhook_ids:selected})}),data=await response.json();if(!response.ok)throw Error(data.error);setModal(false);setSelected([]);setNotice(`${data.queued.length} webhook(s) colocado(s) na fila. Acompanhe o resultado abaixo.`);await reload()}catch(e){setError(e.message)}finally{setBusy(false)}}
  const labels=new Map(hooks.map(h=>[h.id,h.name]))
