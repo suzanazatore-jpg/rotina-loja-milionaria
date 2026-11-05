@@ -33,7 +33,7 @@ export async function GET(request) {
     const requestedDelivery = url.searchParams.get('delivery_id')
     if (requestedDelivery) {
       if (!UUID.test(requestedDelivery)) return json({error:'Envio inválido.'},400)
-      const delivery = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,created_at,delivered_at,payload').eq('id',requestedDelivery).eq('order_id',orderId).maybeSingle())
+      const delivery = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,response_body,created_at,delivered_at,payload').eq('id',requestedDelivery).eq('order_id',orderId).maybeSingle())
       if (!delivery) return json({error:'Envio não encontrado.'},404)
       const hook = await checked(db.from('outbound_webhooks').select('name').eq('id',delivery.webhook_id).maybeSingle())
       return json({delivery,webhook_name:hook?.name || 'Integração removida'})
