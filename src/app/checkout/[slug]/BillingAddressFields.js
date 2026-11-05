@@ -9,6 +9,8 @@ const addressFields = [
 export default function BillingAddressFields({compact, progressive = false, postalOnly = false}) {
   const [zip,setZip] = useState('')
   const [address,setAddress] = useState({})
+  const [number,setNumber] = useState('')
+  const [complement,setComplement] = useState('')
   const [notice,setNotice] = useState('')
   const [looking,setLooking] = useState(false)
   const [expanded,setExpanded] = useState(!compact)
@@ -46,7 +48,7 @@ export default function BillingAddressFields({compact, progressive = false, post
     setNotice('')
     if (value.replace(/\D/g,'') !== zip.replace(/\D/g,'')) setAddress({})
     setZip(value)
-    if (progressive && !postalOnly && value.replace(/\D/g,'').length === 8) lookup(value)
+    if (progressive && value.replace(/\D/g,'').length === 8) lookup(value)
   }
   function changeAddress(key,value) {
     request.current++
@@ -60,7 +62,7 @@ export default function BillingAddressFields({compact, progressive = false, post
       <label className="cp-field"><span>CEP *</span><input placeholder="00000-000" name="zip_code" autoComplete="postal-code" inputMode="numeric" pattern="[0-9]{5}-?[0-9]{3}" maxLength={9} required value={zip} onChange={e=>changeZip(e.target.value)}/></label>
       {!progressive && <div><button type="button" className="pc-secondary" disabled={looking} onClick={()=>lookup()}>{looking?'Buscando…':'Buscar endereço pelo CEP'}</button></div>}
       {!postalOnly && notice && <p className="cp-field wide" role="status">{notice}</p>}
-      {showAddress && <label className="cp-field"><span>Número (ou s/n) *</span><input name="address_number" required maxLength={32}/></label>}
+      {showAddress && <label className="cp-field"><span>Número (ou s/n) *</span><input name="address_number" value={number} onChange={e=>setNumber(e.target.value)} required maxLength={32}/></label>}
     </div>
     {showAddress && <details open={expanded} onToggle={event=>setExpanded(event.currentTarget.open)} onInvalidCapture={()=>setExpanded(true)}>
       <summary>{compact && address.street && !expanded ? [address.street,address.district,address.city,address.state].filter(Boolean).join(' · ') + ' — Editar' : 'Preencher ou editar endereço'}</summary>
@@ -68,7 +70,7 @@ export default function BillingAddressFields({compact, progressive = false, post
       {addressFields.map(([key,label,autoComplete,maxLength])=><label className={'cp-field'+(key==='street'?' wide':'')} key={key}>
         <span>{label} *</span><input name={key} autoComplete={autoComplete} maxLength={maxLength} required pattern={key==='state'?'[A-Za-z]{2}':undefined} value={address[key] || ''} onChange={e=>changeAddress(key,e.target.value)}/>
       </label>)}
-      <label className="cp-field wide"><span>Complemento (opcional)</span><input name="line_2" autoComplete="address-line2" maxLength={128}/></label>
+      <label className="cp-field wide"><span>Complemento (opcional)</span><input name="line_2" value={complement} onChange={e=>setComplement(e.target.value)} autoComplete="address-line2" maxLength={128}/></label>
       </div>
     </details>}
   </section>

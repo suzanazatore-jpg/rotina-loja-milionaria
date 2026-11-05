@@ -17,7 +17,10 @@
 .pc-checkout .express-checkout .cp-field:has(input:not(:placeholder-shown)) > span { transform:translateY(-19px) scale(.78); color:#6554cb; }
 .pc-checkout .express-checkout .cp-field:has(.pc-phone-control) > span { left:64px; }
 .cp-page.express-checkout .pc-country-prefix { min-width:56px; font:26px/1 system-ui; }
-.cp-page.express-checkout .pc-country-prefix::after { content:'⌄'; font:13px/1 Arial; margin-left:6px; color:#777; }
+.cp-page.express-checkout .pc-country-prefix svg { vertical-align:middle; }
+.cp-page.express-checkout .express-country { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:5px; background:#eee; }
+.express-country svg { width:20px; }
+.express-country select { color:#383c3e; background:transparent; border:0; font-family:inherit; font-size:13px; }
 .cp-page.express-checkout .cp-field input:focus { border-bottom:2px solid #6554cb; }
 .cp-page.express-checkout .pc-address { margin:24px 0 0; }
 .cp-page.express-checkout .pc-address input[name=zip_code] { max-width:172px; }
