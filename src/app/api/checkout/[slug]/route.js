@@ -76,6 +76,23 @@ export async function POST(request, context) {
     const paymentConfig = checkoutPaymentConfiguration(loaded)
     if (!paymentConfig.ready) throw new PaymentError('Checkout em preparação. Pagamentos ainda não disponíveis.', 503)
     if (paymentConfig.adminOnly && !(await autorizarAdmin(request, db))) throw new PaymentError(paymentConfig.mode === 'live' ? 'Compra de validação: entre com a conta administrativa para continuar.' : 'Este checkout está em teste administrativo.', 401)
+    if (input.action === 'restart_test') {
+      // Reinicia só a sessão de ofertas de validação e apenas após a compra anterior
+      // estar confirmada. O histórico financeiro e os acessos não são alterados.
+      const testIds = (process.env.CHECKOUT_ADMIN_TEST_OFFER_IDS || '').split(',').map(v => v.trim()).filter(Boolean)
+      if (!testIds.includes(loaded.offer.id) || !session) throw new PaymentError('Nova sessão de teste não autorizada.', 403)
+      const { data: previous, error: previousError } = await db.from('orders')
+        .select('id,status,pagarme_order_id').eq('event_id', `checkout:${session.key}`)
+        .eq('offer_id', loaded.offer.id).maybeSingle()
+      if (previousError) throw new PaymentError('Não foi possível validar a compra anterior.', 503)
+      if (!previous || previous.status !== 'paid' || !previous.pagarme_order_id)
+        throw new PaymentError('A compra anterior ainda não está confirmada. Consulte o pagamento antes de iniciar outro teste.', 409)
+      store.set(name, signCheckoutSession(loaded.offer.id, secret()), {
+        httpOnly: true, secure: new URL(request.url).protocol === 'https:',
+        sameSite: 'strict', path: `/api/checkout/${slug}`, maxAge: CHECKOUT_SESSION_MAX_AGE,
+      })
+      return response({ ready: true, restarted: true })
+    }
     if (input.action === 'start') {
       if (!session) store.set(name, signCheckoutSession(loaded.offer.id, secret()), { httpOnly: true, secure: new URL(request.url).protocol === 'https:', sameSite: 'strict', path: `/api/checkout/${slug}`, maxAge: CHECKOUT_SESSION_MAX_AGE })
       return response({ ready: true })
