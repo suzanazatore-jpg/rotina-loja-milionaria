@@ -143,7 +143,7 @@ async function montarOferta(supabase, dados) {
         && produto.marketplace_id === 'pagarme'
         && Boolean(produto.plan_id)
         && preco >= 1000
-        && !/^(teste|test)(?:\\b|\\s|[-_:])/i.test(nome)
+        && !/^(teste|test)(?:\b|\s|[-_:])/i.test(nome)
         && (!dados.checkout_config?.contract?.required || (process.env.CONTRACTS_ENABLED === 'true' && (process.env.CONTRACT_TOKEN_SECRET?.length || 0) >= 32)),
     },
     active: dados.active !== false,
@@ -250,7 +250,23 @@ export async function PATCH(request) {
   const { entidade, id, active } = await request.json()
   const tabela = entidade === 'produto' ? 'products' : entidade === 'oferta' ? 'offers' : null
   if (!tabela || !id) return erro('Requisição inválida.')
-  const { error } = await supabase.from(tabela).update({ active: active === true }).eq('id', id)
+  let updates = { active: active === true }
+  if (entidade === 'oferta') {
+    const {data: offer, error: offerError} = await supabase.from('offers')
+      .select('id,name,price_cents,product_id,checkout_config,payment_methods').eq('id',id).maybeSingle()
+    if (offerError || !offer) return erro('Oferta não encontrada.',404)
+    const {data: product, error: productError} = await supabase.from('products')
+      .select('active,type,plan_id,marketplace_id').eq('id',offer.product_id).maybeSingle()
+    if (productError || !product) return erro('Produto não encontrado.',404)
+    const restricted = Number(offer.price_cents) < 1000
+      || /^(teste|test)(?:\\b|\\s|[-_:])/i.test(offer.name || '')
+      || offer.checkout_config?.contract?.required && !(process.env.CONTRACTS_ENABLED === 'true' && (process.env.CONTRACT_TOKEN_SECRET?.length || 0) >= 32)
+    updates.checkout_config = {...(offer.checkout_config || {}),
+      auto_publish: active === true && product.active === true && product.type === 'one_time'
+        && product.marketplace_id === 'pagarme' && Boolean(product.plan_id)
+        && Array.isArray(offer.payment_methods) && offer.payment_methods.length > 0 && !restricted }
+  }
+  const { error } = await supabase.from(tabela).update(updates).eq('id', id)
   if (error) return erro(error.message, 500)
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, publication: updates.checkout_config?.auto_publish ? 'public' : 'restricted' })
 }
