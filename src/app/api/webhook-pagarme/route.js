@@ -1,6 +1,7 @@
 import { reverseOrderAccess } from '@/lib/checkoutAccessServer'
 import { timingSafeEqual } from 'node:crypto'
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
+import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { reconcileSubscriptionCharge } from '@/lib/checkoutPaymentsServer'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
@@ -39,6 +40,7 @@ export async function POST(request) {
     if (order && ['refunded','chargedback'].includes(order.status)) await reverseOrderAccess(db, order.order_id)
     const { error } = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', event.id)
     if (error) throw error
+    if (order?.status === 'paid') after(async () => { try { await processOutboundWebhooks(db) } catch { console.error('checkout outbound: delivery pending') } })
     return NextResponse.json({ received: true })
   } catch {
     if (db && eventId) {
