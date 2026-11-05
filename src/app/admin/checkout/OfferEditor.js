@@ -20,6 +20,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
   const [token,setToken] = useState('')
   const [tab,setTab] = useState('detalhes')
   const [message,setMessage] = useState('')
+  const [publication,setPublication] = useState(null)
   const [loading,setLoading] = useState(true)
   const [saving,setSaving] = useState(false)
   const [addOpen,setAddOpen] = useState(false)
@@ -42,7 +43,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
         if (!product || (ofertaId!=='nova' && !offer)) throw new Error('Produto ou oferta não encontrado.')
         const initial = offer ? {...OFERTA_VAZIA,...offer,price:(offer.price_cents/100).toFixed(2).replace('.',','),thank_you_url:offer.thank_you_url || '',bumps:json.bumps.filter(b=>b.offer_id===offer.id).map(b=>({bump_offer_id:b.bump_offer_id,headline:b.headline,description:b.description || ''}))} : {...OFERTA_VAZIA,product_id:produtoId,payment_methods:product.type==='subscription'?['credit_card']:['pix','credit_card'],max_installments:product.type==='subscription'?1:12,monthly_interest_pct:product.type==='subscription'?'0':'2.99',bumps:[]}
         initial.checkout_config = {...CHECKOUT_DEFAULTS,...offer?.checkout_config,tracking_mode:trackingMode(offer?.checkout_config),appearance_mode:offer ? (offer.checkout_config?.appearance_mode || 'custom') : 'inherit',redirects:{...CHECKOUT_DEFAULTS.redirects,...offer?.checkout_config?.redirects,approved:offer?.checkout_config?.redirects?.approved || offer?.thank_you_url || ''}}
-        if (active) {setCatalog(json);setDados(initial);setBaseline(JSON.stringify(initial));setToken(session.access_token);if(window.location.hash==='#checkout')setTab('checkout')}
+        if (active) {setCatalog(json);setDados(initial);setBaseline(JSON.stringify(initial));setPublication(offer ? json.publication?.[offer.id] || null : null);setToken(session.access_token);if(window.location.hash==='#checkout')setTab('checkout')}
       } catch(e) {if(active)setMessage(e.message)}
       finally {if(active)setLoading(false)}
     }
@@ -64,7 +65,8 @@ export default function OfferEditor({produtoId,ofertaId}) {
       const saved = {...dados, id:json.id, slug:json.slug, payment_path:json.payment_path}
       setDados(saved)
       setBaseline(JSON.stringify(saved))
-      setMessage('✓ Oferta salva.')
+      setPublication({status:json.publication,reason:json.publication_reason})
+      setMessage(json.publication === 'public' ? '✓ Oferta salva. Checkout pronto para vender.' : `✓ Oferta salva. ${json.publication_reason || 'A liberação de pagamento ainda precisa de revisão.'}`)
       if(ofertaId==='nova')router.replace(`/admin/checkout/produtos/${encodeURIComponent(produtoId)}/ofertas/${encodeURIComponent(json.id)}`)
     }catch(e){setMessage(e.message)}finally{setSaving(false)}
   }
@@ -81,7 +83,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
   const savedLink = ofertaId==='nova' ? '' : paymentLink(JSON.parse(baseline))
   const path = offerPath(dados.payment_path) || offerPath(dados.name)
   const link = path ? paymentLink({payment_path:path}) : ''
-  const canShare = Boolean(link && link === savedLink)
+  const canShare = Boolean(link && link === savedLink && !dirty && (publication?.status==='public' || publication?.status==='admin_only'))
   const available=catalog.ofertas.filter(o=>o.id!==ofertaId && o.active && !dados.bumps.some(b=>b.bump_offer_id===o.id) && catalog.produtos.find(p=>p.id===o.product_id)?.type==='one_time')
   return <main className="central-home cv-offer-editor">
     <nav aria-label="Caminho da oferta" className={interior.breadcrumb}>
@@ -114,7 +116,8 @@ export default function OfferEditor({produtoId,ofertaId}) {
         }}>Copiar link</button>
         {canShare && <a className="central-action" href={savedLink} target="_blank" rel="noopener noreferrer">Abrir checkout ↗</a>}
       </div>
-      <p className="central-data-note">{link && !canShare ? 'Salve a oferta para ativar e copiar o endereço. Nomes repetidos recebem um número no final.' : 'Link principal de venda'}</p>
+      {publication && !dirty && <p role="status" className="central-data-note" style={{fontWeight:600,color:publication.status==='public'?'#25854c':publication.status==='admin_only'?'#a87516':'var(--cv-muted)'}}>{publication.status==='public'?'✓ Pronto para vender':publication.status==='admin_only'?'Somente teste administrativo':publication.status==='inactive'?'Oferta inativa':'Checkout ainda bloqueado'} · {publication.reason}</p>}
+      <p className="central-data-note">{dirty?'Existem alterações não salvas. Clique em Salvar oferta antes de compartilhar o link.':publication?.status==='blocked'?'A oferta foi salva, mas o checkout não foi liberado. Revise os requisitos acima.':!canShare?'Salve e ative a oferta para disponibilizar o link.':'Link principal de venda'}</p>
     </section>}
     {tab==='auditoria' && ofertaId!=='nova' && <CatalogAudit offerId={ofertaId} token={token} />}
     <form onSubmit={save}>
