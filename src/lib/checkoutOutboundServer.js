@@ -65,7 +65,7 @@ export async function processOutboundWebhooks(db, { sender = sendWebhook, env = 
     } catch { /* Não salva URLs, segredos ou payloads em logs. */ }
     const ok = code >= 200 && code < 300
     const attempts = row.attempts + 1
-    const update = ok ? { status: 'delivered', delivered_at: new Date(now).toISOString(), response_status: code, response_body: responseBody } : { status: attempts >= 8 ? 'failed' : 'retry', response_status: code, response_body: null, next_attempt_at: new Date(now + Math.min(86400, 300 * 2 ** Math.min(attempts - 1, 9)) * 1000).toISOString() }
+    const update = ok ? { status: 'delivered', delivered_at: new Date(now).toISOString(), response_status: code, response_body: responseBody } : { status: attempts >= 8 ? 'failed' : 'retry', response_status: code, response_body: responseBody, next_attempt_at: new Date(now + Math.min(86400, 300 * 2 ** Math.min(attempts - 1, 9)) * 1000).toISOString() }
     const saved = await db.from('webhook_deliveries').update(update).eq('id', row.id).eq('status', 'processing').eq('attempts', attempts)
     if (saved.error) throw new Error('outbound_receipt_unavailable')
     if (ok) sent++
