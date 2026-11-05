@@ -48,7 +48,7 @@ export default function PublicCheckout({ data }) {
   const [method, setMethod] = useState(initialMethod)
   const [installments, setInstallments] = useState(initialMethod === 'credit_card' ? offer.default_installments || 1 : 1)
   const [selectedBumps, setSelectedBumps] = useState([])
-  const needsAddress = config.layout==='guru'?method==='credit_card':config.form_profile !== 'compact' || method === 'credit_card'
+  const needsAddress = config.form_profile !== 'compact'
   const [addressOpen, setAddressOpen] = useState(false),[summaryOpen,setSummaryOpen]=useState(false)
   const [countdownExpired, setCountdownExpired] = useState(false)
   const [busy, setBusy] = useState(false)
