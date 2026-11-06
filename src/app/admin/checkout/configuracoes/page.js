@@ -23,6 +23,7 @@ const groups = [
   {name:'Técnicas',items:[
     {id:'integrations',name:'Integrações',description:'Organize anunciantes, área de membros, automações, email, WhatsApp e pagamentos.',icon:'settings',href:'/admin/checkout/configuracoes/integracoes'},
     {id:'tracking',name:'Pixels e rastreamento',description:'Cadastre o Google Tag Manager e o Meta Pixel usados como padrão.',icon:'goals',href:'/admin/checkout/configuracoes/integracoes/rastreamento'},
+    {id:'notifications',name:'Notificações de vendas',description:'Alertas de venda criada e aprovada por WhatsApp e e-mail, com destinatários, testes e histórico.',icon:'broadcast',href:'/admin/checkout/configuracoes/notificacoes-vendas'},
     {id:'webhooks',name:'Webhooks',description:'Acompanhe os eventos, os recebimentos e as tentativas de entrega.',icon:'settings',href:'/admin/checkout/webhooks'},
   ]},
 ]
