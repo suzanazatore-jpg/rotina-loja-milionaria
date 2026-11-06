@@ -12,13 +12,15 @@ test('credenciais incompletas não são declaradas prontas',()=>{
 })
 test('Brevo envia só ao email especificado, sem credenciais no conteúdo',async()=>{
  const calls=[]
- const env={BREVO_API_KEY:'fake',BREVO_SENDER_EMAIL:'suporte@example.com'}
+ const env={BREVO_API_KEY:'fake'}
  const result=await sendSaleNotification({channel:'email',destination:'destinatario@example.com'},sale,env,async(url,opts)=>{calls.push({url,opts});return {ok:true,json:async()=>({messageId:'fake-id'})}})
  assert.equal(result.provider_message_id,'fake-id')
  assert.equal(calls.length,1)
  assert.equal(calls[0].url,'https://api.brevo.com/v3/smtp/email')
  const body=JSON.parse(calls[0].opts.body)
  assert.equal(body.to[0].email,'destinatario@example.com')
+ assert.equal(body.sender.email,'suporte@suzanazatorre.com.br')
+ assert.equal(saleDeliveryReady(env).email,true)
  assert.match(body.textContent,/Venda criada/)
  assert.doesNotMatch(body.textContent,/fake/)
 })
