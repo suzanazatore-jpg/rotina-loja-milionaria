@@ -4,7 +4,7 @@ const fmt=(cents)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash?u.href:null}catch{return null}}
 export function saleDeliveryReady(env=process.env){
  return {
-  email:Boolean(env.BREVO_API_KEY && env.BREVO_SENDER_EMAIL),
+  email:Boolean(env.BREVO_API_KEY),
   whatsapp:Boolean(safeUrl(env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_URL)&&env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_TOKEN)
  }
 }
@@ -14,7 +14,7 @@ export async function sendSaleNotification(recipient,sale,env=process.env,fetche
  const message=[title,'Rotina da Loja Milionária',`Pedido: ${sale.order_id}`,`Produto: ${sale.name||'Compra'}`,`Valor: ${fmt(sale.amount_cents)}`,`Cliente: ${sale.customer||'Não informado'}`,`Pagamento: ${sale.method||'Não informado'}`,...(sale.link?[`Consultar venda: ${sale.link}`]:[])].join('\n')
  if(recipient.channel==='email'){
   if(!saleDeliveryReady(env).email)throw new Error('email_not_configured')
-  const result=await fetcher('https://api.brevo.com/v3/smtp/email',{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'api-key':env.BREVO_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({sender:{email:env.BREVO_SENDER_EMAIL,name:'Rotina da Loja Milionária'},to:[{email:recipient.destination}],subject:`[Rotina] ${title}`,textContent:message})})
+  const result=await fetcher('https://api.brevo.com/v3/smtp/email',{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'api-key':env.BREVO_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({sender:{email:'suporte@suzanazatorre.com.br',name:'Suzana Zatorre'},to:[{email:recipient.destination}],subject:`[Rotina] ${title}`,textContent:message})})
   if(!result.ok)throw new Error('brevo_http_'+result.status)
   const body=await result.json().catch(()=>({}))
   return {status:'sent',provider:'brevo',provider_message_id:typeof body.messageId==='string'?body.messageId:null}
