@@ -2,10 +2,33 @@
 // Os dois interruptores do servidor começam desligados por padrão.
 const fmt=(cents)=>new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format((cents||0)/100)
 const safeUrl=value=>{try{const u=new URL(value);return u.protocol==='https:'&&!u.username&&!u.password&&!u.hash?u.href:null}catch{return null}}
+const botconversaBase='https://backend.botconversa.com.br/api/v1/webhook'
+const botconversaFlow=(env,eventType)=> {
+ const value=eventType==='order_created'?env.CHECKOUT_BOTCONVERSA_FLOW_CREATED_ID:env.CHECKOUT_BOTCONVERSA_FLOW_PAID_ID
+ return /^[1-9]\\d{0,15}$/.test(String(value||''))?Number(value):null
+}
+export async function sendBotConversaSaleFlow(recipient,sale,env=process.env,fetcher=fetch){
+ if(!env.CHECKOUT_BOTCONVERSA_API_KEY)throw new Error('botconversa_api_key_missing')
+ const phone=String(recipient.destination||'').replace(/\\D/g,'')
+ if(!/^55\\d{10,11}$/.test(phone))throw new Error('botconversa_phone_invalid')
+ // Na API Oficial, somente fluxos que utilizam modelo aprovado fora da janela de 24h.
+ const flowId=botconversaFlow(env,sale.event_type==='test'?'order_created':sale.event_type)
+ if(!flowId)throw new Error('botconversa_approved_flow_missing')
+ const headers={'API-KEY':env.CHECKOUT_BOTCONVERSA_API_KEY,'Content-Type':'application/json'}
+ const lookup=await fetcher(botconversaBase+'/subscriber/get_by_phone/'+phone+'/',{method:'GET',headers,redirect:'error',signal:AbortSignal.timeout(15000)})
+ if(!lookup.ok)throw new Error('botconversa_lookup_http_'+lookup.status)
+ const subscriber=await lookup.json()
+ const subscriberId=subscriber?.id||subscriber?.subscriber?.id
+ if(!/^[1-9]\\d*$/.test(String(subscriberId||'')))throw new Error('botconversa_subscriber_missing')
+ const result=await fetcher(botconversaBase+'/subscriber/'+subscriberId+'/send_flow/',{method:'POST',headers,redirect:'error',signal:AbortSignal.timeout(15000),body:JSON.stringify({flow:flowId})})
+ if(!result.ok)throw new Error('botconversa_flow_http_'+result.status)
+ // Aceite HTTP não comprova entrega nem leitura pelo WhatsApp.
+ return {status:'sent',provider:'botconversa',provider_message_id:null}
+}
 export function saleDeliveryReady(env=process.env){
  return {
   email:Boolean(env.BREVO_API_KEY),
-  whatsapp:Boolean(safeUrl(env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_URL)&&env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_TOKEN)
+  whatsapp:Boolean((env.CHECKOUT_BOTCONVERSA_API_KEY && botconversaFlow(env,'order_created') && botconversaFlow(env,'order_paid')) || (safeUrl(env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_URL)&&env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_TOKEN))
  }
 }
 export async function sendSaleNotification(recipient,sale,env=process.env,fetcher=fetch){
@@ -20,6 +43,7 @@ export async function sendSaleNotification(recipient,sale,env=process.env,fetche
   return {status:'sent',provider:'brevo',provider_message_id:typeof body.messageId==='string'?body.messageId:null}
  }
  if(recipient.channel==='whatsapp'){
+  if(env.CHECKOUT_BOTCONVERSA_API_KEY)return sendBotConversaSaleFlow(recipient,sale,env,fetcher)
   const url=safeUrl(env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_URL)
   if(!url||!env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_TOKEN)throw new Error('whatsapp_not_configured')
   const result=await fetcher(url,{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{Authorization:`Bearer ${env.CHECKOUT_SALES_WHATSAPP_WEBHOOK_TOKEN}`,'Content-Type':'application/json'},body:JSON.stringify({schema_version:1,evento:'checkout_sale_notification',delivery_id:sale.delivery_id||'test',phone:recipient.destination,message,order_id:sale.order_id,sale_event:sale.event_type})})
