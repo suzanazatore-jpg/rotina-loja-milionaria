@@ -57,3 +57,11 @@
   font: inherit;
 }
 .central .central-offer-grid[hidden] {display: none}
+
+/* Shared refresh action across every Central page. */
+.central-topbar-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end}
+.central-refresh-button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--cv-border);border-radius:8px;background:var(--cv-panel);color:var(--cv-text);padding:9px 12px;font:inherit;font-size:13px;cursor:pointer;white-space:nowrap}
+.central-refresh-button:hover:not(:disabled){border-color:var(--cv-action,var(--cv-gold));color:var(--cv-action,var(--cv-gold))}
+.central-refresh-button:focus-visible{outline:2px solid var(--cv-action,var(--cv-gold));outline-offset:3px}
+.central-refresh-button:disabled{opacity:.6;cursor:wait}
+@media(max-width:480px){.central-topbar-actions{gap:6px}.central-refresh-button{padding:7px 9px;font-size:12px}.central-topbar{flex-wrap:wrap}}
