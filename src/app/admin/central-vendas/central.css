@@ -65,3 +65,8 @@
 .central-refresh-button:focus-visible{outline:2px solid var(--cv-action,var(--cv-gold));outline-offset:3px}
 .central-refresh-button:disabled{opacity:.6;cursor:wait}
 @media(max-width:480px){.central-topbar-actions{gap:6px}.central-refresh-button{padding:7px 9px;font-size:12px}.central-topbar{flex-wrap:wrap}}
+
+/* Readable list and filter text throughout the Central. */
+.central .central-table th,.central .central-table td,.central .cv-table th,.central .cv-table td{font-size:16px!important;line-height:1.6}
+.central .cv-filter-dialog label,.central .cv-filter-dialog input,.central .cv-filter-dialog select,.central .cv-filter-dialog button{font-size:16px}
+.central .cv-chip,.central .central-table td small,.central .cv-table td small{font-size:14px!important}

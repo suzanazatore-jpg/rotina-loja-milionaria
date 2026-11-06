@@ -8,7 +8,7 @@ export async function GET(request) {
     const db = checkoutAdminClient()
     if (!(await autorizarAdmin(request, db))) return json({ error: 'Acesso restrito.' }, 401)
     if (new URL(request.url).searchParams.get('view') === 'tracking') {
-      const {data, error} = await db.from('products').select('id,name').eq('tracking_eligible',true).order('name')
+      const {data, error} = await db.from('products').select('id,name').eq('tracking_eligible',true).eq('active',true).order('name')
       if (error) throw error
       return json({ tracking: await loadGlobalTracking(db), products: data })
     }

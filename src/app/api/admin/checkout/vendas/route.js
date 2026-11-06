@@ -24,7 +24,7 @@ export async function GET(request) {
   const limit = 25
 
   try {
-    const { data: produtos, error: errProdutos } = await db.from('products').select('id,name').order('name')
+    const { data: produtos, error: errProdutos } = await db.from('products').select('id,name').eq('active',true).order('name')
     if (errProdutos) throw errProdutos
     const { data: ofertas, error: errOfertas } = await db.from('offers').select('id,name,product_id')
     if (errOfertas) throw errOfertas

@@ -19,6 +19,7 @@ export default function Webhooks() {
   const [category, setCategory] = useState('vendas')
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('todos')
+  const [listStatus, setListStatus] = useState('active')
   const [search, setSearch] = useState('')
   const [urlFilter, setUrlFilter] = useState('')
   const [filtersOpen, setFiltersOpen] = useState(false)
@@ -57,13 +58,13 @@ export default function Webhooks() {
     finally { setBusy(false) }
   }
   const categoryRows = data.webhooks.filter(row => inCategory(row, category))
-  const rows = categoryRows.filter(row => (status === 'todos' || row.active === (status === 'active')) && row.name.toLowerCase().includes(search.trim().toLowerCase()) && row.url.toLowerCase().includes(urlFilter.trim().toLowerCase()))
+  const rows = categoryRows.filter(row => (listStatus === 'todos' || row.active === (listStatus === 'active')) && row.name.toLowerCase().includes(search.trim().toLowerCase()) && row.url.toLowerCase().includes(urlFilter.trim().toLowerCase()))
   const stored = data.webhooks.find(row => row.id === hookId)
   const history = Boolean(selected && tab !== 'detalhe' || receipts)
   return <main className="central-home webhook-page">
     <div className="webhook-breadcrumb"><span>Início</span><span>/</span><span>Configurações</span><span>/</span>{selected || receipts ? <button disabled={busy} onClick={back}>Webhooks</button> : <strong>Webhooks</strong>}{selected && <><span>/</span><span>{selected.name}</span></>}{receipts && <><span>/</span><span>Recebimentos Pagar.me</span></>}</div>
     {(selected || receipts) && <button className="webhook-back" disabled={busy} onClick={back}>← Voltar</button>}
-    {!selected && !receipts && <><div className="webhook-heading"><h1>Webhooks</h1></div><div className="webhook-tabs" role="group" aria-label="Tipos de webhook">{[['assinaturas', 'Assinaturas'], ['vendas', 'Vendas']].map(([key, label]) => <button key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setStatus('todos'); setPage(1) }}>{label}</button>)}</div><div className="webhook-add-bar"><button onClick={() => { setCreating(true); setError(''); setNotice('') }}>+ Adicionar Webhook</button></div></>}
+    {!selected && !receipts && <><div className="webhook-heading"><h1>Webhooks</h1></div><div className="webhook-tabs" role="group" aria-label="Tipos de webhook">{[['assinaturas', 'Assinaturas'], ['vendas', 'Vendas']].map(([key, label]) => <button key={key} aria-pressed={category === key} onClick={() => { setCategory(key); setListStatus('active'); setPage(1) }}>{label}</button>)}</div><div className="webhook-add-bar"><button onClick={() => { setCreating(true); setError(''); setNotice('') }}>+ Adicionar Webhook</button></div></>}
     {selected && <div className="webhook-tabs" role="group" aria-label="Seções do webhook">{Object.entries(sections).map(([key, label]) => <button key={key} aria-pressed={tab === key} disabled={busy} onClick={() => { setTab(key); setPage(1); setStatus('todos'); setError(''); setNotice('') }}>{label}</button>)}</div>}
     {!creating && error && <p className="central-editor-message" role="alert">{error}</p>}{notice && <p className="central-editor-message" role="status">{notice}</p>}
     <section className={`webhook-panel ${selected && tab === 'detalhe' ? 'webhook-detail-panel' : ''}`}>
@@ -81,6 +82,6 @@ export default function Webhooks() {
     </section>
     <div className="webhook-bottom-actions"><button disabled={loading || busy} onClick={() => setRefresh(value => value + 1)}>Atualizar</button>{!selected && !receipts && <button onClick={() => { setReceipts(true); setPage(1); setStatus('todos') }}>Recebimentos Pagar.me →</button>}</div>
     {creating && <CreateDialog products={data.products} busy={busy} error={error} onClose={() => { setCreating(false); setError('') }} onSave={draft => mutate({ action: 'save', dados: draft }, draft)} />}
-    {filtersOpen && !selected && !receipts && <FilterDialog filters={{ name: search, url: urlFilter, status }} onClose={() => setFiltersOpen(false)} onApply={filters => { setSearch(filters.name); setUrlFilter(filters.url); setStatus(filters.status); setPage(1); setFiltersOpen(false) }} />}
+    {filtersOpen && !selected && !receipts && <FilterDialog filters={{ name: search, url: urlFilter, status: listStatus }} onClose={() => setFiltersOpen(false)} onApply={filters => { setSearch(filters.name); setUrlFilter(filters.url); setListStatus(filters.status); setPage(1); setFiltersOpen(false) }} />}
   </main>
 }

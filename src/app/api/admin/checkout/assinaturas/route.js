@@ -11,7 +11,7 @@ export async function GET(request) {
     const params=new URL(request.url).searchParams
     try {subscriptionFilters(params)} catch(error){return NextResponse.json({error:error.message},{status:400})}
     const page=Math.max(1,Math.min(100000,parseInt(params.get('page') || '1',10) || 1))
-    const [all,products]=await Promise.all([subscriptionFilteredRows(db,params),db.from('products').select('id,name').order('name')])
+    const [all,products]=await Promise.all([subscriptionFilteredRows(db,params),db.from('products').select('id,name').eq('active',true).order('name')])
     if(products.error)throw products.error
     const subscriptions=all.slice((page-1)*30,page*30)
     return NextResponse.json({subscriptions,total:all.length,page,products:products.data || []},{headers:{'Cache-Control':'no-store'}})
