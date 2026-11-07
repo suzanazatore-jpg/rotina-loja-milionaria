@@ -143,3 +143,30 @@ test('approved and consented purchase waits for a missing token without sending 
    assert.equal(refused.tables.webhook_events.length,1)
  } finally {for(const [key,value] of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
 })
+
+
+test('automatic measurement is queued and sent after payment without falsely recording an opt-in',async()=>{
+ const old=Object.fromEntries(Object.keys(env).map(key=>[key,process.env[key]]));const original=globalThis.fetch
+ Object.assign(process.env,env)
+ try {
+  const db=database()
+  Object.assign(db.tables.webhook_events[0].payload.tracking,{consent:false,measurement_enabled:true,preference:'unknown',identifiers:{client_ip_address:'203.0.113.42',client_user_agent:'Buyer'}})
+  let calls=0
+  globalThis.fetch=async(url,options)=>{
+    calls++
+    const event=JSON.parse(options.body).data[0]
+    assert.equal(event.event_name,'Purchase')
+    assert.equal(event.event_id,'purchase:order')
+    assert.equal(event.user_data.client_ip_address,'203.0.113.42')
+    return {ok:true,json:async()=>({events_received:1})}
+  }
+  assert.equal((await deliverPaidConversion(db,'order')).status,'sent')
+  await deliverPaidConversion(db,'order')
+  assert.equal(calls,1)
+  const denied=database()
+  Object.assign(denied.tables.webhook_events[0].payload.tracking,{consent:false,measurement_enabled:true,preference:'denied'})
+  assert.equal((await deliverPaidConversion(denied,'order')).status,'disabled')
+  assert.equal(calls,1)
+  assert.equal(db.tables.webhook_events[0].payload.tracking.consent,false)
+ }finally{globalThis.fetch=original;for(const[key,value]of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+})

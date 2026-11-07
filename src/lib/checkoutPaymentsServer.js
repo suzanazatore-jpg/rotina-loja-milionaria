@@ -1,3 +1,4 @@
+import { measurementAllowed } from './checkoutAnalytics.js'
 import { checkoutAttribution } from './checkoutAttribution.js'
 import { randomUUID } from 'node:crypto'
 import { PaymentError, normalizeCustomer, cardReference, orderPayload, confirmedOrderState, pagarme, digest, subscriptionPlanPayload } from './pagarme.js'
@@ -58,7 +59,7 @@ export async function createPayment(db, input, key, tracking = null, { requireAd
     await result(db.from('customers').upsert({ email: customer.email, name: customer.name, document: customer.document, phone: `55${customer.phones.mobile_phone.area_code}${customer.phones.mobile_phone.number}`, billing_address: billingAddress }, { onConflict: 'email' }))
     const localCustomer = await result(db.from('customers').select('id').eq('email', customer.email).single())
     // A chave única no banco e a idempotência do gateway protegem tentativas concorrentes.
-    const inserted = await db.from('orders').insert({ id: randomUUID(), event_id: eventId, customer_id: localCustomer.id, offer_id: offer.id, payment_method: input.payment_method, installments, ...amount, ...(tracking?.consent === true ? { ...checkoutAttribution(tracking.attribution), fbp: tracking.identifiers?.fbp || null, fbc: tracking.identifiers?.fbc || null } : {}) }).select('*').single()
+    const inserted = await db.from('orders').insert({ id: randomUUID(), event_id: eventId, customer_id: localCustomer.id, offer_id: offer.id, payment_method: input.payment_method, installments, ...amount, ...(measurementAllowed(tracking) ? { ...checkoutAttribution(tracking.attribution), fbp: tracking.identifiers?.fbp || null, fbc: tracking.identifiers?.fbc || null } : {}) }).select('*').single()
     if (inserted.error?.code === '23505') throw new PaymentError('Pedido em processamento. Repita com a mesma chave.', 409)
     if (inserted.error) throw new PaymentError('Não foi possível registrar o pedido.', 500)
     order = inserted.data

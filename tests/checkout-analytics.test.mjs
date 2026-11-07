@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFileSync} from 'node:fs'
 const source=readFileSync(new URL('../src/lib/checkoutAnalytics.js',import.meta.url),'utf8')
-const {purchaseAnalytics,trackingDestination,dispatchAnalytics,ecommercePayload}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+const {purchaseAnalytics,trackingDestination,dispatchAnalytics,ecommercePayload,measurementRequest,measurementAllowed}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const snapshot=[{product_id:'main',name:'Protocolo',total_cents:4700},{product_id:'bump',name:'Equipe',total_cents:3700}]
 const order={id:'order',status:'paid',paid_at:'2026-10-14T12:00:00Z',total_cents:8400}
 const purchase=purchaseAnalytics(order,snapshot)
@@ -43,4 +43,18 @@ test('disabled tracking, invalid events and tracker failures never break checkou
  assert.equal(dispatchAnalytics({}, {gtm_id:'GTM-ABCDEFG'},'invalid',purchase,'key'),false)
  assert.equal(dispatchAnalytics({dataLayer:{push(){throw new Error('blocked')}}},{gtm_id:'GTM-ABCDEFG'},'purchase',purchase,'key'),false)
  assert.equal(ecommercePayload({...purchase,total_cents:0}),null)
+})
+
+
+test('new checkout measures without an opt-in click but explicit rejection always wins',()=>{
+  const automatic=measurementRequest({tracking_preference:'unknown'})
+  assert.equal(automatic.measurement_enabled,true)
+  assert.equal(automatic.consent,false)
+  assert.equal(measurementAllowed(automatic),true)
+  assert.equal(measurementAllowed(measurementRequest({tracking_preference:'denied',marketing_consent:true})),false)
+  assert.equal(measurementAllowed({...automatic,preference:'denied',consent:true}),false)
+  assert.equal(measurementAllowed(measurementRequest({tracking_preference:'arbitrary'})),false)
+  assert.equal(measurementAllowed(measurementRequest({marketing_consent:true})),true)
+  assert.equal(measurementAllowed(measurementRequest({marketing_consent:false})),false)
+  assert.equal(measurementAllowed(null),false)
 })

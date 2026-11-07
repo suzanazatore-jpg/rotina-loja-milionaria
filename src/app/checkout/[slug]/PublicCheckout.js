@@ -157,7 +157,7 @@ export default function PublicCheckout({ data, metaVisit }) {
         const get = key => String(values.get(key) || '').trim()
         if (config.confirm_email && get('email_confirmation').toLowerCase() !== get('email').toLowerCase()) throw new Error('Os emails não conferem.')
         const customer = { name: get('name'), email: get('email'), document: get('document'), phone: get('phone'), ...(needsAddress ? { address: { line_1: [get('address_number'), get('street'), get('district')].join(', '), street: get('street'), number: get('address_number'), district: get('district'), line_2: get('line_2'), zip_code: get('zip_code'), city: get('city'), state: get('state').toUpperCase() } } : {}) }
-        const payload = { action: 'pay', customer, payment_method: method, installments, bumps: selectedBumps, email_confirmation: get('email_confirmation'), terms_accepted: values.get('terms_accepted') === 'on', privacy_accepted: values.get('privacy_accepted') === 'on', marketing_consent: readCheckoutConsent() === 'granted', attribution: readCheckoutConsent() === 'granted' ? browserAttribution(window.location.search) : undefined }
+        const payload = { action: 'pay', customer, payment_method: method, installments, bumps: selectedBumps, email_confirmation: get('email_confirmation'), terms_accepted: values.get('terms_accepted') === 'on', privacy_accepted: values.get('privacy_accepted') === 'on', tracking_preference: readCheckoutConsent(), attribution: readCheckoutConsent() !== 'denied' ? browserAttribution(window.location.search) : undefined }
         if (method === 'credit_card') {
           if (!test.publicKey) throw new Error('Pagamento por cartão em preparação.')
           const expiry = get('expiry').match(/^(\d{2})\/(\d{2}|\d{4})$/)

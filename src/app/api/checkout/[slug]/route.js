@@ -10,7 +10,7 @@ import { CHECKOUT_SESSION_MAX_AGE, signCheckoutSession, readCheckoutSession, saf
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
 import { createPayment } from '@/lib/checkoutPaymentsServer'
 import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'
-import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
+import { purchaseAnalytics, measurementRequest } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
 import { validateCheckoutForm, checkoutExpired } from '@/lib/checkoutSettings'
 import { signingUrl } from '@/lib/contractsServer'
@@ -105,21 +105,22 @@ export async function POST(request, context) {
     if (input.payment_method === 'credit_card' && !paymentConfig.publicKey) throw new PaymentError('Pagamento por cartão em preparação.', 503)
     if (paymentConfig.mode === 'live' && input.bumps?.length) throw new PaymentError('Itens adicionais ainda não estão habilitados nesta validação.', 400)
     // Não permita alterar oferta nem aceitar dados abertos do cartão no endpoint público.
-    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps','marketing_consent','attribution','email_confirmation','terms_accepted','privacy_accepted'])
+    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps','marketing_consent','tracking_preference','attribution','email_confirmation','terms_accepted','privacy_accepted'])
     if (Object.keys(input).some(key => !allowed.has(key))) throw new PaymentError('Dados de pagamento inválidos.')
     try { validateCheckoutForm(loaded.config,input) } catch(error) { throw new PaymentError(error.message,400) }
     if (loaded.config.require_terms || loaded.config.require_privacy) {
       const {error} = await db.from('webhook_events').upsert({pagarme_event_id:`checkout-form:${session.key}`,type:'checkout.form.accepted',payload:{offer_id:loaded.offer.id,terms_url:loaded.config.terms_url,privacy_url:loaded.config.privacy_url,terms_accepted:input.terms_accepted===true,privacy_accepted:input.privacy_accepted===true},processed_at:new Date().toISOString()},{onConflict:'pagarme_event_id',ignoreDuplicates:true})
       if(error) throw new PaymentError('Não foi possível registrar o aceite. Tente novamente.',503)
     }
-    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, input.marketing_consent === true ? { consent: true, attribution: checkoutAttribution(input.attribution), identifiers: websiteIdentifiers(request), gateway_base: process.env.PAGARME_BASE_URL, pixel_id: loaded.config.meta_pixel_id, source_url: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}` } : null, { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
+    const measurement = measurementRequest(input)
+    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, measurement.measurement_enabled ? { ...measurement, attribution: checkoutAttribution(input.attribution), identifiers: websiteIdentifiers(request), gateway_base: process.env.PAGARME_BASE_URL, pixel_id: loaded.config.meta_pixel_id, source_url: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}` } : null, { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
     if (payment.status === 'paid') {
       // O pagamento já ocorreu. Uma falha de entrega não pode sugerir nova cobrança.
       try { await fulfillPaidOrder(db, payment.order_id) } catch { /* O webhook e a conciliação administrativa podem repetir a entrega. */ }
       await deliverPaidConversion(db, payment.order_id)
     }
     const status = await readStatus(db, loaded, session)
-    if (payment.trial_started && input.marketing_consent === true) {
+    if (payment.trial_started && measurement.measurement_enabled) {
       status.trial_event_id = 'trial:' + payment.order_id
       const config = conversionConfiguration(loaded.config.meta_pixel_id)
       if (config) {

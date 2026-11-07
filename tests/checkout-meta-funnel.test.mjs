@@ -4,7 +4,7 @@ import { websiteIdentifiers, metaVisit } from '../src/lib/checkoutMetaVisit.js'
 import { readCheckoutSession } from '../src/lib/checkoutSession.js'
 import { dispatchAnalytics } from '../src/lib/checkoutAnalytics.js'
 import { conversionEvent } from '../src/lib/checkoutConversionsServer.js'
-import { funnelEvent } from '../src/lib/checkoutMetaFunnelServer.js'
+import { funnelEvent, deliverFunnelEvent } from '../src/lib/checkoutMetaFunnelServer.js'
 
 test('signed analytics visit is scoped to this offer and cannot read a payment session',()=>{
   const env = {META_CAPI_ACCESS_TOKEN:'test',META_CAPI_PIXEL_ID:'123456',VERCEL_ENV:'production',CHECKOUT_CAPI_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',CHECKOUT_SESSION_SECRET:'a'.repeat(32)}
@@ -64,4 +64,22 @@ test('IP extraction validates addresses, supports proxy lists, and never invents
     assert.equal(read({'x-vercel-forwarded-for':value}).client_ip_address,undefined)
   }
   assert.equal(read({'user-agent':'Browser'}).client_ip_address,undefined)
+})
+
+
+test('funnel receipt confirms IP presence without copying the IP into audit metadata',async()=>{
+  let receipt
+  const db={from(){return {
+    insert(value){receipt=value;return Promise.resolve({error:null})},
+    update(){return {eq(){return Promise.resolve({error:null})}}}
+  }}}
+  const previous=globalThis.fetch
+  globalThis.fetch=async()=>({ok:true,json:async()=>({events_received:1})})
+  try {
+    const event=funnelEvent('AddToCart','AddToCart:visit','https://shop.example',{client_ip_address:'203.0.113.42',client_user_agent:'Buyer'},{id:'product'},'visit')
+    await deliverFunnelEvent(db,{version:'v25.0',token:'test-only'},'123456',event)
+    assert.equal(receipt.payload.has_client_ip,true)
+    assert.equal(receipt.payload.has_client_user_agent,true)
+    assert.ok(!JSON.stringify(receipt).includes('203.0.113.42'))
+  }finally{globalThis.fetch=previous}
 })

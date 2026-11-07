@@ -182,3 +182,9 @@ Reversão: manter `CHECKOUT_LIVE_ENABLED=false` e republicar. Código anterior: 
 A auditoria Meta inclui pagamentos aprovados sem tentativa CAPI e distingue ausência de autorização registrada de envio não confirmado. Não se deve interpretar `orders.capi_sent_at` nulo como prova isolada de falha: o comprovante usado pelo serviço é `webhook_events` com marcador `capi:<order_id>` e `processed_at`. Compras sem autorização no snapshot não são reenviadas retroativamente.
 
 O checkout compartilha a mesma escolha de cookies entre a tela e o payload de pagamento, inclusive quando o armazenamento local está bloqueado. Somente com autorização, salva UTMs presentes na URL e os cookies Meta disponíveis nos campos do pedido. Campos de origem não são inferidos nem inventados para compras antigas.
+
+### Regra atual de medição — 07/11/2026
+
+Esta regra substitui a exigência anterior de clicar em Permitir para novas compras. O checkout atual envia `tracking_preference` com `unknown`, `granted` ou `denied`. `unknown` permite medição automática; `denied` impede os eventos e o registro de identificadores. A preferência explícita de recusa já salva continua valendo. O snapshot registra `measurement_enabled` e `preference`, mantendo `consent=false` quando não houve aceite explícito: a medição automática não inventa uma autorização. Clientes antigos seguem os flags que enviavam.
+
+Navegador, etapas da API e Purchase após pagamento compartilham a regra. O snapshot preserva o IP e os identificadores da navegação original; webhook e cron não usam o IP do gateway/servidor. O event ID estável continua deduplicando navegador/API. Compras históricas sem snapshot de medição não são alteradas nem reenviadas por esta mudança.

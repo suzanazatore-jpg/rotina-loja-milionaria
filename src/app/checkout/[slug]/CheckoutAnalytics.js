@@ -47,10 +47,10 @@ export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,s
   const [preferencesOpen, setPreferencesOpen] = useState(false)
   const browserVisit = useRef(null)
   const posted = useRef(new Set())
-  const consent=useSyncExternalStore(subscribe,snapshot,()=> 'unknown')
+  const consent=useSyncExternalStore(subscribe,snapshot,()=> 'loading')
   const destination=trackingDestination(config)
   const browserAllowed = enabled && !visit?.test
-  const allowed=(browserAllowed || visit?.test) && consent==='granted' && destination.channel!=='off'
+  const allowed=(browserAllowed || visit?.test) && consent!=='denied' && consent!=='loading' && destination.channel!=='off'
   useEffect(()=>{updateConsent(Boolean(browserAllowed && allowed))},[browserAllowed,allowed])
   useEffect(()=>{
     if(!allowed || !browserAllowed)return
@@ -72,7 +72,7 @@ export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,s
       if (browserAllowed) dispatchAnalytics(window, config, action, { ...cart, event_id: id }, id)
       if (visit && !posted.current.has(id)) {
         posted.current.add(id)
-        fetch(endpoint + '/eventos', { method:'POST', keepalive:true, headers:{'Content-Type':'application/json'}, body:JSON.stringify({ consent:true, event:name, ticket:visit.ticket }) }).catch(()=>{})
+        fetch(endpoint + '/eventos', { method:'POST', keepalive:true, headers:{'Content-Type':'application/json'}, body:JSON.stringify({ tracking_preference:consent, event:name, ticket:visit.ticket }) }).catch(()=>{})
       }
     }
     if (browserAllowed && trialId) dispatchAnalytics(window,config,'start_trial',{...currentCart,event_id:trialId},trialId)
@@ -85,7 +85,7 @@ export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,s
   if((!enabled && !visit?.test) || destination.channel==='off')return null
   return <>
     {allowed && browserAllowed && (destination.channel==='gtm' ? <Script id={`sz-gtm-${destination.id}`} src={`https://www.googletagmanager.com/gtm.js?id=${destination.id}`} strategy="afterInteractive"/> : <Script id="sz-meta-sdk" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive"/>)}
-    {preferencesOpen && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir análise e publicidade? Usaremos cookies e enviaremos as etapas do checkout, dados da compra e identificadores do navegador e do email à Meta para medir campanhas.</p><div><button type="button" onClick={()=>{choose('denied');setPreferencesOpen(false)}}>Recusar</button><button type="button" onClick={()=>{choose('granted');setPreferencesOpen(false)}}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
+    {preferencesOpen && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Usamos cookies e dados de navegação e compra para medir campanhas na Meta. A medição está ativa por padrão; você pode recusá-la aqui.</p><div><button type="button" onClick={()=>{choose('denied');setPreferencesOpen(false)}}>Recusar</button><button type="button" onClick={()=>{choose('granted');setPreferencesOpen(false)}}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
     <button type="button" className="pc-cookie-settings" aria-expanded={preferencesOpen} onClick={()=>setPreferencesOpen(value=>!value)}>Preferências de cookies</button>
   </>
 }

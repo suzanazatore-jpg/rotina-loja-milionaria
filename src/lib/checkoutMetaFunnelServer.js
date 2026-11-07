@@ -4,7 +4,7 @@ import { sendConversion } from './checkoutConversionsServer.js'
 // Callers derive the ID and event name from a signed visit or a verified gateway response.
 export async function deliverFunnelEvent(db, config, pixel, event) {
   const key = 'meta:' + event.event_id
-  const payload = { event_name: event.event_name, event_id: event.event_id, pixel_id: pixel, mode: config.testCode ? 'test' : 'live' }
+  const payload = { event_name: event.event_name, event_id: event.event_id, pixel_id: pixel, mode: config.testCode ? 'test' : 'live', has_client_ip: Boolean(event.user_data?.client_ip_address), has_client_user_agent: Boolean(event.user_data?.client_user_agent) }
   const saved = await db.from('webhook_events').insert({ pagarme_event_id: key, type: 'checkout.meta.funnel', payload, error: 'processing' })
   if (saved.error?.code === '23505') return
   if (saved.error) throw new Error('Registro da conversão indisponível.')

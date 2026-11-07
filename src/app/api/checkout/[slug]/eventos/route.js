@@ -1,3 +1,4 @@
+import { measurementRequest } from '@/lib/checkoutAnalytics'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { loadCheckoutOffer, publicCheckoutData } from '@/lib/checkoutPublicServer'
 import { readCheckoutSession } from '@/lib/checkoutSession'
@@ -14,7 +15,7 @@ export async function POST(request, context) {
     const raw = await request.text()
     if (raw.length > 2048) return new Response(null, { status: 413 })
     const input = JSON.parse(raw)
-    if (input.consent !== true || !allowed.has(input.event)) return new Response(null, { status: 400 })
+    if (!measurementRequest(input).measurement_enabled || !allowed.has(input.event)) return new Response(null, { status: 400 })
     const { slug } = await context.params
     const db = checkoutAdminClient()
     const loaded = await loadCheckoutOffer(slug, db)

@@ -39,7 +39,7 @@ export default function MetaEvents() {
     {!data && !error && <p role="status">Consultando configuração…</p>}
     {data && <section className={styles.metaPanel}><h2>{tab} · {data.environment}</h2>
       {tab==='Pixels' && <><dl>{data.checks.map(([name,value])=><div key={name}><dt>{name}</dt><dd>{value}</dd></div>)}</dl><div className={styles.actions}><Link className="central-action" href={back+'/rastreamento'}>Editar Pixel padrão</Link><a className="central-action" href={envUrl} target="_blank" rel="noreferrer">Configurar token na Vercel ↗</a></div><p>Salve o token em META_CAPI_ACCESS_TOKEN no ambiente correspondente e publique a configuração.</p></>}
-      {tab==='Eventos' && <><dl>{stages.map(([name,action])=><div key={name}><dt>{name}</dt><dd>{action}</dd></div>)}</dl><p>A marcação depende do consentimento da compradora. O Pix gera compra ao ser pago.</p></>}
+      {tab==='Eventos' && <><dl>{stages.map(([name,action])=><div key={name}><dt>{name}</dt><dd>{action}</dd></div>)}</dl><p>A medição é automática e respeita a recusa nas preferências de cookies. O Pix gera compra ao ser pago.</p></>}
       {tab==='Auditoria' && <>{!data.deliveries.length ? <p>Nenhuma tentativa de envio pelo servidor registrada neste ambiente.</p> : <table><thead><tr><th>Evento</th><th>Situação</th><th>Data e hora</th><th>Venda</th></tr></thead><tbody>{data.deliveries.map((row,i)=><tr key={i}><td>{row.event}</td><td>{row.status}</td><td>{new Date(row.date).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}</td><td>{row.order?<Link href={'/admin/checkout/vendas/'+row.order}>Abrir venda</Link>:'—'}</td></tr>)}</tbody></table>}</>}
     </section>}
   </main>

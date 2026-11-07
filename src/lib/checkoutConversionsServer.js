@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { purchaseAnalytics } from './checkoutAnalytics.js'
+import { purchaseAnalytics, measurementAllowed } from './checkoutAnalytics.js'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
 export function conversionConfiguration(pixelId, env = process.env) {
@@ -13,7 +13,7 @@ export function conversionConfiguration(pixelId, env = process.env) {
 export function conversionEvent(order, snapshot, customer, now = Date.now()) {
   const purchase = purchaseAnalytics(order, snapshot?.items)
   const time = Math.floor(new Date(order.paid_at).getTime() / 1000)
-  if (!purchase || snapshot?.tracking?.consent !== true || !Number.isFinite(time) || time > now / 1000 || time < now / 1000 - 7 * 86400) return null
+  if (!purchase || !measurementAllowed(snapshot?.tracking) || !Number.isFinite(time) || time > now / 1000 || time < now / 1000 - 7 * 86400) return null
   const email = String(customer?.email || '').trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null
   return { event_name: 'Purchase', event_id: purchase.event_id, event_time: time, action_source: 'website', event_source_url: snapshot.tracking.source_url, user_data: { ...snapshot.tracking.identifiers, em: [hash(email)] }, custom_data: { currency: 'BRL', value: purchase.total_cents / 100, order_id: order.id, content_type: 'product', content_ids: purchase.items.map(item => item.item_id), contents: purchase.items.map(item => ({ id: item.item_id, quantity: 1, item_price: item.price_cents / 100 })) } }
@@ -34,7 +34,7 @@ export async function deliverPaidConversion(db, orderId) {
     const snapshot = saved.data?.payload
     const pixelId = snapshot?.tracking?.pixel_id
     const config = conversionConfiguration(pixelId)
-    if (!pixelId || pixelId !== process.env.META_CAPI_PIXEL_ID || snapshot.tracking.consent !== true || snapshot.tracking.gateway_base !== process.env.PAGARME_BASE_URL) return { status: 'disabled' }
+    if (!pixelId || pixelId !== process.env.META_CAPI_PIXEL_ID || !measurementAllowed(snapshot.tracking) || snapshot.tracking.gateway_base !== process.env.PAGARME_BASE_URL) return { status: 'disabled' }
     // Keep eligible live approvals in the retry queue while the token is being installed.
     const awaitingToken = !process.env.META_CAPI_ACCESS_TOKEN && process.env.CHECKOUT_CAPI_ENABLED === 'true'
       && process.env.VERCEL_ENV === 'production' && snapshot.tracking.gateway_base === 'https://api.pagar.me/core/v5'

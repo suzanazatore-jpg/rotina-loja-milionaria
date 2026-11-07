@@ -1,3 +1,16 @@
+// Current checkout measures by default, while preserving an explicit refusal.
+// Older clients still require their recorded opt-in; no historical choice is invented.
+export function measurementRequest(input = {}) {
+  const preference = input.tracking_preference === undefined
+    ? (input.marketing_consent === true || input.consent === true ? 'granted' : 'denied')
+    : input.tracking_preference
+  const enabled = ['unknown', 'granted'].includes(preference)
+  return { measurement_enabled: enabled, consent: preference === 'granted', preference: enabled ? preference : 'denied' }
+}
+export function measurementAllowed(tracking) {
+  return tracking?.preference !== 'denied' && (tracking?.measurement_enabled === true || tracking?.consent === true)
+}
+
 // Payloads de analytics não recebem email, telefone, documento nem dados de cartão.
 export function trackingDestination(config = {}) {
   if (config.tracking_mode === 'off') return { channel: 'off', id: '' }
