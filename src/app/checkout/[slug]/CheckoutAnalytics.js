@@ -1,6 +1,6 @@
 'use client'
 import Script from 'next/script'
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { trackingDestination, dispatchAnalytics } from '@/lib/checkoutAnalytics'
 import { readCheckoutConsent, writeCheckoutConsent, clearSessionChoice } from '@/lib/checkoutConsent'
 function subscribe(callback) {
@@ -44,6 +44,7 @@ function setup(config) {
   }catch{return false}
 }
 export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,started,paying,purchase,visit,endpoint,trialId}) {
+  const [preferencesOpen, setPreferencesOpen] = useState(false)
   const browserVisit = useRef(null)
   const posted = useRef(new Set())
   const consent=useSyncExternalStore(subscribe,snapshot,()=> 'unknown')
@@ -84,7 +85,7 @@ export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,s
   if((!enabled && !visit?.test) || destination.channel==='off')return null
   return <>
     {allowed && browserAllowed && (destination.channel==='gtm' ? <Script id={`sz-gtm-${destination.id}`} src={`https://www.googletagmanager.com/gtm.js?id=${destination.id}`} strategy="afterInteractive"/> : <Script id="sz-meta-sdk" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive"/>)}
-    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir análise e publicidade? Usaremos cookies e enviaremos as etapas do checkout, dados da compra e identificadores do navegador e do email à Meta para medir campanhas.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
-    {consent!=='unknown' && <button type="button" className="pc-cookie-settings" onClick={()=>choose('unknown')}>Preferências de cookies</button>}
+    {preferencesOpen && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir análise e publicidade? Usaremos cookies e enviaremos as etapas do checkout, dados da compra e identificadores do navegador e do email à Meta para medir campanhas.</p><div><button type="button" onClick={()=>{choose('denied');setPreferencesOpen(false)}}>Recusar</button><button type="button" onClick={()=>{choose('granted');setPreferencesOpen(false)}}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
+    <button type="button" className="pc-cookie-settings" aria-expanded={preferencesOpen} onClick={()=>setPreferencesOpen(value=>!value)}>Preferências de cookies</button>
   </>
 }
