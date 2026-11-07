@@ -29,13 +29,18 @@ export async function GET(request) {
     const keys = orders.filter(order=>order.event_id?.startsWith('checkout:')).map(order=>'request:' + order.event_id.slice(9))
     const requests = keys.length ? await db.from('webhook_events').select('pagarme_event_id,payload').in('pagarme_event_id',keys) : {data:[]}
     if (requests.error) throw requests.error
-    const deliveries = rows.map(row=>({
+    // Recent funnel traffic must not hide an older Purchase receipt for a listed order.
+    const purchaseMarkers = orders.map(order=>'capi:' + order.id)
+    const receipts = purchaseMarkers.length ? await db.from('webhook_events').select('type,payload,received_at,processed_at,error').in('pagarme_event_id',purchaseMarkers) : {data:[]}
+    if (receipts.error) throw receipts.error
+    const visible = [...rows, ...receipts.data.filter(receipt=>!rows.some(row=>row.type==='checkout.capi' && row.payload?.order_id===receipt.payload?.order_id))]
+    const deliveries = visible.map(row=>({
       event:row.type==='checkout.capi'?'Purchase':row.payload?.event_name,
       date:row.processed_at || row.received_at,
       order:row.payload?.order_id || null,
       status:row.processed_at?'Recebido pela Meta':({retry:'Aguardando nova tentativa',processing:'Em processamento',ineligible:'Fora dos critérios de envio'})[row.error] || 'Requer revisão',
     }))
-    deliveries.push(...purchaseAuditRows(orders, requests.data, rows, process.env.PAGARME_BASE_URL))
+    deliveries.push(...purchaseAuditRows(orders, requests.data, visible, process.env.PAGARME_BASE_URL))
     deliveries.sort((a,b)=>new Date(b.date)-new Date(a.date))
     return reply({ environment:live?'Produção':'Prévia', checks, deliveries:deliveries.slice(0,80) })
   } catch { return reply({error:'Falha ao consultar os eventos da Meta.'},503) }
