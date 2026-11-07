@@ -176,3 +176,9 @@ Verificações: 144 testes de checkout/pagamentos/contratos mais teste de rota r
 Pendente para liberação comercial: compra real de R$27 e confirmação via webhook, acesso/email, cartão, compra com contrato, Meta CAPI/GTM e proteção contra abuso antes de permitir sessões anônimas. A versão preparada não comprova esses resultados.
 
 Reversão: manter `CHECKOUT_LIVE_ENABLED=false` e republicar. Código anterior: `a013b2a8b1bc84805333b2d21b832cbc45acd3d8`; deployment anterior `dpl_GhErJbYQJ2yaLQjP5YnAR49nAgdV`. Não apagar pedidos, acessos ou notificações para reverter código.
+
+### Diagnóstico de compras sem eventos — novembro de 2026
+
+A auditoria Meta inclui pagamentos aprovados sem tentativa CAPI e distingue ausência de autorização registrada de envio não confirmado. Não se deve interpretar `orders.capi_sent_at` nulo como prova isolada de falha: o comprovante usado pelo serviço é `webhook_events` com marcador `capi:<order_id>` e `processed_at`. Compras sem autorização no snapshot não são reenviadas retroativamente.
+
+O checkout compartilha a mesma escolha de cookies entre a tela e o payload de pagamento, inclusive quando o armazenamento local está bloqueado. Somente com autorização, salva UTMs presentes na URL e os cookies Meta disponíveis nos campos do pedido. Campos de origem não são inferidos nem inventados para compras antigas.

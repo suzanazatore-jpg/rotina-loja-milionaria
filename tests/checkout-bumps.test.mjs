@@ -73,7 +73,7 @@ test('payment registers and charges main plus selected additional in one gateway
     {table:'order_bumps',data:[{bump_offer_id:bump.offer.id,position:0}]},
     {table:'offers',data:[{...bump.offer,product_id:bump.product.id}]},{table:'products',data:[bump.product]},
     {table:'orders',data:null},{table:'customers',data:null},{table:'customers',data:{id:'customer'}},
-    {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1];assert.equal(localOrder.total_cents,7930)}},
+    {table:'orders',get data(){return localOrder},check(ops){localOrder=ops.find(row=>row[0]==='insert')[1];assert.equal(localOrder.total_cents,7930);assert.equal(localOrder.utm_source,'facebook');assert.equal(localOrder.fbp,'fb.1.1794080000000.123')}},
     {table:'webhook_events',data:null,check(ops){assert.equal(ops.find(row=>row[0]==='insert')[1].payload.items[1].plan_id,'plan-bump')}},
     {table:'order_items',data:null,check(ops){const items=ops.find(row=>row[0]==='upsert')[1];assert.equal(items.length,2);assert.equal(items[1].kind,'bump');assert.equal(items[1].price_cents,3700);assert.notEqual(items[0].id,items[1].id)}},
     {table:'orders',data:[{id:'saved'}]},
@@ -87,7 +87,7 @@ test('payment registers and charges main plus selected additional in one gateway
     assert.equal(body.payments[0].amount,7930)
     return Response.json({id:'or_bumps',code:localOrder.id,amount:7930,customer:{email:customer.email},charges:[{id:'ch_bumps',status:'paid',paid_at:'2026-10-14T12:00:00Z'}]})
   }
-  try{const paid=await createPayment(database(steps),{offer_id:main.id,customer,payment_method:'pix',bumps:[bump.offer.id]},'bumps-request-123456');assert.equal(paid.status,'paid');assert.equal(steps.length,0)}
+  try{const paid=await createPayment(database(steps),{offer_id:main.id,customer,payment_method:'pix',bumps:[bump.offer.id]},'bumps-request-123456',{consent:true,attribution:{utm_source:'facebook',arbitrary:'ignored'},identifiers:{fbp:'fb.1.1794080000000.123'}});assert.equal(paid.status,'paid');assert.equal(steps.length,0)}
   finally{globalThis.fetch=previousFetch;if(previousKey===undefined)delete process.env.PAGARME_SECRET_KEY;else process.env.PAGARME_SECRET_KEY=previousKey}
 })
 test('paid main and additional grant both plans once, preserving the longest shared course access',async()=>{

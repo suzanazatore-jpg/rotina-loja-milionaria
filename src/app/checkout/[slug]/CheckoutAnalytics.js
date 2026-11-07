@@ -2,12 +2,13 @@
 import Script from 'next/script'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { trackingDestination, dispatchAnalytics } from '@/lib/checkoutAnalytics'
-const CONSENT_KEY='sz-checkout-consent-v2'
+import { readCheckoutConsent, writeCheckoutConsent, clearSessionChoice } from '@/lib/checkoutConsent'
 function subscribe(callback) {
-  window.addEventListener('storage',callback);window.addEventListener('sz-checkout-consent',callback)
-  return ()=>{window.removeEventListener('storage',callback);window.removeEventListener('sz-checkout-consent',callback)}
+  const storage = () => { clearSessionChoice(); callback() }
+  window.addEventListener('storage',storage);window.addEventListener('sz-checkout-consent',callback)
+  return ()=>{window.removeEventListener('storage',storage);window.removeEventListener('sz-checkout-consent',callback)}
 }
-function snapshot() {try{return window.localStorage.getItem(CONSENT_KEY) || 'unknown'}catch{return 'unknown'}}
+function snapshot() { return readCheckoutConsent() }
 function updateConsent(granted) {
   try {
     window.dataLayer ||= []
@@ -19,8 +20,7 @@ function updateConsent(granted) {
 }
 function choose(value) {
   updateConsent(value==='granted')
-  try{window.localStorage.setItem(CONSENT_KEY,value)}catch{return}
-  window.dispatchEvent(new Event('sz-checkout-consent'))
+  writeCheckoutConsent(value)
 }
 function setup(config) {
   try {
