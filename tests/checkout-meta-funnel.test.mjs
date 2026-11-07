@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { websiteIdentifiers, metaVisit } from '../src/lib/checkoutMetaVisit.js'
 import { readCheckoutSession } from '../src/lib/checkoutSession.js'
 import { dispatchAnalytics } from '../src/lib/checkoutAnalytics.js'
+import { conversionEvent } from '../src/lib/checkoutConversionsServer.js'
 import { funnelEvent } from '../src/lib/checkoutMetaFunnelServer.js'
 
 test('signed analytics visit is scoped to this offer and cannot read a payment session',()=>{
@@ -35,4 +36,32 @@ test('checkout and API stages share event IDs and repeated renders do not emit a
 test('attribution only uses bounded Meta cookies and the original browser agent',()=>{
   const headers={'user-agent':'Browser','cookie':'other=private; _fbp=fb.1.1793881000000.12345; _fbc=bad@example.com'}
   assert.deepEqual(websiteIdentifiers(new Request('https://shop.example',{headers})),{client_user_agent:'Browser',fbp:'fb.1.1793881000000.12345'})
+})
+
+
+test('Vercel visitor IP accompanies the browser agent in every funnel and paid purchase payload',()=>{
+  for (const ip of ['203.0.113.42','2001:db8::1234']) {
+    const request = new Request('https://shop.example',{headers:{'user-agent':'Buyer Browser','x-vercel-forwarded-for':ip,'x-forwarded-for':'198.51.100.99'}})
+    const identifiers = websiteIdentifiers(request)
+    assert.equal(identifiers.client_ip_address,ip)
+    assert.equal(identifiers.client_user_agent,'Buyer Browser')
+    for (const name of ['AddToCart','InitiateCheckout','AddPaymentInfo','StartTrial']) {
+      assert.equal(funnelEvent(name,name+':visit','https://shop.example',identifiers,{id:'product'},'visit').user_data.client_ip_address,ip)
+    }
+    const snapshot={tracking:{consent:true,identifiers,source_url:'https://shop.example'},items:[{product_id:'product',name:'Desafio',total_cents:2700}]}
+    const order={id:'order',status:'paid',paid_at:new Date(Date.now()-1000).toISOString(),total_cents:2700}
+    // A webhook later uses the saved buyer identifiers, not its own request headers.
+    const purchase=conversionEvent(order,JSON.parse(JSON.stringify(snapshot)),{email:'buyer@example.com'})
+    assert.equal(purchase.user_data.client_ip_address,ip)
+    assert.equal(purchase.user_data.client_user_agent,'Buyer Browser')
+  }
+})
+test('IP extraction validates addresses, supports proxy lists, and never invents a missing IP',()=>{
+  const read=headers=>websiteIdentifiers(new Request('https://shop.example',{headers}))
+  assert.equal(read({'x-forwarded-for':'203.0.113.42, 192.0.2.10'}).client_ip_address,'203.0.113.42')
+  assert.equal(read({'x-real-ip':'2001:db8::2'}).client_ip_address,'2001:db8::2')
+  for(const value of ['unknown','999.1.2.3','203.0.113.42:1234','https://example.com','']) {
+    assert.equal(read({'x-vercel-forwarded-for':value}).client_ip_address,undefined)
+  }
+  assert.equal(read({'user-agent':'Browser'}).client_ip_address,undefined)
 })
