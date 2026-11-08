@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { WEBHOOK_EVENTS } from '@/lib/checkoutWebhookSettings'
 import { CreateDialog, FilterDialog, Switch, WebhookForm } from './WebhookForm'
 import './webhooks.css'
+const FILTER_STORAGE_KEY = 'checkout-webhooks-filters-v1'
 const sections = { detalhe: 'Detalhe', atividades: 'Atividades', auditoria: 'Auditoria' }
 const states = { pending: 'Na fila', processing: 'Processando', delivered: 'Entregue', failed: 'Falha', retry: 'Aguardando nova tentativa', skipped: 'Ignorado' }
 const date = value => value ? new Date(value).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'
@@ -19,8 +20,27 @@ export default function Webhooks() {
   const [category, setCategory] = useState('vendas')
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState('todos')
-  const [search, setSearch] = useState('')
-  const [urlFilter, setUrlFilter] = useState('')
+  const [listFilters, setListFilters] = useState({ name: '', url: '', status: 'active' })
+  const [filtersReady, setFiltersReady] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve().then(() => {
+      if (cancelled) return
+      try {
+        const saved = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) || 'null')
+        if (saved) {
+          setListFilters({ name: typeof saved.name === 'string' ? saved.name : '', url: typeof saved.url === 'string' ? saved.url : '', status: ['todos', 'active', 'inactive'].includes(saved.status) ? saved.status : 'active' })
+          if (['vendas', 'assinaturas'].includes(saved.category)) setCategory(saved.category)
+        }
+      } catch { /* Usa somente ativos se não houver preferência válida. */ }
+      setFiltersReady(true)
+    })
+    return () => { cancelled = true }
+  }, [])
+  useEffect(() => {
+    if (!filtersReady) return
+    try { localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({ ...listFilters, category })) } catch { /* Mantém os filtros durante esta visita. */ }
+  }, [listFilters, category, filtersReady])
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [receipts, setReceipts] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -62,7 +82,7 @@ export default function Webhooks() {
     finally { setBusy(false) }
   }
   const categoryRows = data.webhooks.filter(row => inCategory(row, category))
-  const rows = categoryRows.filter(row => (status === 'todos' || row.active === (status === 'active')) && row.name.toLowerCase().includes(search.trim().toLowerCase()) && row.url.toLowerCase().includes(urlFilter.trim().toLowerCase()))
+  const rows = categoryRows.filter(row => (listFilters.status === 'todos' || row.active === (listFilters.status === 'active')) && row.name.toLowerCase().includes(listFilters.name.trim().toLowerCase()) && row.url.toLowerCase().includes(listFilters.url.trim().toLowerCase()))
   const stored = data.webhooks.find(row => row.id === hookId)
   const history = Boolean(selected && tab !== 'detalhe' || receipts)
   return <main className="central-home webhook-page">
@@ -75,7 +95,7 @@ export default function Webhooks() {
       <div className="webhook-section-heading"><h2>{receipts ? 'Recebimentos Pagar.me' : selected ? sections[tab] : category === 'vendas' ? 'Vendas' : 'Assinaturas'}</h2>{(!selected && !receipts || selected && tab === 'atividades') && <button className="central-action" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(!filtersOpen)}>▽ Filtros</button>}</div>
       {!loading && !data.delivery_enabled && <p className="webhook-paused">Envios pausados durante a configuração.</p>}
       {!selected && !receipts && <><small className="webhook-count">{rows.length} de {categoryRows.length}</small>
-        <div className="central-table-wrap"><table className="central-table webhook-list"><thead><tr><th>Nome</th><th>URL</th><th>Ações</th><th><span className="webhook-sr-only">Atividades</span></th><th><span className="webhook-sr-only">Ativo</span></th></tr></thead><tbody>{!loading && rows.map(row => <tr key={row.id}><td><button className="webhook-name" onClick={() => open(row)}>{row.name}</button></td><td><span className="webhook-list-url" title={row.url}>{row.url}</span></td><td><button className="central-action" disabled={busy} aria-label={`Duplicar ${row.name}`} onClick={() => duplicate(row)}>Duplicar</button></td><td><button className="webhook-history-button" aria-label={`Atividades de ${row.name}`} onClick={() => { open(row); setTab('atividades') }}>◷</button></td><td><Switch checked={row.active} disabled={busy} label={`${row.active ? 'Desativar' : 'Ativar'} ${row.name}`} onChange={active => mutate({ action: 'toggle', id: row.id, active })} /></td></tr>)}{(loading || !rows.length) && <tr><td colSpan={5}>{loading ? 'Carregando…' : 'Nenhum webhook encontrado.'}</td></tr>}</tbody></table></div>
+        <div className="central-table-wrap"><table className="central-table webhook-list"><thead><tr><th>Nome</th><th>URL</th><th>Ações</th><th><span className="webhook-sr-only">Atividades</span></th><th><span className="webhook-sr-only">Ativo</span></th></tr></thead><tbody>{!loading && filtersReady && rows.map(row => <tr key={row.id}><td><button className="webhook-name" onClick={() => open(row)}>{row.name}</button></td><td><span className="webhook-list-url" title={row.url}>{row.url}</span></td><td><button className="central-action" disabled={busy} aria-label={`Duplicar ${row.name}`} onClick={() => duplicate(row)}>Duplicar</button></td><td><button className="webhook-history-button" aria-label={`Atividades de ${row.name}`} onClick={() => { open(row); setTab('atividades') }}>◷</button></td><td><Switch checked={row.active} disabled={busy} label={`${row.active ? 'Desativar' : 'Ativar'} ${row.name}`} onChange={active => mutate({ action: 'toggle', id: row.id, active })} /></td></tr>)}{(loading || !filtersReady || !rows.length) && <tr><td colSpan={5}>{loading || !filtersReady ? 'Carregando…' : 'Nenhum webhook encontrado.'}</td></tr>}</tbody></table></div>
       </>}
       {selected && tab === 'detalhe' && <><button className="central-action" disabled={busy} onClick={() => duplicate(selected)}>Duplicar webhook</button><p className="webhook-info">O aviso será enviado quando a venda atingir um dos status selecionados. Cada envio tem um identificador para reconhecer novas tentativas e evitar ações duplicadas no destino.</p><WebhookForm value={selected} products={data.products} busy={busy} onChange={setSelected} onSubmit={() => mutate({ action: 'save', id: selected.id, dados: selected }, selected)} onCancel={back} dates={{ created: date(stored?.created_at), updated: date(data.updated_at || stored?.created_at) }} /></>}
       {history && <>
@@ -86,6 +106,6 @@ export default function Webhooks() {
     </section>
     <div className="webhook-bottom-actions"><button disabled={loading || busy} onClick={() => setRefresh(value => value + 1)}>Atualizar</button>{!selected && !receipts && <button onClick={() => { setReceipts(true); setPage(1); setStatus('todos') }}>Recebimentos Pagar.me →</button>}</div>
     {creating && <CreateDialog initialValue={duplicateDraft} products={data.products} busy={busy} error={error} onClose={() => { setCreating(false); setError('') }} onSave={draft => mutate({ action: 'save', dados: draft }, draft)} />}
-    {filtersOpen && !selected && !receipts && <FilterDialog filters={{ name: search, url: urlFilter, status }} onClose={() => setFiltersOpen(false)} onApply={filters => { setSearch(filters.name); setUrlFilter(filters.url); setStatus(filters.status); setPage(1); setFiltersOpen(false) }} />}
+    {filtersOpen && !selected && !receipts && <FilterDialog filters={listFilters} onClose={() => setFiltersOpen(false)} onApply={filters => { setListFilters(filters); setPage(1); setFiltersOpen(false) }} />}
   </main>
 }
