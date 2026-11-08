@@ -24,13 +24,13 @@ export function WebhookForm({ value, products, busy, onChange, onSubmit, onCance
     <div className="webhook-form-footer"><button type="button" className="central-action" disabled={busy} onClick={onCancel}>{dates ? 'Voltar' : 'Cancelar'}</button><button type="submit" className="central-primary" disabled={busy}>{busy ? 'Salvando…' : 'Salvar'}</button></div>
   </form>
 }
-export function CreateDialog({ products, busy, error, onClose, onSave }) {
+export function CreateDialog({ initialValue, products, busy, error, onClose, onSave }) {
   const ref = useRef(null)
-  const [draft, setDraft] = useState(newWebhook)
+  const [draft, setDraft] = useState(() => initialValue || newWebhook())
   useEffect(() => { ref.current?.showModal() }, [])
   return <dialog ref={ref} className="webhook-dialog" onCancel={event => { event.preventDefault(); if (!busy) onClose() }} aria-labelledby="new-webhook-title">
-    <div className="webhook-dialog-heading"><h2 id="new-webhook-title">Adicionar Webhook</h2><button type="button" disabled={busy} aria-label="Fechar cadastro" onClick={onClose}>×</button></div>
-    <div className="webhook-dialog-body">{error && <p className="central-editor-message" role="alert">{error}</p>}<WebhookForm value={draft} products={products} busy={busy} onChange={setDraft} onSubmit={() => onSave(draft)} onCancel={onClose} /></div>
+    <div className="webhook-dialog-heading"><h2 id="new-webhook-title">{initialValue ? 'Duplicar Webhook' : 'Adicionar Webhook'}</h2><button type="button" disabled={busy} aria-label="Fechar cadastro" onClick={onClose}>×</button></div>
+    <div className="webhook-dialog-body">{initialValue && <p className="webhook-info">Revise a cópia antes de salvar. Ela começa desativada para evitar envios em dobro.</p>}{error && <p className="central-editor-message" role="alert">{error}</p>}<WebhookForm value={draft} products={products} busy={busy} onChange={setDraft} onSubmit={() => onSave(draft)} onCancel={onClose} /></div>
   </dialog>
 }
 
