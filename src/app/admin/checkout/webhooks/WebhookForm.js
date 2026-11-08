@@ -47,7 +47,7 @@ export function FilterDialog({ filters, onClose, onApply }) {
         <label>URL<input type="text" value={draft.url} onChange={event => setDraft({ ...draft, url: event.target.value })} /></label>
       </div>
       <fieldset className="webhook-filter-status"><legend>Status</legend><div>{[['todos', 'Todos'], ['active', 'Ativo'], ['inactive', 'Inativo']].map(([value, label]) => <label key={value}><input type="radio" name="webhook-list-status" value={value} checked={draft.status === value} onChange={() => setDraft({ ...draft, status: value })} />{label}</label>)}</div></fieldset>
-      <div className="webhook-filter-footer"><button type="button" className="webhook-clear-filters" onClick={() => setDraft({ name: '', url: '', status: 'todos' })}>Limpar filtros</button><button type="submit" className="central-primary">Filtrar</button></div>
+      <div className="webhook-filter-footer"><button type="button" className="webhook-clear-filters" onClick={() => setDraft({ name: '', url: '', status: 'active' })}>Limpar filtros</button><button type="submit" className="central-primary">Filtrar</button></div>
     </form>
   </dialog>
 }
