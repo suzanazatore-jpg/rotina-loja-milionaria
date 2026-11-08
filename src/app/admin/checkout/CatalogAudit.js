@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from './usePersistentFilters'
 import { useEffect,useId,useState } from 'react'
 import styles from './CatalogAudit.module.css'
 
@@ -24,7 +25,7 @@ export default function CatalogAudit({productId,offerId,token}) {
   const [data,setData]=useState(null)
   const [page,setPage]=useState(1)
   const [error,setError]=useState('')
-  const [period,setPeriod]=useState(initialPeriod)
+  const [period,setPeriod]=usePersistentFilters(`auditoria-catalogo:${productId || ''}:${offerId || ''}`,initialPeriod)
   const [draft,setDraft]=useState(period)
   const [filtersOpen,setFiltersOpen]=useState(false)
   const filterId=useId()

@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from '../usePersistentFilters'
 import {FilterDialog,FilterSection} from '../CentralUI'
 import {useEffect,useRef,useState} from 'react'
 import Link from 'next/link'
@@ -10,7 +11,7 @@ const labels={name:'Nome',email:'Email',phone:'Celular',document:'Documento'}
 async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
 export default function Contacts(){
  const [data,setData]=useState({contacts:[],total:0}),[loading,setLoading]=useState(true),[error,setError]=useState(''),[message,setMessage]=useState('')
- const [filters,setFilters]=useState(empty),[applied,setApplied]=useState(empty),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[showFilters,setShowFilters]=useState(false)
+ const [applied,setApplied]=usePersistentFilters('clientes',empty);const [filters,setFilters]=useState(applied),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[showFilters,setShowFilters]=useState(false)
  const [draft,setDraft]=useState(empty),[saving,setSaving]=useState(false),[modalOpen,setModalOpen]=useState(false)
  const dialog=useRef(null)
  useEffect(()=>{const controller=new AbortController();async function load(){setLoading(true);setError('');try{const qs=new URLSearchParams({page:String(page),...applied});const response=await fetch(`/api/admin/checkout/clientes?${qs}`,{headers:await headers(),signal:controller.signal,cache:'no-store'});const json=await response.json();if(!response.ok)throw new Error(json.error);setData(json)}catch(error){if(!controller.signal.aborted)setError(error.message)}finally{if(!controller.signal.aborted)setLoading(false)}}load();return()=>controller.abort()},[applied,page,refresh])

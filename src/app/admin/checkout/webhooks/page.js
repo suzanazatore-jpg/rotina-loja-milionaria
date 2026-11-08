@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from '../usePersistentFilters'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { WEBHOOK_EVENTS } from '@/lib/checkoutWebhookSettings'
@@ -16,12 +17,12 @@ export default function Webhooks() {
   const [data, setData] = useState({ webhooks: [], products: [], rows: [], count: 0 })
   const [selected, setSelected] = useState(null)
   const [tab, setTab] = useState('detalhe')
-  const [category, setCategory] = useState('vendas')
+  const [category, setCategory] = usePersistentFilters('webhooks:categoria','vendas')
   const [page, setPage] = useState(1)
-  const [status, setStatus] = useState('todos')
-  const [listStatus, setListStatus] = useState('active')
-  const [search, setSearch] = useState('')
-  const [urlFilter, setUrlFilter] = useState('')
+  const [status, setStatus] = usePersistentFilters('webhooks:atividades','todos')
+  const [listStatus, setListStatus] = usePersistentFilters('webhooks:status','active')
+  const [search, setSearch] = usePersistentFilters('webhooks:nome','')
+  const [urlFilter, setUrlFilter] = usePersistentFilters('webhooks:url','')
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [receipts, setReceipts] = useState(false)
   const [loading, setLoading] = useState(true)

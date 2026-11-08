@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from '../usePersistentFilters'
 import {useEffect,useState} from 'react'
 import ExportButton from '../ExportButton'
 import {supabase} from '@/lib/supabase'
@@ -13,7 +14,7 @@ function Status({value}){return <span className={`${styles.status} ${styles[valu
 export default function Subscriptions(){
  const router=useRouter()
  const [data,setData]=useState({subscriptions:[],total:0,products:[]}),[loading,setLoading]=useState(true),[error,setError]=useState('')
- const [filters,setFilters]=useState(empty),[applied,setApplied]=useState(empty),[showFilters,setShowFilters]=useState(false),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0)
+ const [applied,setApplied]=usePersistentFilters('assinaturas',empty);const [filters,setFilters]=useState(applied),[showFilters,setShowFilters]=useState(false),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0)
  useEffect(()=>{const controller=new AbortController();async function load(){setLoading(true);setError('');try{const qs=new URLSearchParams({...applied,page:String(page)});const response=await fetch(`/api/admin/checkout/assinaturas?${qs}`,{headers:await headers(),cache:'no-store',signal:controller.signal});const json=await response.json();if(!response.ok)throw new Error(json.error);if(!controller.signal.aborted)setData(current=>({...json,subscriptions:page===1?json.subscriptions:[...current.subscriptions,...json.subscriptions]}))}catch(error){if(!controller.signal.aborted)setError(error.message)}finally{if(!controller.signal.aborted)setLoading(false)}}load();return()=>controller.abort()},[applied,page,refresh])
  function reload(){setPage(1);setRefresh(v=>v+1)}
  const period=applied.inicio || applied.fim?`${applied.inicio?applied.inicio.split('-').reverse().join('/'):'Início'} – ${applied.fim?applied.fim.split('-').reverse().join('/'):'Hoje'}`:'Todo o período'

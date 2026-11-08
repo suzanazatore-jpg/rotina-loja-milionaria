@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from './usePersistentFilters'
 import {useEffect,useRef,useState} from 'react'
 import styles from './ProductInterior.module.css'
 const money=n=>(Number(n || 0)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})
@@ -13,7 +14,7 @@ export default function ProductSales({productId,token}) {
   const [data,setData]=useState(null)
   const [error,setError]=useState('')
   const [page,setPage]=useState(1)
-  const [filters,setFilters]=useState({status:'todos',inicio:'',fim:''})
+  const [filters,setFilters]=usePersistentFilters(`vendas-produto:${productId}`,{status:'todos',inicio:'',fim:''})
   const [filtersOpen,setFiltersOpen]=useState(false)
   const [selected,setSelected]=useState(null)
   const [opening,setOpening]=useState(false)

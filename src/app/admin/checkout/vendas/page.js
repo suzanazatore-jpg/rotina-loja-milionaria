@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from '../usePersistentFilters'
 import {Suspense,useEffect,useState} from 'react'
 import Link from 'next/link'
 import {useSearchParams} from 'next/navigation'
@@ -6,7 +7,7 @@ import {supabase} from '@/lib/supabase'
 import ExportButton from '../ExportButton'
 import {FilterDialog,FilterSection,Status,money,date,statusLabels} from '../CentralUI'
 const defaults={status:'todos',oferta:'',produto:'',inicio:'',fim:'',date_by:'created_at',method:'',marketplace:'',code:'',name:'',email:'',document:''}
-function Sales(){const search=useSearchParams();const [filters,setFilters]=useState({...defaults,oferta:search.get('oferta') || '',produto:search.get('produto') || ''}),[applied,setApplied]=useState({...defaults,oferta:search.get('oferta') || '',produto:search.get('produto') || ''}),[open,setOpen]=useState(false),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[data,setData]=useState({orders:[],products:[],count:0,limit:25}),[loading,setLoading]=useState(true),[error,setError]=useState('')
+function Sales(){const search=useSearchParams();const [applied,setApplied]=usePersistentFilters('vendas',defaults,Object.fromEntries(['oferta','produto'].filter(key=>search.has(key)).map(key=>[key,search.get(key)])));const [filters,setFilters]=useState(applied),[open,setOpen]=useState(false),[page,setPage]=useState(1),[refresh,setRefresh]=useState(0),[data,setData]=useState({orders:[],products:[],count:0,limit:25}),[loading,setLoading]=useState(true),[error,setError]=useState('')
  useEffect(()=>{if(search.get('id'))window.location.replace(`/admin/checkout/vendas/${encodeURIComponent(search.get('id'))}`)},[search])
  useEffect(()=>{const controller=new AbortController();async function load(){setLoading(true);setError('');try{const {data:{session}}=await supabase.auth.getSession(),response=await fetch(`/api/admin/checkout/vendas?${new URLSearchParams({...applied,page:String(page)})}`,{headers:{Authorization:`Bearer ${session?.access_token || ''}`},cache:'no-store',signal:controller.signal}),json=await response.json();if(!response.ok)throw new Error(json.error);if(!controller.signal.aborted)setData(json)}catch(error){if(!controller.signal.aborted)setError(error.message)}finally{if(!controller.signal.aborted)setLoading(false)}}load();return()=>controller.abort()},[applied,page,refresh])
  const change=(key,value)=>setFilters(f=>({...f,[key]:value}))

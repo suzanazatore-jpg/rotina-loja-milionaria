@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from './usePersistentFilters'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -36,9 +37,9 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const [ofertas, setOfertas] = useState([])
   const [planos, setPlanos] = useState([])
   const [extraOpen,setExtraOpen] = useState(false)
-  const [statusFilter,setStatusFilter] = useState('active')
-  const [typeFilter,setTypeFilter] = useState('all')
-  const [marketplaceFilter,setMarketplaceFilter] = useState('all')
+  const [statusFilter,setStatusFilter] = usePersistentFilters('produtos:status','active')
+  const [typeFilter,setTypeFilter] = usePersistentFilters('produtos:tipo','all')
+  const [marketplaceFilter,setMarketplaceFilter] = usePersistentFilters('produtos:marketplace','all')
   const [marketplaces,setMarketplaces] = useState([])
   const [filtersOpen,setFiltersOpen] = useState(false)
   const [mensagem, setMensagem] = useState('')
@@ -46,8 +47,8 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const [salvando, setSalvando] = useState(false)
   const produtoId = initialProdutoId
   const [aba, setAba] = useState('detalhes')
-  const [busca, setBusca] = useState('')
-  const [codigo, setCodigo] = useState('')
+  const [busca, setBusca] = usePersistentFilters('produtos:nome','')
+  const [codigo, setCodigo] = usePersistentFilters('produtos:codigo','')
   const [filterDraft, setFilterDraft] = useState({name:'',code:'',type:'all',marketplace:'all',visibility:'active'})
   function openFilters(){setFilterDraft({name:busca,code:codigo,type:typeFilter,marketplace:marketplaceFilter,visibility:statusFilter});setFiltersOpen(true)}
   function applyFilters(){setBusca(filterDraft.name);setCodigo(filterDraft.code);setTypeFilter(filterDraft.type);setMarketplaceFilter(filterDraft.marketplace);setStatusFilter(filterDraft.visibility);setFiltersOpen(false)}

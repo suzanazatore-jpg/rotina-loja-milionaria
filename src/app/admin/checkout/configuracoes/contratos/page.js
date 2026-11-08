@@ -1,4 +1,5 @@
 'use client'
+import {usePersistentFilters} from '../../usePersistentFilters'
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import styles from '../../ContractFields.module.css'
@@ -16,7 +17,7 @@ export default function ContratosPage() {
   const [token, setToken] = useState('')
   const [data, setData] = useState(null)
   const [tab, setTab] = useState('contratos')
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = usePersistentFilters('contratos:status','')
   const [message, setMessage] = useState('')
   const [events, setEvents] = useState(null)
   const [draft, setDraft] = useState({})
