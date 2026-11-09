@@ -20,6 +20,8 @@ test('public checkout denies real payments, incomplete configuration and acciden
  assert.equal(checkoutTestConfiguration({...env,CHECKOUT_LIVE_ENABLED:'true',CHECKOUT_TEST_ENABLED:'false',PAGARME_SECRET_KEY:'sk_live_mock',PAGARME_PUBLIC_KEY:'pk_live_mock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}).ready,true)
  assert.equal(checkoutTestConfiguration({...env,CHECKOUT_LIVE_ENABLED:'true',CHECKOUT_TEST_ENABLED:'false',PAGARME_SECRET_KEY:'sk_live_mock',PAGARME_PUBLIC_KEY:'pk_live_mock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}).mode,'live')
  assert.equal(checkoutTestConfiguration({...env,CHECKOUT_LIVE_ENABLED:'false',CHECKOUT_TEST_ENABLED:'false',PAGARME_SECRET_KEY:'sk_live_mock',PAGARME_PUBLIC_KEY:'pk_live_mock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}).ready,false)
+ assert.equal(checkoutTestConfiguration({...env,CHECKOUT_LIVE_ENABLED:'true',CHECKOUT_TEST_ENABLED:'false',PAGARME_SECRET_KEY:'sk_live_mock',PAGARME_PUBLIC_KEY:'pk_advR05QU4t0zR6VX',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}).ready,true)
+ assert.equal(checkoutTestConfiguration({...env,CHECKOUT_LIVE_ENABLED:'true',CHECKOUT_TEST_ENABLED:'false',PAGARME_SECRET_KEY:'sk_live_mock',PAGARME_PUBLIC_KEY:'pk_test_mock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}).ready,false)
 })
 test('offer lookup filters active records and exposes only public product/offer fields',async()=>{
  const offer={id:'offer',slug:'offer',name:'Oferta',product_id:'product',price_cents:4700,active:true,max_installments:3,free_installments:3,payment_methods:['pix','credit_card'],pix_discount_pct:10,checkout_config:{},internal_flag:'private'}
