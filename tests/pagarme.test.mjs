@@ -22,6 +22,8 @@ test('live payments require explicit activation and matching credentials', () =>
   assert.throws(() => gatewayConfiguration({ PAGARME_SECRET_KEY: 'sk_live_x' }))
   assert.throws(() => gatewayConfiguration({ PAGARME_SECRET_KEY: 'sk_live_x', PAGARME_BASE_URL: 'https://api.pagar.me/core/v5' }))
   assert.equal(gatewayConfiguration({ PAGARME_SECRET_KEY: 'sk_test_x' }).base,'https://sdx-api.pagar.me/core/v5')
+  assert.equal(gatewayConfiguration({ PAGARME_SECRET_KEY: 'sk_5_example', PAGARME_BASE_URL: 'https://api.pagar.me/core/v5', CHECKOUT_LIVE_ENABLED: 'true' }).base,'https://api.pagar.me/core/v5')
+  assert.throws(() => gatewayConfiguration({ PAGARME_SECRET_KEY: 'sk_test_x', PAGARME_BASE_URL: 'https://api.pagar.me/core/v5', CHECKOUT_LIVE_ENABLED: 'true' }))
   assert.throws(() => gatewayConfiguration({ PAGARME_SECRET_KEY: 'sk_test_x', PAGARME_BASE_URL: 'https://evil.example' }))
 })
 test('raw card fields are rejected and only token is sent', () => {
