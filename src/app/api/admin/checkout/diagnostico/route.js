@@ -18,7 +18,7 @@ export async function GET(request) {
       production_url: env.PAGARME_BASE_URL === expected,
       live_enabled: env.CHECKOUT_LIVE_ENABLED === 'true',
       secret_key_present: secret.length > 0,
-      secret_key_format: /^sk_live_[a-zA-Z0-9_]+$/.test(secret),
+      secret_key_format: /^sk_(?!test_)[a-zA-Z0-9_]+$/.test(secret),
       public_key_present: publicKey.length > 0,
       public_key_format: /^pk_(?!test_)[a-zA-Z0-9_]+$/.test(publicKey),
       session_secret_present: Boolean(env.CHECKOUT_SESSION_SECRET),
