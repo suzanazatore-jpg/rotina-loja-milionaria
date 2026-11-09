@@ -28,9 +28,13 @@ export async function loadCheckoutOffer(slug, db = checkoutAdminClient()) {
 export function checkoutTestConfiguration(env = process.env) {
   try {
     const gateway = gatewayConfiguration(env)
-    const ready = env.CHECKOUT_TEST_ENABLED === 'true' && gateway.base.includes('sdx-api') && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
-    return { ready, tokenBase: gateway.base, publicKey: /^pk_test_[a-zA-Z0-9]+$/.test(env.PAGARME_PUBLIC_KEY || '') ? env.PAGARME_PUBLIC_KEY : '' }
-  } catch { return { ready: false, tokenBase: 'https://sdx-api.pagar.me/core/v5', publicKey: '' } }
+    const sandbox = gateway.base === 'https://sdx-api.pagar.me/core/v5'
+    const publicKey = env.PAGARME_PUBLIC_KEY || ''
+    const validPublicKey = sandbox ? /^pk_test_[a-zA-Z0-9]+$/.test(publicKey) : /^pk_live_[a-zA-Z0-9]+$/.test(publicKey)
+    const enabled = sandbox ? env.CHECKOUT_TEST_ENABLED === 'true' : env.CHECKOUT_LIVE_ENABLED === 'true'
+    const ready = enabled && validPublicKey && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
+    return { ready, mode: sandbox ? 'test' : 'live', tokenBase: gateway.base, publicKey: validPublicKey ? publicKey : '' }
+  } catch { return { ready: false, mode: 'unavailable', tokenBase: '', publicKey: '' } }
 }
 export function publicCheckoutData(loaded, env = process.env) {
   const { offer, product, config, prices, bumps = [] } = loaded
