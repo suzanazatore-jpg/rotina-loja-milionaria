@@ -11,7 +11,7 @@ export function gatewayConfiguration(env = process.env) {
   if (!key) throw new PaymentError('Pagar.me não configurado.', 503)
   if (!['https://sdx-api.pagar.me/core/v5', 'https://api.pagar.me/core/v5'].includes(base)) throw new PaymentError('Ambiente Pagar.me inválido.', 503)
   if (base.includes('sdx-api') && !key.startsWith('sk_test_')) throw new PaymentError('Use uma chave de teste no sandbox.', 503)
-  if (!base.includes('sdx-api') && (env.CHECKOUT_LIVE_ENABLED !== 'true' || !key.startsWith('sk_live_'))) throw new PaymentError('Pagamentos reais ainda não habilitados.', 503)
+  if (!base.includes('sdx-api') && (env.CHECKOUT_LIVE_ENABLED !== 'true' || !/^sk_(?!test_)[a-zA-Z0-9_]+$/.test(key))) throw new PaymentError('Pagamentos reais ainda não habilitados.', 503)
   return { base, key }
 }
 
