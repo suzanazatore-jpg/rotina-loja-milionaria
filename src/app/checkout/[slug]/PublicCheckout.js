@@ -136,7 +136,7 @@ export default function PublicCheckout({ data }) {
       {focused && <div className="cp-hero"><p>{config.store_name}</p><h1>{config.headline || config.product_display_name || product.name}{config.headline_highlight && <span>{config.headline_highlight}</span>}</h1></div>}
       {config.layout === 'banner' && config.headline && <div className="cp-model-headline">{config.headline}{config.headline_highlight && <span>{config.headline_highlight}</span>}</div>}
     <header className="cp-header"><div className="cp-brand">{config.logo_url ? <Asset src={config.logo_url} alt={config.store_name} className="cp-logo" /> : <span className="cp-brand-mark">SZ</span>}<strong>{config.store_name}</strong></div><span className="cp-security">Pagamento protegido</span></header>
-      {!focused && <div className="pc-notice" role="status">{test.ready ? 'Ambiente de teste — disponível somente para o administrador.' : 'Checkout em preparação. Pagamentos ainda não disponíveis.'}</div>}
+      {!focused && (test.mode === 'test' || !test.ready) && <div className="pc-notice" role="status">{test.mode === 'test' ? 'Ambiente de teste — disponível somente para o administrador.' : test.ready ? '' : 'Checkout indisponível. Tente novamente em instantes.'}</div>}
       {config.banner_url && <div className={`cp-banner ${config.mobile_banner_url ? 'pc-desktop-banner' : ''}`}><Asset src={config.banner_url} alt="Oferta" /></div>}
       {config.mobile_banner_url && <div className="cp-banner pc-mobile-banner"><Asset src={config.mobile_banner_url} alt="Oferta" /></div>}
       <div className="cp-columns">
