@@ -27,6 +27,8 @@ export default function OfferEditor({produtoId,ofertaId}) {
   const [headline,setHeadline] = useState('Sim, quero adicionar!')
   const [description,setDescription] = useState('')
   const [baseline,setBaseline] = useState('')
+  const [paymentDiagnostic,setPaymentDiagnostic] = useState(null)
+  const [diagnosticLoading,setDiagnosticLoading] = useState(false)
   useEffect(()=>{
     let active = true
     async function load() {
@@ -64,6 +66,17 @@ export default function OfferEditor({produtoId,ofertaId}) {
       if(ofertaId==='nova')router.replace(`/admin/checkout/produtos/${encodeURIComponent(produtoId)}/ofertas/${encodeURIComponent(json.id)}`)
     }catch(e){setMessage(e.message)}finally{setSaving(false)}
   }
+  async function checkPaymentConfiguration() {
+    setDiagnosticLoading(true)
+    setPaymentDiagnostic(null)
+    try {
+      const response = await fetch('/api/admin/checkout/diagnostico', {headers:{Authorization:`Bearer ${token}`},cache:'no-store'})
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Não foi possível verificar o pagamento.')
+      setPaymentDiagnostic(data)
+    } catch (error) { setPaymentDiagnostic({error:error.message}) }
+    finally { setDiagnosticLoading(false) }
+  }
   function move(index,direction) {setDados(current=>{const bumps=[...current.bumps];const next=index+direction;if(next<0||next>=bumps.length)return current;[bumps[index],bumps[next]]=[bumps[next],bumps[index]];return {...current,bumps}})}
   function addBump() {
     if(!bumpOffer)return
@@ -82,7 +95,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
     <nav className="central-product-tabs" aria-label="Abas da oferta">{[['detalhes','Detalhes'],['bumps','Order Bump'],['vendas','Vendas'],['contrato','Contrato'],['checkout','Checkout'],['auditoria','Auditoria']].map(([key,label])=><button key={key} disabled={key==='bumps' && product.type==='subscription'} aria-current={tab===key?'page':undefined} onClick={()=>setTab(key)}>{label}</button>)}</nav>
     {dados.guru_config?.unsupported_methods?.length > 0 && <p className="central-editor-message" role="note">Importada do Guru. {dados.guru_config.unsupported_methods.map(m=>m==='boleto'?'Boleto':'Pix recorrente').join(' e ')} ainda não disponível neste checkout. Preço e frequência preservados; cobrança automática disponível no cartão.</p>}
     {message && <p role="status" className="central-editor-message">{message}</p>}
-    {tab==='detalhes'&&ofertaId!=='nova' && <section className="central-chart-panel"><h2>Links de pagamento</h2><label className="cv-short-alias">Personalizar link curto<div><span>{CHECKOUT_ORIGIN}/p/</span><input aria-label="Nome do link curto" value={dados.checkout_config.payment_alias || dados.payment_path || ''} placeholder="Ex.: biblioteca" pattern="[a-z][a-z0-9-]{1,31}" maxLength={32} onChange={e=>setDados({...dados,checkout_config:{...dados.checkout_config,payment_alias:e.target.value.toLowerCase()}})}/></div><small>Salve a oferta para ativar o nome escolhido. O link original continua funcionando.</small></label><div className="central-payment-link"><code>{link}</code><button className="central-action" onClick={async()=>{try{await navigator.clipboard.writeText(link);setMessage('✓ Link copiado.')}catch{setMessage('Não foi possível copiar. Selecione o link acima.')}}}>Copiar link</button><a className="central-action" href={link} target="_blank" rel="noopener noreferrer">Abrir checkout ↗</a></div><p className="central-data-note">O link abre a aparência salva da oferta. Pagamentos reais dependem da integração ativa do Pagar.me.</p></section>}
+    {tab==='detalhes'&&ofertaId!=='nova' && <section className="central-chart-panel"><h2>Links de pagamento</h2><div className="central-editor-message" style={{marginBottom:12}}><button type="button" className="central-action" onClick={checkPaymentConfiguration} disabled={diagnosticLoading}>{diagnosticLoading?'Verificando…':'Diagnosticar pagamentos'}</button>{paymentDiagnostic && <div role="status" style={{marginTop:10}}>{paymentDiagnostic.error ? <p>{paymentDiagnostic.error}</p> : <><strong>{paymentDiagnostic.ready?'Configuração de pagamento reconhecida':'Configuração de pagamento incompleta'}</strong><ul>{Object.entries(paymentDiagnostic.checks || {}).map(([key,valid])=><li key={key}>{valid?'✓':'✗'} {({production_url:'Endereço de produção',live_enabled:'Pagamentos reais habilitados',secret_key_present:'Chave secreta cadastrada',secret_key_format:'Formato da chave secreta',public_key_present:'Chave pública cadastrada',public_key_format:'Formato da chave pública',session_secret_present:'Chave de sessão cadastrada',session_secret_length:'Chave de sessão com tamanho suficiente'})[key] || key}</li>)}</ul><small>Diagnóstico somente de leitura, sem exibir valores secretos ou realizar cobranças.</small></>}</div>}</div><label className="cv-short-alias">Personalizar link curto<div><span>{CHECKOUT_ORIGIN}/p/</span><input aria-label="Nome do link curto" value={dados.checkout_config.payment_alias || dados.payment_path || ''} placeholder="Ex.: biblioteca" pattern="[a-z][a-z0-9-]{1,31}" maxLength={32} onChange={e=>setDados({...dados,checkout_config:{...dados.checkout_config,payment_alias:e.target.value.toLowerCase()}})}/></div><small>Salve a oferta para ativar o nome escolhido. O link original continua funcionando.</small></label><div className="central-payment-link"><code>{link}</code><button className="central-action" onClick={async()=>{try{await navigator.clipboard.writeText(link);setMessage('✓ Link copiado.')}catch{setMessage('Não foi possível copiar. Selecione o link acima.')}}}>Copiar link</button><a className="central-action" href={link} target="_blank" rel="noopener noreferrer">Abrir checkout ↗</a></div><p className="central-data-note">O link abre a aparência salva da oferta. Pagamentos reais dependem da integração ativa do Pagar.me.</p></section>}
     {tab==='auditoria' && ofertaId!=='nova' && <CatalogAudit offerId={ofertaId} token={token} />}
     <form onSubmit={save}>
       <div hidden={tab!=='detalhes'} className="central-offer-grid"><section className="central-chart-panel"><h2>Detalhe</h2><FormOferta dados={dados} produto={product} showBumps={false} onChange={setDados} /><label className="central-active-switch"><input type="checkbox" checked={dados.active} onChange={e=>setDados({...dados,active:e.target.checked})} />Oferta ativa</label></section><aside className="central-chart-panel central-offer-image"><h2>Imagem</h2><p className="central-data-note">{dados.checkout_config.product_image_url?'Imagem da oferta':'Herdada do produto'} · ideal 1024 × 1024</p>{(dados.checkout_config.product_image_url || product.image_url)&&<Image unoptimized width={200} height={200} className="cv-offer-product-image" src={dados.checkout_config.product_image_url || product.image_url} alt="Imagem da oferta"/>}<CheckoutImageField label="Imagem do produto ou especialista" value={dados.checkout_config.product_image_url || product.image_url || ''} onChange={url=>setDados({...dados,checkout_config:{...dados.checkout_config,product_image_url:url}})} style={{width:'100%'}}/></aside></div>
