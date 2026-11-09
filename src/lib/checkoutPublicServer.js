@@ -30,7 +30,7 @@ export function checkoutTestConfiguration(env = process.env) {
     const gateway = gatewayConfiguration(env)
     const sandbox = gateway.base === 'https://sdx-api.pagar.me/core/v5'
     const publicKey = env.PAGARME_PUBLIC_KEY || ''
-    const validPublicKey = sandbox ? /^pk_test_[a-zA-Z0-9]+$/.test(publicKey) : /^pk_live_[a-zA-Z0-9]+$/.test(publicKey)
+    const validPublicKey = sandbox ? /^pk_test_[a-zA-Z0-9]+$/.test(publicKey) : /^pk_(?!test_)[a-zA-Z0-9_]+$/.test(publicKey)
     const enabled = sandbox ? env.CHECKOUT_TEST_ENABLED === 'true' : env.CHECKOUT_LIVE_ENABLED === 'true'
     const ready = enabled && validPublicKey && (env.CHECKOUT_SESSION_SECRET?.length || 0) >= 32
     return { ready, mode: sandbox ? 'test' : 'live', tokenBase: gateway.base, publicKey: validPublicKey ? publicKey : '' }
