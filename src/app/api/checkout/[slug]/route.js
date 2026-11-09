@@ -58,9 +58,10 @@ export async function POST(request, context) {
     const input = JSON.parse(text)
     const { db, loaded, store, name, session, slug } = await checkout(request, context)
     if (checkoutExpired(loaded.config)) throw new PaymentError('O prazo desta oferta foi encerrado.', 410)
-    if (!checkoutTestConfiguration().ready) throw new PaymentError('Checkout em preparação. Pagamentos ainda não disponíveis.', 503)
-    // Durante homologação só o administrador pode iniciar pagamentos sandbox.
-    if (!(await autorizarAdmin(request, db))) throw new PaymentError('Este checkout está em teste administrativo.', 401)
+    const paymentEnvironment = checkoutTestConfiguration()
+    if (!paymentEnvironment.ready) throw new PaymentError('Checkout indisponível. Verifique a configuração do Pagar.me.', 503)
+    // Apenas pagamentos de teste exigem autorização administrativa; produção aceita clientes públicos.
+    if (paymentEnvironment.mode === 'test' && !(await autorizarAdmin(request, db))) throw new PaymentError('Este checkout está em teste administrativo.', 401)
     if (input.action === 'start') {
       if (!session) store.set(name, signCheckoutSession(loaded.offer.id, secret()), { httpOnly: true, secure: new URL(request.url).protocol === 'https:', sameSite: 'strict', path: `/api/checkout/${slug}`, maxAge: 1800 })
       return response({ ready: true })
