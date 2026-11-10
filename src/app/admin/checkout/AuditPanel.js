@@ -17,7 +17,6 @@ export default function AuditPanel({orderId,events=[],initialOpen=false}){
  const labels=new Map(hooks.map(h=>[h.id,h.name]))
  const botHooks=hooks.filter(h=>/botconversa|desafio_zerando/i.test(h.name))
  const otherHooks=hooks.filter(h=>!botHooks.some(b=>b.id===h.id))
- const toggleAll = (items, checked) => setSelected(current=>checked?[...new Set([...current,...items.map(h=>h.id)])]:current.filter(id=>!items.some(h=>h.id===id)))
  const rows=[...events.filter(e=>!String(e.id).startsWith('delivery:')).map(e=>({...e,kind:kind(e)})),...deliveries.map(d=>({id:'delivery:'+d.id,deliveryId:d.id,title: d.status==='delivered'?'Webhook enviado':d.status==='failed'?'Erro ao entregar webhook':'Webhook '+(statuses[d.status]||'registrado'),description:`${labels.get(d.webhook_id)||'Integração cadastrada'} · ${d.event_type} · ${d.attempts} tentativa(s)${d.response_status?' · HTTP '+d.response_status:''}`,at:d.delivered_at || d.created_at,kind:d.status==='failed'?'error':'webhook',state:d.status}))].sort((a,b)=>String(b.at||'').localeCompare(String(a.at||'')))
  const filtered=rows.filter(e=>filter==='all'||filter==='webhook'&&(e.kind==='webhook'||e.deliveryId)||filter==='error'&&e.kind==='error'||filter==='payment'&&e.kind==='payment')
  return <section className="central-chart-panel cv-guru-audit">
