@@ -10,7 +10,7 @@ const contractLabels={pending:'Aguardando assinatura',viewed:'Visualizado',signe
 async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
 function SalesTable({orders,contact=false}){return <div className="cv-table-wrap"><table className="cv-table"><thead><tr><th>Código</th>{contact&&<th>Contato</th>}<th>Produto</th><th>Criada em</th><th>Valor</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="cv-code"><Status value={o.status}/><Link className="cv-link" href={`/admin/checkout/vendas/${o.id}`}>{o.pagarme_charge_id || o.pagarme_order_id || o.id}</Link></div></td>{contact&&<td>{o.customer?.name || '—'}</td>}<td>{o.product_name || o.offer_name || '—'}</td><td>{date(o.created_at)}</td><td>{money(o.total_cents)}</td></tr>)}{!orders.length&&<tr><td colSpan={contact?5:4}>Nenhuma venda registrada.</td></tr>}</tbody></table></div>}
 export default function RecordDetail({entity,id,initialTab='detail'}){
- const [reopen,setReopen]=useState(0),[data,setData]=useState(null),[error,setError]=useState(''),[tab,setTab]=useState(initialTab),[refresh,setRefresh]=useState(0),[text,setText]=useState(''),[saving,setSaving]=useState(false),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState(false),[accessBusy,setAccessBusy]=useState(false),[accessNotice,setAccessNotice]=useState(''),[financeAction,setFinanceAction]=useState(null),[financeConfirm,setFinanceConfirm]=useState(''),[financeBusy,setFinanceBusy]=useState(false),[financeNote,setFinanceNote]=useState('')
+ const [reopen,setReopen]=useState(0),[data,setData]=useState(null),[error,setError]=useState(''),[tab,setTab]=useState(initialTab),[refresh,setRefresh]=useState(0),[text,setText]=useState(''),[saving,setSaving]=useState(false),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState(false),[accessBusy,setAccessBusy]=useState(false),[accessNotice,setAccessNotice]=useState(''),[financeAction,setFinanceAction]=useState(null),[financeConfirm,setFinanceConfirm]=useState(''),[financeBusy,setFinanceBusy]=useState(false),[financeNote,setFinanceNote]=useState(''),[invoiceOpen,setInvoiceOpen]=useState(false),[invoiceNumber,setInvoiceNumber]=useState(''),[invoiceUrl,setInvoiceUrl]=useState(''),[invoiceBusy,setInvoiceBusy]=useState(false)
  useEffect(()=>{const controller=new AbortController();async function load(){setError('');try{const response=await fetch(`/api/admin/checkout/registros?${new URLSearchParams({entity,id})}`,{headers:await headers(),cache:'no-store',signal:controller.signal}),json=await response.json();if(!response.ok)throw new Error(json.error);if(!controller.signal.aborted)setData(json)}catch(error){if(!controller.signal.aborted)setError(error.message)}}load();return()=>controller.abort()},[entity,id,refresh])
  async function resendAccessPabbly(){
   setAccessBusy(true);setError('');setAccessNotice('')
@@ -20,6 +20,16 @@ export default function RecordDetail({entity,id,initialTab='detail'}){
    if(!response.ok)throw new Error(json.error||'Não foi possível acionar o Pabbly.')
    setAccessNotice(json.message||'Pabbly acionado.')
   }catch(e){setError(e.message)}finally{setAccessBusy(false)}
+ }
+ async function registerInvoice(e){
+  e.preventDefault();setInvoiceBusy(true);setError('');setFinanceNote('')
+  try{
+   const response=await fetch('/api/admin/checkout/notas-fiscais',{method:'POST',headers:await headers(),body:JSON.stringify({order_id:id,invoice_number:invoiceNumber,invoice_url:invoiceUrl})})
+   const result=await response.json()
+   if(!response.ok)throw new Error(result.error||'Não foi possível registrar a nota fiscal.')
+   setFinanceNote(result.message||'Nota fiscal existente registrada.')
+   setInvoiceOpen(false);setInvoiceNumber('');setInvoiceUrl('');setRefresh(v=>v+1)
+  }catch(e){setError(e.message)}finally{setInvoiceBusy(false)}
  }
  async function executeFinance(e){
   e.preventDefault()
@@ -46,13 +56,15 @@ export default function RecordDetail({entity,id,initialTab='detail'}){
   <button disabled={busy} onClick={()=>sync('sync')}>↻ {busy?'Consultando…':'Atualizar Status'}</button>
   <button onClick={()=>{setTab('audit');setReopen(v=>v+1)}}>↻ Reenviar</button>
   <button type="button" disabled={accessBusy} onClick={resendAccessPabbly}>{accessBusy?'Enviando ao Pabbly…':'↗ Reenviar acesso via Pabbly'}</button>
-  <button disabled title="Em preparação: integração de notas fiscais ainda não disponível.">▤ Informar Nota Fiscal</button>
+  <button type="button" onClick={()=>{setInvoiceOpen(true);setError('')}}>▤ Informar Nota Fiscal</button>
   <button type="button" disabled={busy||financeBusy||r.status==='refunded'||r.status==='chargedback'||!r.pagarme_charge_id} onClick={()=>{setFinanceAction('refund');setFinanceConfirm('');setError('')}}>× Reembolsar</button>
   <button type="button" disabled={busy||financeBusy||!r.pagarme_charge_id} onClick={()=>{setFinanceAction('chargeback');setFinanceConfirm('');setError('')}}>⊙ Marcar como Chargeback</button>
  </div>}
  {error&&<p role="alert" className="central-error">{error}</p>}
  {accessNotice&&<p role="status" className="cv-guru-access-notice">{accessNotice}</p>}
  {financeNote&&<p role="status" className="cv-guru-access-notice">{financeNote}</p>}
+ {invoiceOpen&&entity==='vendas'&&<div className="cv-finance-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="cv-invoice-title" className="cv-finance-dialog"><h2 id="cv-invoice-title">Informar Nota Fiscal</h2><p>Registre uma nota fiscal que já foi emitida. Este formulário não emite nota nem envia documentos ao cliente.</p><form onSubmit={registerInvoice}><label>Número da nota<input required maxLength={120} value={invoiceNumber} onChange={e=>setInvoiceNumber(e.target.value)} placeholder="Número ou identificação da nota"/></label><label>Link HTTPS da nota fiscal<input required type="url" value={invoiceUrl} onChange={e=>setInvoiceUrl(e.target.value)} placeholder="https://..."/></label><div className="cv-finance-actions"><button type="button" disabled={invoiceBusy} onClick={()=>setInvoiceOpen(false)}>Cancelar</button><button type="submit" className="cv-finance-confirm" disabled={invoiceBusy||!invoiceNumber.trim()||!invoiceUrl.trim()}>{invoiceBusy?'Registrando…':'Registrar nota existente'}</button></div></form></section></div>}
+
  {financeAction&&entity==='vendas'&&<div className="cv-finance-backdrop"><section role="dialog" aria-modal="true" aria-labelledby="cv-finance-title" className="cv-finance-dialog"><h2 id="cv-finance-title">{financeAction==='refund'?'Confirmar reembolso integral':'Conferir chargeback'}</h2><p>{financeAction==='refund'?'A Pagar.me receberá uma solicitação REAL para devolver o valor integral desta venda. Esta ação não pode ser desfeita.':'A Central consultará a Pagar.me. Só registrará chargeback se a operadora já confirmar a contestação. Não será criada uma contestação artificial.'}</p>{financeAction==='refund'&&<label>Digite <strong>REEMBOLSAR</strong> para confirmar<input autoComplete="off" value={financeConfirm} onChange={e=>setFinanceConfirm(e.target.value)} placeholder="REEMBOLSAR"/></label>}<div className="cv-finance-actions"><button type="button" disabled={financeBusy} onClick={()=>{setFinanceAction(null);setFinanceConfirm('')}}>Cancelar</button><button type="button" className="cv-finance-confirm" disabled={financeBusy||(financeAction==='refund'&&financeConfirm!=='REEMBOLSAR')} onClick={executeFinance}>{financeBusy?'Conferindo…':financeAction==='refund'?'Solicitar reembolso real':'Consultar e atualizar se confirmado'}</button></div></section></div>}
 
  {tab==='detail'&&entity==='clientes'&&<><BuyerCard customer={r}/><FieldGrid title="Histórico comercial" fields={[["Cadastrado em",date(r.created_at)],['Vendas registradas',data.orders.length],['Vendas aprovadas',data.orders.filter(o=>o.status==='paid').length],['Assinaturas',data.subscriptions.length],['Produtos comprados',data.products.length],['Total em compras aprovadas',money(data.orders.filter(o=>o.status==='paid').reduce((s,o)=>s+o.total_cents,0))]]}/></>}
