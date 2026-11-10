@@ -7,6 +7,7 @@ import { FilterDialog, FilterSection } from './CentralUI'
 import { FormProduto } from './CheckoutForms'
 import ProductDetails from './ProductDetails'
 import ProductOffers from './ProductOffers'
+import ProductCheckout from './ProductCheckout'
 import { paymentLink } from '@/lib/checkoutLinks'
 import ProductSales from './ProductSales'
 import interior from './ProductInterior.module.css'
@@ -36,6 +37,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
   const [produtos, setProdutos] = useState([])
   const [ofertas, setOfertas] = useState([])
   const [planos, setPlanos] = useState([])
+  const [globalConfig,setGlobalConfig] = useState({})
   const [extraOpen,setExtraOpen] = useState(false)
   const [statusFilter,setStatusFilter] = useState('active')
   const [typeFilter,setTypeFilter] = useState('all')
@@ -69,7 +71,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
     try {
       const dados = await api('GET', null, tk)
       setProdutos(dados.produtos || []); setOfertas(dados.ofertas || [])
-      setPlanos(dados.planos || []); setMarketplaces(dados.marketplaces || [])
+      setGlobalConfig(dados.global_config || {});setPlanos(dados.planos || []); setMarketplaces(dados.marketplaces || [])
     } catch (e) { setMensagem(e.message) }
   }, [api])
 
@@ -172,10 +174,11 @@ export default function AdminCheckout({ initialProdutoId = null }) {
           <div className={productStyles.tableWrap}><table className={productStyles.table}><thead><tr><th>Nome</th><th>Código</th><th>Marketplace</th><th><span className={productStyles.srOnly}>Ações</span></th></tr></thead><tbody>{visibleProducts.map(p=><tr key={p.id}><td><div className={productStyles.nameWithVisibility}><label className={productStyles.visibilitySwitch} title={p.active ? 'Ocultar e desativar novas compras' : 'Reativar produto'}><input type="checkbox" role="switch" aria-label={`Disponível para compra: ${p.name}`} checked={p.active === true} disabled={salvando} onChange={()=>alternar('produto',p)}/><span className={productStyles.switchTrack} aria-hidden="true"/></label><Link className={productStyles.productName} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`}>{p.name}</Link></div></td><td>{p.code || p.id}</td><td>{nomeMarketplace(p.marketplace_id)}</td><td><div className={productStyles.actions}><Link className={productStyles.productOpen} href={`/admin/checkout/produtos/${encodeURIComponent(p.id)}`} title={p.type==='subscription'?'Abrir assinatura':'Abrir produto'} aria-label={`Abrir ${p.type==='subscription'?'assinatura':'produto'} ${p.name}`}><ProductIcon kind={p.type}/></Link><button className={productStyles.duplicate} disabled={salvando} title="Duplicar produto" aria-label={`Duplicar ${p.name}`} onClick={()=>duplicarProduto(p)}><ProductIcon kind="copy"/></button></div></td></tr>)}{!visibleProducts.length && <tr><td colSpan={4}>Nenhum produto encontrado. Use Filtros → Visibilidade para consultar os ocultos.</td></tr>}</tbody></table></div>
 
         </> : <>
-          <div className={interior.topbar}><nav aria-label="Caminho do produto" className={interior.breadcrumb}><Link href="/admin/central-vendas">Início</Link><span>/</span><Link href="/admin/checkout">Produtos</Link><span>/</span><span>{selecionado.name}</span></nav><details className={interior.additional}><summary>⚙ Configurações adicionais ⌄</summary><div><button onClick={event=>{event.currentTarget.closest('details').open=false;setAba('detalhes');setExtraOpen(open=>!open)}}>Plano e integrações</button><Link href="/admin/checkout/configuracoes">Padrões de checkout</Link></div></details></div>
-          <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhe'],['ofertas','Ofertas'],['vendas','Vendas'],['auditoria','Auditoria']].map(([key,label])=><button key={key} aria-current={aba===key?'page':undefined} onClick={()=>setAba(key)}>{label}</button>)}</nav>
+          <div className={interior.topbar}><nav aria-label="Caminho do produto" className={interior.breadcrumb}><Link href="/admin/central-vendas">Início</Link><span>/</span><Link href="/admin/checkout">Produtos</Link><span>/</span><span>{selecionado.name}</span></nav><details className={interior.additional}><summary>⚙ Configurações adicionais ⌄</summary><div><button onClick={event=>{event.currentTarget.closest('details').open=false;setAba('detalhes');setExtraOpen(open=>!open)}}>Plano e integrações</button><button onClick={event=>{event.currentTarget.closest('details').open=false;setAba('checkout')}}>Checkout</button><Link href="/admin/checkout/configuracoes">Padrões de checkout</Link></div></details></div>
+          <nav className="central-product-tabs" aria-label="Abas do produto">{[['detalhes','Detalhe'],['ofertas','Ofertas'],['vendas','Vendas'],['checkout','Checkout'],['auditoria','Auditoria']].map(([key,label])=><button key={key} aria-current={aba===key?'page':undefined} onClick={()=>setAba(key)}>{label}</button>)}</nav>
           {<div hidden={aba!=='detalhes'}><ProductDetails key={`${selecionado.id}:${selecionado.updated_at || ''}`} product={selecionado} marketplaces={marketplaces} plans={planos} token={token} onSave={salvarDetalhe} saving={salvando} advanced={extraOpen}/></div>}
           {aba==='ofertas' && <ProductOffers product={selecionado} offers={ofertas.filter(o=>o.product_id===produtoId)} onCreate={()=>novaOferta(selecionado)} onDuplicate={duplicarOferta} onToggle={o=>alternar('oferta',o)} onCopy={copiarLink} busy={salvando}/>}
+          {<div hidden={aba!=='checkout'}><ProductCheckout product={selecionado} offers={ofertas.filter(o=>o.product_id===produtoId)} globalConfig={globalConfig} token={token} onSaved={offer=>setOfertas(current=>current.map(o=>o.id===offer.id?offer:o))}/></div>}
           {aba==='vendas' && <ProductSales productId={selecionado.id} token={token}/>}
           {aba==='auditoria' && <CatalogAudit productId={selecionado.id} token={token}/>}
 
