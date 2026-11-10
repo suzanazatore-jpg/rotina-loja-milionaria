@@ -20,7 +20,7 @@ export async function notifyAccessPabbly(db, {order, customer, password, product
   try { target = new URL(hook.url) } catch { return {status:'invalid_destination'} }
   if (target.protocol !== 'https:' || target.hostname !== 'connect.pabbly.com' || !target.pathname.startsWith('/workflow/sendwebhookdata/')) return {status:'invalid_destination'}
   if (!customer?.email || !customer?.phone || !customer?.name || !order?.paid_at) return {status:'incomplete_customer'}
-  if (!password) return {status:'existing_account'} // Senha existente nunca é recuperada ou inventada.
+  // Contas existentes recebem instruções para definir uma senha; nunca copiamos nem alteramos a senha atual.
   // Nunca registrar a senha no banco, logs ou auditoria.
   const created = await db.from('webhook_events').insert({pagarme_event_id:marker,type:'checkout.access.pabbly',payload:{order_id:order.id,channel:'pabbly'},error:'ready'})
   if (created.error && created.error.code !== '23505') return {status:'failed',reason:'receipt_unavailable'}
@@ -33,8 +33,8 @@ export async function notifyAccessPabbly(db, {order, customer, password, product
       email: customer.email,
       nome: customer.name,
       telefone: phone,
-      senha: password,
-      link_app: LOGIN_URL,
+      senha: password || 'Use a sua senha atual; para criar outra, utilize o link de recuperação.',
+      link_app: password ? LOGIN_URL : RECOVERY_URL,
       nome_produto: productName || 'Curso adquirido',
       evento: 'acesso_liberado',
       tipo_acesso: 'curso',
