@@ -3,6 +3,7 @@ import { randomBytes } from 'node:crypto'
 import { PaymentError } from './pagarme.js'
 import { enviarEmailBoasVindas } from './enviarEmailBoasVindas.js'
 import { enviarEmailRenovacao } from './enviarEmailRenovacao.js'
+import { notifyAccessPabbly } from './checkoutAccessPabblyServer.js'
 
 async function checked(query) {
   const { data, error } = await query
@@ -120,6 +121,14 @@ export async function fulfillPaidOrder(db, orderId) {
       else await enviarEmailRenovacao({ nome: customer.name, email: customer.email, valor: (order.total_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), proximaCobranca: new Date(expiration).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) })
     } catch { emailStatus = 'failed' }
     await checked(db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: emailStatus === 'failed' ? 'Email não enviado; reenviar pelo painel de alunas.' : null, payload: { order_id: order.id, profile_id: profile.id, plan_ids: plans.map(plan => plan.id), email_status: emailStatus } }).eq('id', event.id))
+    // Integração pós-venda: falhas do Pabbly nunca revertem o acesso nem o pagamento.
+    // Somente novos cadastros recebem a senha recém-criada, sem persistí-la.
+    if (password) {
+      try {
+        const offering = await db.from('offers').select('name').eq('id',order.offer_id).maybeSingle()
+        await notifyAccessPabbly(db,{order,customer,password,productName:offering.data?.name})
+      } catch { /* O recibo é separado; a compra aprovada permanece intacta. */ }
+    }
     return { fulfillment: 'completed', email_status: emailStatus }
   } catch (error) {
     await db.from('webhook_events').update({ error: 'retry' }).eq('id', event.id)
