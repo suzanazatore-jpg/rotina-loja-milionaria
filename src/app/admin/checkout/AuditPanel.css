@@ -58,3 +58,10 @@
 .cv-guru-detail-button{font-size:11px!important;padding:4px 0 0!important}
 .cv-guru-detail{margin-top:11px!important}
 @media(max-width:700px){.cv-guru-audit{padding:14px 8px!important}.cv-guru-timeline{padding-left:4px!important}.cv-guru-timeline li{gap:14px!important}.cv-guru-entry:before{width:12px;left:-12px}}
+
+
+.cv-guru-date-range{display:inline-flex;align-items:center;gap:6px;background:var(--cv-panel);border:1px solid var(--cv-border);border-radius:25px;padding:6px 12px;margin:0 0 15px;font-size:11px;color:var(--cv-muted)}
+.cv-guru-filters{max-width:810px;margin:0 auto 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:13px 15px;background:var(--cv-panel);border:1px solid var(--cv-border);border-radius:12px}
+.cv-guru-filters label{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--cv-text)}
+.cv-guru-filters select{min-width:150px;background:var(--cv-panel);color:var(--cv-text);border:1px solid var(--cv-border);border-radius:8px;padding:7px 9px}
+.cv-guru-filters button{border:0;background:transparent;color:var(--cv-link);cursor:pointer;font-size:12px;padding:7px}
