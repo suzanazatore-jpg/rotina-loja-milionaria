@@ -63,8 +63,10 @@ export async function GET(request) {
     const destinations=integrations.map(integration=>({id:integration.id,name:integration.name,destination:destinationLabel(integration.url),active:integration.active}))
     const accessEvent = await checked(db.from('webhook_events').select('processed_at,error,payload').eq('pagarme_event_id',`access:${orderId}`).maybeSingle())
     const access = accessEvent ? {status:accessEvent.processed_at?'completed':accessEvent.error==='retry'?'retry':'pending',email_status:accessEvent.payload?.email_status || 'unknown',processed_at:accessEvent.processed_at} : {status:'not_recorded',email_status:'unknown',processed_at:null}
-    // A entrega final de e-mail e WhatsApp depende dos provedores; não inferir recebimento de um HTTP 200.
-    const afterSale = {access,email_provider_receipt:access.email_status==='sent'?'accepted_not_confirmed':'not_confirmed',whatsapp_delivery:'not_confirmed'}
+    const pabblyEvent=await checked(db.from('webhook_events').select('processed_at,received_at,error').eq('pagarme_event_id',`access-pabbly:${orderId}`).maybeSingle())
+    const pabbly = pabblyEvent ? {status:pabblyEvent.processed_at?'accepted':pabblyEvent.error==='retry'?'retry':'pending',at:pabblyEvent.processed_at||pabblyEvent.received_at} : {status:'not_recorded',at:null}
+    // Aceitação HTTP do Pabbly não comprova mensagem recebida no WhatsApp.
+    const afterSale = {access,pabbly,email_provider_receipt:access.email_status==='sent'?'accepted_not_confirmed':'not_confirmed',whatsapp_delivery:'not_confirmed'}
     // A URL e os segredos do destino jamais são enviados ao navegador.
     return json({hooks,destinations,afterSale,enabled:process.env.CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED === 'true',deliveries:deliveries.map(({payload,...d})=>({...d,environment:payload?.environment || 'unknown'}))})
   } catch {return json({error:'Não foi possível carregar os envios.'},500)}
