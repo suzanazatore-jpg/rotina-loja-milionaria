@@ -10,8 +10,17 @@ const contractLabels={pending:'Aguardando assinatura',viewed:'Visualizado',signe
 async function headers(){const {data:{session}}=await supabase.auth.getSession();return {Authorization:`Bearer ${session?.access_token || ''}`,'Content-Type':'application/json'}}
 function SalesTable({orders,contact=false}){return <div className="cv-table-wrap"><table className="cv-table"><thead><tr><th>Código</th>{contact&&<th>Contato</th>}<th>Produto</th><th>Criada em</th><th>Valor</th></tr></thead><tbody>{orders.map(o=><tr key={o.id}><td><div className="cv-code"><Status value={o.status}/><Link className="cv-link" href={`/admin/checkout/vendas/${o.id}`}>{o.pagarme_charge_id || o.pagarme_order_id || o.id}</Link></div></td>{contact&&<td>{o.customer?.name || '—'}</td>}<td>{o.product_name || o.offer_name || '—'}</td><td>{date(o.created_at)}</td><td>{money(o.total_cents)}</td></tr>)}{!orders.length&&<tr><td colSpan={contact?5:4}>Nenhuma venda registrada.</td></tr>}</tbody></table></div>}
 export default function RecordDetail({entity,id,initialTab='detail'}){
- const [reopen,setReopen]=useState(0),[data,setData]=useState(null),[error,setError]=useState(''),[tab,setTab]=useState(initialTab),[refresh,setRefresh]=useState(0),[text,setText]=useState(''),[saving,setSaving]=useState(false),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState(false)
+ const [reopen,setReopen]=useState(0),[data,setData]=useState(null),[error,setError]=useState(''),[tab,setTab]=useState(initialTab),[refresh,setRefresh]=useState(0),[text,setText]=useState(''),[saving,setSaving]=useState(false),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState(false),[accessBusy,setAccessBusy]=useState(false),[accessNotice,setAccessNotice]=useState('')
  useEffect(()=>{const controller=new AbortController();async function load(){setError('');try{const response=await fetch(`/api/admin/checkout/registros?${new URLSearchParams({entity,id})}`,{headers:await headers(),cache:'no-store',signal:controller.signal}),json=await response.json();if(!response.ok)throw new Error(json.error);if(!controller.signal.aborted)setData(json)}catch(error){if(!controller.signal.aborted)setError(error.message)}}load();return()=>controller.abort()},[entity,id,refresh])
+ async function resendAccessPabbly(){
+  setAccessBusy(true);setError('');setAccessNotice('')
+  try{
+   const response=await fetch('/api/admin/checkout/acesso-pabbly',{method:'POST',headers:await headers(),body:JSON.stringify({order_id:id})})
+   const json=await response.json()
+   if(!response.ok)throw new Error(json.error||'Não foi possível acionar o Pabbly.')
+   setAccessNotice(json.message||'Pabbly acionado.')
+  }catch(e){setError(e.message)}finally{setAccessBusy(false)}
+ }
  async function comment(event){event.preventDefault();setSaving(true);setError('');try{const response=await fetch('/api/admin/checkout/registros',{method:'POST',headers:await headers(),body:JSON.stringify({entity,id,text})}),json=await response.json();if(!response.ok)throw new Error(json.error);setText('');setRefresh(v=>v+1)}catch(error){setError(error.message)}finally{setSaving(false)}}
  async function sync(action){setBusy(true);setError('');try{const endpoint=entity==='assinaturas'?'/api/admin/checkout/assinaturas':'/api/admin/checkout/pagamentos';const response=await fetch(endpoint,{method:'POST',headers:await headers(),body:JSON.stringify(entity==='assinaturas'?{id,action}:{action:'sync',order_id:id})}),json=await response.json();if(!response.ok)throw new Error(json.error);setConfirm(false);setRefresh(v=>v+1)}catch(error){setError(error.message)}finally{setBusy(false)}}
  const tabs=entity==='assinaturas'?[['detail','Detalhe'],['buyer','Assinante'],['invoices','Faturas'],['sales','Vendas'],['comments','Comentários'],['audit','Auditoria']]:entity==='clientes'?[['detail','Detalhe'],['sales','Vendas'],['subscriptions','Assinaturas'],['products','Produtos'],['comments','Comentários'],['audit','Auditoria']]:[['detail','Detalhe'],['buyer','Comprador'],['extras','Extras'],['comments','Comentários'],['audit','Auditoria']]
@@ -23,11 +32,13 @@ export default function RecordDetail({entity,id,initialTab='detail'}){
  {entity==='vendas'&&<div className="cv-guru-actionbar">
   <button disabled={busy} onClick={()=>sync('sync')}>↻ {busy?'Consultando…':'Atualizar Status'}</button>
   <button onClick={()=>{setTab('audit');setReopen(v=>v+1)}}>↻ Reenviar</button>
+  <button type="button" disabled={accessBusy} onClick={resendAccessPabbly}>{accessBusy?'Enviando ao Pabbly…':'↗ Reenviar acesso via Pabbly'}</button>
   <button disabled title="Em preparação: integração de notas fiscais ainda não disponível.">▤ Informar Nota Fiscal</button>
   <button disabled title="Em preparação: reembolso exige integração segura com a Pagar.me.">× Reembolsar</button>
   <button disabled title="Em preparação: contestação é uma ocorrência financeira, não uma ação simulada.">⊙ Marcar como Chargeback</button>
  </div>}
  {error&&<p role="alert" className="central-error">{error}</p>}
+ {accessNotice&&<p role="status" className="cv-guru-access-notice">{accessNotice}</p>}
  {tab==='detail'&&entity==='clientes'&&<><BuyerCard customer={r}/><FieldGrid title="Histórico comercial" fields={[["Cadastrado em",date(r.created_at)],['Vendas registradas',data.orders.length],['Vendas aprovadas',data.orders.filter(o=>o.status==='paid').length],['Assinaturas',data.subscriptions.length],['Produtos comprados',data.products.length],['Total em compras aprovadas',money(data.orders.filter(o=>o.status==='paid').reduce((s,o)=>s+o.total_cents,0))]]}/></>}
  {tab==='detail'&&entity==='vendas'&&<><section className="central-chart-panel cv-guru-summary"><div className="cv-guru-summary-heading"><h2>Detalhe <small>ⓘ Ajuda</small></h2><span className={`cv-guru-status-pill ${r.status==='paid'?'approved':''}`}><Status value={r.status}/>{(statusLabels[r.status]||r.status).toUpperCase()}</span></div><dl className="cv-guru-fields">
  <div><dt>Código</dt><dd>{code}</dd></div>
