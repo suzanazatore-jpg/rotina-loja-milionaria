@@ -3,7 +3,7 @@ import {sendWebhook} from './checkoutOutboundServer.js'
 
 // Entrega de acesso é separada do pagamento e não altera o checkout.
 // O endereço do Pabbly fica no banco administrativo, nunca no navegador ou no GitHub.
-const INTEGRATION_NAME = '[App_Rotina - Acesso] - Pabbly'
+const INTEGRATION_ID = 'principal'
 const LOGIN_URL = 'https://rotina.suzanazatorre.com.br/login'
 const RECOVERY_URL = 'https://rotina.suzanazatorre.com.br/esqueci-senha'
 
@@ -13,7 +13,7 @@ export async function notifyAccessPabbly(db, {order, customer, password, product
   if (eventResult.error) return {status:'failed',reason:'status_unavailable'}
   if (eventResult.data?.processed_at) return {status:'already_sent'}
   if (eventResult.data?.error === 'sending') return {status:'in_progress'}
-  const configured = await db.from('outbound_webhooks').select('id,url,secret,active').eq('name',INTEGRATION_NAME).maybeSingle()
+  const configured = await db.from('checkout_access_pabbly_config').select('url,secret,active').eq('id',INTEGRATION_ID).maybeSingle()
   if (configured.error || !configured.data?.active) return {status:'not_configured'}
   const hook = configured.data
   let target
