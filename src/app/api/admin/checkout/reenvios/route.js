@@ -9,6 +9,16 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const json = (value, status = 200) => Response.json(value, {status, headers: {'Cache-Control':'no-store'}})
 const checked = async query => { const result = await query; if (result.error) throw new Error('Falha ao consultar os dados do webhook.'); return result.data }
+const destinationLabel = value => {
+  try {
+    const url = new URL(value)
+    if (url.protocol !== 'https:') return 'Destino externo'
+    const sections = url.pathname.split('/').filter(Boolean)
+    // O último segmento de webhooks pode ser um token: não o devolva ao navegador.
+    const prefix = sections.length > 1 ? sections.slice(0, -1).join('/') : ''
+    return `${url.origin}/${prefix ? prefix + '/' : ''}•••`
+  } catch { return 'Destino não identificado' }
+}
 async function sale(db, id) {
   const order = await checked(db.from('orders').select('id,status,paid_at,offer_id,event_id,customer_id').eq('id',id).maybeSingle())
   if (!order) return null
@@ -35,17 +45,20 @@ export async function GET(request) {
       if (!UUID.test(requestedDelivery)) return json({error:'Envio inválido.'},400)
       const delivery = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,response_body,created_at,delivered_at,payload').eq('id',requestedDelivery).eq('order_id',orderId).maybeSingle())
       if (!delivery) return json({error:'Envio não encontrado.'},404)
-      const hook = await checked(db.from('outbound_webhooks').select('name').eq('id',delivery.webhook_id).maybeSingle())
-      return json({delivery,webhook_name:hook?.name || 'Integração removida'})
+      const hook = await checked(db.from('outbound_webhooks').select('name,url').eq('id',delivery.webhook_id).maybeSingle())
+      return json({delivery,webhook_name:hook?.name || 'Integração removida',destination:hook?.url?destinationLabel(hook.url):'Destino removido'})
     }
     const hooks = await hooksFor(db,record.products)
     const deliveries = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,created_at,delivered_at,next_attempt_at,payload').eq('order_id',orderId).order('created_at',{ascending:false}).limit(150))
+    const trackedIds=[...new Set(deliveries.map(d=>d.webhook_id).filter(Boolean))]
+    const integrations=trackedIds.length?await checked(db.from('outbound_webhooks').select('id,name,url,active').in('id',trackedIds)):[]
+    const destinations=integrations.map(integration=>({id:integration.id,name:integration.name,destination:destinationLabel(integration.url),active:integration.active}))
     const accessEvent = await checked(db.from('webhook_events').select('processed_at,error,payload').eq('pagarme_event_id',`access:${orderId}`).maybeSingle())
     const access = accessEvent ? {status:accessEvent.processed_at?'completed':accessEvent.error==='retry'?'retry':'pending',email_status:accessEvent.payload?.email_status || 'unknown',processed_at:accessEvent.processed_at} : {status:'not_recorded',email_status:'unknown',processed_at:null}
     // A entrega final de e-mail e WhatsApp depende dos provedores; não inferir recebimento de um HTTP 200.
     const afterSale = {access,email_provider_receipt:access.email_status==='sent'?'accepted_not_confirmed':'not_confirmed',whatsapp_delivery:'not_confirmed'}
     // A URL e os segredos do destino jamais são enviados ao navegador.
-    return json({hooks,afterSale,enabled:process.env.CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED === 'true',deliveries:deliveries.map(({payload,...d})=>({...d,environment:payload?.environment || 'unknown'}))})
+    return json({hooks,destinations,afterSale,enabled:process.env.CHECKOUT_OUTBOUND_WEBHOOKS_ENABLED === 'true',deliveries:deliveries.map(({payload,...d})=>({...d,environment:payload?.environment || 'unknown'}))})
   } catch {return json({error:'Não foi possível carregar os envios.'},500)}
 }
 export async function POST(request) {
