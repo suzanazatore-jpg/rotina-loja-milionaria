@@ -47,7 +47,7 @@ export async function readContractDelivery(db, order) {
  }
  return {id:contract.id,status:contract.status,signed_at:contract.signed_at,access_status:contract.fulfillment_status,has_pdf:Boolean(contract.signed_pdf_path),channels}
 }
-const eventName=type=>({'order.paid':'Pagamento aprovado','charge.paid':'Cobrança aprovada','charge.payment_failed':'Cobrança recusada','order.payment_failed':'Pagamento recusado','subscription.created':'Assinatura criada','subscription.updated':'Assinatura atualizada','subscription.canceled':'Assinatura cancelada','subscription.admin_canceled':'Assinatura cancelada pelo administrador','subscription.admin_synced':'Status consultado no Pagar.me','charge.refunded':'Reembolso registrado','order.canceled':'Pedido cancelado','charge.chargedback':'Contestação registrada'})[type] || `Evento: ${type}`
+const eventName=type=>({'order.paid':'Pagamento aprovado','charge.paid':'Cobrança aprovada','charge.payment_failed':'Cobrança recusada','order.payment_failed':'Pagamento recusado','subscription.created':'Assinatura criada','subscription.updated':'Assinatura atualizada','subscription.canceled':'Assinatura cancelada','subscription.admin_canceled':'Assinatura cancelada pelo administrador','subscription.admin_synced':'Status consultado no Pagar.me','charge.refunded':'Reembolso registrado','order.canceled':'Pedido cancelado','charge.chargedback':'Contestação registrada','checkout.admin.refund_requested':'Reembolso solicitado','checkout.admin.refund_confirmed':'Reembolso confirmado na Pagar.me','checkout.admin.refund_verified':'Reembolso conciliado','checkout.admin.chargeback_verified':'Chargeback confirmado na Pagar.me','checkout.admin.invoice_registered':'Nota fiscal existente registrada','checkout.access.pabbly':'Acesso encaminhado ao Pabbly'})[type] || `Evento: ${type}`
 export async function recordActivity(db,{entity,id,orders=[],subscriptions=[]}){
  const resourceIds=[...new Set([...orders.flatMap(o=>[o.pagarme_order_id,o.pagarme_charge_id]),...subscriptions.map(s=>s.pagarme_subscription_id)].filter(Boolean))]
  const events=[],comments=[]
@@ -56,6 +56,21 @@ export async function recordActivity(db,{entity,id,orders=[],subscriptions=[]}){
  comments.push(...saved.map(e=>({id:e.id,text:String(e.payload?.text || '').slice(0,3000),at:e.received_at,actor:e.payload?.actor || 'Administrador'})))
  const orderIds=orders.map(o=>o.id)
  for(let i=0;i<orderIds.length;i+=200){const deliveries=await allRows(()=>db.from('webhook_deliveries').select('id,event_type,status,attempts,created_at,delivered_at,response_status').in('order_id',orderIds.slice(i,i+200)).order('created_at',{ascending:false}).order('id'));events.push(...deliveries.map(e=>({id:`delivery:${e.id}`,title:e.status==='delivered'?'Webhook entregue':'Webhook registrado',at:e.delivered_at || e.created_at,description:`${e.event_type} · ${e.attempts || 0} tentativa(s)${e.response_status?` · HTTP ${e.response_status}`:''}`})))}
+ for(let i=0;i<orderIds.length;i+=200){
+  const administrative=await allRows(()=>db.from('webhook_events')
+    .select('id,type,received_at,processed_at,error,payload')
+    .in('payload->>order_id',orderIds.slice(i,i+200))
+    .in('type',['checkout.admin.refund_requested','checkout.admin.refund_confirmed','checkout.admin.refund_verified','checkout.admin.chargeback_verified','checkout.admin.invoice_registered','checkout.access.pabbly'])
+    .order('received_at',{ascending:false}).order('id'))
+  events.push(...administrative.map(row=>({
+    id:`admin:${row.id}`,title:eventName(row.type),at:row.processed_at||row.received_at,
+    description:row.type==='checkout.admin.invoice_registered'
+      ? `Nota: ${String(row.payload?.number||'').slice(0,100)} — registrada, não emitida pelo sistema`
+      : row.type==='checkout.access.pabbly'
+        ? row.processed_at?'Pabbly aceitou o evento; confirme a entrega no BotConversa':'Aguardando ou requer nova tentativa'
+        : row.processed_at?'Operação registrada na auditoria':'Solicitação registrada; verifique confirmação da operadora',
+  })))
+ }
  events.push(...comments.map(c=>({id:`comment:${c.id}`,title:'Comentário interno registrado',at:c.at,description:c.text.slice(0,160)})))
  for(const subscription of subscriptions)events.push({id:`subscription:${subscription.id}`,title:'Assinatura criada',at:subscription.created_at,description:subscription.product_name || ''})
  for(const order of orders){events.push({id:`order:${order.id}`,title:'Pedido criado',at:order.created_at,description:order.product_name || order.offer_name || ''});if(order.paid_at)events.push({id:`paid:${order.id}`,title:'Pagamento confirmado',at:order.paid_at,description:'Valor integral da venda registrado na central'})}
