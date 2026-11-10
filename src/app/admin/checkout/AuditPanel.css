@@ -30,3 +30,31 @@
 .cv-guru-send{min-width:105px;min-height:35px;padding:8px 25px;border:0;border-radius:25px;background:#432695;color:white;font-weight:600;font-size:14px;cursor:pointer}
 .cv-guru-send:disabled{background:#b0a2d4;color:#fff;cursor:not-allowed}
 @media(max-width:600px){.cv-guru-modal>header button{right:18px}.cv-guru-modal-body{padding:25px 21px 14px}.cv-guru-modal-options{padding-left:22px;gap:17px}.cv-guru-modal footer{padding:16px 20px 22px}.cv-guru-modal{max-height:92vh}}
+
+
+/* Auditoria de vendas — linha do tempo compacta inspirada no Guru. */
+.cv-guru-audit{background:transparent!important;border:0!important;box-shadow:none!important;max-width:1140px;margin:0 auto;padding:16px 20px 35px!important}
+.cv-guru-heading{border:0!important;padding:0 0 18px!important;align-items:flex-start}
+.cv-guru-heading h2{font-size:18px!important;color:var(--cv-text);font-weight:600}
+.cv-guru-heading h2:before{content:"";display:block;background:#432695;width:22px;height:2px;margin-bottom:9px}
+.cv-guru-heading h2 small{font-weight:400!important;font-size:11px;color:var(--cv-link);padding-left:7px}
+.cv-guru-heading>div>small{font-size:12px}
+.cv-guru-controls button{border:1px solid #5b3dab!important;background:transparent!important;color:var(--cv-link)!important;border-radius:25px!important;padding:9px 17px!important;min-height:36px;cursor:pointer}
+.cv-guru-controls select{border-radius:20px!important;min-height:36px}
+.cv-after-sale{max-width:820px;margin:10px auto 22px;background:var(--cv-panel);border:1px solid var(--cv-border);border-radius:12px;padding:13px 16px;font-size:12px}
+.cv-after-sale p{font-size:12px!important;line-height:1.6;margin:6px 0!important}
+.cv-after-sale small{color:var(--cv-muted);font-size:11px}
+.cv-guru-timeline{max-width:810px!important;margin:12px auto 0!important;padding:0 0 0 12px!important}
+.cv-guru-timeline li{min-height:66px!important;gap:35px!important;padding:0 0 7px 0!important}
+.cv-guru-timeline li:not(:last-child):before{left:14px!important;top:25px!important;bottom:-8px!important;border-left:1px solid #55bce2!important}
+.cv-guru-dot{width:29px!important;height:29px!important;flex:0 0 29px!important;border-radius:50%!important;background:var(--cv-panel)!important;font-size:15px;font-weight:600}
+.cv-guru-entry{position:relative;background:var(--cv-panel)!important;border:0!important;border-radius:14px!important;min-height:50px;padding:13px 18px!important;box-shadow:0 1px 1px #00000006}
+.cv-guru-entry:before{content:"";width:23px;height:1px;background:#55bce2;position:absolute;top:23px;left:-23px}
+.cv-guru-line strong{font-size:13px!important;font-weight:600!important}
+.cv-guru-line time{font-size:11px!important}
+.cv-guru-integration-name{font-weight:600;font-size:12px;line-height:1.4;color:var(--cv-text);margin-top:4px}
+.cv-guru-destination{font-size:11px!important;margin:2px 0!important;color:var(--cv-muted)!important;word-break:break-all}
+.cv-guru-delivery-meta{display:block;color:var(--cv-muted);font-size:11px;margin:4px 0}
+.cv-guru-detail-button{font-size:11px!important;padding:4px 0 0!important}
+.cv-guru-detail{margin-top:11px!important}
+@media(max-width:700px){.cv-guru-audit{padding:14px 8px!important}.cv-guru-timeline{padding-left:4px!important}.cv-guru-timeline li{gap:14px!important}.cv-guru-entry:before{width:12px;left:-12px}}
