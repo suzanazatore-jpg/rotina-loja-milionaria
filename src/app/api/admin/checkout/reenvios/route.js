@@ -9,6 +9,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const json = (value, status = 200) => Response.json(value, {status, headers: {'Cache-Control':'no-store'}})
 const checked = async query => { const result = await query; if (result.error) throw new Error('Falha ao consultar os dados do webhook.'); return result.data }
+const redactPayload = value => {
+  if (Array.isArray(value)) return value.map(redactPayload)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).map(([key,part]) => [
+    key,
+    /^(api_token|password|senha|cvv|card_number|card_token|authorization|secret|token|document)$/i.test(key) ? '[protegido]' : redactPayload(part),
+  ]))
+}
 const destinationLabel = value => {
   try {
     const url = new URL(value)
@@ -46,7 +54,7 @@ export async function GET(request) {
       const delivery = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,response_body,created_at,delivered_at,payload').eq('id',requestedDelivery).eq('order_id',orderId).maybeSingle())
       if (!delivery) return json({error:'Envio não encontrado.'},404)
       const hook = await checked(db.from('outbound_webhooks').select('name,url').eq('id',delivery.webhook_id).maybeSingle())
-      return json({delivery,webhook_name:hook?.name || 'Integração removida',destination:hook?.url?destinationLabel(hook.url):'Destino removido'})
+      return json({delivery:{...delivery,payload:redactPayload(delivery.payload),response_body:String(delivery.response_body||'').slice(0,1000)},webhook_name:hook?.name || 'Integração removida',destination:hook?.url?destinationLabel(hook.url):'Destino removido'})
     }
     const hooks = await hooksFor(db,record.products)
     const deliveries = await checked(db.from('webhook_deliveries').select('id,webhook_id,event_type,status,attempts,response_status,created_at,delivered_at,next_attempt_at,payload').eq('order_id',orderId).order('created_at',{ascending:false}).limit(150))
