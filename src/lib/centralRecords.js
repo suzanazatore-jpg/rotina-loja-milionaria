@@ -60,11 +60,13 @@ export async function recordActivity(db,{entity,id,orders=[],subscriptions=[]}){
   const administrative=await allRows(()=>db.from('webhook_events')
     .select('id,type,received_at,processed_at,error,payload')
     .in('payload->>order_id',orderIds.slice(i,i+200))
-    .in('type',['checkout.admin.refund_requested','checkout.admin.refund_confirmed','checkout.admin.refund_verified','checkout.admin.chargeback_verified','checkout.admin.invoice_registered','checkout.access.pabbly'])
+    .in('type',['checkout.admin.refund_requested','checkout.admin.refund_confirmed','checkout.admin.refund_verified','checkout.admin.chargeback_verified','checkout.admin.invoice_registered','checkout.access.pabbly','checkout.capi'])
     .order('received_at',{ascending:false}).order('id'))
   events.push(...administrative.map(row=>({
-    id:`admin:${row.id}`,title:eventName(row.type),at:row.processed_at||row.received_at,
-    description:row.type==='checkout.admin.invoice_registered'
+    id:`admin:${row.id}`,title:row.type==='checkout.capi'?(row.processed_at?'Compra recebida pela Meta':'Envio de compra para a Meta'):eventName(row.type),at:row.processed_at||row.received_at,
+    description:row.type==='checkout.capi'
+      ? `Purchase · ${row.processed_at?'Recebimento confirmado pela Meta':row.error==='retry'?'Aguardando nova tentativa':row.error==='processing'?'Envio em andamento':'Requer revisão'} · ${row.payload?.attempts || 0} tentativa(s)`
+      : row.type==='checkout.admin.invoice_registered'
       ? `Nota: ${String(row.payload?.number||'').slice(0,100)} — registrada, não emitida pelo sistema`
       : row.type==='checkout.access.pabbly'
         ? row.processed_at?'Pabbly aceitou o evento; confirme a entrega no BotConversa':'Aguardando ou requer nova tentativa'
