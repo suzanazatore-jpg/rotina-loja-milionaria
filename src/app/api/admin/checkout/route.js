@@ -109,7 +109,7 @@ async function montarOferta(supabase, dados) {
     if (config.require_privacy && !urls.privacy_url) throw new Error('Informe a URL da política de privacidade antes de exigir o aceite.')
   }
 
-  if(dados.checkout_config?.payment_alias){const alias=normalizeCheckoutSettings(dados.checkout_config).payment_alias;const existing=await supabase.from('offers').select('id').eq('checkout_config->>payment_alias',alias);if(existing.error)throw new Error('Não foi possível verificar o link curto.');if(existing.data?.some(o=>o.id!==dados.id))throw new Error('Este link curto já está em uso. Escolha outro.')}
+  if(dados.checkout_config?.payment_alias){const alias=normalizeCheckoutSettings(dados.checkout_config).payment_alias;const existing=await supabase.from('offers').select('id').eq('checkout_config->>payment_alias',alias);if(existing.error)throw new Error('Não foi possível verificar o link curto.');if(existing.data?.some(o=>o.id!==dados.id))throw new Error('Este link curto já está em uso. Escolha outro.');const sameSlug=await supabase.from('offers').select('id').eq('slug',alias);if(sameSlug.error)throw new Error('Não foi possível verificar o link curto.');if(sameSlug.data?.some(o=>o.id!==dados.id))throw new Error('Este link curto já é a URL amigável de outra oferta. Escolha outro.')}
 
   return {
     product_id: produto.id,
