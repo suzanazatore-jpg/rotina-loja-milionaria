@@ -7,7 +7,8 @@ function subscribe(callback) {
   window.addEventListener('storage',callback);window.addEventListener('sz-checkout-consent',callback)
   return ()=>{window.removeEventListener('storage',callback);window.removeEventListener('sz-checkout-consent',callback)}
 }
-function snapshot() {try{return window.localStorage.getItem(CONSENT_KEY) || 'unknown'}catch{return 'unknown'}}
+// Sem escolha salva = aceito pelo aviso fixo abaixo do botão de compra. Quem recusar fica salvo como 'denied'.
+function snapshot() {try{return window.localStorage.getItem(CONSENT_KEY)==='denied'?'denied':'granted'}catch{return 'granted'}}
 function updateConsent(granted) {
   try {
     window.dataLayer ||= []
@@ -67,7 +68,12 @@ export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,s
   if(!enabled || destination.channel==='off')return null
   return <>
     {allowed && (destination.channel==='gtm' ? <Script id={`sz-gtm-${destination.id}`} src={`https://www.googletagmanager.com/gtm.js?id=${destination.id}`} strategy="afterInteractive"/> : <Script id="sz-meta-sdk" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive"/>)}
-    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Usamos cookies e enviamos dados da compra e um identificador do seu e-mail à Meta para medir anúncios.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
-    {consent!=='unknown' && <button type="button" className="pc-cookie-settings" onClick={()=>choose('unknown')}>Preferências de cookies</button>}
   </>
+}
+// Link discreto dentro do aviso fixo do checkout para recusar (ou voltar a permitir) cookies de anúncios.
+export function CookieChoice() {
+  const consent=useSyncExternalStore(subscribe,snapshot,()=> 'granted')
+  return consent==='denied'
+    ? <button type="button" className="pc-cookie-choice" onClick={()=>choose('granted')}>Permitir cookies de anúncios</button>
+    : <button type="button" className="pc-cookie-choice" onClick={()=>choose('denied')}>Não permitir cookies de anúncios</button>
 }
