@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import '../../admin/checkout/checkout-preview.css'
 import './public-checkout.css'
+import './checkout-conversion.css'
 import '../../admin/checkout/focused-checkout.css'
 import '../../admin/checkout/checkout-models.css'
 
@@ -26,7 +27,8 @@ export default function PublicCheckout({ data }) {
   const { offer, product, config, prices, test, bumps = [] } = data
   const focused = config.layout === 'focused'
   const SummaryHeading = focused ? 'h2' : 'h1'
-  const initialMethod = config.layout==='guru'&&new Set(prices.map(p=>p.method)).size>1?null:focused && prices.some(price => price.method === 'credit_card') ? 'credit_card' : prices[0]?.method || 'pix'
+  // Pix já vem marcado no modelo Guru para a cliente não travar na escolha.
+  const initialMethod = config.layout==='guru'?(prices.some(price => price.method === 'pix') ? 'pix' : prices[0]?.method || 'pix'):focused && prices.some(price => price.method === 'credit_card') ? 'credit_card' : prices[0]?.method || 'pix'
   const [method, setMethod] = useState(initialMethod)
   const [installments, setInstallments] = useState(initialMethod === 'credit_card' ? offer.default_installments || 1 : 1)
   const [selectedBumps, setSelectedBumps] = useState([])
