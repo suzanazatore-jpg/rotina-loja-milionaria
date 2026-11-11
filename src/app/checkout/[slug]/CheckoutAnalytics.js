@@ -67,7 +67,7 @@ export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,s
   if(!enabled || destination.channel==='off')return null
   return <>
     {allowed && (destination.channel==='gtm' ? <Script id={`sz-gtm-${destination.id}`} src={`https://www.googletagmanager.com/gtm.js?id=${destination.id}`} strategy="afterInteractive"/> : <Script id="sz-meta-sdk" src="https://connect.facebook.net/en_US/fbevents.js" strategy="afterInteractive"/>)}
-    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Permitir análise e publicidade? Usaremos cookies e enviaremos dados da compra e um identificador derivado do seu email à Meta para medir campanhas.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
+    {consent==='unknown' && <aside className="pc-consent" aria-label="Cookies opcionais"><p>Usamos cookies e enviamos dados da compra e um identificador do seu e-mail à Meta para medir anúncios.</p><div><button type="button" onClick={()=>choose('denied')}>Recusar</button><button type="button" onClick={()=>choose('granted')}>Permitir</button>{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></aside>}
     {consent!=='unknown' && <button type="button" className="pc-cookie-settings" onClick={()=>choose('unknown')}>Preferências de cookies</button>}
   </>
 }
