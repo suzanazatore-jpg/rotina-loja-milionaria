@@ -1,13 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ['pdf-parse', '@napi-rs/canvas'],
-  // Link curto de checkout: pay.suzanazatorre.com.br/<slug> mostra /checkout/<slug>.
+  // Link curto de checkout: pay.suzanazatorre.com.br/<link-curto> abre /p/<link-curto>
+  // (link curto definido na oferta, no admin). /desafio7dias fica fixo para não quebrar links já divulgados.
   // Só vale para o domínio pay; os links /checkout/... continuam iguais.
   async rewrites() {
     const pay = [{ type: 'host', value: 'pay.suzanazatorre.com.br' }]
     return [
       { source: '/desafio7dias', has: pay, destination: '/checkout/protocolo-zerando-estoque-47' },
-      { source: '/:slug([a-z0-9-]{1,60})', has: pay, destination: '/checkout/:slug' },
+      { source: '/:code([a-zA-Z0-9_-]{1,60})', has: pay, destination: '/p/:code' },
     ]
   },
   async headers() {
