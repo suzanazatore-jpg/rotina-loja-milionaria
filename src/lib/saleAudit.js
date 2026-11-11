@@ -1,4 +1,8 @@
 import { auditEvent, redactAudit } from './saleDetail.js'
+export function metaConversionAudit(event) {
+ const sent=Boolean(event.processed_at)
+ return {id:`meta:${event.id}`,title:sent?'Compra recebida pela Meta':'Envio de compra para a Meta',description:'Purchase · API de Conversões',source:'Central de Vendas',destination:{name:'Meta',url:`https://graph.facebook.com/${event.payload?.pixel_id || ''}/events`},outcome:sent?'Recebimento confirmado pela Meta':({retry:'Aguardando nova tentativa',processing:'Envio em andamento',ineligible:'Fora dos critérios de envio'})[event.error] || 'Requer revisão',at:event.processed_at || event.received_at,event_type:'Purchase',attempts:event.payload?.attempts || 0,failure:!sent&&event.error==='review_required'?'O envio requer revisão.':null,json:{event:'Purchase',event_id:event.payload?.event_id,order_id:event.payload?.order_id,pixel_id:event.payload?.pixel_id,attempts:event.payload?.attempts || 0,received_by_meta:sent}}
+}
 export function saleEnvironment(snapshot, currentBase='https://sdx-api.pagar.me/core/v5') {
  const base=snapshot?.gateway_base || snapshot?.tracking?.gateway_base
  const mode=base==='https://api.pagar.me/core/v5'?'live':base==='https://sdx-api.pagar.me/core/v5'?'test':'unknown'

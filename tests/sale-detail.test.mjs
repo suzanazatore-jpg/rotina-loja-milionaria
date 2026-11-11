@@ -81,3 +81,13 @@ test('financial delegation requires explicit confirmation and maps only the curr
  await liveSaleRequest(request,id,'chargeback',{confirm:true,reason:'Teste',requestId:id},fetcher)
  assert.equal(JSON.parse(calls[2].options.body).action,'chargeback')
 })
+
+test('Meta audit distinguishes accepted Purchase from a pending attempt and exposes no identifiers',async()=>{
+ const {metaConversionAudit}=await import('../src/lib/saleAudit.js')
+ const record={id:'receipt',payload:{pixel_id:'123456',order_id:'order',event_id:'purchase:order',attempts:1,access_token:'never-expose'},received_at:'2026-11-11T17:43:00Z',error:'retry'}
+ const waiting=metaConversionAudit(record)
+ assert.match(waiting.outcome,/nova tentativa/)
+ const sent=metaConversionAudit({...record,error:null,processed_at:'2026-11-11T17:43:07Z'})
+ assert.equal(sent.title,'Compra recebida pela Meta');assert.equal(sent.at,'2026-11-11T17:43:07Z')
+ assert.equal(JSON.stringify(sent).includes('never-expose'),false)
+})

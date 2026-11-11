@@ -15,6 +15,7 @@ globalThis.__liveRoute={state,loaded,db}
 let source=readFileSync(new URL('../src/app/api/checkout/[slug]/route.js',import.meta.url),'utf8')
 source=source.replace(/^import .* from .*\n/gm,'')
 const prelude=`
+import { purchaseTracking } from '${new URL('../src/lib/checkoutConversionsServer.js',import.meta.url).href}';
 import { CHECKOUT_SESSION_MAX_AGE,signCheckoutSession,readCheckoutSession,safeCheckoutRedirect } from '${new URL('../src/lib/checkoutSession.js',import.meta.url).href}';
 const {state,loaded,db}=globalThis.__liveRoute;
 const NextResponse=Response;
@@ -26,7 +27,7 @@ const checkoutPaymentConfiguration=()=>({ready:state.ready,mode:'live',adminOnly
 const autorizarAdmin=async()=>state.admin;
 const checkoutExpired=()=>false;
 const validateCheckoutForm=()=>{};
-const createPayment=async()=>{state.payCalls++;state.paid=true;return {order_id:'order',status:'paid'}};
+const createPayment=async(_db,_input,_key,tracking)=>{state.tracking=tracking;state.payCalls++;state.paid=true;return {order_id:'order',status:'paid'}};
 const fulfillPaidOrder=async()=>{throw new Error('delivery temporarily unavailable')};
 const deliverPaidConversion=async()=>{};
 const purchaseAnalytics=()=>null;
@@ -58,6 +59,7 @@ test('live route denies visitors and CSRF; successful charge remains paid when d
   const result=await paid.json()
   assert.equal(result.status,'paid');assert.equal(result.fulfillment,'pending');assert.equal(result.redirect_url,null)
   assert.equal(state.payCalls,1)
+  assert.equal(state.tracking.policy,'payment_approved_v1');assert.equal(state.tracking.consent,null);assert.deepEqual(state.tracking.identifiers,{})
   state.delivery=true
   const status=await GET(new Request('https://example.org/api/checkout/pilot'),context)
   const complete=await status.json()

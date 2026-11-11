@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const analytics = `data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/checkoutAnalytics.js', import.meta.url))).toString('base64')}`
 const source = readFileSync(new URL('../src/lib/checkoutConversionsServer.js', import.meta.url), 'utf8').replace('./checkoutAnalytics.js', analytics)
-const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion, retryConversions } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion, retryConversions, purchaseTracking } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env = { META_CAPI_PIXEL_ID:'123456', META_CAPI_ACCESS_TOKEN:'secret', VERCEL_ENV:'production', CHECKOUT_CAPI_ENABLED:'true', PAGARME_BASE_URL:'https://api.pagar.me/core/v5' }
 const now = Date.now()
 const order = { id:'order', status:'paid', paid_at:new Date(now-1000).toISOString(), total_cents:4700 }
@@ -142,4 +142,29 @@ test('approved and consented purchase waits for a missing token without sending 
    await deliverPaidConversion(refused,'order')
    assert.equal(refused.tables.webhook_events.length,1)
  } finally {for(const [key,value] of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+})
+
+
+test('approval policy works without a cookie choice, excludes optional identifiers and preserves refusals', () => {
+ const tracking=purchaseTracking({pixelId:'123456',gatewayBase:env.PAGARME_BASE_URL,sourceUrl:'https://example.com/checkout/offer',preference:'unknown',identifiers:{fbp:'must-not-send'}})
+ assert.equal(tracking.consent,null)
+ assert.deepEqual(tracking.identifiers,{})
+ const event=conversionEvent(order,{...snapshot,tracking},{email:'buyer@example.com'},now)
+ assert.equal(event.event_id,'purchase:order')
+ assert.equal(event.user_data.fbp,undefined)
+ const refusal=purchaseTracking({...tracking,preference:'denied'})
+ assert.equal(conversionEvent(order,{...snapshot,tracking:refusal},{email:'buyer@example.com'},now),null)
+ assert.equal(conversionEvent(order,{...snapshot,tracking:null},{email:'buyer@example.com'},now),null)
+})
+test('automatic approval delivery is idempotent and a recorded refusal is not sent',async()=>{
+ const old=Object.fromEntries(Object.keys(env).map(key=>[key,process.env[key]]));const original=globalThis.fetch;Object.assign(process.env,env)
+ try {
+  let calls=0
+  globalThis.fetch=async()=>{calls++;return {ok:true,json:async()=>({events_received:1})}}
+  const db=database();db.tables.webhook_events[0].payload.tracking=purchaseTracking({pixelId:'123456',gatewayBase:env.PAGARME_BASE_URL,sourceUrl:'https://example.com/checkout/offer',preference:'unknown'})
+  assert.equal((await deliverPaidConversion(db,'order')).status,'sent')
+  await deliverPaidConversion(db,'order');assert.equal(calls,1)
+  const refused=database();refused.tables.webhook_events[0].payload.tracking={...db.tables.webhook_events[0].payload.tracking,consent:false}
+  assert.equal((await deliverPaidConversion(refused,'order')).status,'disabled');assert.equal(calls,1)
+ }finally{globalThis.fetch=original;for(const[key,value]of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
 })
