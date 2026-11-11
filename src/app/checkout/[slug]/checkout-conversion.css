@@ -4,3 +4,5 @@
 .pc-consent>div{gap:6px;flex-wrap:nowrap;flex-shrink:0}
 .pc-consent a{font-size:10px}
 .pc-consent button{padding:6px 10px;font-size:12px}
+.pc-checkout .pc-data-notice{text-align:center;line-height:1.5;opacity:.75;max-width:460px;margin:12px auto 0}
+.pc-cookie-choice{display:inline;background:none;border:0;padding:0;font:inherit;color:inherit;text-decoration:underline;cursor:pointer}
