@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs'
 
 const code=readFileSync(new URL('../src/lib/checkoutAccessPabblyServer.js',import.meta.url),'utf8')
   .replace("import {sendWebhook} from './checkoutOutboundServer.js'","const sendWebhook = () => { throw new Error('Real network forbidden in tests') }")
+  .replace("import {ensureProductIdentification} from './checkoutTagFirstServer.js'","const ensureProductIdentification = async () => ({ready:true})")
 const {notifyAccessPabbly}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'))
 
 const order={id:'12345678-1234-1234-1234-123456789abc',paid_at:'2026-11-10T11:13:01Z'}
@@ -72,4 +73,19 @@ test('only the approved Pabbly domain is permitted',async()=>{
  const result=await notifyAccessPabbly(db,{order,customer,password:'secret',sender:async()=>{throw Error('not allowed')}})
  assert.equal(result.status,'invalid_destination')
  assert.equal(db.recorded(),null)
+})
+
+test('product tag is checked before the access flow and a missing tag delays WhatsApp only',async()=>{
+ const db=fakeDb(), steps=[]
+ const first=await notifyAccessPabbly(db,{order,customer,password:'temporary-password',
+   productTagGate:async()=>{steps.push('tag_not_ready');return {ready:false,reason:'product_tag_pending'}},
+   sender:async()=>{throw Error('access must not run yet')}})
+ assert.equal(first.status,'waiting_product_tag')
+ assert.equal(db.recorded().error,'waiting_tag')
+ assert.deepEqual(steps,['tag_not_ready'])
+ const second=await notifyAccessPabbly(db,{order,customer,password:'temporary-password',
+   productTagGate:async()=>{steps.push('tag_delivered');return {ready:true,reason:'product_tag_accepted'}},
+   sender:async()=>{steps.push('send_access');return {status:200}}})
+ assert.equal(second.status,'accepted_by_pabbly')
+ assert.deepEqual(steps,['tag_not_ready','tag_delivered','send_access'])
 })

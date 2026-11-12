@@ -1,5 +1,6 @@
 import {randomUUID} from 'node:crypto'
 import {sendWebhook} from './checkoutOutboundServer.js'
+import {ensureProductIdentification} from './checkoutTagFirstServer.js'
 
 // Entrega de acesso é separada do pagamento e não altera o checkout.
 // O endereço do Pabbly fica no banco administrativo, nunca no navegador ou no GitHub.
@@ -7,7 +8,7 @@ const INTEGRATION_ID = 'principal'
 const LOGIN_URL = 'https://rotina.suzanazatorre.com.br/login'
 const RECOVERY_URL = 'https://rotina.suzanazatorre.com.br/esqueci-senha'
 
-export async function notifyAccessPabbly(db, {order, customer, password, productName, sender = sendWebhook}) {
+export async function notifyAccessPabbly(db, {order, customer, password, productName, sender = sendWebhook, productTagGate = ensureProductIdentification}) {
   const marker = `access-pabbly:${order.id}`
   const eventResult = await db.from('webhook_events').select('id,error,processed_at').eq('pagarme_event_id',marker).maybeSingle()
   if (eventResult.error) return {status:'failed',reason:'status_unavailable'}
@@ -24,7 +25,18 @@ export async function notifyAccessPabbly(db, {order, customer, password, product
   // Nunca registrar a senha no banco, logs ou auditoria.
   const created = await db.from('webhook_events').insert({pagarme_event_id:marker,type:'checkout.access.pabbly',payload:{order_id:order.id,channel:'pabbly'},error:'ready'})
   if (created.error && created.error.code !== '23505') return {status:'failed',reason:'receipt_unavailable'}
-  const claimed = await db.from('webhook_events').update({error:'sending'}).eq('pagarme_event_id',marker).in('error',['ready','retry']).is('processed_at',null).select('id')
+  // A etiqueta de produto deve ser recebida pelo BotConversa ANTES de
+  // dispararmos o fluxo com login e senha. Não interferimos no pagamento ou no
+  // acesso já liberado por e-mail. Uma falha fica registrada para retentativa.
+  let identification
+  try { identification = await productTagGate(db, order.id) } catch { identification = {ready:false,reason:'tag_check_failed'} }
+  if (identification?.ready !== true) {
+    const waiting = await db.from('webhook_events').update({error:'waiting_tag'})
+      .eq('pagarme_event_id',marker).in('error',['ready','retry','waiting_tag']).is('processed_at',null)
+    if (waiting.error) return {status:'failed',reason:'tag_wait_receipt_failed'}
+    return {status:'waiting_product_tag',reason:identification?.reason || 'tag_pending'}
+  }
+  const claimed = await db.from('webhook_events').update({error:'sending'}).eq('pagarme_event_id',marker).in('error',['ready','retry','waiting_tag']).is('processed_at',null).select('id')
   if (claimed.error || !claimed.data?.length) return {status:'in_progress'}
   try {
     const phoneDigits = String(customer.phone).replace(/\D/g,'')
@@ -51,3 +63,30 @@ export async function notifyAccessPabbly(db, {order, customer, password, product
 }
 
 export {RECOVERY_URL}
+
+ 
+// Recupera somente notificações explicitamente retidas pela identificação do
+// produto. Como a senha temporária nunca é persistida, a retentativa instrui
+// a aluna a usar o link seguro de recuperação, sem criar ou trocar credenciais.
+export async function retryWaitingTagAccess(db, { limit = 3, notify = notifyAccessPabbly } = {}) {
+  const waiting = await db.from('webhook_events')
+    .select('pagarme_event_id,payload')
+    .eq('type','checkout.access.pabbly').eq('error','waiting_tag')
+    .is('processed_at',null).order('received_at',{ascending:true}).limit(limit)
+  if (waiting.error) return {checked:0,sent:0,error:'queue_unavailable'}
+  let sent = 0
+  for (const event of waiting.data || []) {
+    const orderId = event.payload?.order_id
+    if (!/^[0-9a-f-]{36}$/i.test(orderId || '')) continue
+    const purchase = await db.from('orders').select('id,customer_id,offer_id,status,paid_at').eq('id',orderId).maybeSingle()
+    if (purchase.error || purchase.data?.status !== 'paid') continue
+    const customer = await db.from('customers').select('name,email,phone').eq('id',purchase.data.customer_id).maybeSingle()
+    if (customer.error || !customer.data) continue
+    const offer = await db.from('offers').select('name').eq('id',purchase.data.offer_id).maybeSingle()
+    try {
+      const result = await notify(db,{order:purchase.data,customer:customer.data,productName:offer.data?.name})
+      if (result?.status === 'accepted_by_pabbly') sent++
+    } catch { /* O registro fica na fila para uma próxima tentativa. */ }
+  }
+  return {checked:(waiting.data || []).length,sent}
+}
