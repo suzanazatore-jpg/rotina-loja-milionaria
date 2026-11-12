@@ -77,8 +77,12 @@ export async function POST(request, context) {
     }
     const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, purchaseTracking({ pixelId: loaded.config.meta_pixel_id, gatewayBase: process.env.PAGARME_BASE_URL, sourceUrl: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}`, preference: input.marketing_preference === 'denied' || (input.marketing_preference === undefined && input.marketing_consent === false) ? 'denied' : input.marketing_consent === true ? 'granted' : 'unknown', identifiers: purchaseRequestContext(request, input.meta_attribution) }), { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
     if (payment.status === 'paid') {
-      await fulfillPaidOrder(db, payment.order_id)
-      await deliverPaidConversion(db, payment.order_id)
+      // Approval reports independently of access, contracts and communications.
+      // An access failure must never turn an approved charge into a payment error.
+      await Promise.allSettled([
+        Promise.resolve().then(() => fulfillPaidOrder(db, payment.order_id)),
+        Promise.resolve().then(() => deliverPaidConversion(db, payment.order_id)),
+      ])
     }
     return response(await readStatus(db, loaded, session))
   } catch (error) { return response({ error: error instanceof PaymentError ? error.message : 'Não foi possível processar o checkout.' }, error.status || 500) }

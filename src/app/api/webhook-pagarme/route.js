@@ -33,8 +33,12 @@ export async function POST(request) {
     if (stored.processed_at) return NextResponse.json({ received: true })
     const order = await reconcileWebhookResource(db, event, { reconcileSubscriptionCharge })
     if (order?.status === 'paid') {
-      await fulfillPaidOrder(db, order.order_id)
-      await deliverPaidConversion(db, order.order_id)
+      const [access] = await Promise.allSettled([
+        Promise.resolve().then(() => fulfillPaidOrder(db, order.order_id)),
+        Promise.resolve().then(() => deliverPaidConversion(db, order.order_id)),
+      ])
+      // Keep the gateway retry when access fails, even after Purchase was sent.
+      if (access.status === 'rejected') throw access.reason
     }
     if (order && ['refunded','chargedback'].includes(order.status)) await reverseOrderAccess(db, order.order_id)
     const { error } = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', event.id)
