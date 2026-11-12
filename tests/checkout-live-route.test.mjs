@@ -30,6 +30,7 @@ const validateCheckoutForm=()=>{};
 const createPayment=async(_db,_input,_key,tracking)=>{state.tracking=tracking;state.payCalls++;state.paid=true;return {order_id:'order',status:'paid'}};
 const fulfillPaidOrder=async()=>{throw new Error('delivery temporarily unavailable')};
 const deliverPaidConversion=async()=>{};
+const purchaseRequestContext=()=>({});
 const purchaseAnalytics=()=>null;
 const contractCheckoutStatus=()=>({contract_required:false,contract:null,blocked:false});
 const signingUrl=()=>'';
