@@ -12,11 +12,14 @@ const tagUrl = 'https://new-backend.botconversa.com.br/api/v1/webhooks-automatio
 const baseHook = {id:'tag',url:tagUrl,active:true,events:['order.paid'],product_ids:['product']}
 function db({items=[{product_id:'product'}],hooks=[baseHook],receipts=[{id:'receipt',webhook_id:'tag',status:'pending'}],errorTable=null}={}) {
   return {from(table) {
+    let webhookIds = null
     const query = {
-      select(){return query},eq(){return query},in(){return query},
+      select(){return query},eq(){return query},
+      in(field,values){if(table==='webhook_deliveries' && field==='webhook_id') webhookIds=values;return query},
       then(resolve,reject){
         const rows = {order_items:items,outbound_webhooks:hooks,webhook_deliveries:receipts}
-        return Promise.resolve({data:rows[table]||[],error:table===errorTable?{message:'test failure'}:null}).then(resolve,reject)
+        const selected = (rows[table]||[]).filter(row => table!=='webhook_deliveries'||!webhookIds||webhookIds.includes(row.webhook_id))
+        return Promise.resolve({data:selected,error:table===errorTable?{message:'test failure'}:null}).then(resolve,reject)
       }
     }
     return query
