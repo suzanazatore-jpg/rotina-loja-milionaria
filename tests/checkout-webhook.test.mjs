@@ -70,7 +70,7 @@ test('webhook HTTP failure remains unprocessed; retry completes and duplicate ne
  route=route.replace("import { NextResponse } from 'next/server'",'const NextResponse = Response')
  route=route.replace("import { checkoutAdminClient } from '@/lib/checkoutAdminServer'",'const checkoutAdminClient = () => globalThis.__checkoutWebhook.db')
  route=route.replace("import { reconcileSubscriptionCharge } from '@/lib/checkoutPaymentsServer'",'const reconcileSubscriptionCharge = () => {}')
- route=route.replace("import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'",'const fulfillPaidOrder = async () => { globalThis.__checkoutWebhook.state.grants++ }')
+ route=route.replace("import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'",'const fulfillPaidOrder = async () => { globalThis.__checkoutWebhook.state.grants++; if(globalThis.__checkoutWebhook.state.accessFail) throw new Error("access unavailable") }')
  route=route.replace("import { deliverPaidConversion } from '@/lib/checkoutConversionsServer'",'const deliverPaidConversion = async () => { globalThis.__checkoutWebhook.state.conversions++ }')
  route=route.replace("import { reconcileWebhookResource } from '@/lib/checkoutWebhookServer'",'const reconcileWebhookResource = async () => { if(globalThis.__checkoutWebhook.state.fail) throw new Error("not ready"); return {order_id:"order",status:"paid"} }')
  const {POST}=await import(`data:text/javascript;base64,${Buffer.from(route).toString('base64')}`)
@@ -82,10 +82,12 @@ test('webhook HTTP failure remains unprocessed; retry completes and duplicate ne
   assert.equal((await POST(req('null'))).status,400)
   assert.equal((await POST(req('x'.repeat(262145)))).status,413)
   assert.equal((await POST(req())).status,503);assert.equal(state.stored.processed_at,null);assert.equal(state.stored.error,'reconciliation_pending');assert.equal(state.grants,0)
-  state.fail=false
-  assert.equal((await POST(req())).status,200);assert.ok(state.stored.processed_at);assert.equal(state.stored.error,null);assert.equal(state.grants,1);assert.equal(state.conversions,1)
-  assert.equal((await POST(req())).status,200);assert.equal(state.grants,1)
-  assert.equal((await POST(req(body.replace('or_test','or_other')))).status,503);assert.equal(state.grants,1)
+  state.fail=false;state.accessFail=true
+  assert.equal((await POST(req())).status,503);assert.equal(state.conversions,1);assert.equal(state.stored.processed_at,null)
+  state.accessFail=false
+  assert.equal((await POST(req())).status,200);assert.ok(state.stored.processed_at);assert.equal(state.stored.error,null);assert.equal(state.grants,2);assert.equal(state.conversions,2)
+  assert.equal((await POST(req())).status,200);assert.equal(state.grants,2)
+  assert.equal((await POST(req(body.replace('or_test','or_other')))).status,503);assert.equal(state.grants,2)
  }finally{delete globalThis.__checkoutWebhook;if(originalSecret===undefined)delete process.env.PAGARME_WEBHOOK_SECRET;else process.env.PAGARME_WEBHOOK_SECRET=originalSecret}
 })
 test('new chargeback event verifies charge at gateway before changing financial status',async()=>{

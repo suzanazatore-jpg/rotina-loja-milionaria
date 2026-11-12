@@ -27,18 +27,19 @@ export function purchaseRequestContext(request, input = {}, now = Date.now()) {
   // Never use the payment webhook's IP or user agent as the buyer's identity.
   return identifiers
 }
-// Purchase is a server-side approval event. Optional browser cookies are a
-// separate preference; never invent a consent grant or override a refusal.
+// A new paid purchase is reported independently of optional browser cookies.
+// Keep the actual preference unchanged; do not invent cookie identifiers.
 export function purchaseTracking({ pixelId, gatewayBase, sourceUrl, preference, identifiers = {} }) {
   return {
-    policy: 'payment_approved_v1',
+    policy: 'payment_approved_v2',
     consent: preference === 'granted' ? true : preference === 'denied' ? false : null,
     identifiers: preference === 'denied' ? {} : matchingIdentifiers(identifiers),
     pixel_id: pixelId, gateway_base: gatewayBase, source_url: sourceUrl,
   }
 }
 export function purchaseTrackingAllowed(tracking) {
-  return tracking?.consent !== false && (tracking?.consent === true || tracking?.policy === 'payment_approved_v1')
+  // Preserve historical eligibility. Only new v2 purchases use approval alone.
+  return tracking?.policy === 'payment_approved_v2' || (tracking?.consent !== false && (tracking?.consent === true || tracking?.policy === 'payment_approved_v1'))
 }
 export function conversionConfiguration(pixelId, env = process.env) {
   if (!/^\d{5,30}$/.test(pixelId || '') || pixelId !== env.META_CAPI_PIXEL_ID || !env.META_CAPI_ACCESS_TOKEN) return null
@@ -67,7 +68,7 @@ export async function sendConversion(config, pixelId, event, fetcher = fetch) {
   if (!response.ok || receipt.events_received !== 1) throw new Error('Conversão não confirmada pela Meta.')
 }
 // Analytics nunca interrompe a cobrança ou a liberação de acesso. Erros não guardam respostas nem tokens.
-export async function deliverPaidConversion(db, orderId) {
+export async function deliverPaidConversion(db, orderId, { queueOnly = false } = {}) {
   const marker = `capi:${orderId}`
   try {
     const { data: order, error } = await db.from('orders').select('id,event_id,status,paid_at,total_cents,customer_id').eq('id', orderId).single()
@@ -76,43 +77,73 @@ export async function deliverPaidConversion(db, orderId) {
     if (saved.error) return { status: 'pending' }
     const snapshot = saved.data?.payload
     const pixelId = snapshot?.tracking?.pixel_id
+    if (!purchaseTrackingAllowed(snapshot?.tracking) || snapshot.tracking.gateway_base !== process.env.PAGARME_BASE_URL) return { status: 'disabled' }
+    // Persist a recoverable item even when a token is temporarily unavailable.
     const config = conversionConfiguration(pixelId)
-    if (!pixelId || pixelId !== process.env.META_CAPI_PIXEL_ID || !purchaseTrackingAllowed(snapshot.tracking) || snapshot.tracking.gateway_base !== process.env.PAGARME_BASE_URL) return { status: 'disabled' }
-    // Keep eligible live approvals in the retry queue while the token is being installed.
-    const awaitingToken = !process.env.META_CAPI_ACCESS_TOKEN && process.env.CHECKOUT_CAPI_ENABLED === 'true'
-      && process.env.VERCEL_ENV === 'production' && snapshot.tracking.gateway_base === 'https://api.pagar.me/core/v5'
-    if (!config && !awaitingToken) return { status: 'disabled' }
-    const inserted = await db.from('webhook_events').upsert({ pagarme_event_id: marker, type: 'checkout.capi', payload: { order_id: order.id, pixel_id: pixelId, event_id: `purchase:${order.id}`, mode: config?.testCode ? 'test' : 'live' }, error: 'retry' }, { onConflict: 'pagarme_event_id', ignoreDuplicates: true })
-    if (inserted.error) return { status: 'pending' }
-    if (!config) return { status: 'pending' }
+    const queueConfig = conversionConfiguration(pixelId, { ...process.env, META_CAPI_ACCESS_TOKEN: 'configuration-check-only' })
+    if (!queueConfig) return { status: 'disabled' }
     const customer = await db.from('customers').select('email,phone').eq('id', order.customer_id).single()
     if (customer.error) return { status: 'pending' }
     const event = conversionEvent(order, snapshot, customer.data)
     if (!event) return { status: 'skipped' }
-    const claimed = await db.from('webhook_events').update({ error: 'processing' }).eq('pagarme_event_id', marker).eq('error', 'retry').is('processed_at', null).select('id,payload')
+    const inserted = await db.from('webhook_events').upsert({ pagarme_event_id: marker, type: 'checkout.capi', payload: { order_id: order.id, pixel_id: pixelId, event_id: event.event_id, mode: queueConfig.testCode ? 'test' : 'live' }, error: 'retry' }, { onConflict: 'pagarme_event_id', ignoreDuplicates: true })
+    if (inserted.error) return { status: 'pending' }
+    if (queueOnly) return { status: 'queued' }
+    if (!config) return { status: 'pending' }
+    const lease = new Date().toISOString()
+    const claimed = await db.from('webhook_events').update({ error: 'processing', received_at: lease }).eq('pagarme_event_id', marker).eq('error', 'retry').is('processed_at', null).select('id,payload')
     if (claimed.error || !claimed.data?.length) return { status: 'recorded' }
     const payload = claimed.data[0].payload || {}
     if (payload.next_attempt_at && new Date(payload.next_attempt_at).getTime() > Date.now()) {
-      await db.from('webhook_events').update({ error: 'retry' }).eq('pagarme_event_id', marker).eq('error', 'processing')
+      await db.from('webhook_events').update({ error: 'retry' }).eq('pagarme_event_id', marker).eq('error', 'processing').eq('received_at', lease)
       return { status: 'scheduled' }
     }
     const attempts = (Number(payload.attempts) || 0) + 1
     const attemptPayload = { ...payload, attempts, last_attempt_at: new Date().toISOString(), next_attempt_at: new Date(Date.now() + Math.min(86400, 300 * 2 ** (attempts - 1)) * 1000).toISOString() }
-    const recorded = await db.from('webhook_events').update({ payload: attemptPayload }).eq('pagarme_event_id', marker).eq('error', 'processing')
+    const recorded = await db.from('webhook_events').update({ payload: attemptPayload }).eq('pagarme_event_id', marker).eq('error', 'processing').eq('received_at', lease)
     if (recorded.error) return { status: 'review_required' }
     try {
       await sendConversion(config, pixelId, event)
-      const done = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', marker)
-      return { status: done.error ? 'review_required' : 'sent' }
+      const done = await db.from('webhook_events').update({ processed_at: new Date().toISOString(), error: null }).eq('pagarme_event_id', marker).eq('error', 'processing').eq('received_at', lease).select('id')
+      return { status: done.error || !done.data?.length ? 'review_required' : 'sent' }
     } catch {
-      await db.from('webhook_events').update({ error: attempts >= 8 ? 'review_required' : 'retry', received_at: new Date().toISOString() }).eq('pagarme_event_id', marker).is('processed_at', null)
+      await db.from('webhook_events').update({ error: attempts >= 8 ? 'review_required' : 'retry', received_at: new Date().toISOString() }).eq('pagarme_event_id', marker).eq('error', 'processing').eq('received_at', lease).is('processed_at', null)
       return { status: 'pending' }
     }
   } catch { return { status: 'pending' } }
 }
 
+// Reconcile only new approval-policy purchases, within a bounded recent window.
+// Older snapshots are never rewritten or replayed on the basis of missing data.
+export async function reconcileMissingConversions(db, deliver = deliverPaidConversion, now = Date.now()) {
+  if (!conversionConfiguration(process.env.META_CAPI_PIXEL_ID, { ...process.env, META_CAPI_ACCESS_TOKEN: 'configuration-check-only' })) return { disabled: true, checked: 0, queued: 0 }
+  const orders = await db.from('orders').select('id,event_id').eq('status', 'paid').like('event_id', 'checkout:%').gte('paid_at', new Date(now - 24 * 3600000).toISOString()).lte('paid_at', new Date(now).toISOString()).order('paid_at', { ascending: false }).limit(100)
+  if (orders.error) throw new Error('Não foi possível conferir compras sem conversão.')
+  if (!orders.data?.length) return { disabled: false, checked: 0, queued: 0 }
+  const markers = orders.data.map(order => `capi:${order.id}`)
+  const requests = orders.data.map(order => `request:${order.event_id.slice(9)}`)
+  const recorded = await db.from('webhook_events').select('pagarme_event_id,payload').in('pagarme_event_id', [...markers, ...requests])
+  if (recorded.error) throw new Error('Não foi possível conferir recibos de conversão.')
+  const saved = new Map((recorded.data || []).map(row => [row.pagarme_event_id, row]))
+  const missing = orders.data.filter(order => !saved.has(`capi:${order.id}`) && saved.get(`request:${order.event_id.slice(9)}`)?.payload?.tracking?.policy === 'payment_approved_v2').slice(0, 4)
+  let queued = 0
+  for (const order of missing) {
+    const result = await deliver(db, order.id, { queueOnly: true })
+    if (result.status === 'queued') queued++
+  }
+  return { disabled: false, checked: orders.data.length, queued }
+}
+
 export async function retryConversions(db, deliver = deliverPaidConversion, now = Date.now()) {
   if (!conversionConfiguration(process.env.META_CAPI_PIXEL_ID)) return { disabled: true, checked: 0, sent: 0 }
+  // A terminated invocation must not own a conversion indefinitely. Never
+  // recover an active lease or exceed the attempt cap after a crashed send.
+  const stale = await db.from('webhook_events').select('pagarme_event_id,payload,received_at').eq('type', 'checkout.capi').eq('error', 'processing').is('processed_at', null).lte('received_at', new Date(now - 10 * 60000).toISOString()).limit(20)
+  if (stale.error) throw new Error('Não foi possível consultar conversões interrompidas.')
+  for (const row of stale.data || []) {
+    const recovered = await db.from('webhook_events').update({ error: Number(row.payload?.attempts) >= 8 ? 'review_required' : 'retry' }).eq('pagarme_event_id', row.pagarme_event_id).eq('error', 'processing').eq('received_at', row.received_at).is('processed_at', null)
+    if (recovered.error) throw new Error('Não foi possível recuperar a conversão interrompida.')
+  }
   const { data, error } = await db.from('webhook_events').select('pagarme_event_id,payload').eq('type', 'checkout.capi').eq('error', 'retry').is('processed_at', null).order('received_at', { ascending: true }).limit(100)
   if (error) throw new Error('Não foi possível consultar a fila de conversões.')
   const due = (data || []).filter(row => !row.payload?.next_attempt_at || new Date(row.payload.next_attempt_at).getTime() <= now).slice(0, 4)

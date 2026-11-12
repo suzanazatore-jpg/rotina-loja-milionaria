@@ -60,7 +60,7 @@ test('live route denies visitors and CSRF; successful charge remains paid when d
   const result=await paid.json()
   assert.equal(result.status,'paid');assert.equal(result.fulfillment,'pending');assert.equal(result.redirect_url,null)
   assert.equal(state.payCalls,1)
-  assert.equal(state.tracking.policy,'payment_approved_v1');assert.equal(state.tracking.consent,null);assert.deepEqual(state.tracking.identifiers,{})
+  assert.equal(state.tracking.policy,'payment_approved_v2');assert.equal(state.tracking.consent,null);assert.deepEqual(state.tracking.identifiers,{})
   state.delivery=true
   const status=await GET(new Request('https://example.org/api/checkout/pilot'),context)
   const complete=await status.json()

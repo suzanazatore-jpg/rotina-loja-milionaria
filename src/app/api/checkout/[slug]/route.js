@@ -85,9 +85,11 @@ export async function POST(request, context) {
     }
     const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, purchaseTracking({ pixelId: loaded.config.meta_pixel_id, gatewayBase: process.env.PAGARME_BASE_URL, sourceUrl: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}`, preference: input.marketing_preference === 'denied' || (input.marketing_preference === undefined && input.marketing_consent === false) ? 'denied' : input.marketing_consent === true ? 'granted' : 'unknown', identifiers: purchaseRequestContext(request, input.meta_attribution) }), { requireAddress: loaded.config.form_profile !== 'compact' })
     if (payment.status === 'paid') {
-      // O pagamento já ocorreu. Uma falha de entrega não pode sugerir nova cobrança.
-      try { await fulfillPaidOrder(db, payment.order_id) } catch { /* O webhook e a conciliação administrativa podem repetir a entrega. */ }
-      await deliverPaidConversion(db, payment.order_id)
+      // Report approval independently of access and communications.
+      await Promise.allSettled([
+        Promise.resolve().then(() => fulfillPaidOrder(db, payment.order_id)),
+        Promise.resolve().then(() => deliverPaidConversion(db, payment.order_id)),
+      ])
     }
     const status = await readStatus(db, loaded, session)
     if (payment.trial_started && input.marketing_consent === true) {
