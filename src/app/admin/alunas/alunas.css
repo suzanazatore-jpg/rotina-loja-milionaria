@@ -2,3 +2,110 @@
 .aluna-manager-overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:22px;z-index:80}.aluna-manager{background:#0f0f0f;border:1px solid #303030;border-radius:16px;padding:22px;width:min(1180px,100%);max-height:92vh;overflow-y:auto;box-sizing:border-box;box-shadow:0 28px 90px rgba(0,0,0,.7)}.aluna-manager-head{display:flex;align-items:center;gap:14px;background:#151313;border:1px solid #2d2929;border-radius:13px;padding:16px 18px;margin-bottom:14px;position:relative}.aluna-manager-status{margin-left:auto;border:1px solid;border-radius:999px;padding:5px 9px;font-size:10px;font-weight:800;white-space:nowrap}.aluna-manager-close{width:32px;height:32px;border-radius:8px;border:1px solid #333;background:#191919;color:#999;font-size:20px;cursor:pointer}.aluna-manager-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:14px}.aluna-manager-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:stretch}.aluna-manager-card{background:#151313;border:1px solid #2d2929;border-radius:13px;padding:19px;min-width:0}.aluna-manager-title{display:grid;gap:4px;margin-bottom:17px}.aluna-manager-title strong{font-size:14px}.aluna-manager-title span{color:#777;font-size:11px}.aluna-manager-actions{display:flex;flex-direction:column;gap:10px}.aluna-manager-actions>.aluna-manager-title{margin-bottom:3px}
 
 @media(max-width:800px){.aluna-manager-overlay{padding:0;align-items:stretch}.aluna-manager{width:100%;max-height:100vh;border-radius:0;border:0;padding:15px}.aluna-manager-head{padding:13px}.aluna-manager-status{display:none}.aluna-manager-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.aluna-manager-grid{grid-template-columns:1fr}.aluna-manager-card{padding:15px}}
+
+
+/* Layout ampliado e tema claro/escuro — painel de alunas */
+.alunas-theme-switch{margin-left:auto;display:flex;gap:3px;background:#202125;padding:4px;border-radius:11px;white-space:nowrap}
+.alunas-theme-switch button{border:0;border-radius:8px;padding:9px 13px;background:transparent;color:#abb3bd;font-size:12px;font-weight:750;cursor:pointer}
+.alunas-theme-switch button.on{background:#3d331a;color:#f2d37a}
+.alunas-theme-switch button:focus-visible{outline:2px solid #d4af37;outline-offset:2px}
+.aluna-manager-overlay{align-items:flex-start!important;padding:16px!important;overflow-y:auto}
+.aluna-manager{width:min(1420px,98vw)!important;max-height:calc(100vh - 32px)!important;padding:24px!important}
+.aluna-manager-head{margin-bottom:18px!important}
+.aluna-manager-summary{gap:12px!important;margin-bottom:20px!important}
+.aluna-summary-stat{padding:16px!important;border-radius:11px!important}
+.aluna-summary-stat small{font-size:12px!important}
+.aluna-summary-stat strong{font-size:14px!important;line-height:1.5!important}
+.aluna-history-panel{margin:0 0 22px!important;padding:22px!important;border-radius:15px!important}
+.aluna-history-header{margin-bottom:19px!important}
+.aluna-history-header strong{font-size:19px!important;line-height:1.3}
+.aluna-history-header span{font-size:12px!important;display:block;margin-top:5px}
+.aluna-history-header button{font-size:13px!important;padding:10px 15px!important}
+.aluna-history-contents{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px!important;overflow:visible!important;padding-bottom:18px!important}
+.aluna-history-content{min-width:0!important;padding:15px!important;border-radius:11px!important}
+.aluna-history-content small{font-size:11px!important}
+.aluna-history-content strong{font-size:14px!important;line-height:1.45!important}
+.aluna-history-content span{font-size:12px!important;line-height:1.5!important}
+.aluna-history-table-head,.aluna-history-event{display:grid;grid-template-columns:minmax(150px,2fr) minmax(95px,.8fr) minmax(140px,1fr) minmax(95px,.6fr);gap:14px;align-items:center;padding:12px 16px}
+.aluna-history-table-head{background:#232426;color:#a6adb7;border:1px solid #35363a;border-radius:10px 10px 0 0;font-size:12px;font-weight:800}
+.aluna-history-events{max-height:340px!important;overflow-y:auto!important;border:1px solid #35363a!important;border-top:0!important;border-radius:0 0 10px 10px;margin-top:0!important}
+.aluna-history-event{min-height:52px;border-bottom:1px solid #323337}
+.aluna-history-event:last-child{border-bottom:0}
+.aluna-history-event strong{color:#f2f4f6;font-size:14px;line-height:1.4}
+.aluna-history-event span,.aluna-history-event time{color:#aeb7c2;font-size:12px;line-height:1.4}
+.aluna-history-event .aluna-event-registered{color:#63d69a;font-weight:800}
+.alunas-theme-light{background:#f0f3f7!important;color:#1f2b3a!important}
+.alunas-theme-light .alunas-header{background:#fff!important;border-color:#dfe6ee!important;box-shadow:0 1px 6px rgba(32,48,65,.05)}
+.alunas-theme-light .alunas-header p:last-child{color:#233246!important}
+.alunas-theme-light .alunas-theme-switch{background:#eef2f6}
+.alunas-theme-light .alunas-theme-switch button{color:#667589}
+.alunas-theme-light .alunas-theme-switch button.on{background:#fff;color:#997221;box-shadow:0 1px 5px #ccd4dc}
+.alunas-theme-light .alunas-titlebar h1{color:#1c293b}
+.alunas-theme-light .alunas-titlebar p,.alunas-theme-light main>p:last-child{color:#6f8092!important}
+.alunas-theme-light .ghost{background:#fff!important;color:#233246!important;border-color:#d7dfe8!important}
+.alunas-theme-light .alunas-list-card{background:#fff!important;border-color:#dfe6ed!important}
+.alunas-theme-light .alunas-list-card thead tr{background:#f4f6f9!important;color:#59697b!important}
+.alunas-theme-light .alunas-list-card tbody tr{border-color:#e7ecf1!important}
+.alunas-theme-light .alunas-list-card tbody tr:hover{background:#f8fafc}
+.alunas-theme-light .alunas-list-card tbody td{color:#2c3a4b!important}
+.alunas-theme-light .alunas-list-card tbody td:nth-child(2)>span{color:#997221!important}
+.alunas-theme-light .filtro-pop{background:#fff;border-color:#d8e1ea;box-shadow:0 14px 35px #1d30432a}
+.alunas-theme-light .filtro-pop h3,.alunas-theme-light .filtro-campos label{color:#243449}
+.alunas-theme-light .filtro-tabs{background:#eff2f6}
+.alunas-theme-light .filtro-tabs button.on{background:#fcf3d9;color:#815b10}
+.alunas-theme-light .filtro-campos input,.alunas-theme-light .filtro-campos select{background:#fff;color:#233246;border-color:#cfd9e4;color-scheme:light}
+.alunas-theme-light .filtro-pop .limpar{background:#f3f6f9;color:#5d6c7b;border-color:#d8e1e9}
+.alunas-theme-light .aluna-manager{background:#fff!important;color:#1b2a3a!important;border-color:#dbe3eb!important;box-shadow:0 22px 68px #162b3b3d!important}
+.alunas-theme-light .aluna-manager-head{background:#fff!important;border-color:#e0e7ef!important}
+.alunas-theme-light .aluna-manager-head h2{color:#1a2a3a!important}
+.alunas-theme-light .aluna-manager-head p{color:#718093!important}
+.alunas-theme-light .aluna-manager-close{background:#fff!important;color:#637386!important;border-color:#d4dfe8!important}
+.alunas-theme-light .aluna-summary-stat{background:#f8fafc!important;border-color:#e1e7ee!important}
+.alunas-theme-light .aluna-summary-stat small{color:#718093!important}
+.alunas-theme-light .aluna-summary-stat:not(.aluna-summary-financeiro) strong{color:#1f2d3e!important}
+.alunas-theme-light .aluna-history-panel{background:#fff!important;border-color:#dbe3ec!important}
+.alunas-theme-light .aluna-history-header strong{color:#1c2a3b!important}
+.alunas-theme-light .aluna-history-header span{color:#6c7e90!important}
+.alunas-theme-light .aluna-history-header button{background:#fff9ea!important;color:#8b651a!important;border-color:#d4b96e!important}
+.alunas-theme-light .aluna-history-content{background:#f8fafc!important;border-color:#dfe7ef!important}
+.alunas-theme-light .aluna-history-content strong{color:#243348!important}
+.alunas-theme-light .aluna-history-content small{color:#9e7925!important}
+.alunas-theme-light .aluna-history-content span{color:#728195!important}
+.alunas-theme-light .aluna-history-table-head{background:#f3f6f9!important;color:#657689!important;border-color:#e0e8ef!important}
+.alunas-theme-light .aluna-history-events{border-color:#e0e8ef!important}
+.alunas-theme-light .aluna-history-event{border-color:#e8edf2!important}
+.alunas-theme-light .aluna-history-event strong{color:#253347!important}
+.alunas-theme-light .aluna-history-event span,.alunas-theme-light .aluna-history-event time{color:#6a7b8d}
+.alunas-theme-light .aluna-history-event .aluna-event-registered{color:#237a4d!important}
+.alunas-theme-light .aluna-manager-card{background:#fff!important;color:#233246!important;border-color:#dce4ec!important}
+.alunas-theme-light .aluna-manager-title strong{color:#1e2e40}
+.alunas-theme-light .aluna-manager-title span{color:#697b8d!important}
+.alunas-theme-light .aluna-manager-card label{color:#68798b!important}
+.alunas-theme-light .aluna-manager-card input,.alunas-theme-light .alunas-new-modal input{background:#fff!important;color:#243449!important;border-color:#cfd9e4!important}
+.alunas-theme-light .aluna-manager-actions>section{background:#f8fafc!important;border-color:#dce4ed!important}
+.alunas-theme-light .alunas-new-modal,.alunas-theme-light .massa-modal{background:#fff!important;color:#243449!important;border-color:#dce4ec!important}
+.alunas-theme-light .massa-head,.alunas-theme-light .massa-foot{border-color:#dce4ec!important}
+.alunas-theme-light .massa-head p,.alunas-theme-light .massa-foot>span{color:#6f8092}
+.alunas-theme-light .csv-drop{background:#f7f9fb;color:#243449;border-color:#bbc6d4}
+.alunas-theme-light .csv-ajuda{color:#62758a}
+.alunas-theme-light .chips-bloco button{background:#f4f6f9;color:#263446;border-color:#d6e0eb}
+.alunas-theme-light .email-switch{background:#fff9ec;border-color:#e1c990;color:#273548}
+@media(max-width:900px){
+  .aluna-history-table-head,.aluna-history-event{grid-template-columns:minmax(110px,1.5fr) minmax(80px,.75fr) minmax(120px,1fr)}
+  .aluna-history-table-head span:last-child,.aluna-history-event .aluna-event-registered{display:none}
+}
+@media(max-width:650px){
+  .alunas-header{flex-wrap:wrap}
+  .alunas-theme-switch{width:100%;margin-left:0;justify-content:center}
+  .alunas-theme-switch button{flex:1}
+  .aluna-manager-overlay{padding:0!important;align-items:stretch!important}
+  .aluna-manager{width:100%!important;max-height:100vh!important;padding:15px!important;border-radius:0!important}
+  .aluna-history-panel{padding:15px!important}
+  .aluna-history-contents{grid-template-columns:1fr!important}
+  .aluna-history-table-head,.aluna-history-event{grid-template-columns:minmax(110px,1.3fr) minmax(85px,.8fr)}
+  .aluna-history-table-head span:nth-child(2),.aluna-history-event span:not(.aluna-event-registered){display:none}
+  .aluna-history-header{align-items:flex-start!important}
+  .aluna-history-header strong{font-size:17px!important}
+  .aluna-history-header button{flex-shrink:0}
+  .aluna-history-event time{white-space:normal}
+}
