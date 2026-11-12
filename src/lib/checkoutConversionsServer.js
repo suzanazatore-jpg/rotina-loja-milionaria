@@ -1,14 +1,39 @@
 import { createHash } from 'node:crypto'
+import { isIP } from 'node:net'
 import { purchaseAnalytics } from './checkoutAnalytics.js'
 
 const hash = value => createHash('sha256').update(value).digest('hex')
+export function matchingIdentifiers(input = {}) {
+  const output = {}
+  if (!input || typeof input !== 'object') return output
+  for (const key of ['fbc', 'fbp']) if (typeof input[key] === 'string' && /^fb\.\d\.\d{10,13}\.[A-Za-z0-9._-]{1,350}$/.test(input[key])) output[key] = input[key]
+  if (typeof input.client_ip_address === 'string' && isIP(input.client_ip_address)) output.client_ip_address = input.client_ip_address
+  if (typeof input.client_user_agent === 'string' && input.client_user_agent.trim()) output.client_user_agent = input.client_user_agent.slice(0, 512)
+  return output
+}
+export function purchaseRequestContext(request, input = {}, now = Date.now()) {
+  const headers = request.headers
+  const identifiers = matchingIdentifiers({
+    client_ip_address: (headers.get('x-forwarded-for') || headers.get('x-real-ip') || '').split(',')[0].trim(),
+    client_user_agent: headers.get('user-agent'),
+    ...matchingIdentifiers({ fbc: input?.fbc, fbp: input?.fbp }),
+  })
+  const cookies = headers.get('cookie') || ''
+  for (const key of ['fbc', 'fbp']) {
+    const value = cookies.split(';').map(part => part.trim()).find(part => part.startsWith(`_${key}=`))?.slice(5)
+    if (matchingIdentifiers({ [key]: value })[key]) identifiers[key] = value
+  }
+  if (/^[A-Za-z0-9_-]{1,350}$/.test(input?.fbclid || '') && Number.isSafeInteger(input?.click_time) && input.click_time <= now && input.click_time > now - 90 * 86400000) identifiers.fbc = `fb.1.${input.click_time}.${input.fbclid}`
+  // Never use the payment webhook's IP or user agent as the buyer's identity.
+  return identifiers
+}
 // Purchase is a server-side approval event. Optional browser cookies are a
 // separate preference; never invent a consent grant or override a refusal.
 export function purchaseTracking({ pixelId, gatewayBase, sourceUrl, preference, identifiers = {} }) {
   return {
     policy: 'payment_approved_v1',
     consent: preference === 'granted' ? true : preference === 'denied' ? false : null,
-    identifiers: preference === 'granted' ? identifiers : {},
+    identifiers: preference === 'denied' ? {} : matchingIdentifiers(identifiers),
     pixel_id: pixelId, gateway_base: gatewayBase, source_url: sourceUrl,
   }
 }
@@ -29,7 +54,12 @@ export function conversionEvent(order, snapshot, customer, now = Date.now()) {
   if (!purchase || !purchaseTrackingAllowed(snapshot?.tracking) || !Number.isFinite(time) || time > now / 1000 || time < now / 1000 - 7 * 86400) return null
   const email = String(customer?.email || '').trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null
-  return { event_name: 'Purchase', event_id: purchase.event_id, event_time: time, action_source: 'website', event_source_url: snapshot.tracking.source_url, user_data: { em: [hash(email)] }, custom_data: { currency: 'BRL', value: purchase.total_cents / 100, order_id: order.id, content_type: 'product', content_ids: purchase.items.map(item => item.item_id), contents: purchase.items.map(item => ({ id: item.item_id, quantity: 1, item_price: item.price_cents / 100 })) } }
+  let phone = String(customer?.phone || '').replace(/\D/g, '')
+  if ([10, 11].includes(phone.length)) phone = '55' + phone
+  const user_data = { ...matchingIdentifiers(snapshot.tracking.identifiers), em: [hash(email)] }
+  if (/^55\d{10,11}$/.test(phone)) user_data.ph = [hash(phone)]
+  if (order.customer_id) user_data.external_id = [hash(String(order.customer_id))]
+  return { event_name: 'Purchase', event_id: purchase.event_id, event_time: time, action_source: 'website', event_source_url: snapshot.tracking.source_url, user_data, custom_data: { currency: 'BRL', value: purchase.total_cents / 100, order_id: order.id, content_type: 'product', content_ids: purchase.items.map(item => item.item_id), contents: purchase.items.map(item => ({ id: item.item_id, quantity: 1, item_price: item.price_cents / 100 })) } }
 }
 export async function sendConversion(config, pixelId, event, fetcher = fetch) {
   const response = await fetcher(`https://graph.facebook.com/${config.version}/${pixelId}/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: config.token, data: [event], ...(config.testCode ? { test_event_code: config.testCode } : {}) }), signal: AbortSignal.timeout(10000) })
@@ -48,7 +78,7 @@ export async function deliverPaidConversion(db, orderId) {
     const pixelId = snapshot?.tracking?.pixel_id
     const config = conversionConfiguration(pixelId)
     if (!config || !purchaseTrackingAllowed(snapshot.tracking) || snapshot.tracking.gateway_base !== process.env.PAGARME_BASE_URL) return { status: 'disabled' }
-    const customer = await db.from('customers').select('email').eq('id', order.customer_id).single()
+    const customer = await db.from('customers').select('email,phone').eq('id', order.customer_id).single()
     if (customer.error) return { status: 'pending' }
     const event = conversionEvent(order, snapshot, customer.data)
     if (!event) return { status: 'skipped' }

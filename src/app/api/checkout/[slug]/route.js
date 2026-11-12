@@ -5,7 +5,7 @@ import { loadCheckoutOffer, checkoutTestConfiguration } from '@/lib/checkoutPubl
 import { signCheckoutSession, readCheckoutSession, safeCheckoutRedirect } from '@/lib/checkoutSession'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
 import { createPayment } from '@/lib/checkoutPaymentsServer'
-import { deliverPaidConversion, purchaseTracking } from '@/lib/checkoutConversionsServer'
+import { deliverPaidConversion, purchaseTracking, purchaseRequestContext } from '@/lib/checkoutConversionsServer'
 import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
 import { validateCheckoutForm, checkoutExpired } from '@/lib/checkoutSettings'
@@ -68,14 +68,14 @@ export async function POST(request, context) {
     }
     if (input.action !== 'pay' || !session) throw new PaymentError('Inicie uma sessão válida antes do pagamento.', 401)
     // Não permita alterar oferta nem aceitar dados abertos do cartão no endpoint público.
-    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps','marketing_consent','marketing_preference','email_confirmation','terms_accepted','privacy_accepted'])
+    const allowed = new Set(['action','customer','payment_method','installments','card_token','bumps','marketing_consent','marketing_preference','meta_attribution','email_confirmation','terms_accepted','privacy_accepted'])
     if (Object.keys(input).some(key => !allowed.has(key))) throw new PaymentError('Dados de pagamento inválidos.')
     try { validateCheckoutForm(loaded.config,input) } catch(error) { throw new PaymentError(error.message,400) }
     if (loaded.config.require_terms || loaded.config.require_privacy) {
       const {error} = await db.from('webhook_events').upsert({pagarme_event_id:`checkout-form:${session.key}`,type:'checkout.form.accepted',payload:{offer_id:loaded.offer.id,terms_url:loaded.config.terms_url,privacy_url:loaded.config.privacy_url,terms_accepted:input.terms_accepted===true,privacy_accepted:input.privacy_accepted===true},processed_at:new Date().toISOString()},{onConflict:'pagarme_event_id',ignoreDuplicates:true})
       if(error) throw new PaymentError('Não foi possível registrar o aceite. Tente novamente.',503)
     }
-    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, purchaseTracking({ pixelId: loaded.config.meta_pixel_id, gatewayBase: process.env.PAGARME_BASE_URL, sourceUrl: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}`, preference: input.marketing_preference === 'denied' || (input.marketing_preference === undefined && input.marketing_consent === false) ? 'denied' : input.marketing_consent === true ? 'granted' : 'unknown' }), { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
+    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, purchaseTracking({ pixelId: loaded.config.meta_pixel_id, gatewayBase: process.env.PAGARME_BASE_URL, sourceUrl: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}`, preference: input.marketing_preference === 'denied' || (input.marketing_preference === undefined && input.marketing_consent === false) ? 'denied' : input.marketing_consent === true ? 'granted' : 'unknown', identifiers: purchaseRequestContext(request, input.meta_attribution) }), { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
     if (payment.status === 'paid') {
       await fulfillPaidOrder(db, payment.order_id)
       await deliverPaidConversion(db, payment.order_id)

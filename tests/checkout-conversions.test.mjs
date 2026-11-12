@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const analytics = `data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/checkoutAnalytics.js', import.meta.url))).toString('base64')}`
 const source = readFileSync(new URL('../src/lib/checkoutConversionsServer.js', import.meta.url), 'utf8').replace('./checkoutAnalytics.js', analytics)
-const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion, retryConversions, purchaseTracking } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion, retryConversions, purchaseTracking, purchaseRequestContext } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env = { META_CAPI_PIXEL_ID:'123456', META_CAPI_ACCESS_TOKEN:'secret', VERCEL_ENV:'production', CHECKOUT_CAPI_ENABLED:'true', PAGARME_BASE_URL:'https://api.pagar.me/core/v5' }
 const now = Date.now()
 const order = { id:'order', status:'paid', paid_at:new Date(now-1000).toISOString(), total_cents:4700 }
@@ -151,4 +151,29 @@ test('automatic approval delivery is idempotent and a recorded refusal is not se
   const refused=database();refused.tables.webhook_events[0].payload.tracking={...db.tables.webhook_events[0].payload.tracking,consent:false}
   assert.equal((await deliverPaidConversion(refused,'order')).status,'disabled');assert.equal(calls,1)
  }finally{globalThis.fetch=original;for(const[key,value]of Object.entries(old)){if(value===undefined)delete process.env[key];else process.env[key]=value}}
+})
+
+
+test('Purchase includes actual buyer matching data, hashes phone and keeps stable deduplication ID',()=>{
+ const request=new Request('https://pay.example/api/checkout/offer',{headers:{'x-forwarded-for':'203.0.113.42, 10.0.0.1','user-agent':'Buyer Browser','cookie':'_fbp=fb.1.1794432600000.123456'}})
+ const identifiers=purchaseRequestContext(request,{fbclid:'Actual_Click_123',click_time:now-60000},now)
+ const tracking=purchaseTracking({pixelId:'123456',gatewayBase:env.PAGARME_BASE_URL,sourceUrl:'https://pay.example/offer',preference:'unknown',identifiers})
+ const event=conversionEvent({...order,customer_id:'stable-customer'},{...snapshot,tracking},{email:'buyer@example.com',phone:'(84) 99663-3020'},now)
+ assert.equal(event.user_data.client_ip_address,'203.0.113.42')
+ assert.equal(event.user_data.client_user_agent,'Buyer Browser')
+ assert.equal(event.user_data.fbc,`fb.1.${now-60000}.Actual_Click_123`)
+ assert.equal(event.user_data.fbp,'fb.1.1794432600000.123456')
+ assert.match(event.user_data.ph[0],/^[a-f0-9]{64}$/)
+ assert.equal(event.user_data.ph[0],conversionEvent(order,{...snapshot,tracking},{email:'buyer@example.com',phone:'+55 84 99663-3020'},now).user_data.ph[0])
+ assert.equal(event.event_id,'purchase:order')
+ assert.equal(JSON.stringify(event).includes('99663'),false)
+ const refused=purchaseTracking({preference:'denied',identifiers})
+ assert.deepEqual(refused.identifiers,{})
+ assert.equal(conversionEvent(order,{...snapshot,tracking:refused},{email:'buyer@example.com'},now),null)
+})
+test('no real click means no fbc; client-supplied network identity and invalid values are ignored',()=>{
+ const request=new Request('https://example.org/api/checkout/offer',{headers:{'x-forwarded-for':'not-an-ip','user-agent':'Actual Buyer'}})
+ const identifiers=purchaseRequestContext(request,{client_ip_address:'192.0.2.9',client_user_agent:'spoofed',fbclid:'bad<script>',click_time:now},now)
+ assert.deepEqual(identifiers,{client_user_agent:'Actual Buyer'})
+ assert.equal(purchaseRequestContext(request,{fbclid:'valid',click_time:now+1},now).fbc,undefined)
 })

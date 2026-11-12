@@ -1,5 +1,6 @@
 'use client'
 import Image from 'next/image'
+import { checkoutAttribution } from '@/lib/checkoutAttribution'
 import CheckoutAssurances from '../../admin/checkout/CheckoutAssurances'
 import {Inter} from 'next/font/google'
 import { flushSync } from 'react-dom'
@@ -24,6 +25,7 @@ function PaymentSymbol({ method }) {
 function Asset({ src, alt, className = '' }) { return <Image unoptimized src={src} alt={alt} width={800} height={400} className={className} /> }
 
 export default function PublicCheckout({ data }) {
+  useEffect(() => { checkoutAttribution(window) }, [])
   const { offer, product, config, prices, test, bumps = [] } = data
   const focused = config.layout === 'focused'
   const SummaryHeading = focused ? 'h2' : 'h1'
@@ -107,7 +109,7 @@ export default function PublicCheckout({ data }) {
         const get = key => String(values.get(key) || '').trim()
         if (config.confirm_email && get('email_confirmation').toLowerCase() !== get('email').toLowerCase()) throw new Error('Os emails não conferem.')
         const customer = { name: get('name'), email: get('email'), document: get('document'), phone: get('phone'), ...(needsAddress ? { address: { line_1: [get('address_number'), get('street'), get('district')].join(', '), street: get('street'), number: get('address_number'), district: get('district'), line_2: get('line_2'), zip_code: get('zip_code'), city: get('city'), state: get('state').toUpperCase() } } : {}) }
-        const payload = { action: 'pay', customer, payment_method: method, installments, bumps: selectedBumps, email_confirmation: get('email_confirmation'), terms_accepted: values.get('terms_accepted') === 'on', privacy_accepted: values.get('privacy_accepted') === 'on', marketing_preference: (() => { try { return localStorage.getItem('sz-checkout-consent-v2') || 'unknown' } catch { return 'unknown' } })(), marketing_consent: (() => { try { return localStorage.getItem('sz-checkout-consent-v2') === 'granted' } catch { return false } })() }
+        const payload = { action: 'pay', meta_attribution: checkoutAttribution(window), customer, payment_method: method, installments, bumps: selectedBumps, email_confirmation: get('email_confirmation'), terms_accepted: values.get('terms_accepted') === 'on', privacy_accepted: values.get('privacy_accepted') === 'on', marketing_preference: (() => { try { return localStorage.getItem('sz-checkout-consent-v2') || 'unknown' } catch { return 'unknown' } })(), marketing_consent: (() => { try { return localStorage.getItem('sz-checkout-consent-v2') === 'granted' } catch { return false } })() }
         if (method === 'credit_card') {
           if (!test.publicKey) throw new Error('Pagamento por cartão em preparação.')
           const expiry = get('expiry').match(/^(\d{2})\/(\d{2}|\d{4})$/)
