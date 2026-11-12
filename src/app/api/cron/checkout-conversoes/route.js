@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { retryConversions, reconcileMissingConversions } from '@/lib/checkoutConversionsServer'
 import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'
+import { retryWaitingTagAccess } from '@/lib/checkoutAccessPabblyServer'
 import { processContractReminders } from '@/lib/contractsServer'
 import { processContractTasks } from '@/lib/contractCompletionServer'
 
@@ -24,10 +25,12 @@ export async function GET(request) {
     const access = await expireOrderAccess(db)
     let outbound
     try { outbound = await processOutboundWebhooks(db) } catch { outbound = { error: 'queue_pending' } }
+    let access_messages
+    try { access_messages = await retryWaitingTagAccess(db) } catch { access_messages = { error: 'access_notifications_pending' } }
     let contracts
     try { contracts = await processContractReminders(db) } catch { contracts = { error: 'reminders_pending' } }
     let contract_tasks
     try { contract_tasks = await processContractTasks(db) } catch { contract_tasks = { error: 'tasks_pending' } }
-    return Response.json({ ...conversions, reconciliation, access, outbound, contracts, contract_tasks }, { headers: { 'Cache-Control': 'no-store' } })
+    return Response.json({ ...conversions, reconciliation, access, outbound, access_messages, contracts, contract_tasks }, { headers: { 'Cache-Control': 'no-store' } })
   } catch { return Response.json({ error: 'Não foi possível processar conversões.' }, { status: 503 }) }
 }
