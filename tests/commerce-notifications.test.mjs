@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { notifyPaidOrder, notifyGuruCommerce } from '../src/lib/commerceNotificationsServer.js'
+import { notifyPaidOrder, notifyGuruCommerce, processCommercePush } from '../src/lib/commerceNotificationsServer.js'
 import { commerceNotice, installationMessage, whatsappNumber, SALES_RECIPIENTS } from '../src/lib/commerceNotices.js'
 
 function fixture(status = 'paid', renewal = false) {
@@ -8,22 +8,29 @@ function fixture(status = 'paid', renewal = false) {
     orders: [{ id: 'order', status, paid_at: '2026-11-14T12:00:00Z', offer_id: 'offer', customer_id: 'customer', total_cents: 79700, parent_order_id: renewal ? 'origin' : null }],
     commerce_notification_config: [{ id: true, activated_at: '2026-11-13T12:00:00Z' }],
     customers: [{ id: 'customer', profile_id: 'student', name: 'Ana Maria', email: 'ana@example.com' }],
-    offers: [{ id: 'offer', product: { name: 'Clube da Loja Lucrativa' } }], order_items: [], user_notifications: [], webhook_events: [],
+    offers: [{ id: 'offer', product: { name: 'Clube da Loja Lucrativa' } }], order_items: [], user_notifications: [], webhook_events: [], push_subscriptions: [], commerce_push_deliveries: [],
   }
   return { tables, from(table) {
-    let filters = [], values, options
+    let filters = [], values, options, mutation, offset = 0, end = Infinity
     const q = {
       select() { return q }, eq(k, v) { filters.push(row => row[k] === v); return q },
+      not(k, _op, v) { filters.push(row => (row[k] ?? null) !== v); return q },
+      gte(k, v) { filters.push(row => row[k] >= v); return q },
+      lte(k, v) { filters.push(row => row[k] <= v); return q },
+      lt(k, v) { filters.push(row => row[k] < v); return q },
+      order() { return q }, range(a, b) { offset = a; end = b + 1; return q }, limit(n) { end = n; return q },
+      update(v) { mutation = v; return q },
       single() { q.one = true; return q }, maybeSingle() { q.one = true; return q },
       upsert(v, o) { values = v; options = o; return q },
       then(resolve, reject) { return Promise.resolve().then(() => {
         if (!tables[table]) throw Error('Unexpected table ' + table)
         if (values) {
           const keys = options.onConflict.split(',')
-          if (!tables[table].some(row => keys.every(key => row[key] === values[key]))) tables[table].push(values)
+          for (const value of Array.isArray(values) ? values : [values]) if (!tables[table].some(row => keys.every(key => row[key] === value[key]))) tables[table].push({ id: `${table}-${tables[table].length}`, sent_at: new Date().toISOString(), ...(table === 'commerce_push_deliveries' ? { status: 'pending', attempts: 0, next_attempt_at: new Date(0).toISOString() } : {}), ...value })
         }
-        const rows = tables[table].filter(row => filters.every(f => f(row)))
-        return { data: q.one ? rows[0] || null : rows, error: null }
+        const rows = tables[table].filter(row => filters.every(f => f(row))).slice(offset, end)
+        if (mutation) rows.forEach(row => Object.assign(row, mutation))
+        return { data: structuredClone(q.one ? rows[0] || null : rows), error: null }
       }).then(resolve, reject) },
     }
     return q
@@ -37,6 +44,27 @@ test('confirmed sale reaches exactly the two verified accounts once despite retr
     assert.deepEqual(db.tables.user_notifications.map(row => row.user_id), SALES_RECIPIENTS)
     assert.equal(db.tables.user_notifications.length, 2)
     assert.match(db.tables.user_notifications[0].body, /Ana • Clube da Loja Lucrativa • R\$\s797,00/)
+  } finally { if (saved === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = saved }
+})
+test('push retries only failed devices; repeated workers do not resend successful deliveries', async () => {
+  const saved = process.env.VERCEL_ENV; process.env.VERCEL_ENV = 'production'
+  try {
+    const db = fixture()
+    await notifyPaidOrder(db, 'order')
+    db.tables.push_subscriptions.push(...SALES_RECIPIENTS.map((user_id, i) => ({ id: `device${i}`, user_id, active: true, endpoint: `https://push.example/${i}`, p256dh: 'key', auth: 'auth' })))
+    const calls = []
+    let fail = true
+    const send = async sub => { calls.push(sub.endpoint); if (sub.endpoint.endsWith('/1') && fail) throw Error('temporary') }
+    const first = await processCommercePush(db, send)
+    assert.deepEqual(first, { sent: 1, failed: 1 })
+    await processCommercePush(db, send)
+    assert.equal(calls.length, 2)
+    fail = false
+    const retry = db.tables.commerce_push_deliveries.find(row => row.status === 'pending')
+    retry.next_attempt_at = new Date(0).toISOString()
+    await processCommercePush(db, send); await processCommercePush(db, send)
+    assert.deepEqual(calls, ['https://push.example/0','https://push.example/1','https://push.example/1'])
+    assert.ok(db.tables.commerce_push_deliveries.every(row => row.status === 'sent'))
   } finally { if (saved === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = saved }
 })
 test('renewal notifies student and owners; first or additional purchase does not claim renewal', async () => {
