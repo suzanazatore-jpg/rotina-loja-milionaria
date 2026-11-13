@@ -23,6 +23,7 @@ const menu = [
   ['Assinaturas', '/admin/checkout/assinaturas', 'subscriptions'],
   ['Produtos', '/admin/checkout', 'products'],
   ['Clientes', '/admin/checkout/clientes', 'customers'],
+  ['Instalação do app', '/admin/checkout/app-instalacao', 'installation'],
   ['Configurações', '/admin/checkout/configuracoes', 'settings'],
 ]
 export default function CentralShell({ children }) {
@@ -50,7 +51,7 @@ export default function CentralShell({ children }) {
     <aside className={`central-sidebar ${menuOpen ? 'is-open' : ''}`}>
       <Link href="/admin/central-vendas" className="central-brand" onClick={() => setMenuOpen(false)}><span className="central-monogram">SZ</span><span>Central de Vendas<small>Suzana Zatorre</small></span></Link>
       <p className="central-nav-caption">GESTÃO COMERCIAL</p>
-      <nav aria-label="Central de Vendas">{menu.map(([label, href, icon]) => href ? <Link key={icon} href={href} aria-current={(pathname === href || (href === '/admin/checkout/configuracoes' && pathname.startsWith(href + '/')) || (href === '/admin/checkout' && pathname.startsWith('/admin/checkout/produtos/'))) ? 'page' : undefined} title={label} className="central-nav-item" onClick={() => setMenuOpen(false)}><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span></Link> : <div key={icon} className="central-nav-item disabled" aria-disabled="true"><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span><small>Em breve</small></div>)}</nav>
+      <nav aria-label="Central de Vendas">{menu.map(([label, href, icon]) => href ? <Link key={icon} href={href} aria-current={(pathname === href || (href === '/admin/checkout/configuracoes' && pathname.startsWith(href + '/')) || (href === '/admin/checkout' && pathname.startsWith('/admin/checkout/produtos/'))) ? 'page' : undefined} title={label} className="central-nav-item" onClick={() => setMenuOpen(false)}><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',installation:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span></Link> : <div key={icon} className="central-nav-item disabled" aria-disabled="true"><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',installation:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span><small>Em breve</small></div>)}</nav>
       <Link href="/admin" className="central-office">← Meu Escritório</Link>
       <div className="central-sidebar-footer">Seu negócio. Sua central.</div>
     </aside>

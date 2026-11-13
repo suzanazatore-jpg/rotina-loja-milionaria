@@ -1,3 +1,4 @@
+import { reconcileCommerceNotices } from '@/lib/commerceNotificationsServer'
 import { expireOrderAccess } from '@/lib/checkoutAccessServer'
 import { timingSafeEqual } from 'node:crypto'
 import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
@@ -31,6 +32,8 @@ export async function GET(request) {
     try { contracts = await processContractReminders(db) } catch { contracts = { error: 'reminders_pending' } }
     let contract_tasks
     try { contract_tasks = await processContractTasks(db) } catch { contract_tasks = { error: 'tasks_pending' } }
-    return Response.json({ ...conversions, reconciliation, access, outbound, access_messages, contracts, contract_tasks }, { headers: { 'Cache-Control': 'no-store' } })
+    let commerce_notifications
+    try { commerce_notifications = await reconcileCommerceNotices(db) } catch { commerce_notifications = { error: 'commerce_notifications_pending' } }
+    return Response.json({ commerce_notifications, ...conversions, reconciliation, access, outbound, access_messages, contracts, contract_tasks }, { headers: { 'Cache-Control': 'no-store' } })
   } catch { return Response.json({ error: 'Não foi possível processar conversões.' }, { status: 503 }) }
 }

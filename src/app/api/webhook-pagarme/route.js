@@ -1,3 +1,5 @@
+import { notifyPaidOrder, processCommercePush } from '@/lib/commerceNotificationsServer'
+import { after } from 'next/server'
 import { reverseOrderAccess } from '@/lib/checkoutAccessServer'
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
@@ -32,10 +34,12 @@ export async function POST(request) {
     if (stored.type !== event.type || stored.payload?.resource_id !== event.data.id) throw new Error('Evento conflitante.')
     if (stored.processed_at) return NextResponse.json({ received: true })
     const order = await reconcileWebhookResource(db, event, { reconcileSubscriptionCharge })
+    after(async () => { try { await processCommercePush(db) } catch { console.error('commerce_push_pending') } })
     if (order?.status === 'paid') {
       const [access] = await Promise.allSettled([
         Promise.resolve().then(() => fulfillPaidOrder(db, order.order_id)),
         Promise.resolve().then(() => deliverPaidConversion(db, order.order_id)),
+        Promise.resolve().then(() => notifyPaidOrder(db, order.order_id)),
       ])
       // Keep the gateway retry when access fails, even after Purchase was sent.
       if (access.status === 'rejected') throw access.reason

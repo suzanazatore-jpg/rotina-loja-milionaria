@@ -28,7 +28,7 @@ export async function GET(request) {
   let protocolOnly
   try { protocolOnly = (await protocolNotificationUserIds(supabase, [user.id])).has(user.id) }
   catch { return Response.json({ error: 'Não foi possível verificar suas notificações.' }, { status: 503, headers: noStore }) }
-  const scoped = query => protocolOnly ? query.like('target_url', '/protocolo/%') : query
+  const scoped = query => protocolOnly ? query.or('target_url.like./protocolo/%,commerce_key.not.is.null') : query
   const [historyResult, unreadResult] = await Promise.all([
     scoped(supabase
       .from('user_notifications')

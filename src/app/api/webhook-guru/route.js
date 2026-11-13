@@ -1,3 +1,5 @@
+import { notifyGuruCommerce, processCommercePush } from '@/lib/commerceNotificationsServer'
+import { after } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import { enviarEmailBoasVindas } from '@/lib/enviarEmailBoasVindas'
@@ -253,6 +255,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Token invalido.' }, { status: 401 })
     }
 
+    after(async () => { try { await processCommercePush(supabaseAdmin) } catch { console.error('commerce_push_pending') } })
     const webhookType = payload?.webhook_type
 
     if (webhookType === 'subscription') {
@@ -295,6 +298,7 @@ export async function POST(request) {
         if (updateError) throw new Error(`Erro ao atualizar assinatura: ${updateError.message}`)
         await vincularPlanoAoPerfil({ perfilId: perfilExistente.id, plano, nome, email, whatsapp })
         await garantirMatriculaProtocolo(perfilExistente.id, plano, nomeProduto)
+        await notifyGuruCommerce(supabaseAdmin, payload, perfilExistente.id, true)
         try {
           await enviarEmailRenovacao({ nome, email, valor: valorFormatado, proximaCobranca: proximaCobrancaFormatada })
         } catch (e) { console.error('Erro e-mail renovacao:', e) }
@@ -331,6 +335,7 @@ export async function POST(request) {
         throw error
       }
 
+      await notifyGuruCommerce(supabaseAdmin, payload, novoUserId, false)
       try { await enviarEmailBoasVindas({ nome, email, senha }) }
       catch (e) { console.error('Erro e-mail boas-vindas:', e) }
 
@@ -387,6 +392,7 @@ export async function POST(request) {
         if (updateError) throw new Error(`Erro ao atualizar acesso: ${updateError.message}`)
         await vincularPlanoAoPerfil({ perfilId: perfilExistente.id, plano, nome, email, whatsapp })
         await garantirMatriculaProtocolo(perfilExistente.id, plano, nomeProduto)
+        await notifyGuruCommerce(supabaseAdmin, payload, perfilExistente.id, false)
         return NextResponse.json({ success: true, tipo: 'acesso_atualizado', email, tipo_acesso, plano: plano.name }, { status: 200 })
       }
 
@@ -417,6 +423,7 @@ export async function POST(request) {
         throw error
       }
 
+      await notifyGuruCommerce(supabaseAdmin, payload, novoUserId, false)
       try { await enviarEmailBoasVindas({ nome, email, senha }) }
       catch (e) { console.error('Erro e-mail boas-vindas:', e) }
 

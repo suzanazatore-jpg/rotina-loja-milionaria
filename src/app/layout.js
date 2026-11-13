@@ -1,3 +1,4 @@
+import AppInstallationTracker from './components/AppInstallationTracker'
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PwaInstallPrompt from "./components/PwaInstallPrompt";
@@ -50,6 +51,7 @@ export default function RootLayout({ children }) {
         {children}
         <AdminAlunasPlanInjector />
         <PwaInstallPrompt />
+        <AppInstallationTracker />
         <MorningNotificationPrompt />
       </body>
     </html>
