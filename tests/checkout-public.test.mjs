@@ -25,7 +25,7 @@ test('public checkout denies real payments, incomplete configuration and acciden
  assert.equal(checkoutTestConfiguration({...env,CHECKOUT_LIVE_ENABLED:'true',CHECKOUT_TEST_ENABLED:'false',PAGARME_SECRET_KEY:'sk_live_mock',PAGARME_PUBLIC_KEY:'pk_test_mock',PAGARME_BASE_URL:'https://api.pagar.me/core/v5'}).ready,false)
 })
 test('offer lookup filters active records and exposes only public product/offer fields',async()=>{
- const offer={id:'offer',slug:'offer',name:'Oferta',product_id:'product',price_cents:4700,active:true,max_installments:3,free_installments:3,payment_methods:['pix','credit_card'],pix_discount_pct:10,checkout_config:{},internal_flag:'private'}
+ const offer={id:'offer',slug:'offer',name:'Oferta',product_id:'product',price_cents:4700,active:true,max_installments:3,free_installments:3,monthly_interest_pct:'2.23',payment_methods:['pix','credit_card'],pix_discount_pct:10,checkout_config:{},internal_flag:'private'}
  const product={id:'product',name:'Produto',type:'one_time',active:true,plan_id:'internal-plan',botconversa_tag:'private',image_url:'https://example.org/product.png'}
  let calls=0
  const db={from(table){
@@ -40,6 +40,7 @@ test('offer lookup filters active records and exposes only public product/offer 
  assert.equal(loaded.prices.find(p=>p.method==='pix').total_cents,4230)
  assert.equal(loaded.prices.find(p=>p.installments===3).total_cents,4700)
  const exposed=publicCheckoutData(loaded,env)
+ assert.equal(exposed.offer.monthly_interest_pct,2.23)
  assert.equal(exposed.offer.internal_flag,undefined)
  assert.equal(exposed.product.plan_id,undefined)
  assert.equal(exposed.product.botconversa_tag,undefined)
