@@ -2,11 +2,11 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {randomUUID} from 'node:crypto'
 import {readFileSync} from 'node:fs'
-import {offerCode,offerId,paymentLink,CHECKOUT_ORIGIN} from '../src/lib/checkoutLinks.js'
+import {offerCode,offerId,paymentLink,SHORT_ORIGIN} from '../src/lib/checkoutLinks.js'
 const source=readFileSync(new URL('../src/lib/checkoutSettings.js',import.meta.url),'utf8').replace("'./contractTemplates.js'",JSON.stringify(new URL('../src/lib/contractTemplates.js',import.meta.url).href)).replace("'./checkoutTracking.js'",JSON.stringify(new URL('../src/lib/checkoutTracking.js',import.meta.url).href))
 const {normalizeCheckoutSettings,validateCheckoutForm}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
-test('compact links are lossless across UUIDs and reject noncanonical codes',()=>{for(let i=0;i<100;i++){const id=randomUUID(),code=offerCode(id);assert.equal(code.length,22);assert.equal(offerId(code),id);assert.match(paymentLink({id}),new RegExp('^'+CHECKOUT_ORIGIN+'/p/'));assert.doesNotMatch(code,/[+/=]/)}for(const code of ['../admin','https://evil.test','bad','A'.repeat(21)+'B'])assert.equal(offerId(code),null);assert.equal(offerCode('not-an-id'),'')})
-test('friendly payment aliases remain offer-specific and reject arbitrary URLs',()=>{const input={layout:'guru',payment_alias:'Biblioteca',document_type:'cnpj'},config=normalizeCheckoutSettings(input);assert.equal(config.payment_alias,'biblioteca');assert.equal(paymentLink({id:randomUUID(),checkout_config:config}),CHECKOUT_ORIGIN+'/p/biblioteca');for(const alias of ['https://evil.test','../admin','a b','a'.repeat(33),'x'])assert.throws(()=>normalizeCheckoutSettings({payment_alias:alias}));assert.equal(config.font,'Inter');assert.equal(config.support_email,'suporte@suzanazatorre.com.br')})
+test('compact links are lossless across UUIDs and reject noncanonical codes',()=>{for(let i=0;i<100;i++){const id=randomUUID(),code=offerCode(id);assert.equal(code.length,22);assert.equal(offerId(code),id);assert.match(paymentLink({id}),new RegExp('^'+SHORT_ORIGIN+'/'));assert.doesNotMatch(code,/[+/=]/)}for(const code of ['../admin','https://evil.test','bad','A'.repeat(21)+'B'])assert.equal(offerId(code),null);assert.equal(offerCode('not-an-id'),'')})
+test('friendly payment aliases remain offer-specific and reject arbitrary URLs',()=>{const input={layout:'guru',payment_alias:'Biblioteca',document_type:'cnpj'},config=normalizeCheckoutSettings(input);assert.equal(config.payment_alias,'biblioteca');assert.equal(paymentLink({id:randomUUID(),checkout_config:config}),SHORT_ORIGIN+'/biblioteca');for(const alias of ['https://evil.test','../admin','a b','a'.repeat(33),'x'])assert.throws(()=>normalizeCheckoutSettings({payment_alias:alias}));assert.equal(config.font,'Inter');assert.equal(config.support_email,'suporte@suzanazatorre.com.br')})
 test('document selection is enforced on the server while CPF/CNPJ accepts either',()=>{assert.throws(()=>validateCheckoutForm({document_type:'cpf'},{customer:{document:'12345678000190'}}),/CPF/);assert.throws(()=>validateCheckoutForm({document_type:'cnpj'},{customer:{document:'12345678901'}}),/CNPJ/);for(const document of ['12345678901','12345678000190'])validateCheckoutForm({document_type:'cpf_cnpj'},{customer:{document}})})
 
 test('offer name previews the public path and a reserved path wins over a legacy alias', async () => {
@@ -16,5 +16,14 @@ test('offer name previews the public path and a reserved path wins over a legacy
   assert.equal(offerPath('7 Dias'), '7-dias')
   assert.equal(offerPath(''), '')
   assert.equal(offerPath('a'.repeat(59) + ' clube'), 'a'.repeat(59))
-  assert.equal(paymentLink({payment_path:'acao-verao-2',checkout_config:{payment_alias:'antigo'}}), CHECKOUT_ORIGIN+'/p/acao-verao-2')
+  assert.equal(paymentLink({payment_path:'acao-verao-2',checkout_config:{payment_alias:'antigo'}}), SHORT_ORIGIN+'/acao-verao-2')
+})
+
+
+test('canonical payment link follows the reserved friendly path without changing the internal slug',()=>{
+ const offer={id:randomUUID(),slug:'identidade-interna',payment_path:'nova-oferta',checkout_config:{payment_alias:'alias-antigo'}}
+ assert.equal(paymentLink(offer),'https://pay.suzanazatorre.com.br/nova-oferta')
+ assert.equal(paymentLink({...offer,payment_path:'outra-oferta'}),'https://pay.suzanazatorre.com.br/outra-oferta')
+ assert.equal(offer.slug,'identidade-interna')
+ assert.equal(paymentLink({}),'')
 })

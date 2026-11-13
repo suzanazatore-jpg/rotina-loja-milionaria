@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   serverExternalPackages: ['pdf-parse', '@napi-rs/canvas'],
+  async rewrites() {
+    return [{ source: '/:code([a-zA-Z0-9_-]{1,60})', has: [{type:'host',value:'pay.suzanazatorre.com.br'}], destination:'/p/:code' }]
+  },
   async headers() {
     return [
       {
