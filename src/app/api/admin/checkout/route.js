@@ -1,3 +1,4 @@
+import { offerPath } from '@/lib/checkoutLinks'
 import { normalizeCheckoutSettings } from '@/lib/checkoutSettings'
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient, gerarSlug, reaisParaCentavos } from '@/lib/checkoutAdminServer'
@@ -115,6 +116,7 @@ async function montarOferta(supabase, dados) {
     product_id: produto.id,
     name: nome,
     slug: gerarSlug(dados.slug || `${produto.slug}-${nome}`),
+    ...(typeof dados.payment_path === 'string' ? {payment_path:offerPath(dados.payment_path) || offerPath(nome) || 'oferta'} : {}),
     price_cents: preco,
     payment_methods: metodos,
     max_installments: maxParcelas,
@@ -206,10 +208,10 @@ export async function POST(request) {
       const consulta = id
         ? supabase.from('offers').update(registro).eq('id', id)
         : supabase.from('offers').insert(registro)
-      const { data, error } = await consulta.select('id').single()
+      const { data, error } = await consulta.select('id,slug,payment_path').single()
       if (error) throw new Error(error.message)
       await salvarBumps(supabase, data.id, dados.bumps)
-      return NextResponse.json({ ok: true, id: data.id })
+      return NextResponse.json({ ok: true, ...data })
     }
     return erro('Entidade inválida.')
   } catch (e) {

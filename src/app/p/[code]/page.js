@@ -10,11 +10,13 @@ export default async function Page({params}){
   const {code}=await params
   if(!/^[a-zA-Z0-9_-]{1,60}$/.test(code))notFound()
   const db=checkoutAdminClient()
+  const reserved=await db.from('checkout_offer_links').select('offer_id').eq('path',code).maybeSingle()
+  if(reserved.error)throw new Error('Não foi possível abrir este link.')
   // Ordem igual à do admin: link curto personalizado → URL amigável (slug) → link salvo → código da oferta.
   const alias=await db.from('offers').select('id').eq('checkout_config->>payment_alias',code).eq('active',true).limit(2)
   if(alias.error)throw new Error('Não foi possível abrir este link.')
-  if(alias.data?.length>1)notFound()
-  let targetId=alias.data?.[0]?.id || null
+  if(!reserved.data && alias.data?.length>1)notFound()
+  let targetId=reserved.data?.offer_id || alias.data?.[0]?.id || null
   if(!targetId){
     const bySlug=await db.from('offers').select('id').eq('slug',code).eq('active',true).maybeSingle()
     if(bySlug.error)throw new Error('Não foi possível abrir este link.')
