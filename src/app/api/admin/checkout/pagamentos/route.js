@@ -1,3 +1,5 @@
+import { notifyPaidOrder, processCommercePush } from '@/lib/commerceNotificationsServer'
+import { after } from 'next/server'
 import { reverseOrderAccess } from '@/lib/checkoutAccessServer'
 import { NextResponse } from 'next/server'
 import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
@@ -18,9 +20,11 @@ export async function POST(request) {
     const output = input.action === 'sync'
       ? await syncPayment(db, input.order_id)
       : await createPayment(db, input, request.headers.get('idempotency-key'))
+    after(async () => { try { await processCommercePush(db) } catch { console.error('commerce_push_pending') } })
     const steps = output.status === 'paid' ? await Promise.allSettled([
       Promise.resolve().then(() => fulfillPaidOrder(db, output.order_id)),
       Promise.resolve().then(() => deliverPaidConversion(db, output.order_id)),
+      Promise.resolve().then(() => notifyPaidOrder(db, output.order_id)),
     ]) : null
     const fulfillment = steps?.[0].status === 'fulfilled' ? steps[0].value : steps ? { fulfillment: 'pending' } : {}
     const reversal = ['refunded','chargedback'].includes(output.status) ? await reverseOrderAccess(db, output.order_id) : {}
