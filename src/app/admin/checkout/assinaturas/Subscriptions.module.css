@@ -2,3 +2,5 @@
 
 /* Shared compact list rhythm. */
 .table{border-spacing:0 4px}.table th{padding:10px 14px;font-weight:400}.table td{padding:12px 14px}.toolbar{margin-top:16px}.heading{margin-bottom:24px}
+
+.status{border:0;background:none}.status svg{width:17px;height:17px}.badges>span{display:inline-flex;align-items:center;gap:5px}

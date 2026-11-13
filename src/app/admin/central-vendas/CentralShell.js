@@ -5,7 +5,7 @@ import {Inter,Urbanist} from 'next/font/google'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { supabase } from '@/lib/supabase'
-import AppIcon from '@/app/components/AppIcon'
+import AppIcon from '@/app/admin/central-vendas/CentralIcon'
 import './central.css'
 
 const inter=Inter({subsets:['latin'],display:'swap',variable:'--central-inter'})
@@ -49,12 +49,12 @@ export default function CentralShell({ children }) {
     <aside className={`central-sidebar ${menuOpen ? 'is-open' : ''}`}>
       <Link href="/admin/central-vendas" className="central-brand" onClick={() => setMenuOpen(false)}><span className="central-monogram">SZ</span><span>Central de Vendas<small>Suzana Zatorre</small></span></Link>
       <p className="central-nav-caption">GESTÃO COMERCIAL</p>
-      <nav aria-label="Central de Vendas">{menu.map(([label, href, icon]) => href ? <Link key={icon} href={href} aria-current={(pathname === href || (href === '/admin/checkout/configuracoes' && pathname.startsWith(href + '/')) || (href === '/admin/checkout' && pathname.startsWith('/admin/checkout/produtos/'))) ? 'page' : undefined} title={label} aria-label={label} className="central-nav-item" onClick={() => setMenuOpen(false)}><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span></Link> : <div key={icon} className="central-nav-item disabled" aria-disabled="true"><AppIcon name={{overview:'goals',products:'courses',sales:'plans',subscriptions:'routine',customers:'profile',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span><small>Em breve</small></div>)}</nav>
-      <Link href="/admin" className="central-office">← Meu Escritório</Link>
+      <nav aria-label="Central de Vendas">{menu.map(([label, href, icon]) => href ? <Link key={icon} href={href} aria-current={(pathname === href || (href === '/admin/checkout/configuracoes' && pathname.startsWith(href + '/')) || (href === '/admin/checkout' && pathname.startsWith('/admin/checkout/produtos/'))) ? 'page' : undefined} title={label} aria-label={label} className="central-nav-item" onClick={() => setMenuOpen(false)}><AppIcon name={{overview:'dashboard',products:'products',sales:'cart',subscriptions:'subscriptions',customers:'customers',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span></Link> : <div key={icon} className="central-nav-item disabled" aria-disabled="true"><AppIcon name={{overview:'dashboard',products:'products',sales:'cart',subscriptions:'subscriptions',customers:'customers',settings:'settings'}[icon]} size={20} /><span className="central-nav-label">{label}</span><small>Em breve</small></div>)}</nav>
+      <Link href="/admin" className="central-office" aria-label="Meu Escritório" title="Meu Escritório"><AppIcon name="arrowLeft" size={19}/><span className="central-office-label">Meu Escritório</span></Link>
       <div className="central-sidebar-footer">Seu negócio. Sua central.</div>
     </aside>
     <div className="central-workspace">
-      <header className="central-topbar"><div className="central-topbar-title"><button className="central-menu-button" onClick={() => { setCollapsed(!collapsed); setMenuOpen(!menuOpen) }} aria-expanded={!collapsed} aria-label="Expandir ou recolher menu da Central de Vendas">☰</button><div><span className="central-company">Suzana Zatorre Educacional Ltda</span></div></div><div className="central-theme" role="group" aria-label="Tema da Central de Vendas">{['claro', 'preto'].map(value => <button key={value} aria-pressed={theme === value} onClick={() => changeTheme(value)}>{value === 'claro' ? '☀ Claro' : '◐ Preto'}</button>)}</div></header>
+      <header className="central-topbar"><div className="central-topbar-title"><button className="central-menu-button" onClick={() => { setCollapsed(!collapsed); setMenuOpen(!menuOpen) }} aria-expanded={!collapsed} aria-label="Expandir ou recolher menu da Central de Vendas"><AppIcon name="menu" size={18}/></button><div><span className="central-company">Suzana Zatorre Educacional Ltda</span></div></div><div className="central-theme" role="group" aria-label="Tema da Central de Vendas">{['claro', 'preto'].map(value => <button key={value} aria-pressed={theme === value} onClick={() => changeTheme(value)}><><AppIcon name={value === 'claro'?'sun':'moon'} size={14}/>{value === 'claro'?'Claro':'Preto'}</></button>)}</div></header>
       <div className="central-body">{access === 'allowed' ? children : <div className="central-access" role="status">{access === 'loading' ? 'Carregando sua central…' : 'Acesso restrito ao administrador.'}</div>}</div>
     </div>
   </div>

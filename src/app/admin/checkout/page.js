@@ -1,4 +1,5 @@
 'use client'
+import CentralIcon from '@/app/admin/central-vendas/CentralIcon'
 
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -150,7 +151,7 @@ export default function AdminCheckout({ initialProdutoId = null }) {
             <h1 style={{ fontSize: '24px', margin: '5px 0' }}>{selecionado ? selecionado.name : 'Produtos'}</h1>
             {selecionado && <p style={{ color: 'var(--cv-muted)', margin: 0 }}>O produto é o que a aluna recebe. A oferta é como ele é vendido: preço, parcelas e link do checkout.</p>}
           </div>
-          <div className={productStyles.headerActions}><ExportButton section="catalogo" label="XLS"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}>＋ Adicionar produto</button></div>
+          <div className={productStyles.headerActions}><ExportButton section="catalogo" label="XLS"/><button onClick={() => { setMensagem(''); setFormProduto({ dados: { ...PRODUTO_VAZIO } }) }} style={{ background: 'var(--cv-gold)', color: 'var(--cv-on-gold)', border: 0, borderRadius: '999px', padding: '11px 18px', fontWeight: 900, cursor: 'pointer' }}><CentralIcon name="plus" size={16}/> Adicionar produto</button></div>
         </div>}
 
         {mensagem && <div role="status" aria-live="polite" style={{ background: 'var(--cv-selected)', border: '1px solid #5b4c17', color: 'var(--cv-gold)', padding: '11px 13px', borderRadius: '9px', marginBottom: '16px' }}>{mensagem}</div>}

@@ -1,4 +1,5 @@
 'use client'
+import CentralIcon from '@/app/admin/central-vendas/CentralIcon'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 export default function ExportButton({section='tudo',filters={},label='Baixar Excel',disabled=false}) {
@@ -16,5 +17,5 @@ export default function ExportButton({section='tudo',filters={},label='Baixar Ex
       const link=document.createElement('a');link.href=url;link.download=`central-${section}.xlsx`;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),30000)
     } catch(error){setError(error.message)} finally {setBusy(false)}
   }
-  return <span style={{display:'inline-grid',gap:6}}><button type="button" className="central-action cv-export" disabled={disabled || busy} onClick={download}>{busy?'Gerando planilha…':label}</button>{error && <small role="alert" style={{color:'var(--cv-danger)',maxWidth:300}}>{error}</small>}</span>
+  return <span style={{display:'inline-grid',gap:6}}><button type="button" className="central-action cv-export" disabled={disabled || busy} onClick={download}><CentralIcon name="export" size={15}/>{busy?'Gerando planilha…':label}</button>{error && <small role="alert" style={{color:'var(--cv-danger)',maxWidth:300}}>{error}</small>}</span>
 }
