@@ -30,3 +30,7 @@ test('não envia a canais WhatsApp ou sem credencial',async()=>{
 test('rejeição do provedor permanece erro, sem confirmação de entrega',async()=>{
  await assert.rejects(sendCheckoutSaleEmail({channel:'email',destination:'a@example.com'},order,{env:{BREVO_API_KEY:'test'},fetcher:async()=>({ok:false,status:403})}),/brevo_http_403/)
 })
+
+test('venda criada nunca dispara email, mesmo quando chamada diretamente', async()=>{
+ await assert.rejects(sendCheckoutSaleEmail({channel:'email',destination:'destinatario@example.com',name:'Teste'},{...order,event_type:'order_created'},{env:{BREVO_API_KEY:'test'},fetcher:async()=>assert.fail('venda criada não deve enviar')}),/invalid_sale_event/)
+})
