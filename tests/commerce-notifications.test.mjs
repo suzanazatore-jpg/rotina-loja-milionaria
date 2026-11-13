@@ -2,6 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { notifyPaidOrder, notifyGuruCommerce, processCommercePush } from '../src/lib/commerceNotificationsServer.js'
 import { commerceNotice, installationMessage, whatsappNumber, SALES_RECIPIENTS } from '../src/lib/commerceNotices.js'
+import { installationAccountStatus, formatInstallationPhone } from '../src/lib/appInstallationStatus.js'
+import { sendInstallationWhatsappBatch } from '../src/lib/appInstallationBulkServer.js'
 import { installationReport, installationReportUser } from '../src/lib/appInstallationReportServer.js'
 
 function fixture(status = 'paid', renewal = false) {
@@ -9,12 +11,14 @@ function fixture(status = 'paid', renewal = false) {
     orders: [{ id: 'order', status, paid_at: '2026-11-14T12:00:00Z', offer_id: 'offer', customer_id: 'customer', total_cents: 79700, parent_order_id: renewal ? 'origin' : null }],
     commerce_notification_config: [{ id: true, activated_at: '2026-11-13T12:00:00Z' }],
     customers: [{ id: 'customer', profile_id: 'student', name: 'Ana Maria', email: 'ana@example.com' }],
-    offers: [{ id: 'offer', product: { name: 'Clube da Loja Lucrativa' } }], order_items: [], user_notifications: [], webhook_events: [], push_subscriptions: [], commerce_push_deliveries: [],
+    offers: [{ id: 'offer', product: { name: 'Clube da Loja Lucrativa' } }], order_items: [], user_notifications: [], webhook_events: [], perfis: [], app_user_activity: [], push_subscriptions: [], commerce_push_deliveries: [],
   }
   return { tables, from(table) {
     let filters = [], values, options, mutation, offset = 0, end = Infinity
     const q = {
       select() { return q }, eq(k, v) { filters.push(row => row[k] === v); return q },
+      in(k, values) { filters.push(row => values.includes(row[k])); return q },
+      insert(v) { values = v; options = { onConflict: 'id' }; return q },
       not(k, _op, v) { filters.push(row => (row[k] ?? null) !== v); return q },
       gte(k, v) { filters.push(row => row[k] >= v); return q },
       lte(k, v) { filters.push(row => row[k] <= v); return q },
@@ -27,7 +31,7 @@ function fixture(status = 'paid', renewal = false) {
         if (!tables[table]) throw Error('Unexpected table ' + table)
         if (values) {
           const keys = options.onConflict.split(',')
-          for (const value of Array.isArray(values) ? values : [values]) if (!tables[table].some(row => keys.every(key => row[key] === value[key]))) tables[table].push({ id: `${table}-${tables[table].length}`, sent_at: new Date().toISOString(), ...(table === 'commerce_push_deliveries' ? { status: 'pending', attempts: 0, next_attempt_at: new Date(0).toISOString() } : {}), ...value })
+          for (const value of Array.isArray(values) ? values : [values]) if (!tables[table].some(row => keys.every(key => value[key] !== undefined && row[key] === value[key]))) tables[table].push({ id: `${table}-${tables[table].length}`, sent_at: new Date().toISOString(), created_at: new Date().toISOString(), ...(table === 'commerce_push_deliveries' ? { status: 'pending', attempts: 0, next_attempt_at: new Date(0).toISOString() } : {}), ...value })
         }
         const rows = tables[table].filter(row => filters.every(f => f(row))).slice(offset, end)
         if (mutation) rows.forEach(row => Object.assign(row, mutation))
@@ -137,4 +141,37 @@ test('installation report lists active students only and authorizes only the ver
   db.auth = { getUser: async () => ({ data: { user: { id: 'student', email: 'student@example.com', user_metadata: { role: 'admin' } } } }) }
   assert.equal(await installationReportUser(request, db), null)
   assert.equal(await installationReportUser(new Request('https://example.com'), db), null)
+})
+test('financial eligibility excludes expired, overdue and refunded access without assuming unknown payment', () => {
+  const profile = { status: 'active' }
+  for (const status_assinatura of ['atrasado', 'reembolsado', 'cancelado', 'inadimplente']) assert.equal(installationAccountStatus(profile, { status_assinatura }, '2026-11-13').active, false)
+  assert.equal(installationAccountStatus(profile, { status_assinatura: 'ativo', acesso_expira_em: '2026-11-12' }, '2026-11-13').active, false)
+  assert.equal(installationAccountStatus(profile, { status_assinatura: 'ativo', acesso_expira_em: '2026-11-13' }, '2026-11-13').active, true)
+  assert.equal(installationAccountStatus(profile, { status_assinatura: null }, '2026-11-13').financial_status, 'Sem informação')
+  assert.equal(installationAccountStatus(profile, { status_assinatura: 'ativo' }, '2026-11-13').financial_status, 'Em dia')
+  assert.equal(formatInstallationPhone('5584996633020'), '(84) 99663-3020')
+})
+test('WhatsApp batch contains only selected eligible people and duplicate sends are skipped', async () => {
+  const previous = process.env.PABBLY_CAMPANHA_WEBHOOK_URL
+  process.env.PABBLY_CAMPANHA_WEBHOOK_URL = 'https://example.com/test-hook'
+  try {
+    const db = fixture()
+    const [selected, unrelated] = SALES_RECIPIENTS
+    db.tables.profiles = [
+      { id: selected, role: 'student', status: 'active', name: 'Selecionado', phone: '84996633020' },
+      { id: unrelated, role: 'student', status: 'active', name: 'Não selecionada', phone: '84988199174' },
+    ]
+    db.tables.app_installations = []; db.tables.app_install_reminders = []
+    const bodies = []
+    const send = async (_url, options) => { bodies.push(JSON.parse(options.body)); return { ok: true } }
+    const first = await sendInstallationWhatsappBatch(db, { id: 'admin' }, [selected], send)
+    assert.equal(first.accepted, 1)
+    assert.deepEqual(bodies[0].destinatarios.map(person => person.id), [selected])
+    assert.equal(db.tables.app_install_reminders[0].channel, 'whatsapp')
+    const again = await sendInstallationWhatsappBatch(db, { id: 'admin' }, [selected], send)
+    assert.equal(again.accepted, 0); assert.equal(bodies.length, 1)
+    db.tables.app_installations.push({ user_id: unrelated, evidence: 'admin_confirmed', confirmed_at: new Date().toISOString() })
+    const installed = await sendInstallationWhatsappBatch(db, { id: 'admin' }, [unrelated], send)
+    assert.equal(installed.accepted, 0); assert.equal(bodies.length, 1)
+  } finally { if (previous === undefined) delete process.env.PABBLY_CAMPANHA_WEBHOOK_URL; else process.env.PABBLY_CAMPANHA_WEBHOOK_URL = previous }
 })
