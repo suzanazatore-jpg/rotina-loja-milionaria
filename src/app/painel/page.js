@@ -13,8 +13,6 @@ import RoutinePdfButton from '@/app/components/RoutinePdfButton'
 import AppIcon from '@/app/components/AppIcon'
 import NotificationCenter from '@/app/components/NotificationCenter'
 import NotificationPreference from './NotificationPreference'
-import { SALES_RECIPIENTS } from '@/lib/commerceNotices'
-const AppInstallationReport = dynamic(() => import('@/app/components/AppInstallationReport'))
 import TutorialVideoPlayer from '@/app/components/TutorialVideoPlayer'
 import './premium.css'
 
@@ -194,8 +192,9 @@ export default function Painel() {
 
   useEffect(() => {
     const destino = new URLSearchParams(window.location.search).get('secao')
+    if (destino === 'instalacao-app') { window.location.replace('/admin/app-instalacao'); return }
     const timer = window.setTimeout(() => {
-      if (['inicio', 'rotina', 'vendas', 'conteudos', 'calendario', 'campanhas', 'precificacao', 'bonus', 'instalacao-app'].includes(destino)) setSecao(destino)
+      if (['inicio', 'rotina', 'vendas', 'conteudos', 'calendario', 'campanhas', 'precificacao', 'bonus'].includes(destino)) setSecao(destino)
     }, 0)
     return () => window.clearTimeout(timer)
   }, [])
@@ -425,7 +424,6 @@ export default function Painel() {
 
   // É admin? (mostra o botão de escritório só pra ela)
   const isAdmin = usuario?.email === ADMIN_EMAIL
-  const podeVerInstalacao = isAdmin || SALES_RECIPIENTS.includes(usuario?.id)
 
   const rotinaLiberada = conteudosLiberados.includes('routine')
   const campanhasLiberadas = conteudosLiberados.includes('campaigns')
@@ -438,7 +436,6 @@ export default function Painel() {
     { id: 'conteudos', icone: 'content', label: 'Conteúdos' },
     ...(trafegoLiberado ? [{ id: 'trafego', icone: 'campaigns', label: 'Relatórios de tráfego' }] : []),
     { id: 'dados', icone: 'profile', label: 'Meus Dados' },
-    ...(podeVerInstalacao ? [{ id: 'instalacao-app', icone: 'profile', label: 'Instalação do app' }] : []),
     { id: 'ajuda', icone: 'support', label: 'Suporte' },
   ]
 
@@ -611,8 +608,6 @@ export default function Painel() {
           {/* ─── conteúdo interno (com padding) ─── */}
           {secao !== 'inicio' && (
             <div style={{ padding: '20px 18px' }}>
-
-              {secao === 'instalacao-app' && podeVerInstalacao && <AppInstallationReport cores={cores} />}
 
               {/* TODOS OS ACESSOS — conteúdo completo em cascata no desktop */}
               {secao === 'acessos' && (

@@ -81,6 +81,7 @@ export default function Admin() {
         { icone: 'support', titulo: 'Suporte', sub: 'Centralize e responda as solicitações das alunas.', rota: '/admin/suporte' },
         { icone: 'notifications', titulo: 'Notificações', sub: 'Edite os avisos das 8h e 9h e envie testes.', rota: '/admin/notificacoes' },
         { icone: 'broadcast', titulo: 'Campanhas em Massa', sub: 'Envie mensagens por e-mail e WhatsApp.', rota: '/admin/comunicacao' },
+        { icone: 'users', titulo: 'Instalação do app', sub: 'Veja os alunos ativos e envie lembretes para instalar o aplicativo.', rota: '/admin/app-instalacao' },
       ],
     },
     {
