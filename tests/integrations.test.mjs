@@ -47,7 +47,7 @@ test('integration API refuses unauthorized requests before reading configuration
   assert.deepEqual(await authorized.json(),{statuses:{brevo:{configured:false}}})
 })
 test('all actionable destinations exist in this application; planned Google Ads never claims a connection',()=>{
-  for(const item of INTEGRATIONS)for(const [,href]of item.actions)assert.doesNotThrow(()=>readFileSync(new URL(`../src/app${href}/page.js`,import.meta.url)))
+  for(const item of INTEGRATIONS)for(const [,href]of item.actions)assert.doesNotThrow(()=>readFileSync(new URL(`../src/app${href.split('?')[0]}/page.js`,import.meta.url)))
   assert.equal(INTEGRATIONS.find(item=>item.id==='google-ads').planned,true)
   assert.equal(integrationStatus()['google-ads'],undefined)
 })

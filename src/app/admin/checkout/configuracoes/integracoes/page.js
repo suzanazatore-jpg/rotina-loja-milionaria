@@ -57,7 +57,7 @@ export default function Integrations() {
       <p className={styles.footnote} role="status" aria-live="polite">{loading?'Consultando as configurações deste ambiente…':`${filtered.length} ${filtered.length===1?'ferramenta encontrada':'ferramentas encontradas'}. Configuração encontrada não confirma conexão ou entrega.`}</p>
       {groups.map(group=><section className={styles.section} key={group.id} aria-label={group.name}>
         <h2 className={group.id==='configured'?styles.configured:styles.pending}>{group.name}<span>{group.items.length}</span></h2>
-        <div className={styles.grid}>{group.items.map(item=><button type="button" className={styles.card} key={item.id} title={item.description} onClick={()=>setSelected(item)}>
+        <div className={styles.grid}>{group.items.map(item=><button type="button" className={styles.card} key={item.id} title={item.description} onClick={()=>item.id==='meta'?window.location.assign('/admin/checkout/configuracoes/integracoes/meta'):setSelected(item)}>
           <span className={styles.brand}><span className={styles.icon}><AppIcon name={item.icon} size={24}/></span><strong>{item.name}</strong></span>
           <span className={styles.badge}>{item.planned?'Planejada':loading?'Consultando…':error?'Não verificado':statuses?.[item.id]?.label || 'Não verificado'}</span>
         </button>)}</div>
