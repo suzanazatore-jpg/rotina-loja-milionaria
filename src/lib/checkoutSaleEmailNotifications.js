@@ -1,7 +1,7 @@
 // Administrative sale email alerts. Isolated from payment, access and WhatsApp flows.
 // Default OFF: enable via CHECKOUT_SALES_EMAIL_ENABLED and per-event/recipient switches after deployment review.
 // A provider HTTP acceptance is "sent", never proof of inbox delivery.
-const eventNames = {order_created:'Venda criada',order_paid:'Venda aprovada'}
+const eventNames = {order_paid:'Venda aprovada'}
 const currency = cents => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100)
 const localTime = date => new Date(date).toLocaleString('pt-BR',{timeZone:'America/Fortaleza',dateStyle:'short',timeStyle:'short'})
 async function required(query,label){
@@ -40,12 +40,12 @@ export async function processCheckoutSaleEmails(db,{env=process.env,sender=sendC
  if(env.CHECKOUT_SALES_EMAIL_ENABLED!=='true')return {enabled:false,processed:0}
  if(!env.BREVO_API_KEY)return {enabled:true,processed:0,error:'brevo_not_configured'}
  const events=await required(db.from('checkout_notification_event_settings').select('event_type').eq('enabled',true),'event_settings_unavailable')
- const allowed=new Set(events.map(x=>x.event_type))
+ const allowed=new Set(events.filter(x=>x.event_type==='order_paid').map(x=>x.event_type))
  if(!allowed.size)return {enabled:true,processed:0}
  const pending=await required(db.from('checkout_notification_deliveries').select('id,order_id,recipient_id,event_type,status,attempts').in('status',['queued','failed']).lt('attempts',3).order('created_at',{ascending:true}).limit(20),'delivery_queue_unavailable')
  let processed=0,failed=0
  for(const job of pending){
-  if(!allowed.has(job.event_type)||!job.order_id)continue
+  if(job.event_type!=='order_paid'||!allowed.has(job.event_type)||!job.order_id)continue
   const {data:recipient,error:recipientError}=await db.from('checkout_notification_recipients').select('id,name,channel,destination,enabled').eq('id',job.recipient_id).maybeSingle()
   if(recipientError||!recipient||!recipient.enabled||recipient.channel!=='email')continue
   const {data:claimed,error:claimError}=await db.from('checkout_notification_deliveries').update({status:'sending',attempts:job.attempts+1,updated_at:now.toISOString()}).eq('id',job.id).eq('status',job.status).eq('attempts',job.attempts).select('id')
@@ -53,12 +53,12 @@ export async function processCheckoutSaleEmails(db,{env=process.env,sender=sendC
   try{
    const order=await required(db.from('orders').select('id,customer_id,offer_id,total_cents,payment_method,created_at,paid_at,status').eq('id',job.order_id).single(),'order_unavailable')
    // Approval alerts must only describe confirmed payments.
-   if(job.event_type==='order_paid'&&(order.status!=='paid'||!order.paid_at))throw new Error('payment_not_confirmed')
+   if(order.status!=='paid'||!order.paid_at)throw new Error('payment_not_confirmed')
    const [customer,offer]=await Promise.all([
     required(db.from('customers').select('name').eq('id',order.customer_id).single(),'customer_unavailable'),
     required(db.from('offers').select('name').eq('id',order.offer_id).single(),'offer_unavailable')
    ])
-   const sale={id:order.id,event_type:job.event_type,customer:customer.name,product:offer.name,total_cents:order.total_cents,payment_method:order.payment_method,occurred_at:job.event_type==='order_paid'?order.paid_at:order.created_at}
+   const sale={id:order.id,event_type:job.event_type,customer:customer.name,product:offer.name,total_cents:order.total_cents,payment_method:order.payment_method,occurred_at:order.paid_at}
    const receipt=await sender(recipient,sale,{env})
    const saved=await db.from('checkout_notification_deliveries').update({status:'sent',provider_message_id:receipt.messageId,sent_at:now.toISOString(),error_message:null,updated_at:now.toISOString()}).eq('id',job.id).eq('status','sending')
    if(saved.error)throw new Error('receipt_save_failed')
