@@ -1,5 +1,13 @@
 import { allRows } from './centralRecords.js'
-import { installationMessage, whatsappNumber } from './commerceNotices.js'
+import { installationMessage, whatsappNumber, SALES_RECIPIENTS } from './commerceNotices.js'
+
+export async function installationReportUser(request, db) {
+  const token = request.headers.get('authorization')?.replace(/^Bearer /, '')
+  if (!token) return null
+  const { data: { user }, error } = await db.auth.getUser(token)
+  if (error || !user) return null
+  return user.email === 'suporte@suzanazatorre.com.br' || SALES_RECIPIENTS.includes(user.id) ? user : null
+}
 
 export async function installationReport(db) {
   const [profiles, installations, subscriptions, reminders] = await Promise.all([

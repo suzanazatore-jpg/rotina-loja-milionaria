@@ -1,12 +1,12 @@
-import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
-import { installationReport } from '@/lib/appInstallationReportServer'
+import { checkoutAdminClient } from '@/lib/checkoutAdminServer'
+import { installationReport, installationReportUser } from '@/lib/appInstallationReportServer'
 import { installationMessage } from '@/lib/commerceNotices'
 import { validId } from '@/lib/centralRecords'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 export async function GET(request) {
   const db = checkoutAdminClient()
-  if (!await autorizarAdmin(request, db)) return Response.json({ error: 'Acesso restrito.' }, { status: 401, headers })
+  if (!await installationReportUser(request, db)) return Response.json({ error: 'Acesso restrito.' }, { status: 401, headers })
   try {
     const rows = await installationReport(db)
     return Response.json({ rows, email_enabled: Boolean(process.env.BREVO_API_KEY) }, { headers })
@@ -15,7 +15,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   const db = checkoutAdminClient()
-  if (!await autorizarAdmin(request, db)) return Response.json({ error: 'Acesso restrito.' }, { status: 401, headers })
+  if (!await installationReportUser(request, db)) return Response.json({ error: 'Acesso restrito.' }, { status: 401, headers })
   let delivery
   try {
     const { user_id } = await request.json()

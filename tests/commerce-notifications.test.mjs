@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { notifyPaidOrder, notifyGuruCommerce, processCommercePush } from '../src/lib/commerceNotificationsServer.js'
 import { commerceNotice, installationMessage, whatsappNumber, SALES_RECIPIENTS } from '../src/lib/commerceNotices.js'
+import { installationReport, installationReportUser } from '../src/lib/appInstallationReportServer.js'
 
 function fixture(status = 'paid', renewal = false) {
   const tables = {
@@ -118,4 +119,22 @@ test('legacy Guru paid invoice is deduplicated and first invoice retry cannot be
     await notifyGuruCommerce(db, payload, 'student', true)
     assert.equal(db.tables.user_notifications.length, 5)
   } finally { if (saved === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = saved }
+})
+test('installation report lists active students only and authorizes only the verified owners', async () => {
+  const db = fixture()
+  db.tables.profiles = [
+    { id: 'active', role: 'student', status: 'active', name: 'Ativa' },
+    { id: 'blocked', role: 'student', status: 'blocked', name: 'Bloqueada' },
+    { id: 'admin', role: 'admin', status: 'active', name: 'Admin' },
+  ]
+  db.tables.app_installations = []; db.tables.app_install_reminders = []
+  assert.deepEqual((await installationReport(db)).map(row => row.id), ['active'])
+  const request = new Request('https://example.com', { headers: { authorization: 'Bearer verified-token' } })
+  for (const id of SALES_RECIPIENTS) {
+    db.auth = { getUser: async () => ({ data: { user: { id, email: 'owner@example.com' } } }) }
+    assert.equal((await installationReportUser(request, db)).id, id)
+  }
+  db.auth = { getUser: async () => ({ data: { user: { id: 'student', email: 'student@example.com', user_metadata: { role: 'admin' } } } }) }
+  assert.equal(await installationReportUser(request, db), null)
+  assert.equal(await installationReportUser(new Request('https://example.com'), db), null)
 })
