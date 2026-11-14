@@ -13,7 +13,7 @@ export default function FloatingFilters({title,children,onClose,onApply,onClear,
   const reposition=()=>setPosition({top:Math.max(66,Math.min(anchor?.bottom+10 || 160,window.innerHeight-300)),right:Math.max(16,window.innerWidth-(anchor?.right || window.innerWidth-24))})
   reposition()
   element.querySelector('input,select,button')?.focus({preventScroll:true})
-  const dismiss=e=>{if(!element.contains(e.target)&&!trigger.current?.contains(e.target))close.current()}
+  const dismiss=e=>{if(!element.contains(e.target)&&!trigger.current?.contains(e.target)&&!e.target.closest('[data-cv-calendar]'))close.current()}
   const key=e=>{if(e.key==='Escape'){e.preventDefault();close.current()}}
   document.addEventListener('pointerdown',dismiss)
   document.addEventListener('keydown',key)
