@@ -48,3 +48,6 @@
 .filterBody .radios label{display:flex;align-items:center;gap:10px;color:var(--cv-text)}
 .filterBody .radios input{width:20px;min-height:20px!important;height:20px;padding:0;border:initial}
 .filterBody h3:before{display:block;margin:0}
+
+/* Shared compact list rhythm. */
+.table{border-spacing:0 4px}.table th{padding:10px 14px;font-weight:400}.table td{padding:12px 14px}.toolbar{margin-top:16px}.heading{margin-bottom:24px}

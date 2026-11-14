@@ -24,7 +24,7 @@ export async function GET(request) {
   const limit = 25
 
   try {
-    const { data: produtos, error: errProdutos } = await db.from('products').select('id,name').order('name')
+    const { data: produtos, error: errProdutos } = await db.from('products').select('id,name,active').order('name')
     if (errProdutos) throw errProdutos
     const { data: ofertas, error: errOfertas } = await db.from('offers').select('id,name,product_id')
     if (errOfertas) throw errOfertas
@@ -60,7 +60,7 @@ export async function GET(request) {
 
     const all=await readSales(db,url.searchParams)
     const data=all.slice((page-1)*limit,page*limit)
-    return NextResponse.json({orders:data,count:all.length,page,limit,products:produtos},{headers:{'Cache-Control':'no-store'}})
+    return NextResponse.json({orders:data,count:all.length,page,limit,products:(produtos || []).filter(p=>p.active!==false)},{headers:{'Cache-Control':'no-store'}})
   } catch (error) {
     console.error('checkout vendas admin', error)
     return NextResponse.json({ error: 'Não foi possível consultar os pedidos.' }, { status: 500 })

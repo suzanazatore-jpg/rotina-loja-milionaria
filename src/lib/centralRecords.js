@@ -2,7 +2,8 @@ export const validId=value=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 export async function allRows(factory,limit=100000){const rows=[];for(let offset=0;;offset+=1000){const {data,error}=await factory().range(offset,offset+999);if(error)throw error;rows.push(...data || []);if(rows.length>limit)throw new Error('Muitos registros. Reduza o período.');if(!data || data.length<1000)return rows}}
 const plain=value=>String(value || '').trim().slice(0,150)
 export function saleFilters(params){
- const f=Object.fromEntries(['status','oferta','produto','inicio','fim','date_by','method','marketplace','code','name','email','document','source','customer'].map(key=>[key,plain(params.get(key))]))
+ const f=Object.fromEntries(['status','oferta','produto','inicio','fim','date_by','method','marketplace','code','name','email','document','source','customer','tracking'].map(key=>[key,plain(params.get(key))]))
+ if(f.tracking&&!['with','without'].includes(f.tracking))throw new Error('Rastreamento inválido.')
  f.date_by=f.date_by || 'created_at'
  if(!['created_at','paid_at'].includes(f.date_by))throw new Error('Data de referência inválida.')
  for(const key of ['produto','oferta','customer'])if(f[key]&&!validId(f[key]))throw new Error('Código inválido.')
@@ -30,7 +31,8 @@ export async function readSales(db,params=new URLSearchParams()){
  })
  let matchingItems=null
  if(f.produto)matchingItems=new Set((await allRows(()=>db.from('order_items').select('order_id').eq('product_id',f.produto).order('id'))).map(r=>r.order_id))
- return rows.filter(r=>(!f.marketplace||r.offer?.product?.marketplace_id===f.marketplace)&&(!f.produto||r.offer?.product_id===f.produto||matchingItems.has(r.id))).map(r=>({...r,offer_name:r.offer?.name || '',product_name:r.offer?.product?.name || '',marketplace:r.offer?.product?.marketplace_id || 'pagarme'}))
+ const tracked=r=>['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].some(key=>String(r[key] || '').trim())
+ return rows.filter(r=>(!f.tracking||(f.tracking==='with'?tracked(r):!tracked(r)))&&(!f.marketplace||r.offer?.product?.marketplace_id===f.marketplace)&&(!f.produto||r.offer?.product_id===f.produto||matchingItems.has(r.id))).map(r=>({...r,offer_name:r.offer?.name || '',product_name:r.offer?.product?.name || '',marketplace:r.offer?.product?.marketplace_id || 'pagarme'}))
 }
 export async function relatedItems(db,ids){const rows=[];for(let i=0;i<ids.length;i+=200)rows.push(...await allRows(()=>db.from('order_items').select('id,order_id,kind,price_cents,product_id,offer_id,product:products(id,name,code,marketplace_id),offer:offers(id,name)').in('order_id',ids.slice(i,i+200)).order('id')));return rows}
 export async function readContractDelivery(db, order) {

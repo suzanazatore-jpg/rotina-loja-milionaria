@@ -5,7 +5,7 @@ import CheckoutSettingsEditor from '../CheckoutSettingsEditor'
 import { CHECKOUT_DEFAULTS } from '@/lib/checkoutSettings'
 import Link from 'next/link'
 import ExportButton from '../ExportButton'
-import AppIcon from '@/app/components/AppIcon'
+import AppIcon from '@/app/admin/central-vendas/CentralIcon'
 import styles from './SettingsHub.module.css'
 
 const groups = [
@@ -15,6 +15,7 @@ const groups = [
     {id:'emails',name:'Emails transacionais',description:'Consulte o que o aplicativo envia e o que ainda está em preparação.',icon:'broadcast'},
   ]},
   {name:'Organização',items:[
+    {id:'simulator',name:'Simulador de vendas',description:'Simule quanto cobrar, taxas e valor líquido por parcela.',icon:'money',href:'/admin/checkout/simulador'},
     {id:'contracts',name:'Contratos',description:'Edite os modelos, acompanhe assinaturas e consulte o histórico dos contratos.',icon:'plans',href:'/admin/checkout/configuracoes/contratos'},
     {id:'products',name:'Produtos e ofertas',description:'Organize produtos, preços, parcelamentos e links de pagamento.',icon:'courses',href:'/admin/checkout'},
     {id:'plans',name:'Planos e acessos',description:'Gerencie os planos, cursos e períodos de acesso do aplicativo.',icon:'routine',href:'/admin/planos'},
@@ -73,7 +74,7 @@ export default function Settings({initialView=null}) {
   const filtered=groups.map(group=>({...group,items:group.items.filter(item=>searchText(`${item.name} ${item.description}`).includes(searchText(search.trim())))})).filter(group=>group.items.length)
   const notices=message && <p role="status" className="central-editor-message">{message}</p>
   if(!selected)return <main className="central-home">
-    <header className={styles.heading}><div><h1>Configurações</h1><p>Escolha o assunto que deseja configurar.</p></div><div className={styles.headingActions}><label className={styles.search}><span aria-hidden="true">⌕</span><input type="search" aria-label="Pesquisar configurações" placeholder="Pesquisar configurações" value={search} onChange={event=>setSearch(event.target.value)} /></label><ExportButton section="tudo" label="Baixar tudo · Excel"/></div></header>
+    <header className={styles.heading}><div><h1>Configurações</h1><p>Escolha o assunto que deseja configurar.</p></div><div className={styles.headingActions}><label className={styles.search}><AppIcon name="search" size={17}/><input type="search" aria-label="Pesquisar configurações" placeholder="Pesquisar configurações" value={search} onChange={event=>setSearch(event.target.value)} /></label><ExportButton section="tudo" label="Baixar tudo · Excel"/></div></header>
     {notices}
     {dirty && <p className={styles.note}>Você tem alterações ainda não salvas. Abra o assunto novamente para revisar e salvar.</p>}
     {filtered.map(group=><section key={group.name} className={styles.section} aria-label={group.name}><h2>{group.name}</h2><div className={styles.grid}>{group.items.map(item=>{
