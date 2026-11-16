@@ -9,6 +9,7 @@ test('transaction adapter preserves gross sale, installments, contact and source
  assert.equal(body.product.id,'1773344369');assert.equal(body.product.offer.id,'source-offer')
  assert.equal(body.contact.phone_number,'99999999999');assert.equal(body.contact.doc,'test-document')
  assert.equal(body.payment.gross,3600);assert.equal(body.payment.total,4550.4);assert.equal(body.payment.installments.value,379.2)
+ assert.equal(body.payment.processing_times.started_at,'2026-10-24T12:00:00.000Z');assert.equal(body.payment.processing_times.finished_at,'2026-10-24T12:00:00.000Z')
  assert.equal(body.payment.net,null);assert.equal(body.payment.affiliate_value,null)
  assert.equal(body.id,'order-1');assert.equal(body.event_id,'delivery-1');assert.equal(body.api_token,'test-token')
  assert.equal(sample.api_token,undefined);assert.equal(body.credit_card,undefined)
