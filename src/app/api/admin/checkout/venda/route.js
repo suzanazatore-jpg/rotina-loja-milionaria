@@ -49,7 +49,7 @@ export async function GET(request){try{
   try{const t=await liveSaleRequest(request,id,'gateway');lastTransaction={acquirer_name:t.name,acquirer_tid:t.tid,acquirer_return_code:t.code,acquirer_message:t.message,created_at:t.start,updated_at:t.end,card:{brand:t.brand,last_four_digits:t.last4}}}catch(e){paymentError=e.message}
  }
  const meta=await checked(db.from('webhook_events').select('id,payload,received_at,processed_at,error').eq('pagarme_event_id',`capi:${id}`).maybeSingle())
- const events=[...data.activity.events.filter(e=>!String(e.id).startsWith('delivery:')&&!provider.some(p=>p.id===e.id)&&e.id!==meta?.id),...provider.map(providerAudit),...actions.map(administrativeAudit),...deliveries.map(e=>deliveryAudit(e,hooks.find(h=>h.id===e.webhook_id))),...(meta?[metaConversionAudit(meta)]:[])].sort((a,b)=>String(b.at).localeCompare(String(a.at)))
+ const events=[...data.activity.events.filter(e=>!String(e.id).startsWith('delivery:')&&!provider.some(p=>p.id===e.id)&&e.id!==meta?.id),...provider.map(providerAudit),...actions.map(action=>administrativeAudit(action,deliveries)),...deliveries.map(e=>deliveryAudit(e,hooks.find(h=>h.id===e.webhook_id))),...(meta?[metaConversionAudit(meta)]:[])].sort((a,b)=>String(b.at).localeCompare(String(a.at)))
  const aliases=await checked(db.from('checkout_offer_links').select('path').eq('offer_id',order.offer_id).limit(1))
  const token=invoiceToken(id,process.env.CHECKOUT_SESSION_SECRET)
  const contract=data.contract
