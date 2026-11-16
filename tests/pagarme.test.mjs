@@ -30,6 +30,8 @@ test('raw card fields are rejected and only token is sent', () => {
   assert.deepEqual(cardReference({ card_token:'token_abc' }),{ card_token:'token_abc' })
   const payload = orderPayload({ id:'order', payment_method:'credit_card', installments:1,total_cents:4700 },offer,product,{},cardReference({card_token:'token_abc'}))
   assert.equal(payload.payments[0].credit_card.card_token,'token_abc')
+  assert.equal(payload.payments[0].credit_card.statement_descriptor,'SUZANAZATORRE')
+  assert.ok(payload.payments[0].credit_card.statement_descriptor.length <= 13, 'Pagar.me statement descriptor max is 13 characters')
   assert.equal(payload.items[0].amount,4700)
 })
 test('confirmation must match code, amount and customer; pending never becomes paid', () => {
