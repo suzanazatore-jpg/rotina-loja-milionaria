@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {invoiceToken,readInvoiceToken,redactAudit,validateInvoice,validateBuyer} from '../src/lib/saleDetail.js'
 import {readFileSync} from 'node:fs'
+import { paymentLink as buildPaymentLink } from '../src/lib/checkoutLinks.js'
 const id='30e2c0e9-edcf-4d98-9b22-40096f9ed6c0',secret='a'.repeat(48)
 test('invoice links cannot be forged, reused for another order or verified without configuration',()=>{
  const t=invoiceToken(id,secret);assert.equal(readInvoiceToken(t,secret),id)
@@ -90,4 +91,10 @@ test('Meta audit distinguishes accepted Purchase from a pending attempt and expo
  const sent=metaConversionAudit({...record,error:null,processed_at:'2026-11-11T17:43:07Z'})
  assert.equal(sent.title,'Compra recebida pela Meta');assert.equal(sent.at,'2026-11-11T17:43:07Z')
  assert.equal(JSON.stringify(sent).includes('never-expose'),false)
+})
+
+// The admin sale detail must never copy the current preview hostname as a real payment link.
+test('central payment URLs use the production checkout domain',()=>{
+ assert.match(readFileSync(new URL('../src/app/api/admin/checkout/venda/route.js',import.meta.url),'utf8'),/payment_path:aliases\[0\]\?\.path\?paymentLink\(/)
+ assert.equal(buildPaymentLink({payment_path:'gestao-de-trafego-pago'}),'https://pay.suzanazatorre.com.br/gestao-de-trafego-pago')
 })
