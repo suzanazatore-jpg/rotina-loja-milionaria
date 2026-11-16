@@ -7,6 +7,7 @@ import { processOutboundWebhooks } from '@/lib/checkoutOutboundServer'
 import { retryWaitingTagAccess } from '@/lib/checkoutAccessPabblyServer'
 import { processContractReminders } from '@/lib/contractsServer'
 import { processContractTasks } from '@/lib/contractCompletionServer'
+import { processCheckoutSaleEmails } from '@/lib/checkoutSaleEmailNotifications'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -34,6 +35,8 @@ export async function GET(request) {
     try { contract_tasks = await processContractTasks(db) } catch { contract_tasks = { error: 'tasks_pending' } }
     let commerce_notifications
     try { commerce_notifications = await reconcileCommerceNotices(db) } catch { commerce_notifications = { error: 'commerce_notifications_pending' } }
-    return Response.json({ commerce_notifications, ...conversions, reconciliation, access, outbound, access_messages, contracts, contract_tasks }, { headers: { 'Cache-Control': 'no-store' } })
+    let sale_emails
+    try { sale_emails = await processCheckoutSaleEmails(db) } catch { sale_emails = { error: 'sale_email_queue_pending' } }
+    return Response.json({ commerce_notifications, sale_emails, ...conversions, reconciliation, access, outbound, access_messages, contracts, contract_tasks }, { headers: { 'Cache-Control': 'no-store' } })
   } catch { return Response.json({ error: 'Não foi possível processar conversões.' }, { status: 503 }) }
 }
