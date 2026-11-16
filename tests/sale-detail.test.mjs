@@ -52,9 +52,9 @@ test('audit shows exact configured destination and never calls queued delivery s
  const hook={name:'BotConversa — compra',url:'https://example.org/hooks/buyer'}
  const waiting=deliveryAudit({id:'1',status:'pending',attempts:0,event_type:'order.paid',created_at:'2026-11-05T20:00:00Z'},hook)
  assert.equal(waiting.destination.url,hook.url);assert.equal(waiting.title,'Webhook na fila');assert.match(waiting.outcome,/ainda não enviado/)
- const sent=deliveryAudit({id:'2',status:'delivered',response_status:200,attempts:1},hook);assert.equal(sent.title,'Webhook Enviado');assert.equal(sent.http_status,200)
- const failed=deliveryAudit({id:'3',status:'retry',response_status:500},hook);assert.match(failed.failure,/500/)
- const incoming=providerAudit({id:'4',type:'charge.paid',error:'reconciliation_pending'});assert.equal(incoming.source,'Pagar.me');assert.equal(incoming.destination.name,'Central de Vendas');assert.match(incoming.outcome,/aguardando conciliação/)
+ const sent=deliveryAudit({id:'2',status:'delivered',response_status:200,attempts:1,event_type:'order.paid'},hook);assert.equal(sent.title,'Webhook Enviado');assert.equal(sent.http_status,200);assert.match(sent.description,/Pagamento aprovado/)
+ const failed=deliveryAudit({id:'3',status:'retry',response_status:500},hook);assert.equal(failed.title,'Erro ao Entregar Webhook');assert.match(failed.failure,/500/)
+ const incoming=providerAudit({id:'4',type:'charge.paid',error:'reconciliation_pending'});assert.equal(incoming.source,'Pagar.me');assert.equal(incoming.title,'Cobrança aprovada');assert.equal(incoming.event_type,'charge.paid');assert.match(incoming.description,/charge.paid/);assert.equal(incoming.destination.name,'Central de Vendas');assert.match(incoming.outcome,/aguardando conciliação/)
  assert.equal(saleEnvironment({gateway_base:'https://api.pagar.me/core/v5'},'https://sdx-api.pagar.me/core/v5').matches,false)
  assert.equal(saleEnvironment({gateway_base:'https://api.pagar.me/core/v5'},'https://api.pagar.me/core/v5').matches,true)
 })
