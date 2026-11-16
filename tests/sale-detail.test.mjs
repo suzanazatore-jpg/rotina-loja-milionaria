@@ -98,3 +98,22 @@ test('central payment URLs use the production checkout domain',()=>{
  assert.match(readFileSync(new URL('../src/app/api/admin/checkout/venda/route.js',import.meta.url),'utf8'),/payment_path:aliases\[0\]\?\.path\?paymentLink\(/)
  assert.equal(buildPaymentLink({payment_path:'gestao-de-trafego-pago'}),'https://pay.suzanazatorre.com.br/gestao-de-trafego-pago')
 })
+
+
+test('resend audit reflects actual delivery receipts instead of stale queued message',async()=>{
+ const {administrativeAudit,resendDeliveryOutcome}=await import('../src/lib/saleAudit.js')
+ const action={
+  id:'action',received_at:'2026-11-16T18:51:44.173Z',processed_at:'2026-11-16T18:51:46.542Z',
+  payload:{action:'resend',actor:'admin',channels:['webhooks'],result:{webhooks:{state:'queued',count:4}}}
+ }
+ const deliveries=Array.from({length:4},(_,i)=>({
+  id:`delivery-${i}`,webhook_id:`hook-${i}`,event_type:'order.paid',status:'delivered',
+  response_status:200,created_at:'2026-11-16T18:51:45.500Z'
+ }))
+ assert.match(administrativeAudit(action,deliveries).outcome,/Reenvio concluído.*4 de 4 webhooks entregues/)
+ assert.match(administrativeAudit(action,[]).outcome,/aguardando processamento/)
+ assert.match(administrativeAudit(action,deliveries.map((d,i)=>i===1?{...d,status:'retry',response_status:500}:d)).outcome,/Reenvio com falhas.*3 de 4/)
+ assert.match(administrativeAudit(action,deliveries.slice(0,2)).outcome,/Reenvio em andamento.*2 de 4/)
+ assert.equal(resendDeliveryOutcome({payload:{action:'sync'}},deliveries),null)
+ assert.match(administrativeAudit(action,[...deliveries,{...deliveries[0],webhook_id:'older',created_at:'2026-11-16T18:20:00.000Z'}]).outcome,/4 de 4/)
+})
