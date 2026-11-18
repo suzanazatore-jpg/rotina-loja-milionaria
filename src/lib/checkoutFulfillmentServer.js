@@ -1,5 +1,5 @@
 import { applyOrderAccess } from './checkoutAccessServer.js'
-import { randomBytes } from 'node:crypto'
+import { randomInt } from 'node:crypto'
 import { PaymentError } from './pagarme.js'
 import { enviarEmailBoasVindas } from './enviarEmailBoasVindas.js'
 import { enviarEmailRenovacao } from './enviarEmailRenovacao.js'
@@ -78,7 +78,8 @@ export async function fulfillPaidOrder(db, orderId) {
     let profile = await checked(db.from('perfis').select('id,acesso_expira_em').eq('email', customer.email).maybeSingle())
     let password
     if (!profile) {
-      password = randomBytes(18).toString('base64url')
+      // A senha inicial tem seis dígitos, sem zero à esquerda, para manter o mesmo valor em todos os canais.
+      password = String(randomInt(100_000, 1_000_000))
       const { data, error } = await db.auth.admin.createUser({ email: customer.email, password, email_confirm: true })
       if (error) throw new PaymentError('Não foi possível criar o acesso. Verifique se a conta já existe.', 409)
       profile = { id: data.user.id }
