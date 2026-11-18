@@ -33,20 +33,72 @@ function fakeDb({active=true,url='https://connect.pabbly.com/workflow/sendwebhoo
  }
 }
 
+test('a new paid order uses the same six-digit password for login, email and WhatsApp', async () => {
+ const source = readFileSync(new URL('../src/lib/checkoutFulfillmentServer.js', import.meta.url), 'utf8')
+  .replace("import { applyOrderAccess } from './checkoutAccessServer.js'", "const applyOrderAccess = async () => ({status:'completed'})")
+  .replace("import { PaymentError } from './pagarme.js'", 'const PaymentError = Error')
+  .replace("import { enviarEmailBoasVindas } from './enviarEmailBoasVindas.js'", 'export const deliveries = {}; const enviarEmailBoasVindas = async ({senha}) => { deliveries.email = senha }')
+  .replace("import { enviarEmailRenovacao } from './enviarEmailRenovacao.js'", "const enviarEmailRenovacao = async () => { throw Error('Unexpected renewal') }")
+  .replace("import { notifyAccessPabbly } from './checkoutAccessPabblyServer.js'", 'const notifyAccessPabbly = async (_db, {password}) => { deliveries.whatsapp = password }')
+  .replace("const {after} = await import('next/server')", 'const after = callback => { deliveries.after = callback }')
+ const {fulfillPaidOrder, deliveries} = await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))
+ const rows = {
+  orders: {...order, status:'paid', customer_id:'customer', offer_id:'offer', total_cents:1700},
+  customers: customer,
+  webhook_events: {id:'receipt', error:'ready'},
+  order_items: [{product_id:'product', offer_id:'offer', kind:'main'}],
+  products: [{id:'product', plan_id:'plan'}],
+  plans: [{id:'plan', period_days:180}],
+ }
+ const db = {
+  auth: {admin: {async createUser({password}) {
+   deliveries.login = password
+   return {data:{user:{id:'profile'}}}
+  }}},
+  from(table) {
+   let data = rows[table] ?? null
+   const query = {
+    select() { return query }, eq() { return query }, in() { return query },
+    single() { return query }, maybeSingle() { return query },
+    insert() { return query }, upsert() { return query },
+    update() { data = [{id:'receipt'}]; return query },
+    then(resolve, reject) { return Promise.resolve({data}).then(resolve, reject) },
+   }
+   return query
+  },
+ }
+ const env = {CHECKOUT_FULFILLMENT_ENABLED:'true', CHECKOUT_ACCESS_LEDGER_ENABLED:'true', CONTRACTS_ENABLED:'false', VERCEL_ENV:'production'}
+ const previous = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]))
+ Object.assign(process.env, env)
+ try {
+  assert.equal((await fulfillPaidOrder(db, order.id)).fulfillment,'completed')
+  await deliveries.after()
+  assert.match(deliveries.login,/^[1-9]\d{5}$/)
+  assert.equal(deliveries.email,deliveries.login)
+  assert.equal(deliveries.whatsapp,deliveries.login)
+ } finally {
+  for (const [key, value] of Object.entries(previous)) {
+   if (value === undefined) delete process.env[key]
+   else process.env[key] = value
+  }
+ }
+})
+
 test('new access is sent once to Pabbly with the exact existing workflow fields',async()=>{
  const db=fakeDb(), sent=[]
  const sender=async(_url,payload)=>{sent.push(payload);return {status:200}}
- const result=await notifyAccessPabbly(db,{order,customer,password:'temporary-password',productName:'Desafio 7 Dias',sender})
+ const password='615204'
+ const result=await notifyAccessPabbly(db,{order,customer,password,productName:'Desafio 7 Dias',sender})
  assert.equal(result.status,'accepted_by_pabbly')
  assert.equal(sent.length,1)
  assert.equal(sent[0].email,customer.email)
  assert.equal(sent[0].nome,customer.name)
  assert.equal(sent[0].telefone,customer.phone)
- assert.equal(sent[0].senha,'temporary-password')
+ assert.equal(sent[0].senha,password)
  assert.equal(sent[0].link_app,'https://rotina.suzanazatorre.com.br/login')
  assert.equal(sent[0].nome_produto,'Desafio 7 Dias')
- assert.equal(JSON.stringify(db.recorded()).includes('temporary-password'),false)
- assert.equal((await notifyAccessPabbly(db,{order,customer,password:'temporary-password',sender})).status,'already_sent')
+ assert.equal(JSON.stringify(db.recorded()).includes(password),false)
+ assert.equal((await notifyAccessPabbly(db,{order,customer,password,sender})).status,'already_sent')
  assert.equal(sent.length,1)
 })
 
