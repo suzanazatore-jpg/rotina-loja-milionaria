@@ -1,5 +1,7 @@
 import { processOutboundWebhooks } from './checkoutOutboundServer.js'
 
+const SALES_NOTIFICATION_WEBHOOK_NAME = '[notificações de vendas_wpp]'
+
 // Apenas os webhooks do BotConversa que identificam a compra precisam preceder
 // a mensagem de acesso. Outros destinos continuam na fila independente.
 export function isProductTagDestination(value) {
@@ -16,10 +18,12 @@ export async function ensureProductIdentification(db, orderId, { dispatch = proc
   const items = await db.from('order_items').select('product_id').eq('order_id', orderId)
   if (items.error || !Array.isArray(items.data) || !items.data.length) return { ready: false, reason: 'items_unavailable' }
   const purchased = new Set(items.data.map(item => item.product_id))
-  const hooks = await db.from('outbound_webhooks').select('id,url,events,product_ids,active').eq('active', true)
+  const hooks = await db.from('outbound_webhooks').select('id,name,url,events,product_ids,active').eq('active', true)
   if (hooks.error || !Array.isArray(hooks.data)) return { ready: false, reason: 'hooks_unavailable' }
+  // A notificação da equipe usa o mesmo tipo de destino, mas não aplica a etiqueta da aluna.
   const relevant = hooks.data.filter(hook =>
     hook.active && isProductTagDestination(hook.url) &&
+    hook.name?.trim().toLowerCase() !== SALES_NOTIFICATION_WEBHOOK_NAME &&
     Array.isArray(hook.events) && hook.events.includes('order.paid') &&
     (hook.product_ids == null || hook.product_ids.some(productId => purchased.has(productId)))
   )

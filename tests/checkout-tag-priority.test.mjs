@@ -42,6 +42,20 @@ test('sends only the purchased product tag webhook before access',async()=>{
   assert.equal(result.ready,true)
   assert.deepEqual(sent,['tag-delivery'])
 })
+test('a failed sales notification does not block a confirmed product tag',async()=>{
+  const salesNotification = { ...baseHook, id: 'sales', name: '[Notificações de Vendas_Wpp]' }
+  const receipts = [
+    { id: 'tag-delivery', webhook_id: 'tag', status: 'delivered' },
+    { id: 'sales-delivery', webhook_id: 'sales', status: 'retry' },
+  ]
+  const database = db({ receipts, hooks: [baseHook, salesNotification] })
+  const sent = []
+  const dispatch = (_db, { deliveryIds }) => { sent.push(...deliveryIds) }
+
+  const result = await ensureProductIdentification(database, 'order', { dispatch })
+  assert.deepEqual(result, { ready: true, reason: 'product_tag_accepted' })
+  assert.deepEqual(sent, [])
+})
 test('missing or failed product tagging is never mistaken for confirmation',async()=>{
   const missing=await ensureProductIdentification(db({receipts:[]}), 'order',{dispatch:()=>assert.fail('should not dispatch absent receipt')})
   assert.equal(missing.ready,false)
