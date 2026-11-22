@@ -7,7 +7,7 @@ import { loadCheckoutOffer, checkoutTestConfiguration } from '@/lib/checkoutPubl
 import { signCheckoutSession, readCheckoutSession, safeCheckoutRedirect } from '@/lib/checkoutSession'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
 import { createPayment } from '@/lib/checkoutPaymentsServer'
-import { deliverPaidConversion, purchaseTracking, purchaseRequestContext } from '@/lib/checkoutConversionsServer'
+import { deliverPaidConversion, purchasePageContext, purchaseTracking, purchaseRequestContext } from '@/lib/checkoutConversionsServer'
 import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
 import { validateCheckoutForm, checkoutExpired } from '@/lib/checkoutSettings'
@@ -77,7 +77,23 @@ export async function POST(request, context) {
       const {error} = await db.from('webhook_events').upsert({pagarme_event_id:`checkout-form:${session.key}`,type:'checkout.form.accepted',payload:{offer_id:loaded.offer.id,terms_url:loaded.config.terms_url,privacy_url:loaded.config.privacy_url,terms_accepted:input.terms_accepted===true,privacy_accepted:input.privacy_accepted===true},processed_at:new Date().toISOString()},{onConflict:'pagarme_event_id',ignoreDuplicates:true})
       if(error) throw new PaymentError('Não foi possível registrar o aceite. Tente novamente.',503)
     }
-    const payment = await createPayment(db, { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps }, session.key, purchaseTracking({ pixelId: loaded.config.meta_pixel_id, gatewayBase: process.env.PAGARME_BASE_URL, sourceUrl: `${new URL(request.url).origin}/checkout/${encodeURIComponent(slug)}`, preference: input.marketing_preference === 'denied' || (input.marketing_preference === undefined && input.marketing_consent === false) ? 'denied' : input.marketing_consent === true ? 'granted' : 'unknown', identifiers: purchaseRequestContext(request, input.meta_attribution) }), { requireAddress: loaded.config.layout!=='guru' && loaded.config.form_profile !== 'compact' })
+    const preference = input.marketing_preference === 'denied' ||
+      (input.marketing_preference === undefined && input.marketing_consent === false)
+      ? 'denied' : input.marketing_consent === true ? 'granted' : 'unknown'
+    const tracking = purchaseTracking({
+      ...purchasePageContext(request, slug),
+      pixelId: loaded.config.meta_pixel_id,
+      gatewayBase: process.env.PAGARME_BASE_URL,
+      preference,
+      identifiers: purchaseRequestContext(request, input.meta_attribution),
+    })
+    const payment = await createPayment(
+      db,
+      { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps },
+      session.key,
+      tracking,
+      { requireAddress: loaded.config.layout !== 'guru' && loaded.config.form_profile !== 'compact' },
+    )
     if (payment.status === 'paid') {
       after(async () => { try { await processCommercePush(db) } catch { console.error('commerce_push_pending') } })
       // Approval reports independently of access, contracts and communications.
