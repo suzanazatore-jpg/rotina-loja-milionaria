@@ -23,18 +23,39 @@ export function purchaseRequestContext(request, input = {}, now = Date.now()) {
     const value = cookies.split(';').map(part => part.trim()).find(part => part.startsWith(`_${key}=`))?.slice(5)
     if (matchingIdentifiers({ [key]: value })[key]) identifiers[key] = value
   }
-  if (/^[A-Za-z0-9_-]{1,350}$/.test(input?.fbclid || '') && Number.isSafeInteger(input?.click_time) && input.click_time <= now && input.click_time > now - 90 * 86400000) identifiers.fbc = `fb.1.${input.click_time}.${input.fbclid}`
+  const hasNewClick = /^[A-Za-z0-9_-]{1,350}$/.test(input?.fbclid || '') &&
+    Number.isSafeInteger(input?.click_time) && input.click_time <= now && input.click_time > now - 90 * 86400000
+  if (hasNewClick && identifiers.fbc?.split('.').slice(3).join('.') !== input.fbclid) {
+    identifiers.fbc = `fb.1.${input.click_time}.${input.fbclid}`
+  }
   // Never use the payment webhook's IP or user agent as the buyer's identity.
   return identifiers
 }
 // A new paid purchase is reported independently of optional browser cookies.
 // Keep the actual preference unchanged; do not invent cookie identifiers.
-export function purchaseTracking({ pixelId, gatewayBase, sourceUrl, preference, identifiers = {} }) {
+export function purchasePageContext(request, slug) {
+  const origin = new URL(request.url).origin
+  const referer = request.headers.get('referer')
+  const page = referer && URL.canParse(referer) ? new URL(referer) : null
+  if (page?.origin === origin && /^\/(?:p\/|checkout\/)?[a-zA-Z0-9_-]{1,60}\/?$/.test(page.pathname)) {
+    return { sourceUrl: `${origin}${page.pathname}`, campaignParams: page.searchParams }
+  }
+  return { sourceUrl: `${origin}/checkout/${encodeURIComponent(slug)}` }
+}
+
+export function purchaseTracking({ pixelId, gatewayBase, sourceUrl, preference, identifiers = {}, campaignParams }) {
+  const utm = {}
+  if (preference !== 'denied' && campaignParams) {
+    for (const key of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term']) {
+      const value = campaignParams.get(key)?.trim()
+      if (value && !/[\u0000-\u001f\u007f]/u.test(value)) utm[key] = value.slice(0, 200)
+    }
+  }
   return {
     policy: 'payment_approved_v2',
     consent: preference === 'granted' ? true : preference === 'denied' ? false : null,
     identifiers: preference === 'denied' ? {} : matchingIdentifiers(identifiers),
-    pixel_id: pixelId, gateway_base: gatewayBase, source_url: sourceUrl,
+    pixel_id: pixelId, gateway_base: gatewayBase, source_url: sourceUrl, utm,
   }
 }
 export function purchaseTrackingAllowed(tracking) {

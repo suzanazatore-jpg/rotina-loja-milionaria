@@ -3,11 +3,33 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 const analytics = `data:text/javascript;base64,${Buffer.from(readFileSync(new URL('../src/lib/checkoutAnalytics.js', import.meta.url))).toString('base64')}`
 const source = readFileSync(new URL('../src/lib/checkoutConversionsServer.js', import.meta.url), 'utf8').replace('./checkoutAnalytics.js', analytics)
-const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion, retryConversions, reconcileMissingConversions, purchaseTracking, purchaseRequestContext } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+const { conversionConfiguration, conversionEvent, sendConversion, deliverPaidConversion, retryConversions, reconcileMissingConversions, purchasePageContext, purchaseTracking, purchaseRequestContext } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env = { META_CAPI_PIXEL_ID:'123456', META_CAPI_ACCESS_TOKEN:'secret', VERCEL_ENV:'production', CHECKOUT_CAPI_ENABLED:'true', PAGARME_BASE_URL:'https://api.pagar.me/core/v5' }
 const now = Date.now()
 const order = { id:'order', status:'paid', paid_at:new Date(now-1000).toISOString(), total_cents:4700 }
 const snapshot = { items:[{product_id:'product',name:'Plano',total_cents:4700}], tracking:{consent:true,source_url:'https://example.com/checkout/offer'} }
+test('records the public payment link and only the allowed campaign parameters', () => {
+  const url = 'https://pay.example/api/checkout/desafio'
+  const request = new Request(url, { headers: {
+    referer: 'https://pay.example/oferta-curta?utm_source=facebook&utm_content=123&email=private&fbclid=ActualClick&utm_term=bad%00value',
+  } })
+  const page = purchasePageContext(request, 'desafio')
+  const tracking = purchaseTracking({ ...page, preference: 'unknown' })
+  assert.equal(tracking.source_url, 'https://pay.example/oferta-curta')
+  assert.deepEqual(tracking.utm, { utm_source: 'facebook', utm_content: '123' })
+  assert.deepEqual(purchaseTracking({ ...page, preference: 'denied' }).utm, {})
+  for (const referer of ['https://other.example/oferta-curta?utm_source=wrong', 'https://pay.example/api/checkout/desafio', 'invalid']) {
+    const fallback = purchasePageContext(new Request(url, { headers: { referer } }), 'desafio')
+    assert.deepEqual(fallback, { sourceUrl: 'https://pay.example/checkout/desafio' })
+  }
+})
+test('keeps the original Meta click cookie when that click is also forwarded in the URL', () => {
+  const original = `fb.1.${now - 120000}.OriginalClick`
+  const request = new Request('https://pay.example/api/checkout/desafio', { headers: { cookie: `_fbc=${original}` } })
+  assert.equal(purchaseRequestContext(request, { fbclid: 'OriginalClick', click_time: now - 30000 }, now).fbc, original)
+  const latest = purchaseRequestContext(request, { fbclid: 'NewClick', click_time: now - 30000 }, now)
+  assert.equal(latest.fbc, `fb.1.${now - 30000}.NewClick`)
+})
 test('conversion is disabled by default, in previews and for another pixel', () => {
  assert.equal(conversionConfiguration('123456',{}),null)
  assert.equal(conversionConfiguration('654321',env),null)
@@ -111,6 +133,7 @@ test('cron rejects missing or wrong secret and accepts authenticated disabled ru
   .replace("import { processContractReminders } from '@/lib/contractsServer'",'const processContractReminders = async () => ({disabled:true,sent:0})')
   .replace("import { processContractTasks } from '@/lib/contractCompletionServer'",'const processContractTasks = async () => ({disabled:true,checked:0})')
   .replace("import { reconcileCommerceNotices } from '@/lib/commerceNotificationsServer'", 'const reconcileCommerceNotices = async () => ({disabled:true})')
+  .replace("import { processCheckoutSaleEmails } from '@/lib/checkoutSaleEmailNotifications'", 'const processCheckoutSaleEmails = async () => ({disabled:true})')
   .replace("import { retryWaitingTagAccess } from '@/lib/checkoutAccessPabblyServer'", 'const retryWaitingTagAccess = async () => ({disabled:true})')
  const {GET}=await import(`data:text/javascript;base64,${Buffer.from(routeSource).toString('base64')}`)
  const saved=process.env.CRON_SECRET
