@@ -75,7 +75,7 @@ export async function readTrackingReport(db, filters, metaOptions) {
   const metaRequest = linked ? readTrackingMeta({ from, to, ...metaOptions }).catch(() => null) : null
   const ordersRequest = allRows(() => {
     let query = db.from('orders')
-      .select('id,status,total_cents,pagarme_charge_id,paid_at,utm_source,utm_medium,utm_campaign,utm_content,utm_term,offer:offers!inner(product_id,product:products(name))')
+      .select('id,status,total_cents,pagarme_charge_id,payment_method,paid_at,utm_source,utm_medium,utm_campaign,utm_content,utm_term,offer:offers!inner(product_id,product:products(name))')
       .in('status', ['paid', ...reversedStatuses])
       .gte('paid_at', `${from}T00:00:00-03:00`).lt('paid_at', `${addDays(to, 1)}T00:00:00-03:00`)
     if (productId) query = query.eq('offer.product_id', productId)
