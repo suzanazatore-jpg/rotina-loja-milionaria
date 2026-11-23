@@ -1,0 +1,8 @@
+.cv-tracking .central-metrics article > span {
+  display: block;
+  padding-inline-end: 30px;
+}
+
+.cv-tracking .cv-table small {
+  color: var(--cv-muted);
+}
