@@ -3,6 +3,14 @@
   padding-inline-end: 30px;
 }
 
-.cv-tracking .cv-table small {
+.cv-tracking .cv-table small,
+.central .cv-tracking .central-metrics article > small {
   color: var(--cv-muted);
+}
+
+.cv-tracking-order {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }

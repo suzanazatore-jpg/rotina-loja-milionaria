@@ -6,7 +6,7 @@ export const challengeTracking = {
   campaignName: 'Desafio_7D_Vs.08',
 }
 
-const isMetaId = value => /^\d{5,30}$/.test(value || '')
+export const isMetaId = value => /^\d{5,30}$/.test(value || '')
 const purchaseAction = 'offsite_conversion.fb_pixel_purchase'
 
 function metaReader({ token, version, fetcher, timeout }) {
@@ -38,7 +38,7 @@ export async function readTrackingMeta({ from, to, token, version = 'v25.0', fet
     const body = await get(`${campaignId}/insights`, {
       level: 'ad',
       time_range: JSON.stringify({ since: from, until: to }),
-      fields: 'account_id,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,date_start,date_stop,spend,actions',
+      fields: 'account_id,campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,date_start,date_stop,spend,actions,action_values',
       limit: '100',
       ...(after ? { after } : {}),
     })
@@ -46,6 +46,8 @@ export async function readTrackingMeta({ from, to, token, version = 'v25.0', fet
     for (const row of body.data) {
       const spend = Number(row.spend)
       const purchases = Number(row.actions?.find(action => action.action_type === purchaseAction)?.value ?? 0)
+      const purchaseValue = row.action_values?.find(action => action.action_type === purchaseAction)?.value
+      const reportedValue = purchaseValue == null || purchaseValue === '' ? null : Number(purchaseValue)
       if (row.account_id !== accountId || row.campaign_id !== campaignId ||
         !row.date_start || !row.date_stop || row.date_start < from || row.date_stop > to || row.date_start > row.date_stop ||
         !isMetaId(row.ad_id) || !isMetaId(row.adset_id) ||
@@ -57,6 +59,7 @@ export async function readTrackingMeta({ from, to, token, version = 'v25.0', fet
         campaign: row.campaign_id, campaignName: row.campaign_name,
         adset: row.adset_id, adsetName: row.adset_name, ad: row.ad_id, adName: row.ad_name,
         spend: Math.round(spend * 100), purchases,
+        purchaseValue: Number.isFinite(reportedValue) && reportedValue >= 0 ? Math.round(reportedValue * 100) : purchases === 0 ? 0 : null,
       })
     }
     if (!body.paging?.next) return { rows: [...rows.values()], updatedAt: new Date().toISOString() }

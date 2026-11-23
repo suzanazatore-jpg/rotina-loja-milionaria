@@ -1,10 +1,10 @@
 import { allRows, readConversionReceipt, saleFilters } from './centralRecords.js'
-import { challengeTracking, readTrackingMeta } from './centralTrackingMeta.js'
+import { challengeTracking, isMetaId, readTrackingMeta } from './centralTrackingMeta.js'
 import { readTrackingFees } from './centralTrackingFees.js'
 
 const dayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', dateStyle: 'short' })
 const reversedStatuses = ['refunded', 'chargedback']
-const media = order => [order.utm_campaign, order.utm_term, order.utm_content]
+const media = order => [order.utm_campaign, order.utm_term, order.utm_content].map(value => value?.trim() || '')
 const keyFor = (campaign, adset, ad) => JSON.stringify([campaign || '', adset || '', ad || ''])
 
 function addDays(day, count) {
@@ -29,14 +29,25 @@ function addSale(row, order, fees) {
   if (row.fees !== null) row.fees = fees.has(order.pagarme_charge_id) ? row.fees + fees.get(order.pagarme_charge_id) : null
 }
 
+function metaEfficiency({ purchases, spend, purchaseValue }) {
+  return {
+    metaCpa: purchases > 0 && spend != null ? Math.round(spend / purchases) : null,
+    metaRoas: spend > 0 && purchaseValue != null ? purchaseValue / spend : null,
+  }
+}
+
 export function summarizeTracking(orders, receipts, meta, fees) {
   const groups = new Map()
-  const totals = { approved: 0, accepted: 0, unknown: 0, gross: 0, refunds: 0, fees: 0, spend: meta ? 0 : null, purchases: meta ? 0 : null }
+  const totals = {
+    approved: 0, accepted: 0, unknown: 0, withAdIds: 0, gross: 0, refunds: 0, fees: 0,
+    spend: meta ? 0 : null, purchases: meta ? 0 : null, purchaseValue: meta ? 0 : null,
+  }
   for (const row of meta?.rows || []) {
     const key = keyFor(row.campaign, row.adset, row.ad)
     groups.set(key, { key, approved: 0, gross: 0, refunds: 0, fees: 0, ...row })
     totals.spend += row.spend
     totals.purchases += row.purchases
+    totals.purchaseValue = totals.purchaseValue != null && row.purchaseValue != null ? totals.purchaseValue + row.purchaseValue : null
   }
 
   const sales = orders.map(order => {
@@ -50,6 +61,7 @@ export function summarizeTracking(orders, receipts, meta, fees) {
     addSale(row, order, fees)
     addSale(totals, order, fees)
     if (conversion?.state === 'accepted') totals.accepted++
+    if ([campaign, adset, ad].every(isMetaId)) totals.withAdIds++
     if (!campaign && !adset && !ad && !origin) totals.unknown++
     return {
       id: order.id, key, code: order.pagarme_charge_id || order.id,
@@ -62,10 +74,11 @@ export function summarizeTracking(orders, receipts, meta, fees) {
 
   const rows = [...groups.values()].map(row => ({
     ...row,
+    ...metaEfficiency(row),
     cpa: row.spend != null && row.approved ? Math.round(row.spend / row.approved) : null,
     net: row.spend != null && row.fees != null ? row.gross - row.refunds - row.fees - row.spend : null,
   })).sort((a, b) => b.approved - a.approved || (b.spend ?? -1) - (a.spend ?? -1))
-  return { totals, rows, sales }
+  return { totals: { ...totals, ...metaEfficiency(totals) }, rows, sales }
 }
 
 export async function readTrackingReport(db, filters, metaOptions) {
