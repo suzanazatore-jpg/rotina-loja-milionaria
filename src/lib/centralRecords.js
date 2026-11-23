@@ -80,3 +80,18 @@ export async function recordActivity(db,{entity,id,orders=[],subscriptions=[]}){
  for(const order of orders){events.push({id:`order:${order.id}`,title:'Pedido criado',at:order.created_at,description:order.product_name || order.offer_name || ''});if(order.paid_at)events.push({id:`paid:${order.id}`,title:'Pagamento confirmado',at:order.paid_at,description:'Valor integral da venda registrado na central'})}
  return {events:events.filter(e=>e.at).sort((a,b)=>String(b.at).localeCompare(String(a.at))),comments}
 }
+
+export function readConversionReceipt(row) {
+  if (!row) return null
+  const status = row.error
+  const processedAt = status ? null : row.processed_at
+  const mode = row.payload?.mode
+  return {
+    state: mode === 'test' ? 'test' : processedAt && mode === 'live' ? 'accepted' :
+      ['retry', 'processing', 'review_required'].includes(status) ? status : 'unconfirmed',
+    at: processedAt,
+    attempts: Number(row.payload?.attempts) || 0,
+    lastAttemptAt: row.payload?.last_attempt_at,
+    nextAttemptAt: status === 'retry' ? row.payload?.next_attempt_at : null,
+  }
+}
