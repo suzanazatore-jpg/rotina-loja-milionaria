@@ -86,3 +86,15 @@ test('uses the sum of confirmed credit fees and leaves unrelated payables unknow
   }, { PAGARME_BASE_URL: 'https://api.pagar.me/core/v5', PAGARME_SECRET_KEY: 'sk_mock', CHECKOUT_LIVE_ENABLED: 'true' })
   assert.deepEqual([...fees.entries()], [['ch_A', 50]])
 })
+
+test('handles Pix payables without an echoed charge ID when the charge amount reconciles', async () => {
+  const orders = [
+    { pagarme_charge_id: 'ch_A', payment_method: 'pix', total_cents: 2700 },
+    { pagarme_charge_id: 'ch_B', payment_method: 'pix', total_cents: 4500 },
+  ]
+  const fees = await readTrackingFees(orders, async url => {
+    if (url.searchParams.get('forward_cursor')) return Response.json({ data: [], paging: { forward_cursor: null } })
+    return Response.json({ data: [{ type: 'credit', payment_method: 'pix', id: 1, amount: 2700, fee: 31 }], paging: { forward_cursor: 'next' } })
+  }, { PAGARME_BASE_URL: 'https://api.pagar.me/core/v5', PAGARME_SECRET_KEY: 'sk_mock', CHECKOUT_LIVE_ENABLED: 'true' })
+  assert.deepEqual([...fees.entries()], [['ch_A', 31]])
+})
