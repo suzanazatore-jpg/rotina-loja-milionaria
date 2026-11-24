@@ -38,10 +38,11 @@ export default function PublicCheckout({ data, compact = false }) {
   const preferredMethod = focused ? 'credit_card' : guru || compact ? 'pix' : null
   const initialMethod = methods.includes(preferredMethod) ? preferredMethod : methods[0] || 'pix'
   const [method, setMethod] = useState(initialMethod)
+  const compactCard = compact && method === 'credit_card'
   const [installments, setInstallments] = useState(initialMethod === 'credit_card' ? offer.default_installments || 1 : 1)
   const [selectedBumps, setSelectedBumps] = useState([])
   const needsAddress = config.layout==='guru'?method==='credit_card':config.form_profile !== 'compact' || method === 'credit_card'
-  const [addressOpen, setAddressOpen] = useState(compact && initialMethod === 'credit_card')
+  const [addressOpen, setAddressOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [countdownExpired, setCountdownExpired] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -72,7 +73,7 @@ export default function PublicCheckout({ data, compact = false }) {
   function changePayment(key) {
     if (compact && key === method) return
     setMethod(key)
-    if (compact && key === 'credit_card') setAddressOpen(true)
+    if (compact) setAddressOpen(false)
     setInstallments(key === 'credit_card' ? offer.default_installments || 1 : 1)
     setSelectedBumps(current => current.filter(id => bumps.find(bump => bump.offer_id === id)?.prices.some(price => price.method === key)))
   }
@@ -144,13 +145,47 @@ export default function PublicCheckout({ data, compact = false }) {
     } catch (failure) { setError(failure.message || 'Falha de conexão. Consulte o pagamento antes de tentar novamente.') }
     finally { submitting.current = false; setBusy(false) }
   }
-  const paymentControls = method==='credit_card'?<div className="cp-fields"><Field name="card_number" label="Número do cartão *" autoComplete="cc-number" inputMode="numeric" wide minLength={13} maxLength={24}/><Field name="holder_name" label="Nome impresso no cartão *" autoComplete="cc-name" wide maxLength={64}/><Field name="expiry" label="Validade *" autoComplete="cc-exp" placeholder="MM/AA" inputMode="numeric" pattern="[0-9]{2}/([0-9]{2}|[0-9]{4})" maxLength={7}/><Field name="cvv" label="CVV *" autoComplete="cc-csc" inputMode="numeric" type="password" pattern="[0-9]{3,4}" maxLength={4}/><label className="cp-field pc-installments"><span>Parcelamento *</span><select aria-label="Parcelamento" value={installments} onChange={e=>setInstallments(Number(e.target.value))}>{prices.filter(p=>p.method===method).map(p=><option key={p.installments} value={p.installments}>{String(p.installments).padStart(2,'0')} × {money(cartPrice(p).total_cents/p.installments)}</option>)}</select></label></div>:compact ? <p className="compact-pix-note">Gere o código Pix e pague no app do seu banco.</p> : <div className="cp-pix-info"><div><strong>Atenção a estes detalhes:</strong><ul><li>Pagamento à vista pelo Pix.</li><li>O acesso é liberado após a confirmação do pagamento.</li><li>Após o vencimento do código, faça um novo pedido.</li></ul></div></div>
+  const installmentField = (
+    <label className={compactCard ? 'cp-field pc-installments wide' : 'cp-field pc-installments'}>
+      <span>{compactCard ? 'Nº de parcelas' : 'Parcelamento *'}</span>
+      <select aria-label={compactCard ? undefined : 'Parcelamento'} value={installments}
+        onChange={event => setInstallments(Number(event.target.value))}
+      >
+        {prices.filter(price => price.method === method).map(price => {
+          const amount = money(cartPrice(price).total_cents / price.installments)
+          const label = compactCard && price.installments === 1
+            ? `À vista: ${amount}`
+            : `${String(price.installments).padStart(2, '0')} × ${amount}`
+          return <option key={price.installments} value={price.installments}>{label}</option>
+        })}
+      </select>
+    </label>
+  )
+  const cardControls = (
+    <div className={compactCard ? 'cp-fields compact-card-fields' : 'cp-fields'}>
+      {compactCard && installmentField}
+      <Field name="card_number" label={compactCard ? 'Número do cartão' : 'Número do cartão *'}
+        {...(compactCard && { placeholder: 'Número do cartão' })}
+        autoComplete="cc-number" inputMode="numeric" wide minLength={13} maxLength={24} />
+      <Field name="holder_name" label={compactCard ? 'Nome impresso no cartão' : 'Nome impresso no cartão *'}
+        autoComplete="cc-name" wide maxLength={64} />
+      <Field name="expiry" label={compactCard ? 'Validade (MM/AA)' : 'Validade *'}
+        autoComplete="cc-exp" placeholder={compactCard ? 'Validade (MM/AA)' : 'MM/AA'}
+        inputMode="numeric" pattern="[0-9]{2}/([0-9]{2}|[0-9]{4})" maxLength={7} />
+      <Field name="cvv" label={compactCard ? 'CVV' : 'CVV *'} {...(compactCard && { placeholder: 'CVV' })}
+        autoComplete="cc-csc" inputMode="numeric" type="password" pattern="[0-9]{3,4}" maxLength={4} />
+      {!compactCard && installmentField}
+    </div>
+  )
+  const paymentControls = method === 'credit_card' ? cardControls : compact
+    ? <p className="compact-pix-note">Gere o código Pix e pague no app do seu banco.</p>
+    : <div className="cp-pix-info"><div><strong>Atenção a estes detalhes:</strong><ul><li>Pagamento à vista pelo Pix.</li><li>O acesso é liberado após a confirmação do pagamento.</li><li>Após o vencimento do código, faça um novo pedido.</li></ul></div></div>
   const billingAddress = needsAddress && (
-    <details className="pc-address"
-      open={(compact && config.form_profile !== 'compact') || (config.layout !== 'guru' && config.form_profile !== 'compact') || addressOpen}
+    <details className={compactCard ? 'pc-address compact-card-address' : 'pc-address'}
+      open={addressOpen || (!compactCard && (compact || config.layout !== 'guru') && config.form_profile !== 'compact')}
       onToggle={event => setAddressOpen(event.currentTarget.open)}
     >
-      <summary>Endereço de cobrança</summary>
+      <summary>{compactCard ? 'Endereço de cobrança (obrigatório)' : 'Endereço de cobrança'}</summary>
       <p className="pc-note">{compact ? 'Informe o endereço associado ao pagamento.' : 'Necessário para processar o cartão no Pagar.me.'}</p>
       <div className="cp-fields">
         <Field name="zip_code" label="CEP" autoComplete="postal-code" inputMode="numeric" maxLength={9} />
@@ -193,9 +228,18 @@ export default function PublicCheckout({ data, compact = false }) {
               </FormGroup>
               <FormGroup {...(compact && { className: 'compact-payment' })}>
                 {compact ? <h2>Forma de pagamento</h2> : <><div className="cp-divider" /><div className="cp-step"><span>2</span><div><h2>{guru ? 'Método de pagamento' : 'Escolha a forma de pagamento'}</h2><p>Escolha a melhor forma para você.</p></div></div></>}
-                {(focused || guru) ? <div className="pc-payment-options">{methods.map(key => <section key={key} className={`pc-payment-option ${method === key ? 'is-open' : ''}`}><button type="button" aria-expanded={method === key} aria-controls={`payment-panel-${key}`} onClick={() => changePayment(key)}><span className="pc-payment-radio" aria-hidden="true" /><PaymentSymbol method={key} />{key === 'pix' ? 'Pix' : 'Cartão de crédito'}</button>{method === key && <div id={`payment-panel-${key}`} className="pc-payment-body">{paymentControls}</div>}</section>)}</div> : <><div className="cp-payment-tabs">{methods.map(key => <button type="button" key={key} aria-pressed={method === key} onClick={() => changePayment(key)}>{compact && <PaymentSymbol method={key} />}{key === 'pix' ? 'Pix' : 'Cartão de crédito'}</button>)}</div>{(!compact || methods.length > 0) && paymentControls}</>}
-                {compact && billingAddress}
+                {(focused || guru) ? <div className="pc-payment-options">{methods.map(key => <section key={key} className={`pc-payment-option ${method === key ? 'is-open' : ''}`}><button type="button" aria-expanded={method === key} aria-controls={`payment-panel-${key}`} onClick={() => changePayment(key)}><span className="pc-payment-radio" aria-hidden="true" /><PaymentSymbol method={key} />{key === 'pix' ? 'Pix' : 'Cartão de crédito'}</button>{method === key && <div id={`payment-panel-${key}`} className="pc-payment-body">{paymentControls}</div>}</section>)}</div> : <><div className="cp-payment-tabs">{methods.map(key => <button type="button" key={key} aria-pressed={method === key} onClick={() => changePayment(key)}>{compact && <PaymentSymbol method={key} />}{key === 'pix' ? 'Pix' : 'Cartão de crédito'}</button>)}</div>{(!compact || (!compactCard && methods.length > 0)) && paymentControls}</>}
+                {compact && !compactCard && billingAddress}
               </FormGroup>
+              {compactCard && (
+                <>
+                  <section className="compact-card" aria-labelledby="compact-card-heading">
+                    <h2 id="compact-card-heading">Dados do cartão</h2>
+                    {cardControls}
+                  </section>
+                  {billingAddress}
+                </>
+              )}
             {shownBumps.length > 0 && <section className="pc-bumps" aria-label="Ofertas adicionais"><h3>{compact ? 'Adicionais opcionais' : 'Aproveite e compre junto:'}</h3>{shownBumps.map(bump => {
               const price = bumpPrice(bump)
               return <label key={bump.offer_id} className={`pc-bump ${selectedBumps.includes(bump.offer_id) ? 'is-selected' : ''} ${!price ? 'is-unavailable' : ''}`}><input type="checkbox" disabled={!price} checked={selectedBumps.includes(bump.offer_id)} onChange={event => setSelectedBumps(current => event.target.checked ? [...current, bump.offer_id] : current.filter(id => id !== bump.offer_id))} /><span><strong>{compact ? bump.product_name : bump.headline}</strong>{!compact && <span className="pc-bump-name">{bump.product_name}</span>}{bump.description && <span className="pc-bump-description">{bump.description}</span>}<b>{price ? `+ ${compact ? displayPrice(price.total_cents) : money(price.total_cents)}` : 'Indisponível nesta forma de pagamento'}</b></span>{focused && <span className="pc-bump-add">Adicionar produto</span>}</label>

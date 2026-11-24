@@ -129,6 +129,7 @@
 
 .compact-data,
 .compact-payment,
+.compact-card,
 .compact-review,
 .compact-checkout .cp-form-card,
 .compact-checkout .compact-terms {
@@ -141,6 +142,7 @@
 
 .compact-data h2,
 .compact-payment h2,
+.compact-card h2,
 .compact-checkout .pc-bumps h3,
 .compact-checkout .pc-order-summary h3 {
   margin: 0 0 12px;
@@ -195,6 +197,21 @@
 
 .compact-checkout .pc-address {
   border-color: var(--compact-border);
+}
+
+.compact-card-fields .cp-field:not(.pc-installments) > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.compact-checkout .compact-card-address {
+  margin: 0;
+  background: var(--cp-panel);
 }
 
 .compact-pix-note {
@@ -343,6 +360,7 @@
 
   .compact-data,
   .compact-payment,
+  .compact-card,
   .compact-review,
   .compact-checkout .cp-form-card,
   .compact-checkout .compact-terms {
