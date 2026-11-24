@@ -1,3 +1,5 @@
+import { safeMedia } from './trafficReportModel.js'
+
 // First campaign explicitly linked to the Central. Traffic-management client accounts are independent.
 export const challengeTracking = {
   productId: 'c35a5d1c-bf01-4d98-805f-b86f05e345f1',
@@ -78,4 +80,40 @@ export async function readTrackingAd(order, { token, version = 'v25.0', fetcher 
   if (ad.id !== order.utm_content || ad.account_id !== accountId ||
     ad.campaign?.id !== campaignId || ad.adset?.id !== order.utm_term) return null
   return { ad: ad.name, adset: ad.adset.name, campaign: ad.campaign.name }
+}
+
+function creativeImage(value, token) {
+  const safe = safeMedia(value)
+  if (!safe || safe.includes(token)) return null
+  const url = new URL(safe)
+  if (url.searchParams.has('access_token') || url.searchParams.has('appsecret_proof')) return null
+  const isCdn = /(^|\.)(fbcdn\.net|fbsbx\.com|cdninstagram\.com)$/.test(url.hostname)
+  const isMetaThumbnail = url.hostname === 'www.facebook.com' && /^\/ads\/image\/?$/.test(url.pathname)
+  return isCdn || isMetaThumbnail ? safe : null
+}
+
+export async function readTrackingMedia(rows, { token, version = 'v25.0', fetcher = fetch } = {}) {
+  const { accountId, campaignId } = challengeTracking
+  const ads = [...new Set(rows.filter(row => row.campaign === campaignId && isMetaId(row.ad)).map(row => row.ad))]
+  if (!token || !ads.length) return rows
+
+  const media = new Map()
+  try {
+    const get = metaReader({ token, version, fetcher, timeout: 3500 })
+    for (let offset = 0; offset < ads.length; offset += 50) {
+      const ids = ads.slice(offset, offset + 50)
+      const body = await get('', { ids: ids.join(','), fields: 'id,account_id,campaign_id,adset_id,creative{thumbnail_url,image_url}' })
+      for (const id of ids) {
+        const ad = body[id]
+        if (ad?.id !== id || ad.account_id !== accountId || ad.campaign_id !== campaignId || !isMetaId(ad.adset_id)) continue
+        const urls = [...new Set([ad.creative?.thumbnail_url, ad.creative?.image_url].map(value => creativeImage(value, token)).filter(Boolean))]
+        if (urls.length) media.set(id, { adset: ad.adset_id, urls })
+      }
+    }
+  } catch { /* Creative availability does not determine report availability. */ }
+
+  return rows.map(row => {
+    const item = media.get(row.ad)
+    return item && row.campaign === campaignId && item.adset === row.adset ? { ...row, imageUrls: item.urls } : row
+  })
 }
