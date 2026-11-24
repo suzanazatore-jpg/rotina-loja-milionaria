@@ -6,3 +6,16 @@ test('receive mode finds the smallest gross amount reaching the target after rou
 test('installment distribution always sums exactly to each total',()=>{for(let n=1;n<=12;n++){const r=simulateSale({amountCents:10001,installments:n,rateBps:1234});assert.equal(r.chargeSchedule.reduce((a,b)=>a+b,0),r.gross);assert.equal(r.netSchedule.reduce((a,b)=>a+b,0),r.net);assert.ok(Math.max(...r.chargeSchedule)-Math.min(...r.chargeSchedule)<=1)}assert.deepEqual(splitCents(100,3),[34,33,33])})
 test('invalid or unconfigured financial inputs cannot silently produce estimates',()=>{for(const args of [{amountCents:0,rateBps:0},{amountCents:100,rateBps:null},{amountCents:100,rateBps:10000},{amountCents:100,rateBps:10,installments:13},{amountCents:100,rateBps:0,fixedFeeCents:101}])assert.throws(()=>simulateSale(args));assert.throws(()=>parseMoney('-1'));assert.throws(()=>parseMoney('12,345'));assert.equal(parseMoney('R$ 1.234,56'),123456);assert.equal(parseMoney('27'),2700)})
 test('private rate tables validate and retain missing rates without inventing defaults',()=>{const empty=emptySimulatorRates();assert.equal(normalizeSimulatorRates(empty).brands.Visa[0],null);empty.brands.Visa[0]=1000;assert.equal(normalizeSimulatorRates(empty).brands.Visa[0],1000);empty.brands.Elo[1]=-1;assert.throws(()=>normalizeSimulatorRates(empty))})
+
+test('Brazilian thousands separators and decimal inputs are accepted without ambiguity', () => {
+  assert.equal(parseMoney('4.000'), 400000)
+  assert.equal(parseMoney('R$ 4.000,00'), 400000)
+  assert.equal(parseMoney('4000.01'), 400001)
+  assert.equal(parseMoney('4000,01'), 400001)
+  assert.throws(() => parseMoney('4.00,01'))
+})
+
+test('the receive target can reach the limit if gross still fits', () => {
+  assert.equal(simulateSale({ amountCents: 100000000, rateBps: 0, mode: 'receive' }).gross, 100000000)
+  assert.throws(() => simulateSale({ amountCents: 100000000, rateBps: 1, mode: 'receive' }), /ultrapassa/)
+})
