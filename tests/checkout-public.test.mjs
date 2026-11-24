@@ -8,6 +8,7 @@ const source=readFileSync(new URL('../src/lib/checkoutPublicServer.js',import.me
  .replace("'./pagarme.js'",JSON.stringify(moduleUrl('pagarme')))
  .replace("'./checkoutCart.js'",JSON.stringify(moduleUrl('checkoutCart')))
  .replace("'./checkoutTracking.js'",JSON.stringify(moduleUrl('checkoutTracking')))
+ .replace("'./checkoutVisitServer.js'",JSON.stringify(moduleUrl('checkoutVisitServer')))
 const {checkoutTestConfiguration,loadCheckoutOffer,publicCheckoutData}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env={CHECKOUT_TEST_ENABLED:'true',CHECKOUT_SESSION_SECRET:'a'.repeat(32),PAGARME_SECRET_KEY:'sk_test_mock',PAGARME_PUBLIC_KEY:'pk_test_mock'}
 test('public checkout denies real payments, incomplete configuration and accidental activation',()=>{
@@ -46,6 +47,7 @@ test('offer lookup filters active records and exposes only public product/offer 
  assert.equal(exposed.product.botconversa_tag,undefined)
  assert.equal(exposed.test.publicKey,'pk_test_mock')
  assert.equal(exposed.test.key,undefined)
+ assert.equal(exposed.visit_token,null)
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'preview'}).analytics_enabled,false)
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'production'}).analytics_enabled,true)
  assert.equal(await loadCheckoutOffer('../invalid',db),null)

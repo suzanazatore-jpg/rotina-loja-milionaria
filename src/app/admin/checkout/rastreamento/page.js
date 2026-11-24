@@ -20,7 +20,7 @@ const roas = value => value == null ? '—' : `${multiple.format(value)}×`
 const pageSize = 25
 const mediaOrders = {
   purchases: 'Mais compras atribuídas', metaCpa: 'Menor custo por compra na Meta',
-  metaRoas: 'Maior retorno na Meta', approved: 'Mais vendas na Central',
+  metaRoas: 'Maior retorno na Meta', visits: 'Mais visitas ao checkout', approved: 'Mais vendas na Central',
 }
 
 function compareMedia(a, b, field) {
@@ -39,17 +39,18 @@ function MediaLabel({ name, id }) {
 
 function MediaTable({ rows, selected, select }) {
   return <div className="cv-table-wrap"><table className="cv-table">
-    <thead><tr><th>Campanha / origem</th><th>Conjunto</th><th>Anúncio</th><th>Investimento</th><th>Compras Meta Ads</th><th>CPA Meta</th><th>ROAS Meta</th><th>Vendas na Central</th><th>Faturamento</th><th>Taxas Pagar.me</th><th>CPA da Central</th><th>Após taxas e mídia</th></tr></thead>
+    <thead><tr><th>Campanha / origem</th><th>Conjunto</th><th>Anúncio</th><th>Visitas ao checkout</th><th>Investimento</th><th>Compras Meta Ads</th><th>CPA Meta</th><th>ROAS Meta</th><th>Vendas na Central</th><th>Faturamento</th><th>Taxas Pagar.me</th><th>CPA da Central</th><th>Após taxas e mídia</th></tr></thead>
     <tbody>{rows.map(row => <tr key={row.key}>
       <td><MediaLabel name={row.campaignName} id={row.campaign || row.origin || (!row.ad && !row.adset ? 'Origem não identificada' : '')}/></td>
       <td><MediaLabel name={row.adsetName} id={row.adset}/></td>
       <td><MediaLabel name={row.adName} id={row.ad}/></td>
+      <td>{count(row.visits)}</td>
       <td>{currency(row.spend)}</td>
       <td>{count(row.purchases)}</td><td>{currency(row.metaCpa)}</td><td>{roas(row.metaRoas)}</td>
       <td>{row.approved ? <button type="button" className="cv-link" aria-label={`Ver ${row.approved} vendas de ${row.adName || row.ad || row.campaignName || row.campaign || row.origin || 'origem não identificada'}`} aria-pressed={selected === row.key} onClick={() => select(row.key)}>{count(row.approved)}</button> : '0'}</td>
       <td>{currency(row.gross)}{row.refunds > 0 && <><br/><small>Estornos {currency(row.refunds)}</small></>}</td>
       <td>{currency(row.fees)}</td><td>{currency(row.cpa)}</td><td>{currency(row.net)}</td>
-    </tr>)}{!rows.length && <tr><td colSpan={12}>Sem registros no período.</td></tr>}</tbody>
+    </tr>)}{!rows.length && <tr><td colSpan={13}>Sem registros no período.</td></tr>}</tbody>
   </table></div>
 }
 
@@ -115,8 +116,16 @@ export default function TrackingPage() {
   const product = report?.products.find(item => item.id === report.productId)?.name || 'Todos os produtos'
   const totals = report?.totals
   const hasMeta = report?.meta.status === 'ready'
-  const sortedRows = report ? [...report.rows].sort((a, b) => compareMedia(a, b, hasMeta ? orderBy : 'approved')) : []
+  const visits = report?.visits
+  const hasVisits = visits?.total != null
+  const sortOptions = Object.keys(mediaOrders).filter(field => field === 'approved' || (field === 'visits' ? hasVisits : hasMeta))
+  const activeOrder = sortOptions.includes(orderBy) ? orderBy : 'approved'
+  const sortedRows = report ? [...report.rows].sort((a, b) => compareMedia(a, b, activeOrder)) : []
+  const salesPer100 = visits?.complete && visits.total > 0 ? (100 * totals.approved / visits.total).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) : ''
+  const visitNote = salesPer100 ? `${salesPer100} vendas / 100 visitas` : visits?.since ? `Coleta desde ${date(visits.since)}` :
+    visits?.status === 'unavailable' ? 'Contagem indisponível' : 'Aguardando a primeira visita'
   const cards = totals ? [
+    ['Visitas ao checkout', count(visits?.total), 'users', visitNote],
     ['Vendas aprovadas', count(totals.approved), 'cart', `${currency(totals.gross)} em faturamento bruto`],
     ['Recebidas pela Meta', count(totals.accepted), 'check', coverage(totals.accepted, totals.approved)],
     ['Compras no Meta Ads', count(totals.purchases), 'dashboard', totals.purchaseValue == null ? '' : `${currency(totals.purchaseValue)} atribuídos`],
@@ -159,9 +168,10 @@ export default function TrackingPage() {
         <span>{label}</span><i className="cv-metric-icon"><AppIcon name={icon} size={17}/></i><strong>{value}</strong>{note && <small>{note}</small>}
       </article>)}</div>
       <p className="central-data-note">Atualizado em {date(report.updatedAt)} · {count(totals.unknown)} vendas sem origem registrada. A cobertura por anúncio usa os IDs de campanha, conjunto e anúncio gravados no pedido.</p>
+      <p className="central-data-note">Cada abertura do checkout conta uma visita. A coluna por anúncio usa os IDs presentes no link. O indicador de vendas por 100 visitas compara os totais de um período integralmente coberto pela coleta.</p>
       <section className="central-chart-panel">
-        <div className="cv-toolbar"><h2>Desempenho por anúncio</h2>{hasMeta && <label className="cv-tracking-order">Ordenar por<select value={orderBy} onChange={event => setOrderBy(event.target.value)}>
-          {Object.entries(mediaOrders).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        <div className="cv-toolbar"><h2>Desempenho por anúncio</h2>{sortOptions.length > 1 && <label className="cv-tracking-order">Ordenar por<select value={activeOrder} onChange={event => setOrderBy(event.target.value)}>
+          {sortOptions.map(value => <option key={value} value={value}>{mediaOrders[value]}</option>)}
         </select></label>}</div>
         {report.meta.status === 'unavailable' && <p className="central-data-note">O relatório da Meta está indisponível nesta consulta. As vendas e os recibos da Central continuam disponíveis.</p>}
         {report.meta.status === 'unlinked' && <p className="central-data-note">A leitura de investimento e atribuição da Meta está vinculada à campanha do Desafio. Selecione o Desafio para consultar esses dados.</p>}

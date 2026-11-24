@@ -1,6 +1,6 @@
 'use client'
 import Script from 'next/script'
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { trackingDestination, dispatchAnalytics } from '@/lib/checkoutAnalytics'
 const CONSENT_KEY='sz-checkout-consent-v2'
 function subscribe(callback) {
@@ -44,10 +44,27 @@ function setup(config) {
   return true
   }catch{return false}
 }
-export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,started,purchase}) {
+export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,started,purchase,visitToken}) {
   const consent=useSyncExternalStore(subscribe,snapshot,()=> 'unknown')
   const destination=trackingDestination(config)
   const allowed=enabled && consent==='granted' && destination.channel!=='off'
+  const sentVisit = useRef(null)
+  useEffect(() => {
+    if (!visitToken || consent === 'unknown') return
+    function recordVisibleVisit() {
+      if (document.visibilityState !== 'visible' || sentVisit.current === visitToken) return
+      sentVisit.current = visitToken
+      const query = new URLSearchParams(window.location.search)
+      const tags = consent === 'granted' ? { campaign: query.get('utm_campaign'), adset: query.get('utm_term'), ad: query.get('utm_content') } : {}
+      void fetch('/api/checkout/telemetria/visita', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+        credentials: 'omit', referrerPolicy: 'no-referrer', body: JSON.stringify({ token: visitToken, ...tags }),
+      }).catch(() => {})
+    }
+    recordVisibleVisit()
+    document.addEventListener('visibilitychange', recordVisibleVisit)
+    return () => document.removeEventListener('visibilitychange', recordVisibleVisit)
+  }, [visitToken, consent])
   useEffect(()=>{updateConsent(allowed)},[allowed])
   useEffect(()=>{
     if(!allowed)return

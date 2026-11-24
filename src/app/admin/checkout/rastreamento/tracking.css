@@ -14,3 +14,9 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+@media (min-width: 1201px) {
+  .cv-tracking .central-metrics {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
