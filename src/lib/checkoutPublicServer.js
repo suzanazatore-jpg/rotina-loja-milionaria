@@ -26,6 +26,10 @@ export async function loadCheckoutOffer(slug, db = checkoutAdminClient()) {
   const bumps = product.type === 'subscription' ? [] : await loadOrderBumps(db, offer.id)
   return { offer, product, config, prices, bumps }
 }
+export function usesCompactCheckout(config, previewModel, env = process.env) {
+  return config.checkout_model === 'compact' || (env.VERCEL_ENV === 'preview' && previewModel === 'compacto')
+}
+
 export function checkoutTestConfiguration(env = process.env) {
   try {
     const gateway = gatewayConfiguration(env)

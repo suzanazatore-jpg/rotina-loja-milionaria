@@ -20,12 +20,6 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
-.compact-brand {
-  margin: 0 0 12px;
-  color: var(--cp-accent);
-  font-weight: 750;
-}
-
 .compact-product {
   display: flex;
   align-items: center;

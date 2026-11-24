@@ -1,7 +1,7 @@
 import {notFound} from 'next/navigation'
 import {checkoutAdminClient} from '@/lib/checkoutAdminServer'
 import {offerId} from '@/lib/checkoutLinks'
-import {loadCheckoutOffer,publicCheckoutData} from '@/lib/checkoutPublicServer'
+import {loadCheckoutOffer,publicCheckoutData,usesCompactCheckout} from '@/lib/checkoutPublicServer'
 import PublicCheckout from '../../checkout/[slug]/PublicCheckout'
 export const dynamic='force-dynamic'
 export const metadata={title:'Checkout | Suzana Zatorre',robots:{index:false,follow:false}}
@@ -33,5 +33,5 @@ export default async function Page({params,searchParams}){
   if(!result.data)notFound()
   const loaded=await loadCheckoutOffer(result.data.slug,db)
   if(!loaded)notFound()
-  return <PublicCheckout data={publicCheckoutData(loaded)} compact={query?.modelo === 'compacto'}/>
+  return <PublicCheckout data={publicCheckoutData(loaded)} compact={usesCompactCheckout(loaded.config, query?.modelo)}/>
 }

@@ -55,3 +55,12 @@ test('offer contract survives normalization and appearance inheritance without b
  assert.deepEqual(resolveCheckoutSettings({}, {contract}).contract,{required:false})
  assert.throws(()=>normalizeCheckoutSettings({contract:{...contract,term_months:0}}),/prazo/)
 })
+
+test('existing offers use the official checkout, and the saved model only affects its own offer', () => {
+ const selected = { appearance_mode:'inherit', checkout_model:'compact' }
+ assert.equal(normalizeCheckoutSettings({}).checkout_model, 'official')
+ assert.equal(normalizeCheckoutSettings({ checkout_model:'outro' }).checkout_model, 'official')
+ assert.equal(resolveCheckoutSettings(selected, { checkout_model:'official' }).checkout_model, 'compact')
+ assert.equal(checkoutSettingsDraft(selected, { checkout_model:'official' }).checkout_model, 'compact')
+ assert.equal(resolveCheckoutSettings({ appearance_mode:'inherit' }, selected).checkout_model, 'official')
+})

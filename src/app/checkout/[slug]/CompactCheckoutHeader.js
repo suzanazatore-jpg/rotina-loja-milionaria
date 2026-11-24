@@ -11,9 +11,6 @@ export default function CompactCheckoutHeader({ config, offer, product, prices, 
 
   return (
     <>
-      <header className="compact-brand">
-        <span>{config.store_name}</span>
-      </header>
       <section className="compact-product" aria-labelledby="checkout-product">
         <div className="compact-product-main">
           <div className="compact-product-photo">

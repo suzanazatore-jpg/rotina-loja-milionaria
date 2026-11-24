@@ -210,7 +210,7 @@ export async function POST(request) {
         : supabase.from('offers').insert(registro)
       const { data, error } = await consulta.select('id,slug,payment_path').single()
       if (error) throw new Error(error.message)
-      await salvarBumps(supabase, data.id, dados.bumps)
+      if (!id || Object.hasOwn(dados, 'bumps')) await salvarBumps(supabase, data.id, dados.bumps)
       return NextResponse.json({ ok: true, ...data })
     }
     return erro('Entidade inválida.')
