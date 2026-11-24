@@ -6,8 +6,8 @@ import PublicCheckout from '../../checkout/[slug]/PublicCheckout'
 export const dynamic='force-dynamic'
 export const metadata={title:'Checkout | Suzana Zatorre',robots:{index:false,follow:false}}
 
-export default async function Page({params}){
-  const {code}=await params
+export default async function Page({params,searchParams}){
+  const [{code},query]=await Promise.all([params,searchParams])
   if(!/^[a-zA-Z0-9_-]{1,60}$/.test(code))notFound()
   const db=checkoutAdminClient()
   const reserved=await db.from('checkout_offer_links').select('offer_id').eq('path',code).maybeSingle()
@@ -33,5 +33,5 @@ export default async function Page({params}){
   if(!result.data)notFound()
   const loaded=await loadCheckoutOffer(result.data.slug,db)
   if(!loaded)notFound()
-  return <PublicCheckout data={publicCheckoutData(loaded)}/>
+  return <PublicCheckout data={publicCheckoutData(loaded)} compact={query?.modelo === 'compacto'}/>
 }
