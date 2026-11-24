@@ -9,7 +9,7 @@ const source=readFileSync(new URL('../src/lib/checkoutPublicServer.js',import.me
  .replace("'./checkoutCart.js'",JSON.stringify(moduleUrl('checkoutCart')))
  .replace("'./checkoutTracking.js'",JSON.stringify(moduleUrl('checkoutTracking')))
  .replace("'./checkoutVisitServer.js'",JSON.stringify(moduleUrl('checkoutVisitServer')))
-const {checkoutTestConfiguration,loadCheckoutOffer,publicCheckoutData}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+const {checkoutTestConfiguration,loadCheckoutOffer,publicCheckoutData,usesCompactCheckout}=await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
 const env={CHECKOUT_TEST_ENABLED:'true',CHECKOUT_SESSION_SECRET:'a'.repeat(32),PAGARME_SECRET_KEY:'sk_test_mock',PAGARME_PUBLIC_KEY:'pk_test_mock'}
 test('public checkout denies real payments, incomplete configuration and accidental activation',()=>{
  assert.equal(checkoutTestConfiguration(env).ready,true)
@@ -50,7 +50,20 @@ test('offer lookup filters active records and exposes only public product/offer 
  assert.equal(exposed.visit_token,null)
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'preview'}).analytics_enabled,false)
  assert.equal(publicCheckoutData(loaded,{...env,CHECKOUT_TRACKING_ENABLED:'true',PAGARME_BASE_URL:'https://api.pagar.me/core/v5',VERCEL_ENV:'production'}).analytics_enabled,true)
+ offer.price_cents=1000
+ const updated=publicCheckoutData(await loadCheckoutOffer('offer',db),env)
+ assert.equal(updated.offer.price_cents,1000)
+ assert.equal(updated.prices.find(p=>p.method==='pix').total_cents,900)
+ assert.equal(updated.prices.find(p=>p.installments===3).total_cents,1000)
  assert.equal(await loadCheckoutOffer('../invalid',db),null)
  product.marketplace_id='future_provider'
  assert.equal(await loadCheckoutOffer('offer',db),null)
+})
+
+test('model is selected per offer, with a query override only in preview', () => {
+ assert.equal(usesCompactCheckout({}, 'compacto', { VERCEL_ENV:'production' }), false)
+ assert.equal(usesCompactCheckout({}, 'compacto', {}), false)
+ assert.equal(usesCompactCheckout({ checkout_model:'official' }, 'compacto', { VERCEL_ENV:'preview' }), true)
+ assert.equal(usesCompactCheckout({ checkout_model:'compact' }, undefined, { VERCEL_ENV:'production' }), true)
+ assert.equal(usesCompactCheckout({ checkout_model:'official' }, undefined, { VERCEL_ENV:'production' }), false)
 })

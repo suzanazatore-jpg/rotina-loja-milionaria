@@ -59,7 +59,10 @@ export default function OfferEditor({produtoId,ofertaId}) {
   async function save(e) {
     e.preventDefault();setSaving(true);setMessage('')
     try {
-      const response=await fetch('/api/admin/checkout',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({entidade:'oferta',id:ofertaId==='nova'?undefined:ofertaId,dados})})
+      const { bumps, ...offerFields } = dados
+      const isNew = ofertaId === 'nova'
+      const changedBumps = isNew || JSON.stringify(bumps) !== JSON.stringify(JSON.parse(baseline).bumps)
+      const response=await fetch('/api/admin/checkout',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},body:JSON.stringify({entidade:'oferta',id:isNew?undefined:ofertaId,dados:changedBumps ? dados : offerFields})})
       const json=await response.json()
       if(!response.ok)throw new Error(json.error || 'Não foi possível salvar.')
       const saved={...dados,id:json.id,slug:json.slug,payment_path:json.payment_path};setDados(saved);setBaseline(JSON.stringify(saved));setMessage('✓ Oferta salva.')
@@ -107,7 +110,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
       </section>
       <section hidden={tab!=='vendas'} className="central-chart-panel"><h2>Vendas desta oferta</h2>{ofertaId==='nova'?<p>Salve a oferta antes de consultar suas vendas.</p>:<Link className="central-action" href={`/admin/checkout/vendas?oferta=${encodeURIComponent(ofertaId)}`}>Consultar pedidos da oferta →</Link>}</section>
       <div hidden={tab!=='contrato'}><ContractOfferSettings value={dados.checkout_config} onChange={checkout_config=>setDados({...dados,checkout_config})} offer={dados} product={product} /></div>
-      <div hidden={tab!=='checkout'}><CheckoutSettingsEditor value={dados.checkout_config} onChange={checkout_config=>setDados({...dados,checkout_config})} offer={dados} product={product} globalConfig={catalog.global_config} /></div>
+      <div hidden={tab!=='checkout'}><CheckoutSettingsEditor value={dados.checkout_config} onChange={checkout_config=>setDados({...dados,checkout_config})} offer={dados} product={product} globalConfig={catalog.global_config} paymentUrl={canShare && !dirty && dados.active ? savedLink : ''} /></div>
       <div className="central-editor-actions"><span>{dirty?'Alterações ainda não salvas':'Nenhuma alteração pendente'}</span><button type="button" className="central-action" disabled={saving || !dirty} onClick={()=>setDados(JSON.parse(baseline))}>Descartar alterações</button><button className="central-primary" disabled={saving || (!dirty && ofertaId!=='nova')}>{saving?'Salvando…':'Salvar oferta'}</button></div>
     </form>
   </main>
