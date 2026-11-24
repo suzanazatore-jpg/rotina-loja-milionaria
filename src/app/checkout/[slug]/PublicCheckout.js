@@ -137,7 +137,7 @@ export default function PublicCheckout({ data }) {
   const color = { '--cp-bg': config.background, '--cp-panel': config.panel, '--cp-text': config.text, '--cp-accent': config.accent, '--cp-button-text': config.button_text_color, fontFamily: config.layout==='guru'?'var(--checkout-inter), Inter, Arial, sans-serif':config.font }
   return <main className={`pc-checkout ${inter.variable}`} style={color}>
     <CheckoutCountdown config={config} onExpire={setCountdownExpired} />
-    <CheckoutAnalytics config={config} enabled={data.analytics_enabled} viewCart={viewCart} currentCart={analyticsCart} started={attemptStarted} purchase={result?.purchase} />
+    <CheckoutAnalytics config={config} enabled={data.analytics_enabled} viewCart={viewCart} currentCart={analyticsCart} started={attemptStarted} purchase={result?.purchase} visitToken={data.visit_token} />
     <div className={`cp-page ${config.layout === 'focused' ? 'focused' : config.layout === 'stacked' ? 'stacked' : config.layout === 'guru' ? 'guru' : config.layout === 'banner' ? 'banner' : ''}`}>
       {focused && <div className="cp-hero"><p>{config.store_name}</p><h1>{config.headline || config.product_display_name || product.name}{config.headline_highlight && <span>{config.headline_highlight}</span>}</h1></div>}
       {config.layout === 'banner' && config.headline && <div className="cp-model-headline">{config.headline}{config.headline_highlight && <span>{config.headline_highlight}</span>}</div>}

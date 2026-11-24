@@ -36,7 +36,7 @@ function metaEfficiency({ purchases, spend, purchaseValue }) {
   }
 }
 
-export function summarizeTracking(orders, receipts, meta, fees) {
+export function summarizeTracking(orders, receipts, meta, fees, visits = null) {
   const groups = new Map()
   const totals = {
     approved: 0, accepted: 0, unknown: 0, withAdIds: 0, gross: 0, refunds: 0, fees: 0,
@@ -48,6 +48,14 @@ export function summarizeTracking(orders, receipts, meta, fees) {
     totals.spend += row.spend
     totals.purchases += row.purchases
     totals.purchaseValue = totals.purchaseValue != null && row.purchaseValue != null ? totals.purchaseValue + row.purchaseValue : null
+  }
+
+  const visitsByAd = new Map()
+  for (const visit of visits?.byAd || []) {
+    const { campaign, adset, ad, count } = visit
+    const key = keyFor(campaign, adset, ad)
+    visitsByAd.set(key, count)
+    if (!groups.has(key)) groups.set(key, { key, campaign, adset, ad, approved: 0, gross: 0, refunds: 0, fees: 0, spend: null, purchases: null })
   }
 
   const sales = orders.map(order => {
@@ -75,14 +83,40 @@ export function summarizeTracking(orders, receipts, meta, fees) {
   const rows = [...groups.values()].map(row => ({
     ...row,
     ...metaEfficiency(row),
+    visits: visits?.total != null && [row.campaign, row.adset, row.ad].every(isMetaId) ? visitsByAd.get(row.key) ?? 0 : null,
     cpa: row.spend != null && row.approved ? Math.round(row.spend / row.approved) : null,
     net: row.spend != null && row.fees != null ? row.gross - row.refunds - row.fees - row.spend : null,
   })).sort((a, b) => b.approved - a.approved || (b.spend ?? -1) - (a.spend ?? -1))
   return { totals: { ...totals, ...metaEfficiency(totals) }, rows, sales }
 }
 
+export function checkoutVisitWindow(result, from, until) {
+  const since = result?.since
+  if (!since) return { status: 'waiting', total: null, since: null, complete: false, byAd: [] }
+  const started = Date.parse(since)
+  const available = started < Date.parse(until)
+  return {
+    status: available ? 'recording' : 'historical',
+    total: available ? result.total : null,
+    since, complete: started <= Date.parse(from),
+    byAd: available ? result.by_ad : [],
+  }
+}
+
+async function readVisits(db, { from, until, productId }) {
+  try {
+    const { data, error } = await db.rpc('checkout_visit_report', { p_from: from, p_until: until, p_product_id: productId || null })
+    if (error || !data || !Number.isSafeInteger(data.total) || !Array.isArray(data.by_ad)) throw new Error('Contagem indisponível.')
+    return checkoutVisitWindow(data, from, until)
+  } catch {
+    return { status: 'unavailable', total: null, since: null, complete: false, byAd: [] }
+  }
+}
+
 export async function readTrackingReport(db, filters, metaOptions) {
   const { from, to, productId } = filters
+  const firstInstant = `${from}T00:00:00-03:00`
+  const until = `${addDays(to, 1)}T00:00:00-03:00`
   const linked = productId === challengeTracking.productId
   const productsRequest = allRows(() => db.from('products').select('id,name').order('name').order('id'))
   const metaRequest = linked ? readTrackingMeta({ from, to, ...metaOptions }).catch(() => null) : null
@@ -90,18 +124,20 @@ export async function readTrackingReport(db, filters, metaOptions) {
     let query = db.from('orders')
       .select('id,status,total_cents,pagarme_charge_id,payment_method,paid_at,utm_source,utm_medium,utm_campaign,utm_content,utm_term,offer:offers!inner(product_id,product:products(name))')
       .in('status', ['paid', ...reversedStatuses])
-      .gte('paid_at', `${from}T00:00:00-03:00`).lt('paid_at', `${addDays(to, 1)}T00:00:00-03:00`)
+      .gte('paid_at', firstInstant).lt('paid_at', until)
     if (productId) query = query.eq('offer.product_id', productId)
     return query.order('paid_at', { ascending: false }).order('id')
   }, 10000)
 
-  const [orders, products, meta, receipts, fees] = await Promise.all([
+  const [orders, products, meta, receipts, fees, { byAd, ...visits }] = await Promise.all([
     ordersRequest, productsRequest, metaRequest,
     ordersRequest.then(orders => readTrackingReceipts(db, orders)),
     ordersRequest.then(orders => readTrackingFees(orders)),
+    readVisits(db, { from: firstInstant, until, productId }),
   ])
   return {
-    ...summarizeTracking(orders, receipts, meta, fees),
+    ...summarizeTracking(orders, receipts, meta, fees, { ...visits, byAd }),
+    visits,
     from, to, products, productId, defaultProductId: challengeTracking.productId, updatedAt: new Date().toISOString(),
     meta: { status: linked ? (meta ? 'ready' : 'unavailable') : 'unlinked', updatedAt: meta?.updatedAt },
   }
