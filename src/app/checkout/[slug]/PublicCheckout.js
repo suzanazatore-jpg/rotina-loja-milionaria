@@ -7,6 +7,7 @@ import { flushSync } from 'react-dom'
 import CheckoutAnalytics, { CookieChoice } from './CheckoutAnalytics'
 import CheckoutCountdown from '../../admin/checkout/CheckoutCountdown'
 import CompactCheckoutHeader from './CompactCheckoutHeader'
+import { CompactBuyerNotices } from './CompactCheckoutTrust'
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import '../../admin/checkout/checkout-preview.css'
@@ -248,11 +249,34 @@ export default function PublicCheckout({ data, compact = false }) {
             </fieldset>
             <FormGroup {...(compact && { className: 'compact-review' })}>
             {(compact || focused || selectedBumps.length > 0) && <div className="pc-order-summary">{(compact || focused) && <h3>{compact ? 'Resumo do pedido' : 'Detalhes da compra'}</h3>}<div><span>{config.product_display_name || offer.name || product.name}</span><strong>{compact ? displayPrice(basePrice.total_cents) : money(singlePayment?.total_cents ?? offer.price_cents)}</strong></div>{bumps.filter(bump => selectedBumps.includes(bump.offer_id)).map(bump => <div key={bump.offer_id}><span>{bump.product_name}</span><strong>{compact ? displayPrice(bumpPrice(bump)?.total_cents) : money(bumpPrice(bump)?.total_cents)}</strong></div>)}</div>}
-            {(compact || (!focused && !guru) || selectedBumps.length > 0) && <div className="cp-total" aria-live={compact ? "polite" : undefined}><span>Total</span><strong>{summaryTotal}</strong></div>}{error && <p className="pc-error" role="alert">{error}</p>}{attemptStarted && <button type="button" className="pc-secondary" onClick={() => checkStatus().catch(e => setError(e.message))}>Consultar pedido</button>}{focused && !test.ready && <p className="pc-preparation-note" role="status">Checkout em preparação. Pagamentos ainda não disponíveis.</p>}<button className="cp-purchase-button" type="submit" disabled={busy || countdownExpired || !method || (compact && !methods.length) || !test.ready || (method === 'credit_card' && !test.publicKey)}>{countdownExpired ? 'Prazo encerrado' : busy ? 'Processando…' : attemptStarted ? 'Reenviar a mesma tentativa' : compact && method === 'pix' ? 'Gerar código Pix' : config.button_text}</button>{method === 'credit_card' && selected.interest_cents > 0 && <p className="pc-cta-interest">Taxa de juros: {Number(offer.monthly_interest_pct).toLocaleString('pt-BR')}% ao mês</p>}<p className="cp-legal pc-data-notice">Ao continuar, você concorda com os termos da compra e com o uso dos seus dados para processar o pedido e medir nossos anúncios (cookies e Meta). Os dados do cartão vão direto para o Pagar.me. <CookieChoice /></p>{method === 'credit_card' && !test.publicKey && <p className="pc-note">Pagamento por cartão em preparação.</p>}<div className="cp-processor"><svg width="14" height="16" viewBox="0 0 20 22" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="9" width="14" height="11" rx="2"/><path d="M6 9V6a4 4 0 0 1 8 0v3"/></svg><span>Pagamento processado por</span><strong>Pagar.me</strong></div>
+            {(compact || (!focused && !guru) || selectedBumps.length > 0) && <div className="cp-total" aria-live={compact ? "polite" : undefined}><span>Total</span><strong>{summaryTotal}</strong></div>}{error && <p className="pc-error" role="alert">{error}</p>}{attemptStarted && <button type="button" className="pc-secondary" onClick={() => checkStatus().catch(e => setError(e.message))}>Consultar pedido</button>}{focused && !test.ready && <p className="pc-preparation-note" role="status">Checkout em preparação. Pagamentos ainda não disponíveis.</p>}<button className="cp-purchase-button" type="submit" disabled={busy || countdownExpired || !method || (compact && !methods.length) || !test.ready || (method === 'credit_card' && !test.publicKey)}>{countdownExpired ? 'Prazo encerrado' : busy ? 'Processando…' : attemptStarted ? 'Reenviar a mesma tentativa' : compact && method === 'pix' ? 'Gerar código Pix' : config.button_text}</button>{method === 'credit_card' && selected.interest_cents > 0 && <p className="pc-cta-interest">Taxa de juros: {Number(offer.monthly_interest_pct).toLocaleString('pt-BR')}% ao mês</p>}<p className="cp-legal pc-data-notice">Ao continuar, você concorda com os termos da compra e com o uso dos seus dados para processar o pedido e medir nossos anúncios (cookies e Meta). Os dados do cartão vão direto para o Pagar.me. <CookieChoice /></p>{method === 'credit_card' && !test.publicKey && <p className="pc-note">Pagamento por cartão em preparação.</p>}{!compact && <div className="cp-processor"><svg width="14" height="16" viewBox="0 0 20 22" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="3" y="9" width="14" height="11" rx="2"/><path d="M6 9V6a4 4 0 0 1 8 0v3"/></svg><span>Pagamento processado por</span><strong>Pagar.me</strong></div>}
             </FormGroup>
           </form>}{result && error && <p role="alert" className="pc-error">{error}</p>}
         </section>
-      </div><footer className="cp-footer"><p className="pc-payment-footer">Pagamento processado pelo <strong>Pagar.me</strong>.</p><div className={compact ? "compact-support" : "guru-support"}>{(!compact || config.support_phone || config.support_email) && <h3>Atendimento</h3>}{config.support_phone&&<a href={`https://wa.me/${config.support_phone.replace(/\D/g,'')}`} target="_blank" rel="noopener noreferrer">☏ {config.support_phone}</a>}{config.support_email&&<a href={`mailto:${config.support_email}`}>✉ {config.support_email}</a>}</div><strong>{config.store_name}</strong><p className="pc-company-note">{config.company_name}</p>{config.company_document && <p className="pc-company-note">CNPJ: {config.company_document}</p>}{config.company_address && <p className="pc-company-note">{config.company_address}</p>}<div>{config.terms_url && <a href={config.terms_url} target="_blank" rel="noopener noreferrer">Termos de uso</a>}{config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}</div></footer>
+      </div>
+      {compact && <CompactBuyerNotices />}
+      <footer className="cp-footer">
+        {!compact && <p className="pc-payment-footer">Pagamento processado pelo <strong>Pagar.me</strong>.</p>}
+        {compact && <div className="compact-company">
+          <strong>Suzana Zatorre Educacional</strong>
+          <span>CNPJ 51.557.598/0001-55</span>
+        </div>}
+        <div className={compact ? 'compact-support' : 'guru-support'}>
+          {(!compact || config.support_phone || config.support_email) && <h3>Atendimento</h3>}
+          {config.support_phone && <a href={`https://wa.me/${config.support_phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">☏ {config.support_phone}</a>}
+          {config.support_email && <a href={`mailto:${config.support_email}`}>✉ {config.support_email}</a>}
+        </div>
+        {!compact && <>
+          <strong>{config.store_name}</strong>
+          <p className="pc-company-note">{config.company_name}</p>
+          {config.company_document && <p className="pc-company-note">CNPJ: {config.company_document}</p>}
+        </>}
+        {config.company_address && <p className="pc-company-note">{config.company_address}</p>}
+        <div>
+          {config.terms_url && <a href={config.terms_url} target="_blank" rel="noopener noreferrer">Termos de uso</a>}
+          {config.privacy_url && <a href={config.privacy_url} target="_blank" rel="noopener noreferrer">Política de privacidade</a>}
+        </div>
+      </footer>
     </div>
   </main>
 }
