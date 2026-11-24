@@ -110,7 +110,7 @@ export default function OfferEditor({produtoId,ofertaId}) {
       </section>
       <section hidden={tab!=='vendas'} className="central-chart-panel"><h2>Vendas desta oferta</h2>{ofertaId==='nova'?<p>Salve a oferta antes de consultar suas vendas.</p>:<Link className="central-action" href={`/admin/checkout/vendas?oferta=${encodeURIComponent(ofertaId)}`}>Consultar pedidos da oferta →</Link>}</section>
       <div hidden={tab!=='contrato'}><ContractOfferSettings value={dados.checkout_config} onChange={checkout_config=>setDados({...dados,checkout_config})} offer={dados} product={product} /></div>
-      <div hidden={tab!=='checkout'}><CheckoutSettingsEditor value={dados.checkout_config} onChange={checkout_config=>setDados({...dados,checkout_config})} offer={dados} product={product} globalConfig={catalog.global_config} paymentUrl={canShare && !dirty && dados.active ? savedLink : ''} /></div>
+      <div hidden={tab!=='checkout'}><CheckoutSettingsEditor value={dados.checkout_config} onChange={checkout_config=>setDados({...dados,checkout_config})} offer={dados} product={product} globalConfig={catalog.global_config} catalog={catalog} paymentUrl={canShare && !dirty && dados.active ? savedLink : ''} /></div>
       <div className="central-editor-actions"><span>{dirty?'Alterações ainda não salvas':'Nenhuma alteração pendente'}</span><button type="button" className="central-action" disabled={saving || !dirty} onClick={()=>setDados(JSON.parse(baseline))}>Descartar alterações</button><button className="central-primary" disabled={saving || (!dirty && ofertaId!=='nova')}>{saving?'Salvando…':'Salvar oferta'}</button></div>
     </form>
   </main>
