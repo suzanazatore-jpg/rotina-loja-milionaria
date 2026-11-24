@@ -1,5 +1,5 @@
 import { allRows, readConversionReceipt, saleFilters } from './centralRecords.js'
-import { challengeTracking, isMetaId, readTrackingMeta } from './centralTrackingMeta.js'
+import { challengeTracking, isMetaId, readTrackingMedia, readTrackingMeta } from './centralTrackingMeta.js'
 import { readTrackingFees } from './centralTrackingFees.js'
 
 const dayFormat = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', dateStyle: 'short' })
@@ -135,8 +135,11 @@ export async function readTrackingReport(db, filters, metaOptions) {
     ordersRequest.then(orders => readTrackingFees(orders)),
     readVisits(db, { from: firstInstant, until, productId }),
   ])
+  const report = summarizeTracking(orders, receipts, meta, fees, { ...visits, byAd })
+  const rows = linked ? await readTrackingMedia(report.rows, metaOptions) : report.rows
   return {
-    ...summarizeTracking(orders, receipts, meta, fees, { ...visits, byAd }),
+    ...report,
+    rows,
     visits,
     from, to, products, productId, defaultProductId: challengeTracking.productId, updatedAt: new Date().toISOString(),
     meta: { status: linked ? (meta ? 'ready' : 'unavailable') : 'unlinked', updatedAt: meta?.updatedAt },

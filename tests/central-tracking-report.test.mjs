@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { challengeTracking, readTrackingMeta } from '../src/lib/centralTrackingMeta.js'
+import { challengeTracking, readTrackingMedia, readTrackingMeta } from '../src/lib/centralTrackingMeta.js'
 import { readConversionReceipt } from '../src/lib/centralRecords.js'
 import { readTrackingFees } from '../src/lib/centralTrackingFees.js'
 import { summarizeTracking, trackingFilters } from '../src/lib/centralTrackingReport.js'
@@ -109,6 +109,35 @@ test('uses the sum of confirmed credit fees and leaves unrelated payables unknow
     return Response.json({ data: [{ ...payable, id: 1, fee: 20 }], paging: { total: 2, forward_cursor: 'next' } })
   }, { PAGARME_BASE_URL: 'https://api.pagar.me/core/v5', PAGARME_SECRET_KEY: 'sk_mock', CHECKOUT_LIVE_ENABLED: 'true' })
   assert.deepEqual([...fees.entries()], [['ch_A', 50]])
+})
+
+test('matches creative thumbnails by ad ID and keeps unavailable media separate from report data', async () => {
+  const { campaignId, accountId } = challengeTracking
+  const adset = '12345'
+  const ad1 = { campaign: campaignId, adset, ad: '23456', adName: 'Mesmo nome', spend: 100 }
+  const ad2 = { ...ad1, ad: '34567' }
+  const other = { ...ad1, campaign: '45678' }
+  const wrongSet = { ...ad1, adset: '56789' }
+  const invalid = { ...ad1, ad: '67890' }
+  const rows = [ad1, ad2, other, wrongSet, invalid, { origin: 'Origem não identificada' }]
+  const thumbnail1 = 'https://scontent.example.fbcdn.net/first.jpg'
+  const thumbnail2 = 'https://www.facebook.com/ads/image/?d=second'
+  const credentials = { account_id: accountId, campaign_id: campaignId, adset_id: adset }
+  const result = await readTrackingMedia(rows, {
+    token: 'server-token-for-test',
+    fetcher: async (url, options) => {
+      assert.equal(url.hostname, 'graph.facebook.com')
+      assert.equal(url.searchParams.get('ids'), '23456,34567,67890')
+      assert.equal(options.headers.Authorization, 'Bearer server-token-for-test')
+      return Response.json({
+        [ad1.ad]: { ...credentials, id: ad1.ad, creative: { thumbnail_url: thumbnail1, image_url: 'https://fbcdn.net.other.example/file' } },
+        [ad2.ad]: { ...credentials, id: ad2.ad, creative: { thumbnail_url: thumbnail2, image_url: 'https://fbcdn.net/full.jpg?access_token=private' } },
+        [invalid.ad]: { ...credentials, id: invalid.ad, account_id: '00000', creative: { image_url: thumbnail1 } },
+      })
+    },
+  })
+  assert.deepEqual(result, [{ ...ad1, imageUrls: [thumbnail1] }, { ...ad2, imageUrls: [thumbnail2] }, other, wrongSet, invalid, rows[5]])
+  assert.deepEqual(await readTrackingMedia(rows, { token: 'test', fetcher: async () => new Response(null, { status: 502 }) }), rows)
 })
 
 test('handles Pix payables without an echoed charge ID when the charge amount reconciles', async () => {

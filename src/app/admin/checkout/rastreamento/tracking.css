@@ -15,6 +15,28 @@
   gap: 8px;
 }
 
+.cv-tracking-creative {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cv-tracking-thumbnail {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--cv-border);
+  border-radius: 6px;
+  background: var(--cv-field);
+  object-fit: cover;
+}
+
+.cv-tracking-thumbnail-empty {
+  display: grid;
+  place-items: center;
+  color: var(--cv-muted);
+}
+
 @media (min-width: 1201px) {
   .cv-tracking .central-metrics {
     grid-template-columns: repeat(6, minmax(0, 1fr));

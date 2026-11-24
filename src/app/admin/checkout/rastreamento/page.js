@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import AppIcon from '@/app/admin/central-vendas/CentralIcon'
 import { supabase } from '@/lib/supabase'
+import TrafficCreativeImage from '../../trafego/TrafficCreativeImage'
 import DateRangePicker from '../DateRangePicker'
 import { date, FilterDialog, FilterSection, money, Status, statusLabels } from '../CentralUI'
 import { conversionLabel } from './trackingLabels'
@@ -43,7 +44,11 @@ function MediaTable({ rows, selected, select }) {
     <tbody>{rows.map(row => <tr key={row.key}>
       <td><MediaLabel name={row.campaignName} id={row.campaign || row.origin || (!row.ad && !row.adset ? 'Origem não identificada' : '')}/></td>
       <td><MediaLabel name={row.adsetName} id={row.adset}/></td>
-      <td><MediaLabel name={row.adName} id={row.ad}/></td>
+      <td><div className="cv-tracking-creative">
+        {row.ad && <TrafficCreativeImage ad={{ id: row.ad, name: row.adName || row.ad, image_urls: row.imageUrls }}
+          className="cv-tracking-thumbnail" fallback={<span className="cv-tracking-thumbnail cv-tracking-thumbnail-empty" title="Miniatura indisponível">—</span>}/>}
+        <div><MediaLabel name={row.adName} id={row.ad}/></div>
+      </div></td>
       <td>{count(row.visits)}</td>
       <td>{currency(row.spend)}</td>
       <td>{count(row.purchases)}</td><td>{currency(row.metaCpa)}</td><td>{roas(row.metaRoas)}</td>
