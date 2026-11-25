@@ -1,12 +1,13 @@
+import { randomBytes } from 'node:crypto'
 import { autorizarAdmin, checkoutAdminClient } from '@/lib/checkoutAdminServer'
 import { allRows } from '@/lib/centralRecords'
-import { checkoutFunnelFilters, readTrackableLink, trackableCheckoutUrl } from '@/lib/checkoutFunnel'
+import { checkoutFunnelFilters, readTrackableLink, trackableCheckoutUrl, trackableShortCode, trackableShortUrl } from '@/lib/checkoutFunnel'
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } })
 const activeOffers = db => db.from('offers').select('id,name,product:products!inner(id,name,marketplace_id)')
   .eq('active', true).eq('product.active', true)
 const usesPagarme = offer => (offer.product.marketplace_id || 'pagarme') === 'pagarme'
-const withUrl = link => ({ ...link, url: trackableCheckoutUrl(link) })
+const withUrls = link => ({ ...link, url: trackableCheckoutUrl(link), shortUrl: trackableShortUrl(link) })
 
 export async function GET(request) {
   try {
@@ -18,7 +19,7 @@ export async function GET(request) {
         allRows(() => activeOffers(db).order('name').order('id')),
         allRows(() => db.from('checkout_trackable_links').select('*').order('created_at', { ascending: false }).order('id')),
       ])
-      return json({ offers: offers.filter(usesPagarme), links: links.map(withUrl) })
+      return json({ offers: offers.filter(usesPagarme), links: links.map(withUrls) })
     }
     let filters
     try {
@@ -50,9 +51,16 @@ export async function POST(request) {
     const { data: offer, error: offerError } = await activeOffers(db).eq('id', link.offer_id).maybeSingle()
     if (offerError) throw offerError
     if (!offer || !usesPagarme(offer)) return json({ error: 'Selecione uma oferta com checkout ativo.' }, 400)
-    const { data, error } = await db.from('checkout_trackable_links').insert(link).select().single()
-    if (error) throw error
-    return json({ link: withUrl(data) }, 201)
+    const code = trackableShortCode(link.name)
+    const insert = shortCode => db.from('checkout_trackable_links')
+      .insert({ ...link, short_code: shortCode }).select().single()
+
+    let saved = await insert(code)
+    if (saved.error?.code === '23505') {
+      saved = await insert(code + '-' + randomBytes(4).toString('hex'))
+    }
+    if (saved.error) throw saved.error
+    return json({ link: withUrls(saved.data) }, 201)
   } catch {
     return json({ error: 'Não foi possível gerar o link.' }, 500)
   }
