@@ -1,6 +1,7 @@
 'use client'
 import Image from 'next/image'
 import { checkoutAttribution } from '@/lib/checkoutAttribution'
+import { funnelPaymentHeaders, recordFunnelEvent } from '@/lib/checkoutFunnelClient'
 import CheckoutAssurances from '../../admin/checkout/CheckoutAssurances'
 import {Inter} from 'next/font/google'
 import { flushSync } from 'react-dom'
@@ -32,7 +33,7 @@ function PaymentSymbol({ method }) {
 }
 function Asset({ src, alt, className = '' }) { return <Image unoptimized src={src} alt={alt} width={800} height={400} className={className} /> }
 
-export default function PublicCheckout({ data, compact = false }) {
+export default function PublicCheckout({ data, compact = false, funnelToken }) {
   useEffect(() => { checkoutAttribution(window) }, [])
   const { offer, product, config, prices, test, bumps = [] } = data
   const focused = !compact && config.layout === 'focused'
@@ -56,6 +57,7 @@ export default function PublicCheckout({ data, compact = false }) {
   const [result, setResult] = useState(null)
   const [copied, setCopied] = useState(false)
   const [attemptStarted, setAttemptStarted] = useState(false)
+  const funnelStart = useRef(null)
   const pendingRequest = useRef(null)
   const form = useRef(null)
   const submitting = useRef(false)
@@ -113,9 +115,16 @@ export default function PublicCheckout({ data, compact = false }) {
     return () => { active = false; clearInterval(interval) }
   }, [endpoint, result?.status])
 
+  function recordFunnelStart() {
+    if (!funnelToken || funnelStart.current === funnelToken) return
+    funnelStart.current = funnelToken
+    recordFunnelEvent(funnelToken, true)
+  }
+
   async function submit(event) {
     event.preventDefault()
     if (submitting.current) return
+    recordFunnelStart()
     const values = pendingRequest.current ? null : new FormData(form.current)
     submitting.current = true; setBusy(true); setError('')
     try {
@@ -144,7 +153,9 @@ export default function PublicCheckout({ data, compact = false }) {
         pendingRequest.current = payload
         setAttemptStarted(true)
       }
-      const response = await fetch(endpoint, { method: 'POST', headers, body: JSON.stringify(pendingRequest.current) })
+      const response = await fetch(endpoint, {
+        method: 'POST', headers: { ...headers, ...funnelPaymentHeaders(funnelToken) }, body: JSON.stringify(pendingRequest.current),
+      })
       const json = await response.json()
       if (!response.ok) throw new Error(json.error || 'Não foi possível concluir. Consulte o pagamento antes de tentar novamente.')
       setResult(json)
@@ -211,7 +222,7 @@ export default function PublicCheckout({ data, compact = false }) {
   const color = { '--cp-bg': config.background, '--cp-panel': config.panel, '--cp-text': config.text, '--cp-accent': config.accent, '--cp-button-text': config.button_text_color, fontFamily: config.layout==='guru'?'var(--checkout-inter), Inter, Arial, sans-serif':config.font }
   return <main className={`pc-checkout ${inter.variable} ${compact ? 'compact-checkout' : ''}`} style={compact ? undefined : color}>
     <CheckoutCountdown config={config} onExpire={setCountdownExpired} />
-    <CheckoutAnalytics config={config} enabled={data.analytics_enabled} viewCart={viewCart} currentCart={analyticsCart} started={attemptStarted} purchase={result?.purchase} visitToken={data.visit_token} />
+    <CheckoutAnalytics config={config} enabled={data.analytics_enabled} viewCart={viewCart} currentCart={analyticsCart} started={attemptStarted} purchase={result?.purchase} visitToken={data.visit_token} funnelToken={funnelToken} />
     <div className={`cp-page ${compact ? 'compact' : config.layout === 'focused' ? 'focused' : config.layout === 'stacked' ? 'stacked' : config.layout === 'guru' ? 'guru' : config.layout === 'banner' ? 'banner' : ''}`}>
       {compact ? <CompactCheckoutHeader config={config} offer={offer} product={product} prices={prices} money={money} /> : <>
       {focused && <div className="cp-hero"><p>{config.store_name}</p><h1>{config.headline || config.product_display_name || product.name}{config.headline_highlight && <span>{config.headline_highlight}</span>}</h1></div>}
@@ -225,7 +236,9 @@ export default function PublicCheckout({ data, compact = false }) {
         {focused && <div className="pc-country-note">BR · Pagamento em reais (R$)</div>}
         {!compact && <aside className="cp-summary">{config.layout === 'guru' && <><div className="guru-seller">{config.logo_url ? <Asset src={config.logo_url} alt="" className="guru-seller-logo" /> : <span className="guru-seller-monogram">SZ</span>}<strong>{config.company_name || config.store_name}</strong></div><div className="guru-security"><svg width="16" height="18" viewBox="0 0 24 26" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M12 2 3 6v7c0 5 9 11 9 11s9-6 9-11V6l-9-4Z"/><path d="m7 12 3 3 7-7"/></svg> Compra segura</div></>}<span className="cp-kicker">SUA ESCOLHA</span>{config.product_image_url ? <Asset src={config.product_image_url} alt={product.name} className="cp-product-image" /> : <div className="cp-product-placeholder"><span>SZ</span><strong>{config.product_display_name || product.name}</strong></div>}<SummaryHeading>{config.product_display_name || offer.name || product.name}</SummaryHeading>{config.layout==='guru'&&<button type="button" className="guru-summary-toggle" aria-expanded={summaryOpen} onClick={()=>setSummaryOpen(!summaryOpen)}><span>Detalhe da compra ⌄</span><strong>{summaryTotal}</strong></button>}{config.layout === 'guru' && config.headline && <p className="guru-offer-headline">{config.headline} {config.headline_highlight}</p>}{focused && <p className="pc-producer">Por {config.store_name}</p>}{config.subtitle && (config.layout !== 'guru' || config.subtitle !== config.product_display_name) && <p className="cp-description">{config.subtitle}</p>}<div className={`cp-price ${summaryOpen?'guru-summary-open':''}`}>{config.layout === 'guru' && <div className="guru-price-rows"><div><span>Produto</span><strong>{money(offer.price_cents)}</strong></div><div><span>TOTAL</span><strong>{summaryTotal}</strong></div></div>}<span>{product.type === 'subscription' ? 'Valor por cobrança' : 'Total da sua compra'}</span><strong>{summaryTotal}</strong>{product.type === 'subscription' && <small>A cada {offer.billing_interval_count} {({day:'dia(s)',week:'semana(s)',month:'mês(es)',year:'ano(s)'})[offer.billing_interval]}</small>}{product.type === 'subscription' && offer.billing_cycles > 0 && <small>Até {offer.billing_cycles} cobrança(s).</small>}{offer.trial_days > 0 && <small>Teste de {offer.trial_days} dias. O acesso será liberado após o pagamento.</small>}</div><CheckoutAssurances config={config}/></aside>}
         <section className={compact && !result ? "compact-form" : "cp-form-card"}>
-          {result ? <div className="pc-result" aria-live="polite"><span className="pc-result-icon" style={result.status === 'paid' ? { color: '#16A34A', borderColor: '#16A34A' } : undefined}>{result.status === 'paid' ? '✓' : '◇'}</span><h2>{labels[result.status] || 'Aguardando confirmação'}</h2><p>{result.status === 'paid' ? result.contract_required ? result.contract?.status === 'canceled' ? 'O contrato foi cancelado. Entre em contato com o suporte.' : result.contract?.access_status === 'completed' ? 'Contrato assinado e acesso liberado.' : result.contract?.status === 'signed' ? 'Assinatura registrada. Acompanhe a liberação pela página do contrato.' : 'Para concluir a entrega, assine o contrato. O link estará disponível aqui assim que o documento for preparado.' : compact && test.mode === 'live' ? 'Sua compra foi aprovada. Confira as instruções de acesso enviadas para você.' : 'Pagamento de teste confirmado. A liberação depende da configuração de teste do app.' : waiting(result.status) ? 'A confirmação será atualizada aqui automaticamente.' : 'Consulte o suporte se precisar de ajuda.'}</p><strong>{money(result.total_cents)}</strong>{result.pix_code && waiting(result.status) && <div className="pc-pix"><label>Código Pix copia e cola<textarea readOnly rows={4} value={result.pix_code} /></label><button type="button" className="pc-secondary" onClick={async () => { try { await navigator.clipboard.writeText(result.pix_code); setCopied(true) } catch { setError('Selecione e copie o código acima.') } }}>{copied ? 'Copiado!' : 'Copiar código Pix'}</button>{result.pix_expires_at && <small>Válido até {new Date(result.pix_expires_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</small>}</div>}{waiting(result.status) && <button type="button" className="pc-secondary" onClick={() => checkStatus().catch(e => setError(e.message))}>Conferir pagamento</button>}{result.contract?.signing_url && <a className="cp-purchase-button" href={result.contract.signing_url}>{result.contract.status === 'signed' ? 'Acompanhar acesso e contrato →' : 'Assinar meu contrato →'}</a>}{result.status === 'paid' && result.contract_required && !result.contract && <button type="button" className="pc-secondary" onClick={() => checkStatus().catch(e => setError(e.message))}>Conferir contrato</button>}{result.redirect_url && <a className="cp-purchase-button" href={result.redirect_url}>Continuar →</a>}</div> : <form ref={form} onSubmit={submit} onInvalidCapture={event => { if (event.target.closest('.pc-address')) flushSync(() => setAddressOpen(true)) }}>
+          {result ? <div className="pc-result" aria-live="polite"><span className="pc-result-icon" style={result.status === 'paid' ? { color: '#16A34A', borderColor: '#16A34A' } : undefined}>{result.status === 'paid' ? '✓' : '◇'}</span><h2>{labels[result.status] || 'Aguardando confirmação'}</h2><p>{result.status === 'paid' ? result.contract_required ? result.contract?.status === 'canceled' ? 'O contrato foi cancelado. Entre em contato com o suporte.' : result.contract?.access_status === 'completed' ? 'Contrato assinado e acesso liberado.' : result.contract?.status === 'signed' ? 'Assinatura registrada. Acompanhe a liberação pela página do contrato.' : 'Para concluir a entrega, assine o contrato. O link estará disponível aqui assim que o documento for preparado.' : compact && test.mode === 'live' ? 'Sua compra foi aprovada. Confira as instruções de acesso enviadas para você.' : 'Pagamento de teste confirmado. A liberação depende da configuração de teste do app.' : waiting(result.status) ? 'A confirmação será atualizada aqui automaticamente.' : 'Consulte o suporte se precisar de ajuda.'}</p><strong>{money(result.total_cents)}</strong>{result.pix_code && waiting(result.status) && <div className="pc-pix"><label>Código Pix copia e cola<textarea readOnly rows={4} value={result.pix_code} /></label><button type="button" className="pc-secondary" onClick={async () => { try { await navigator.clipboard.writeText(result.pix_code); setCopied(true) } catch { setError('Selecione e copie o código acima.') } }}>{copied ? 'Copiado!' : 'Copiar código Pix'}</button>{result.pix_expires_at && <small>Válido até {new Date(result.pix_expires_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</small>}</div>}{waiting(result.status) && <button type="button" className="pc-secondary" onClick={() => checkStatus().catch(e => setError(e.message))}>Conferir pagamento</button>}{result.contract?.signing_url && <a className="cp-purchase-button" href={result.contract.signing_url}>{result.contract.status === 'signed' ? 'Acompanhar acesso e contrato →' : 'Assinar meu contrato →'}</a>}{result.status === 'paid' && result.contract_required && !result.contract && <button type="button" className="pc-secondary" onClick={() => checkStatus().catch(e => setError(e.message))}>Conferir contrato</button>}{result.redirect_url && <a className="cp-purchase-button" href={result.redirect_url}>Continuar →</a>}</div> : <form ref={form} onSubmit={submit} onInput={event => {
+          if (['name', 'email', 'phone'].includes(event.target.name)) recordFunnelStart()
+        }} onInvalidCapture={event => { if (event.target.closest('.pc-address')) flushSync(() => setAddressOpen(true)) }}>
             {!compact && <div className="cp-step"><span>1</span><div><h2>{guru ? 'Os seus dados' : 'Dados pessoais'}</h2><p>Informe os dados para receber o acesso.</p></div></div>}
             <fieldset disabled={frozen}>
               <FormGroup {...(compact && { className: 'compact-data' })}>

@@ -1,0 +1,41 @@
+.cv-trackable-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 195px), 1fr));
+  gap: 12px;
+}
+
+.cv-trackable-fields label,
+.cv-trackable-result label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--cv-muted);
+  font-size: 13px;
+}
+
+.cv-trackable-fields input,
+.cv-trackable-fields select,
+.cv-trackable-result input {
+  width: 100%;
+  color: var(--cv-text);
+  background: var(--cv-field);
+  border: 1px solid var(--cv-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+
+.cv-trackable-links form .cv-actions,
+.cv-trackable-result {
+  margin-top: 14px;
+}
+
+.cv-trackable-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.cv-trackable-links .cv-table td:nth-child(n+2) {
+  overflow-wrap: anywhere;
+}

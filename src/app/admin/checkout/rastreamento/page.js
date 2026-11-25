@@ -151,7 +151,7 @@ export default function TrackingPage() {
 
   return <main className="central-home cv-tracking">
     <header className="cv-heading"><h1>Rastreamento <small>Vendas</small></h1>
-      <div className="cv-actions"><button className="central-action" disabled={loading} onClick={() => setRefresh(value => value + 1)}><AppIcon name="refresh" size={15}/>Atualizar</button></div>
+      <div className="cv-actions"><Link className="central-primary" href="/admin/checkout/rastreamento/links"><AppIcon name="link" size={15}/>Gerador de Links Rastreáveis</Link><button className="central-action" disabled={loading} onClick={() => setRefresh(value => value + 1)}><AppIcon name="refresh" size={15}/>Atualizar</button></div>
     </header>
     <div className="cv-toolbar">
       <div className="cv-chips"><span className="cv-chip"><AppIcon name="calendar" size={13}/>{period}</span>

@@ -2,6 +2,7 @@
 import Script from 'next/script'
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { trackingDestination, dispatchAnalytics } from '@/lib/checkoutAnalytics'
+import { recordFunnelEvent } from '@/lib/checkoutFunnelClient'
 const CONSENT_KEY='sz-checkout-consent-v2'
 function subscribe(callback) {
   window.addEventListener('storage',callback);window.addEventListener('sz-checkout-consent',callback)
@@ -44,11 +45,23 @@ function setup(config) {
   return true
   }catch{return false}
 }
-export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,started,purchase,visitToken}) {
+export default function CheckoutAnalytics({config,enabled,viewCart,currentCart,started,purchase,visitToken,funnelToken}) {
   const consent=useSyncExternalStore(subscribe,snapshot,()=> 'unknown')
   const destination=trackingDestination(config)
   const allowed=enabled && consent==='granted' && destination.channel!=='off'
   const sentVisit = useRef(null)
+  const sentFunnel = useRef(null)
+  useEffect(() => {
+    if (!funnelToken || consent === 'unknown') return
+    function recordFunnelVisit() {
+      if (document.visibilityState !== 'visible' || sentFunnel.current === funnelToken) return
+      sentFunnel.current = funnelToken
+      recordFunnelEvent(funnelToken, false)
+    }
+    recordFunnelVisit()
+    document.addEventListener('visibilitychange', recordFunnelVisit)
+    return () => document.removeEventListener('visibilitychange', recordFunnelVisit)
+  }, [funnelToken, consent])
   useEffect(() => {
     if (!visitToken || consent === 'unknown') return
     function recordVisibleVisit() {
