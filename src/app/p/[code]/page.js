@@ -1,3 +1,5 @@
+import { headers } from 'next/headers'
+import { funnelPageToken } from '@/lib/checkoutFunnelServer'
 import {notFound} from 'next/navigation'
 import {checkoutAdminClient} from '@/lib/checkoutAdminServer'
 import {offerId} from '@/lib/checkoutLinks'
@@ -33,5 +35,8 @@ export default async function Page({params,searchParams}){
   if(!result.data)notFound()
   const loaded=await loadCheckoutOffer(result.data.slug,db)
   if(!loaded)notFound()
-  return <PublicCheckout data={publicCheckoutData(loaded)} compact={usesCompactCheckout(loaded.config, query?.modelo)}/>
+  const data = publicCheckoutData(loaded)
+  const compact = usesCompactCheckout(loaded.config, query?.modelo)
+  const funnelToken = funnelPageToken(data, compact, query, (await headers()).get('referer'))
+  return <PublicCheckout data={data} compact={compact} funnelToken={funnelToken} />
 }

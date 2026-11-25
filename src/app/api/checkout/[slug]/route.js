@@ -7,6 +7,7 @@ import { loadCheckoutOffer, checkoutTestConfiguration } from '@/lib/checkoutPubl
 import { signCheckoutSession, readCheckoutSession, safeCheckoutRedirect } from '@/lib/checkoutSession'
 import { fulfillPaidOrder } from '@/lib/checkoutFulfillmentServer'
 import { createPayment } from '@/lib/checkoutPaymentsServer'
+import { checkoutFunnelEvent, recordCheckoutFunnel } from '@/lib/checkoutFunnelServer'
 import { deliverPaidConversion, purchasePageContext, purchaseTracking, purchaseRequestContext } from '@/lib/checkoutConversionsServer'
 import { purchaseAnalytics } from '@/lib/checkoutAnalytics'
 import { PaymentError } from '@/lib/pagarme'
@@ -87,6 +88,23 @@ export async function POST(request, context) {
       preference,
       identifiers: purchaseRequestContext(request, input.meta_attribution),
     })
+    const funnelToken = request.headers.get('x-checkout-funnel')
+    if (funnelToken) {
+      const attemptedAt = new Date().toISOString()
+      after(async () => {
+        try {
+          const visit = checkoutFunnelEvent({
+            token: funnelToken,
+            consent: request.headers.get('x-checkout-funnel-consent') === '1',
+            visitor: request.headers.get('x-checkout-visitor'),
+            started: true,
+          })
+          if (visit?.p_offer === loaded.offer.id) await recordCheckoutFunnel(db, visit, session.key, attemptedAt)
+        } catch {
+          console.error('checkout_funnel_attribution_failed')
+        }
+      })
+    }
     const payment = await createPayment(
       db,
       { offer_id: loaded.offer.id, customer: input.customer, payment_method: input.payment_method, installments: input.installments, card_token: input.card_token, bumps: input.bumps },
