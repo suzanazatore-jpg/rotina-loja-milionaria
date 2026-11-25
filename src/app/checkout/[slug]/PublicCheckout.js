@@ -21,6 +21,11 @@ const inter=Inter({subsets:['latin'],display:'swap',variable:'--checkout-inter'}
 const money = value => (Number(value || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const waiting = status => ['pending','waiting_payment'].includes(status)
 const labels = { paid: 'Pagamento confirmado!', failed: 'Pagamento não aprovado', canceled: 'Pagamento cancelado', refunded: 'Pagamento reembolsado', chargedback: 'Pagamento contestado', pending: 'Aguardando confirmação', waiting_payment: 'Aguardando pagamento' }
+function formatCardExpiry(event) {
+  const input = event.currentTarget
+  const digits = input.value.replace(/\D/g, '').slice(0, 6)
+  input.value = digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits
+}
 function Field({ name, label, wide = false, prefix, ...props }) { return <label className={`cp-field ${wide ? 'wide' : ''}`}><span>{label}</span><div className={prefix ? "pc-phone-control" : "pc-input-control"}>{prefix && <span className="pc-country-prefix" aria-hidden="true">BR +55</span>}<input name={name} placeholder={({email:"Digite seu email para receber a compra",email_confirmation:"Digite novamente seu email",name:"Digite seu nome completo",document:"Digite seu CPF ou CNPJ",phone:"(11) 99999-9999",card_number:"0000 0000 0000 0000",holder_name:"Nome impresso no cartão",cvv:"3 ou 4 dígitos"})[name]} required {...props} /></div></label> }
 function PaymentSymbol({ method }) {
   return method === 'pix' ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m12 2 5 5-5 5-5-5 5-5Zm0 10 5 5-5 5-5-5 5-5ZM2 12l5-5m10 0 5 5-5 5M7 17l-5-5" /></svg> : <svg width="19" height="15" viewBox="0 0 24 18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><rect x="1" y="1" width="22" height="16" rx="2"/><path d="M1 6h22M5 12h5"/></svg>
@@ -172,7 +177,8 @@ export default function PublicCheckout({ data, compact = false }) {
         autoComplete="cc-name" wide maxLength={64} />
       <Field name="expiry" label={compactCard ? 'Validade (MM/AA)' : 'Validade *'}
         autoComplete="cc-exp" placeholder={compactCard ? 'Validade (MM/AA)' : 'MM/AA'}
-        inputMode="numeric" pattern="[0-9]{2}/([0-9]{2}|[0-9]{4})" maxLength={7} />
+        inputMode="numeric" pattern="[0-9]{2}/([0-9]{2}|[0-9]{4})" maxLength={7}
+        onInput={formatCardExpiry} onBlur={formatCardExpiry} />
       <Field name="cvv" label={compactCard ? 'CVV' : 'CVV *'} {...(compactCard && { placeholder: 'CVV' })}
         autoComplete="cc-csc" inputMode="numeric" type="password" pattern="[0-9]{3,4}" maxLength={4} />
       {!compactCard && installmentField}
