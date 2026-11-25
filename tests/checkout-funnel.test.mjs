@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { checkoutFunnelFilters, readTrackableLink, trackableCheckoutUrl } from '../src/lib/checkoutFunnel.js'
+import {
+  checkoutFunnelFilters, readTrackableLink, trackableCheckoutUrl, trackableShortCode,
+  trackableShortLookup, trackableShortUrl,
+} from '../src/lib/checkoutFunnel.js'
 import { offerId } from '../src/lib/checkoutLinks.js'
 import { checkoutFunnelEvent, signCheckoutFunnel } from '../src/lib/checkoutFunnelServer.js'
 
@@ -75,4 +78,40 @@ test('uses the São Paulo visit dates and validates the report filters', () => {
   })
   assert.throws(() => checkoutFunnelFilters(new URLSearchParams({ grupo: 'constructor' }), new Date(now)))
   assert.throws(() => checkoutFunnelFilters(new URLSearchParams({ inicio: '2026-11-31' }), new Date(now)))
+})
+
+test('uses readable short codes and resolves pre-existing links by their own IDs', () => {
+  assert.equal(trackableShortCode(' Desafio: Vídeo 1 '), 'desafio-video-1')
+  assert.equal(trackableShortCode('🎬'), 'link')
+  assert.ok(trackableShortCode('Desafio com estoque parado em muitas lojas').length <= 32)
+  const address = new URL(trackableShortUrl({ id: link, short_code: 'desafio-video-1' }))
+  assert.equal(address.href, 'https://pay.suzanazatorre.com.br/r/desafio-video-1')
+  assert.deepEqual(trackableShortLookup(address.pathname.split('/').pop()), { column: 'short_code', value: 'desafio-video-1' })
+  const oldAddress = new URL(trackableShortUrl({ id: link }))
+  assert.equal(oldAddress.search, '')
+  assert.deepEqual(trackableShortLookup(oldAddress.pathname.split('/').pop()), { column: 'id', value: link })
+  for (const code of ['../outro', '--', '_broken', 'a'.repeat(42), undefined]) {
+    assert.equal(trackableShortLookup(code), null)
+  }
+})
+
+test('keeps the saved attribution and ad click IDs when following a short link', () => {
+  const incoming = new URLSearchParams({
+    utm_source: 'outra-origem', utm_medium: 'pago', fbclid: 'clique_Meta-1', gclid: 'clique_Google-2',
+    sz_link: 'outro-link', next: 'https://example.test', ttclid: 'não autorizado',
+  })
+  const url = new URL(trackableCheckoutUrl({
+    id: link, offer_id: offer, utm_source: 'instagram', utm_campaign: 'Natal & Verão', utm_content: 'Vídeo',
+  }, incoming))
+  assert.equal(url.origin, 'https://rotina.suzanazatorre.com.br')
+  assert.equal(offerId(url.pathname.split('/').pop()), offer)
+  assert.equal(url.searchParams.get('sz_link'), link)
+  assert.equal(url.searchParams.get('utm_source'), 'instagram')
+  assert.equal(url.searchParams.get('utm_medium'), 'pago')
+  assert.equal(url.searchParams.get('utm_campaign'), 'Natal & Verão')
+  assert.equal(url.searchParams.get('utm_content'), 'Vídeo')
+  assert.equal(url.searchParams.get('fbclid'), 'clique_Meta-1')
+  assert.equal(url.searchParams.get('gclid'), 'clique_Google-2')
+  assert.equal(url.searchParams.has('next'), false)
+  assert.equal(url.searchParams.has('ttclid'), false)
 })

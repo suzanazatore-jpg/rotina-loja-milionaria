@@ -75,6 +75,7 @@ export default function TrackableLinksPage() {
   const [offers, setOffers] = useState([])
   const [links, setLinks] = useState([])
   const [created, setCreated] = useState(null)
+  const [fullAddress, setFullAddress] = useState(false)
   const [error, setError] = useState('')
   const [catalogError, setCatalogError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -129,6 +130,7 @@ export default function TrackableLinksPage() {
     try {
       const { link } = await request('', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) })
       setCreated(link)
+      setFullAddress(false)
       setLinks(current => [link, ...current.filter(item => item.id !== link.id)])
       setHistoryPage(0)
       form.reset()
@@ -139,12 +141,13 @@ export default function TrackableLinksPage() {
     }
   }
 
-  async function copy(link) {
+  async function copy(link, full = false) {
     try {
-      await navigator.clipboard.writeText(link.url)
-      setFormMessage(`Link «${link.name}» copiado.`)
+      await navigator.clipboard.writeText(full ? link.url : link.shortUrl)
+      setFormMessage(`Link ${full ? 'com UTMs' : 'curto'} de «${link.name}» copiado.`)
     } catch {
       setCreated(link)
+      setFullAddress(full)
       setFormMessage('Selecione o endereço para copiar.')
     }
   }
@@ -171,10 +174,19 @@ export default function TrackableLinksPage() {
       </form>
       {catalogError && <p className="central-error" role="alert">{catalogError}</p>}
       {error && <p className="central-error" role="alert">{error}</p>}
-      {created && <div className="cv-trackable-result">
-        <label>Link de {created.name}<input readOnly value={created.url} onFocus={event => event.target.select()} /></label>
-        <button className="central-action" type="button" onClick={() => copy(created)}>Copiar link</button>
-      </div>}
+      {created && <>
+        <div className="cv-trackable-result">
+          <label>Link curto de {created.name}<input readOnly value={created.shortUrl} onFocus={event => event.target.select()} /></label>
+          <button className="central-action" type="button" onClick={() => copy(created)}>Copiar link curto</button>
+        </div>
+        <button className="cv-link cv-trackable-full" type="button" aria-expanded={fullAddress} onClick={() => setFullAddress(current => !current)}>
+          {fullAddress ? 'Ocultar link com UTMs' : 'Ver link com UTMs'}
+        </button>
+        {fullAddress && <div className="cv-trackable-result">
+          <label>Link com UTMs de {created.name}<input readOnly value={created.url} onFocus={event => event.target.select()} /></label>
+          <button className="central-action" type="button" onClick={() => copy(created, true)}>Copiar link com UTMs</button>
+        </div>}
+      </>}
       {formMessage && <p className="central-data-note" role="status">{formMessage}</p>}
     </section>
 
@@ -187,7 +199,8 @@ export default function TrackableLinksPage() {
             <td><strong>{link.name}</strong><br /><small>{offers.find(offer => offer.id === link.offer_id)?.name || 'Oferta indisponível'}</small></td>
             <td>{link.utm_source}</td><td>{link.utm_campaign || '—'}</td><td>{link.utm_content || '—'}</td>
             <td><div className="cv-actions">
-              <button type="button" className="central-action" aria-label={`Copiar link ${link.name}`} onClick={() => copy(link)}>Copiar</button>
+              <button type="button" className="central-action" aria-label={`Copiar link curto de ${link.name}`} onClick={() => copy(link)}>Copiar link curto</button>
+              <button type="button" className="central-action" aria-label={`Copiar link com UTMs de ${link.name}`} onClick={() => copy(link, true)}>Copiar com UTMs</button>
               <button type="button" className="central-action" aria-label={`Ver métricas de ${link.name}`} onClick={() => {
                 setFilters(current => ({ ...current, oferta: '', link: link.id, pagina: 1 }))
                 document.getElementById('metricas-links')?.scrollIntoView()

@@ -1,5 +1,5 @@
 import { validId, saleFilters } from './centralRecords.js'
-import { CHECKOUT_ORIGIN, offerCode } from './checkoutLinks.js'
+import { CHECKOUT_ORIGIN, SHORT_ORIGIN, offerCode, offerId, offerPath } from './checkoutLinks.js'
 
 export const checkoutUtmFields = {
   utm_source: 'Origem (utm_source)',
@@ -27,13 +27,39 @@ export function marketingValue(value) {
     : ''
 }
 
-export function trackableCheckoutUrl(link) {
+const clickFields = ['fbclid', 'gclid', 'gbraid', 'wbraid', 'dclid', 'ttclid', 'msclkid']
+
+export function trackableCheckoutUrl(link, incoming) {
   const url = new URL('/p/' + offerCode(link.offer_id), CHECKOUT_ORIGIN)
   url.searchParams.set('sz_link', link.id)
   for (const key of Object.keys(checkoutUtmFields)) {
-    if (link[key]) url.searchParams.set(key, link[key])
+    const value = link[key] || marketingValue(incoming?.get(key))
+    if (value) url.searchParams.set(key, value)
+  }
+  for (const key of clickFields) {
+    const value = incoming?.get(key)
+    if (/^[A-Za-z0-9._~-]{1,350}$/.test(value || '')) url.searchParams.set(key, value)
   }
   return url.toString()
+}
+
+export function trackableShortCode(name) {
+  return offerPath(name).slice(0, 32).replace(/-+$/, '') || 'link'
+}
+
+export function trackableShortUrl(link) {
+  const code = link.short_code || '_' + offerCode(link.id)
+  return new URL('/r/' + code, SHORT_ORIGIN).toString()
+}
+
+export function trackableShortLookup(code) {
+  if (typeof code !== 'string') return null
+  if (code.startsWith('_')) {
+    const id = offerId(code.slice(1))
+    return id ? { column: 'id', value: id } : null
+  }
+  if (code.length > 41 || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(code)) return null
+  return { column: 'short_code', value: code }
 }
 
 export function readTrackableLink(input) {

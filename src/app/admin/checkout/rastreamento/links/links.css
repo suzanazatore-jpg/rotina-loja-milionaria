@@ -36,6 +36,10 @@
   align-items: end;
 }
 
+.cv-trackable-full {
+  margin-top: 8px;
+}
+
 .cv-trackable-links .cv-table td:nth-child(n+2) {
   overflow-wrap: anywhere;
 }
